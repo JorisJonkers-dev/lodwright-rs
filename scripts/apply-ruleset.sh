@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MPL-2.0
 # Apply every ruleset in .github/rulesets/*.json to a repository: create it if the name is absent,
 # update it in place otherwise. Idempotent. Adapted from the organisation template's apply-ruleset.sh,
 # which handles one ruleset; this one loops so the release-tag ruleset is applied too.

@@ -9,6 +9,7 @@ publish.workspace = true
 description = "Synthetic fixture builders (plugin bytes, LAND heights, DDS headers): the only test data this repository allows."
 
 [dependencies]
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
 
 [lints]
 workspace = true

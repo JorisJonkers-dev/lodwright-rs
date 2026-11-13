@@ -71,3 +71,83 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Cross-check against the record definitions in xEdit's wbDefinitionsFNV.pas (MPL-2.0) when verifying."
+
+[[source]]
+id = "plugin-group-layout"
+fact = "A GRUP is a 24-byte header (signature 'GRUP', u32 size that includes the header, 4 label bytes, u32 group type, 8 bytes of stamp and version data) followed by its child records and groups; the size covers the whole group."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/GRUP"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-group-types"
+fact = "Group types: 0 top (label is a record signature), 1 world children (label is the WRLD FormID), 2 interior block, 3 interior sub-block, 4 exterior block, 5 exterior sub-block, 6 cell children (label is the CELL FormID), 7 topic children, 8 cell persistent children, 9 cell temporary children, 10 cell visible-distant children."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/GRUP"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-record-compression"
+fact = "A record whose flags include 0x00040000 stores its data as a u32 decompressed size followed by a zlib stream."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-deleted-flag"
+fact = "A record whose flags include 0x00000020 is deleted and carries no usable data."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-xxxx-subrecord"
+fact = "A subrecord XXXX (size 4) holds a u32 that is the real size of the next subrecord, whose own u16 size field is then zero."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "cell-xclc-grid"
+fact = "An exterior CELL has an XCLC subrecord whose first two fields are the signed 32-bit grid x and y of the cell (a flags u32 may follow)."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/CELL"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "wrld-edid"
+fact = "A WRLD record carries its editor id in the EDID subrecord, a zero-terminated string."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-formid-masters"
+fact = "The high byte of a FormID indexes the plugin's own master list; an index equal to the number of masters means the plugin itself."
+url = "https://en.uesp.net/wiki/Tes4Mod:FormID"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false

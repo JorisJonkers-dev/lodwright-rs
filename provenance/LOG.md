@@ -23,3 +23,20 @@ synthetic builders in `lodwright-testkit`, never a reader of real game files.
 Open: whether the real file differs from the synthetic stand-ins is checked, on the owner's machine only, by
 comparing with the owner's own plugins and xLODGen output (`docs/TESTING.md`, oracle plan); nothing of that
 comparison is recorded here except the resulting facts.
+
+## 2026-11-14: plugin reader
+
+Recorded as specifier from the public UESP pages' known content, not re-read afterwards: every row is
+`verified = false`, and the implementation was written from the rows only.
+
+- `plugin-group-layout`: the 24-byte GRUP header and its size rule.
+- `plugin-group-types`: the group types the walker distinguishes (1 sets the worldspace; the others are descended into).
+- `plugin-record-compression`: the compressed-record flag and the size prefix.
+- `plugin-deleted-flag`: deleted records are skipped.
+- `plugin-xxxx-subrecord`: oversized subrecords.
+- `cell-xclc-grid`: the cell grid coordinates.
+- `wrld-edid`: the worldspace name.
+- `plugin-formid-masters`: FormID master index, used by the worldspace assembly (next slice).
+
+Open: whether the real records differ from these descriptions is checked on the owner's machine against the
+owner's own plugins.

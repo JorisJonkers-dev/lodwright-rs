@@ -1,43 +1,30 @@
-# xlodgen-rs
+# lodwright-rs
 
-A Rust port of [xLODGen](https://github.com/sheson/xLODGen) (terrain, object and tree LOD generation for
-Fallout: New Vegas / Tale of Two Wastelands, by sheson, built on [xEdit](https://github.com/TES5Edit/TES5Edit))
-that runs natively on Linux. The original is Windows-only.
+A Linux-native, clean-room generator of terrain and object LOD (level of detail) data for Fallout: New Vegas and
+Tale of Two Wastelands, written in Rust. The existing generators are Windows-only; this one is built from public
+file-format documentation, our own measurements and synthetic tests.
 
-**Licence: MPL-2.0**, the licence of xEdit, whose source xLODGen's host code is part of
-(`Core/wbLOD.pas` and neighbours in TES5Edit/TES5Edit, read on 2026-11-13). Files translated from those
-sources stay MPL-2.0.
-
-## Licence reasoning
-
-- Open: the xEdit side of xLODGen (LOD settings, tree LOD lists, atlas and bin packing, the drivers) is
-  MPL-2.0 and may be ported.
-- Closed: the terrain LOD generator and `LODGen.exe` 3.x have no published source or licence. The only public
-  `LODGen` source (TES5Edit/xLODGen, 2016) has no licence and is therefore all rights reserved.
-- So the terrain and object engines are a **clean-room reimplementation**, from file formats and observed
-  behaviour only.
+**Licence: MPL-2.0.** How the clean-room rule and the licence follow from the licences of the existing tools is in
+[docs/clean-room.md](docs/clean-room.md).
 
 ## Clean-room rule
 
-Allowed inputs: format documents (UESP and similar), xEdit's MPL source, public readmes and guides, Microsoft
-DDS documentation, the game's own data formats, and outputs of xLODGen run on your own data. Not allowed:
-decompiled or disassembled xLODGen/LODGen binaries, the unlicensed LODGen C# source, leaked or pasted source.
-Whoever implements the engines works from the recorded facts (`docs/formats/` when it exists) and the MPL sources, not from the closed code. Record
-where each format fact came from in `provenance/sources.toml` and `provenance/LOG.md` (CI checks the record). Game data and oracle outputs never go in this
-repository; test fixtures are synthetic.
+Format facts come from public format documents, the MPL-2.0 xEdit source, public readmes, Microsoft's DDS
+documentation, the game's own data formats on the owner's machine, and black-box output of an existing generator
+run on the owner's own data. Decompiled or leaked code and unlicensed source are never read. Every fact the code
+relies on is recorded in `provenance/sources.toml` and `provenance/LOG.md` (CI checks the record). Game data and
+reference output never go in this repository; test fixtures are synthetic.
 
 ## Status
 
-Setup only: a Cargo workspace (`xlodgen-core`, `xlodgen-cli`, `xlodgen-testkit`), the pipeline and the clean-room
-guardrails. **No LOD generation is implemented and no game format is parsed**; the testkit builds synthetic bytes for
-tests. The CLI has `--version`, `--help` and `doctor <data-folder>` (checks the folder exists, prints nothing from
-it).
+A Cargo workspace (`lodwright-core`, `lodwright-cli`, `lodwright-testkit`), the pipeline and the clean-room
+guardrails. The CLI binary is `lodwright`.
 
 ## Scope
 
-Planned: LAND/VHGT heightfield reader, `.lod` writer and a block-aligned raster (first slice), then `.btr`, terrain
-textures, object and tree LOD. Linux-native; the original is Windows-only. Out of scope: running the game, and
-shipping or reading anyone's game data from this repository.
+Heightfield reader, `.lod` writer and a block-aligned raster (first slice), then terrain meshes, terrain textures,
+object and tree LOD. Out of scope: running the game, and shipping or reading anyone's game data from this
+repository.
 
 ## Where to read next
 
@@ -45,5 +32,3 @@ shipping or reading anyone's game data from this repository.
 - [docs/clean-room.md](docs/clean-room.md): who may read what; provenance rules; what CI enforces.
 - [docs/TESTING.md](docs/TESTING.md): synthetic fixtures only, properties, oracle plan, `verify` design.
 - [docs/PRACTICES.md](docs/PRACTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md).
-
-Not affiliated with sheson or the xEdit team. No one has been contacted about this port.

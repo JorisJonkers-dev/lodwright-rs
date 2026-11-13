@@ -28,6 +28,6 @@ this file stays a pointer. Add repo-specific guidance below.
 
 ## This repository
 
-xlodgen-rs is a planned clean-room Rust port of xLODGen (see README.md). Never read the unlicensed 2016 LODGen
+lodwright-rs is a clean-room Rust terrain and object LOD generator (see README.md). Never read the unlicensed 2016 generator
 C# source, decompiled binaries or leaked code; format facts come from allowed inputs only and each one gets a row
 in `provenance/sources.toml`. No game data in the repository, ever.

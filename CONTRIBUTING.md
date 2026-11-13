@@ -5,7 +5,7 @@ This repository is private and owned by Joris Jonkers. Contributions happen by i
 ## Before you start
 
 Read [docs/clean-room.md](docs/clean-room.md). It decides which inputs you may use: never the unlicensed 2016
-LODGen C# source, decompiled or leaked code, or anything under an unknown licence. If you have seen such material,
+generator C# source (see docs/clean-room.md), decompiled or leaked code, or anything under an unknown licence. If you have seen such material,
 say so before working on that area.
 
 ## Setup
@@ -26,7 +26,7 @@ game data in the repository, a pull request or an issue.
 - Every source file starts with `SPDX-License-Identifier: MPL-2.0`.
 - Every format fact the code relies on is a row in `provenance/sources.toml`, mentioned in `provenance/LOG.md`, and
   referenced from code with `// source: <id>`.
-- Tests use synthetic fixtures from `xlodgen-testkit`; nothing binary is committed (`docs/TESTING.md`).
+- Tests use synthetic fixtures from `lodwright-testkit`; nothing binary is committed (`docs/TESTING.md`).
 - `unsafe` is forbidden; clippy pedantic and `-D warnings` apply.
 - Fill in the pull request template; the pipeline's `Pipeline Complete` check must be green to merge (squash).
 

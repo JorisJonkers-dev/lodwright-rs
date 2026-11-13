@@ -1,6 +1,6 @@
 # Clean-room process
 
-xlodgen-rs is licensed MPL-2.0 and reimplements parts of xLODGen whose source is closed or unlicensed. This
+lodwright-rs is licensed MPL-2.0 and reimplements parts of xLODGen whose source is closed or unlicensed. This
 document is the rule for everyone who writes code or docs here. The study behind it is
 `docs/research/porting/xlodgen-licence-and-design.md` in the NV-Linux-Modding repository.
 

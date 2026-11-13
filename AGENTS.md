@@ -5,8 +5,8 @@ Guidance for any coding agent working in this repository.
 - Agent contract: [CLAUDE.md](CLAUDE.md)
 - Estate conventions: https://github.com/JorisJonkers-dev/workspace/blob/main/CLAUDE.md
 
-xlodgen-rs is a planned clean-room Rust port of xLODGen. Read [docs/clean-room.md](docs/clean-room.md) (written
-in a following pull request) before touching a format or reading any xLODGen source: the clean-room rule decides
+lodwright-rs is a clean-room Rust terrain and object LOD generator. Read [docs/clean-room.md](docs/clean-room.md)
+before touching a format or reading any source of an existing generator: the clean-room rule decides
 which inputs are allowed.
 
 ## Build and test

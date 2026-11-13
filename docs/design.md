@@ -1,6 +1,6 @@
 # Design
 
-Source study: `docs/research/porting/xlodgen-licence-and-design.md` in the NV-Linux-Modding repository (licence
+Source study: `docs/research/porting/the licence-and-design study` in the NV-Linux-Modding repository (licence
 reading, clean-room process, risks). The process is [clean-room.md](clean-room.md); the test strategy is
 [TESTING.md](TESTING.md). This file is the plan and the interfaces. **No format code exists yet**: the testkit has
 synthetic stand-ins, the core has contracts.
@@ -20,9 +20,9 @@ synthetic stand-ins, the core has contracts.
 
 | Crate | Role |
 | --- | --- |
-| `xlodgen-core` | Library: one module per contract below. No I/O beyond what a module's reader or writer takes as `Read`/`Write` or bytes |
-| `xlodgen-cli` | Thin binary `xlodgen`: `--version`, `--help`, `doctor <data-folder>`; later `generate` and `verify` (see TESTING.md) |
-| `xlodgen-testkit` | Synthetic builders and reference readers for tests and fuzz seeds; the only allowed test data |
+| `lodwright-core` | Library: one module per contract below. No I/O beyond what a module's reader or writer takes as `Read`/`Write` or bytes |
+| `lodwright-cli` | Thin binary `lodwright`: `--version`, `--help`, `doctor <data-folder>`; later `generate` and `verify` (see TESTING.md) |
+| `lodwright-testkit` | Synthetic builders and reference readers for tests and fuzz seeds; the only allowed test data |
 
 ## First slice: interfaces only
 

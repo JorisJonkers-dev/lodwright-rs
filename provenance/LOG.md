@@ -11,7 +11,7 @@ Roles: the *specifier* reads allowed inputs and records facts; the *implementer*
 
 Recorded by J.W. Jonkers as specifier. These facts were written down from the public pages' known content while
 the repository was set up; no page was re-read afterwards, so every row is `verified = false`. They feed only the
-synthetic builders in `xlodgen-testkit`, never a reader of real game files.
+synthetic builders in `lodwright-testkit`, never a reader of real game files.
 
 - `dds-header-layout`: DDS magic, the 124-byte header and the offsets of height, width, mip count.
 - `dds-pixel-format`: the 32-byte pixel format and the FourCC field.

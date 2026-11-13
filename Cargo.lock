@@ -3,13 +3,13 @@
 version = 4
 
 [[package]]
-name = "xlodgen-cli"
+name = "lodwright-cli"
 version = "0.0.0"
 
 [[package]]
-name = "xlodgen-core"
+name = "lodwright-core"
 version = "0.0.0"
 
 [[package]]
-name = "xlodgen-testkit"
+name = "lodwright-testkit"
 version = "0.0.0"

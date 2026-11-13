@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/xlodgen-core", "crates/xlodgen-cli", "crates/xlodgen-testkit"]
+members = ["crates/lodwright-core", "crates/lodwright-cli", "crates/lodwright-testkit"]
 # fuzz/ is its own workspace (libfuzzer-sys stays out of the shipped crates).
 exclude = ["fuzz"]
 
@@ -9,7 +9,7 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MPL-2.0"
-repository = "https://github.com/JorisJonkers-dev/xlodgen-rs"
+repository = "https://github.com/JorisJonkers-dev/lodwright-rs"
 publish = false
 
 [workspace.lints.rust]
@@ -21,5 +21,5 @@ all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 
 [workspace.dependencies]
-xlodgen-core = { path = "crates/xlodgen-core" }
-xlodgen-testkit = { path = "crates/xlodgen-testkit" }
+lodwright-core = { path = "crates/lodwright-core" }
+lodwright-testkit = { path = "crates/lodwright-testkit" }

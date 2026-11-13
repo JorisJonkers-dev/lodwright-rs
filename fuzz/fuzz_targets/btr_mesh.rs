@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Fuzz harness for the `.btr` terrain mesh reader.
 //!
-//! The reader does not exist in `xlodgen-core` yet, so this runs the testkit's own reference reader (or nothing
+//! The reader does not exist in `lodwright-core` yet, so this runs the testkit's own reference reader (or nothing
 //! where the testkit has none). When the real reader lands, replace the call below with it; the target already
 //! compiles and runs in the weekly fuzz workflow. The only property: arbitrary bytes never panic.
 

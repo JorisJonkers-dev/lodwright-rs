@@ -16,6 +16,8 @@ Rules (docs/clean-room.md explains why):
   data        no file with a game-data extension, no file over MAX_BYTES and no file with NUL bytes, except the
               paths in provenance/fixture-allowlist.txt ("<path> <reason>", at most MAX_ALLOWLIST entries).
   gitignore   .gitignore lists every game-data extension.
+  names       the name of the tool this project was named after (see OLD_NAME_RE) appears nowhere, in file
+              contents or paths, except the provenance notes (NAME_ALLOWED).
 """
 
 from __future__ import annotations
@@ -51,6 +53,18 @@ URL_PREFIXES = ("https://", "oracle:")
 BAD_LICENCES = {"", "unknown", "none", "unlicensed", "all rights reserved", "n/a", "tbd"}
 # Inputs the clean-room rule forbids. Matched case-insensitively against the url and the fact.
 FORBIDDEN_SOURCES = ("github.com/tes5edit/xlodgen", "decompil", "disassembl", "leaked")
+
+# The retired project name, and the name of the tool it reimplemented, may only appear where the lineage is
+# recorded: the provenance notes, the clean-room process document, this guard and its tests, and the generated
+# changelog. Elsewhere the project stands on its own name.
+OLD_NAME_RE = re.compile(r"lodgen", re.IGNORECASE)
+NAME_ALLOWED_PREFIXES = ("provenance/",)
+NAME_ALLOWED_FILES = {
+    "docs/clean-room.md",
+    "scripts/cleanroom_guards.py",
+    "scripts/test_cleanroom_guards.py",
+    "CHANGELOG.md",
+}
 
 GAME_DATA_EXTS = (
     ".esm", ".esp", ".esl", ".bsa", ".ba2", ".nif", ".kf", ".dds", ".btr", ".bto", ".btt", ".lod",
@@ -291,6 +305,24 @@ def check_gitignore(root: Path, v: Violations) -> None:
             v.add(".gitignore", f"does not ignore *{ext}")
 
 
+# --- names ------------------------------------------------------------------------------------------------------
+
+
+def check_names(root: Path, files: list[str], v: Violations) -> None:
+    for rel in files:
+        if rel in NAME_ALLOWED_FILES or rel.startswith(NAME_ALLOWED_PREFIXES):
+            continue
+        if OLD_NAME_RE.search(rel):
+            v.add(rel, "the path carries the retired name; it may only appear in the provenance notes")
+            continue
+        text = read_text(root, rel)
+        if text is None:
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
+            if OLD_NAME_RE.search(line):
+                v.add(f"{rel}:{number}", "carries the retired name; it may only appear in the provenance notes")
+
+
 # --- driver -----------------------------------------------------------------------------------------------------
 
 
@@ -310,12 +342,14 @@ def run(root: Path, command: str, base: str | None) -> Violations:
         check_data(root, files, v)
     if command in ("gitignore", "all"):
         check_gitignore(root, v)
+    if command in ("names", "all"):
+        check_names(root, files, v)
     return v
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["spdx", "provenance", "data", "gitignore", "all"])
+    parser.add_argument("command", choices=["spdx", "provenance", "data", "gitignore", "names", "all"])
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--base", help="check only what HEAD adds relative to this ref")
     args = parser.parse_args(argv)

@@ -1,5 +1,5 @@
 [package]
-name = "xlodgen-fuzz"
+name = "lodwright-fuzz"
 version = "0.0.0"
 edition = "2024"
 license = "MPL-2.0"
@@ -10,8 +10,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-xlodgen-core = { path = "../crates/xlodgen-core" }
-xlodgen-testkit = { path = "../crates/xlodgen-testkit" }
+lodwright-core = { path = "../crates/lodwright-core" }
+lodwright-testkit = { path = "../crates/lodwright-testkit" }
 
 # Own workspace root: keeps libfuzzer-sys out of the shipped crates and the root lockfile.
 [workspace]

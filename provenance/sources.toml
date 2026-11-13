@@ -18,7 +18,7 @@ date = 2026-11-13
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Used by xlodgen-testkit's synthetic header builder."
+note = "Used by lodwright-testkit's synthetic header builder."
 
 [[source]]
 id = "dds-pixel-format"

@@ -1,18 +1,33 @@
 # Contributing
 
-This is a source-available proprietary project owned by Joris Jonkers.
+This repository is private and owned by Joris Jonkers. Contributions happen by invitation.
 
-External contributions are not accepted unless Joris Jonkers explicitly asks
-for them. Public pull requests may be closed without review.
+## Before you start
 
-If you were invited to contribute:
+Read [docs/clean-room.md](docs/clean-room.md). It decides which inputs you may use: never the unlicensed 2016
+LODGen C# source, decompiled or leaked code, or anything under an unknown licence. If you have seen such material,
+say so before working on that area.
 
-1. keep changes scoped to the requested repository and issue
-2. do not include secrets, private data, local scratch files, or generated
-   planning artifacts
-3. do not hand-edit `CHANGELOG.md`; release-please owns changelog updates
-4. include the relevant tests or validation output in the pull request
-5. use impersonal, professional commit and pull request wording
+## Setup
 
-Security vulnerabilities must be reported privately as described in
-`SECURITY.md`.
+```sh
+mise install        # task, actionlint, gitleaks, cargo-deny, zizmor, cargo-llvm-cov
+task check          # everything the pipeline runs
+```
+
+The Rust toolchain is pinned in `rust-toolchain.toml`. On NixOS wrap cargo in
+`nix shell nixpkgs#gcc nixpkgs#lld -c`. Do not run the game, Wine, Proton or MO2 for any change here, and never put
+game data in the repository, a pull request or an issue.
+
+## Rules for a change
+
+- Small pull requests with Conventional Commit titles (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`); the title becomes the
+  squash commit and release-please reads it. Do not hand-edit `CHANGELOG.md`.
+- Every source file starts with `SPDX-License-Identifier: MPL-2.0`.
+- Every format fact the code relies on is a row in `provenance/sources.toml`, mentioned in `provenance/LOG.md`, and
+  referenced from code with `// source: <id>`.
+- Tests use synthetic fixtures from `xlodgen-testkit`; nothing binary is committed (`docs/TESTING.md`).
+- `unsafe` is forbidden; clippy pedantic and `-D warnings` apply.
+- Fill in the pull request template; the pipeline's `Pipeline Complete` check must be green to merge (squash).
+
+Security reports go privately as described in [SECURITY.md](SECURITY.md).

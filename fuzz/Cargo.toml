@@ -1,0 +1,65 @@
+[package]
+name = "xlodgen-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MPL-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+xlodgen-core = { path = "../crates/xlodgen-core" }
+xlodgen-testkit = { path = "../crates/xlodgen-testkit" }
+
+# Own workspace root: keeps libfuzzer-sys out of the shipped crates and the root lockfile.
+[workspace]
+
+[profile.release]
+debug = 1
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[[bin]]
+name = "plugin_records"
+path = "fuzz_targets/plugin_records.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "land_vhgt"
+path = "fuzz_targets/land_vhgt.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lod_settings"
+path = "fuzz_targets/lod_settings.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dds_header"
+path = "fuzz_targets/dds_header.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "btr_mesh"
+path = "fuzz_targets/btr_mesh.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bto_mesh"
+path = "fuzz_targets/bto_mesh.rs"
+test = false
+doc = false
+bench = false

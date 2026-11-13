@@ -13,6 +13,10 @@ name = "lodwright"
 path = "src/main.rs"
 
 [dependencies]
+lodwright-core = { workspace = true }
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
 
 [lints]
 workspace = true

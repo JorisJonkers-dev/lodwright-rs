@@ -6,6 +6,10 @@
 use std::io::Write;
 use std::path::Path;
 
+mod commands;
+mod load;
+mod options;
+
 /// Exit code: success.
 pub const EXIT_OK: u8 = 0;
 /// Exit code: a check failed (for example the data folder is missing).
@@ -13,13 +17,22 @@ pub const EXIT_FAILED: u8 = 1;
 /// Exit code: the arguments were not understood.
 pub const EXIT_USAGE: u8 = 2;
 
-const HELP: &str = "lodwright: clean-room terrain and object LOD generator (not implemented yet)
+const HELP: &str = "lodwright: clean-room terrain and object LOD generator (terrain planning so far)
 
 Usage: lodwright [--help | --version]
        lodwright doctor <data-folder>
+       lodwright plan --data <data-folder> (--plugin NAME ... | --load-order FILE) [--world NAME]
+                      [--format text|json] [--blocks]
+       lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
+                      --out <file.pgm> [--level N] [--allow-in-repo]
 
 Commands:
   doctor <data-folder>  check that the folder exists; prints nothing taken from it
+  plan                  read the plugins (in load order, masters first) and print the terrain LOD plan:
+                        blocks per level, vertex and triangle counts, errors, output paths
+  heightmap             write the world's height raster as a 16-bit PGM (north up) for inspection
+
+Plugins are read from the data folder; nothing is written there. Output is numbers and file names only.
 
 Options:
   -h, --help     print this help
@@ -38,9 +51,27 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
             &format!("lodwright {}\n", env!("CARGO_PKG_VERSION")),
         ),
         ["doctor", folder] => doctor(Path::new(folder), out, err),
+        ["plan", rest @ ..] => world_command(rest, out, err, commands::plan),
+        ["heightmap", rest @ ..] => world_command(rest, out, err, commands::heightmap),
         [] => usage(err, "no command given"),
         ["doctor", ..] => usage(err, "doctor takes exactly one argument: the data folder"),
         [other, ..] => usage(err, &format!("unknown argument: {other}")),
+    }
+}
+
+type Command = fn(&options::Options, &mut dyn Write) -> Result<(), String>;
+
+fn world_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write, command: Command) -> u8 {
+    let options = match options::parse(args) {
+        Ok(options) => options,
+        Err(problem) => return usage(err, &problem),
+    };
+    match command(&options, out) {
+        Ok(()) => EXIT_OK,
+        Err(problem) => {
+            let _ = writeln!(err, "lodwright: {problem}");
+            EXIT_FAILED
+        }
     }
 }
 

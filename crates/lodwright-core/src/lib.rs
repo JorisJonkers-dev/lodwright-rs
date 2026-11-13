@@ -6,14 +6,17 @@
 //! fact the code relies on is a row in `provenance/sources.toml`.
 //!
 //! Pipeline so far: [`plugin`] reads plugins, [`worldspace`] assembles worlds across a load order, [`land`] decodes
-//! heights, [`raster`] puts them on a block-aligned grid. [`lod`] and [`dds`] are still contracts only.
+//! heights, [`raster`] puts them on a block-aligned grid, [`terrain`] plans the LOD blocks and meshes, [`layout`] names the
+//! output files. [`lod`] and [`dds`] are still contracts only.
 
 pub mod dds;
 pub mod error;
 pub mod land;
+pub mod layout;
 pub mod lod;
 pub mod plugin;
 pub mod raster;
+pub mod terrain;
 pub mod worldspace;
 
 pub use error::Error;

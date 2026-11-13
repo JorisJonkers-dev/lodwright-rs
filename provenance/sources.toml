@@ -151,3 +151,46 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
+
+[[source]]
+id = "cell-size-units"
+fact = "A cell is 4096 world units on each side; the 32 intervals of the 33 x 33 LAND vertex grid are therefore 128 units apart."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "lod-block-naming"
+fact = "A terrain LOD block of level L covers L x L cells and is named by the world's editor id, the level and the cell coordinates of its south-west cell (a multiple of L, negative values allowed): <World>.<level>.<x>.<y>."
+url = "oracle:lod-output-tree"
+licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Recorded from the owner's research notes (the NV-Linux-Modding repository, docs/research/porting); to be checked against the owner's output tree with the planned verify command."
+
+[[source]]
+id = "lod-terrain-paths"
+fact = "Terrain LOD meshes are <World>.<level>.<x>.<y>.btr in meshes/landscape/lod/<World>/blocks/; terrain LOD textures are the same name with .dds (diffuse) and _n.dds before the extension (normal) in textures/landscape/lod/<World>/blocks/."
+url = "oracle:lod-output-tree"
+licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Same origin and the same open check as lod-block-naming. The exact suffix of the normal map is the least certain part."
+
+[[source]]
+id = "lod-settings-path"
+fact = "The per-world LOD settings file is LODSettings/<World>.lod under the data folder."
+url = "oracle:lod-output-tree"
+licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Same origin and the same open check as lod-block-naming; the design notes also mention a .lod next to the meshes."

@@ -26,6 +26,11 @@ pub enum Error {
     Decompress,
     /// A plugin names a master that is not in the load order.
     MissingMaster(String),
+    /// A raster over the worldspace would need more samples than the allowed maximum.
+    RasterTooLarge {
+        /// Samples the raster would hold.
+        samples: u128,
+    },
 }
 
 impl fmt::Display for Error {
@@ -44,6 +49,11 @@ impl fmt::Display for Error {
             Self::MissingMaster(name) => {
                 write!(f, "master {name} is not in the load order")
             }
+            Self::RasterTooLarge { samples } => write!(
+                f,
+                "the height raster would need {samples} samples, more than {}",
+                crate::raster::MAX_SAMPLES
+            ),
         }
     }
 }
@@ -88,6 +98,13 @@ mod tests {
             Error::MissingMaster("A.esm".into()).to_string(),
             "master A.esm is not in the load order"
         );
+    }
+
+    #[test]
+    fn raster_too_large_names_the_sizes() {
+        let text = Error::RasterTooLarge { samples: 1 << 40 }.to_string();
+        assert!(text.contains("1099511627776"));
+        assert!(text.contains("134217728"));
     }
 
     #[test]

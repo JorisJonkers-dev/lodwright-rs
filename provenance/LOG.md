@@ -40,3 +40,17 @@ Recorded as specifier from the public UESP pages' known content, not re-read aft
 
 Open: whether the real records differ from these descriptions is checked on the owner's machine against the
 owner's own plugins.
+
+## 2026-11-14: terrain planning and output layout
+
+Specifier entries, written before the planner and the layout module. All rows are `verified = false`.
+
+- `cell-size-units`: world units per cell and per LAND interval; the mesh coordinates depend on it.
+- `lod-block-naming`: how a block is named and what its coordinates mean. From the owner's research notes about the
+  folder layout they saw in their own LOD output; not re-checked against the files yet.
+- `lod-terrain-paths`: the folders and file names of terrain meshes and textures.
+- `lod-settings-path`: where the per-world settings file lives.
+
+Open: the three layout rows are the first thing the owner checks on their machine (list the output folder of an
+existing run, compare names). The contents of `.btr`, `.dds` normal maps and `.lod` are not specified yet, so the
+planner writes no such file: it computes what would be written.

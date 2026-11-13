@@ -26,6 +26,10 @@ pub enum Error {
     Decompress,
     /// A plugin names a master that is not in the load order.
     MissingMaster(String),
+    /// A worldspace name cannot be used as a folder or file name.
+    BadWorldName(String),
+    /// A LOD level of zero cells was requested.
+    ZeroLevel,
     /// A raster over the worldspace would need more samples than the allowed maximum.
     RasterTooLarge {
         /// Samples the raster would hold.
@@ -49,6 +53,10 @@ impl fmt::Display for Error {
             Self::MissingMaster(name) => {
                 write!(f, "master {name} is not in the load order")
             }
+            Self::BadWorldName(name) => {
+                write!(f, "worldspace name {name:?} cannot be used in a path")
+            }
+            Self::ZeroLevel => f.write_str("a LOD level must span at least one cell"),
             Self::RasterTooLarge { samples } => write!(
                 f,
                 "the height raster would need {samples} samples, more than {}",
@@ -105,6 +113,18 @@ mod tests {
         let text = Error::RasterTooLarge { samples: 1 << 40 }.to_string();
         assert!(text.contains("1099511627776"));
         assert!(text.contains("134217728"));
+    }
+
+    #[test]
+    fn layout_errors_name_the_problem() {
+        assert_eq!(
+            Error::BadWorldName("a/b".into()).to_string(),
+            "worldspace name \"a/b\" cannot be used in a path"
+        );
+        assert_eq!(
+            Error::ZeroLevel.to_string(),
+            "a LOD level must span at least one cell"
+        );
     }
 
     #[test]

@@ -7,5 +7,7 @@
 //! so that round trips can be tested before the real readers exist.
 
 pub mod dds;
+pub mod golden;
 pub mod land;
 pub mod plugin;
+pub mod rng;

@@ -9,6 +9,9 @@ version = "0.0.0"
 [[package]]
 name = "lodwright-core"
 version = "0.0.0"
+dependencies = [
+ "lodwright-testkit",
+]
 
 [[package]]
 name = "lodwright-testkit"

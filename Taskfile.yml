@@ -41,6 +41,14 @@ tasks:
       - actionlint
       - zizmor --offline --no-progress .github/workflows/
 
+  guards:
+    desc: Clean-room guards on the whole tree (SPDX headers, provenance references, game-data guard, .gitignore)
+    cmd: python3 -I scripts/cleanroom_guards.py all
+
+  scripts:
+    desc: Self-tests of the repository's own scripts (throwaway git repositories, no network)
+    cmd: python3 -I -m unittest discover -s scripts -p 'test_*.py' -t scripts
+
   check:
     desc: Everything the pipeline runs on a pull request
     cmds:
@@ -51,3 +59,5 @@ tasks:
       - task: deny
       - task: secrets
       - task: lint:actions
+      - task: guards
+      - task: scripts

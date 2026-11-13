@@ -1,0 +1,73 @@
+# Machine-readable provenance: every format fact the code relies on is a row here. Code points at a row with a
+# `// source: <id>` comment (`# source:` in Python, shell and TOML); scripts/cleanroom_guards.py fails the build for
+# a reference without a row, a row without a licence, a forbidden source, or a row LOG.md does not mention.
+#
+# Fields: id, fact, url (https://, or oracle:<role> for the owner's own xLODGen output, described by role and
+# never by content), licence (of the source), date (when it was recorded), recorded_by, role (specifier or
+# implementer), verified (true once a second reader re-read the page against the fact), note (optional).
+#
+# The rows below were recorded while setting the repository up, from the public pages' known content, and were
+# not re-read against the pages afterwards: verified = false. The specifier re-reads each page and flips the flag.
+
+[[source]]
+id = "dds-header-layout"
+fact = "A DDS file starts with the magic 'DDS ' and a 124-byte DDS_HEADER: size (124), flags, height, width, pitch, depth, mip count at offset 28 of the file, then the 32-byte pixel format at offset 76."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Used by xlodgen-testkit's synthetic header builder."
+
+[[source]]
+id = "dds-pixel-format"
+fact = "The DDS pixel format is 32 bytes: size (32), flags (0x4 = FOURCC), then the FourCC (for example DXT1, DXT5) in the next four bytes; caps2 and caps flags follow in the header."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-pixelformat"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "plugin-record-header"
+fact = "A FO3/FNV record is a 24-byte header (4-byte signature, u32 data size, u32 flags, u32 FormID, 8 bytes of version control) followed by the data; all integers are little endian."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Synthetic stand-in only: the testkit writes no groups and no compression."
+
+[[source]]
+id = "plugin-subrecord-layout"
+fact = "Record data is a run of subrecords: 4-byte signature, u16 size, bytes. The TES4 header record carries HEDR (f32 version, u32 record count, u32 next object id) and, per master, MAST (zero-terminated file name) then DATA (8 bytes)."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/TES4"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "land-vhgt-layout"
+fact = "The VHGT subrecord of LAND is an f32 offset, 33 x 33 signed byte deltas and 3 unused bytes (1096 bytes in all)."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "land-vhgt-integration"
+fact = "Heights are rebuilt from the deltas by integration: the first value of each row accumulates down the first column, the rest of a row accumulates along the row, starting from the offset; the result is multiplied by 8 to get world units."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-13
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Cross-check against the record definitions in xEdit's wbDefinitionsFNV.pas (MPL-2.0) when verifying."

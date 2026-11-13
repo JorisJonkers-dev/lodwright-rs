@@ -1,0 +1,3 @@
+# Committed files that the data guard (scripts/cleanroom_guards.py) lets through although they look like game
+# data. One exact repository path per line followed by the reason: "<path> <reason>". At most ten entries, each at
+# most 64 KiB. Empty on purpose: tests build their bytes in memory (xlodgen-testkit) and nothing binary is committed.

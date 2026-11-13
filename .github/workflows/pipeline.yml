@@ -109,6 +109,12 @@ jobs:
       - name: Workflows
         if: ${{ !cancelled() }}
         run: mise exec -- task lint:actions
+      - name: Clean-room guards
+        if: ${{ !cancelled() }}
+        run: mise exec -- task guards
+      - name: Guard self-tests
+        if: ${{ !cancelled() }}
+        run: mise exec -- task scripts
 
       # A skipped job fails, except the two that only run on pull requests.
       - name: Reusable-workflow jobs passed

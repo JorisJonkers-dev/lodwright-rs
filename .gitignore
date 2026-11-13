@@ -64,3 +64,23 @@ scratchpads/
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# Game data and tool output never enter this repository (docs/clean-room.md, docs/TESTING.md). Fixtures are
+# built in memory by tests. scripts/cleanroom_guards.py (task guards) fails the build if one is committed anyway.
+*.esm
+*.esp
+*.esl
+*.bsa
+*.ba2
+*.nif
+*.kf
+*.dds
+*.btr
+*.bto
+*.btt
+*.lod
+*.wav
+*.ogg
+*.mp3
+*.fos
+*.ess

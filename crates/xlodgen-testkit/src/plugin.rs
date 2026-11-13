@@ -5,6 +5,7 @@
 //! control, then the data. Data is a run of subrecords: 4-byte signature, `u16` size, bytes. There are no
 //! groups and no compression; a reader for the real format is a separate, later piece of work.
 
+// source: plugin-record-header
 const RECORD_HEADER: usize = 24;
 
 /// One synthetic record.
@@ -89,6 +90,7 @@ impl PluginBuilder {
         self
     }
 
+    // source: plugin-subrecord-layout
     /// The finished bytes.
     #[must_use]
     pub fn build(&self) -> Vec<u8> {

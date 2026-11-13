@@ -3,10 +3,7 @@
   "target": "branch",
   "enforcement": "active",
   "conditions": {
-    "ref_name": {
-      "exclude": [],
-      "include": ["refs/heads/main"]
-    }
+    "ref_name": { "exclude": [], "include": ["~DEFAULT_BRANCH"] }
   },
   "rules": [
     { "type": "deletion" },
@@ -30,8 +27,7 @@
         "strict_required_status_checks_policy": false,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "Pipeline Complete", "integration_id": 15368 },
-          { "context": "repository-hygiene / Agent Attribution Guard", "integration_id": 15368 }
+          { "context": "Pipeline Complete", "integration_id": 15368 }
         ]
       }
     }

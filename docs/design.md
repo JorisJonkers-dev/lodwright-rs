@@ -2,8 +2,7 @@
 
 Source study: `docs/research/porting/the licence-and-design study` in the NV-Linux-Modding repository (licence
 reading, clean-room process, risks). The process is [clean-room.md](clean-room.md); the test strategy is
-[TESTING.md](TESTING.md). This file is the plan and the interfaces. **No format code exists yet**: the testkit has
-synthetic stand-ins, the core has contracts.
+[TESTING.md](TESTING.md). This file is the plan and the interfaces. The testkit builds the synthetic inputs (plugins with groups and compression, worldspaces, VHGT, DDS headers).
 
 ## Pipeline
 
@@ -24,26 +23,25 @@ synthetic stand-ins, the core has contracts.
 | `lodwright-cli` | Thin binary `lodwright`: `--version`, `--help`, `doctor <data-folder>`; later `generate` and `verify` (see TESTING.md) |
 | `lodwright-testkit` | Synthetic builders and reference readers for tests and fuzz seeds; the only allowed test data |
 
-## First slice: interfaces only
+## What exists
 
-Goal: LAND heightfield reader, `.lod` writer and a block-aligned raster for one worldspace, verified by synthetic
-VHGT round trips in CI and, on the owner's machine only, by comparing against an existing `.btr` and `.lod`.
-The shapes below are the contract the implementer works to; they change only together with this file.
+| Module (`lodwright-core`) | State |
+| --- | --- |
+| `plugin` | `read(&[u8]) -> Result<Plugin, Error>`: TES4 header, masters, group tree, compressed records, extended subrecords; `WRLD`, `CELL` (grid) and `LAND` (VHGT) decoded, everything else skipped |
+| `land` | `decode_vhgt`: 33 x 33 heights in world units from the offset and signed deltas |
+| `worldspace` | `Worldspace::from_load_order`: FormIDs resolved through master lists, later plugins override cells, bounds, seam error |
+| `raster` | `BlockGrid` (cell to block mapping) and `HeightRaster` (whole blocks, shared edge vertices, no-data, cap on size, per-block crop) |
+| `terrain` | `plan_world`: blocks per level, uniform-step decimation under a tolerance and the 16-bit vertex cap, texture sizes, paths |
+| `layout` | output paths: meshes, textures, normal maps, `.lod`; world names checked |
+| `lod`, `dds` | contracts only (the `.lod` fields and the DDS writer wait for facts and for the owner's checks) |
 
-```text
-plugin::read(bytes: &[u8]) -> Result<Plugin, Error>            // TES4 header, masters, records; LAND/WRLD/CELL decoded, rest opaque
-land::decode_vhgt(payload: &[u8]) -> Result<CellHeights, Error> // 33 x 33 heights in world units
-land::Worldspace::from_plugins(&[Plugin]) -> Worldspace          // cells by (x, y), overrides resolved by load order
-raster::BlockGrid::new(block_cells) -> Result<BlockGrid, Error>  // exists today: cell <-> block mapping
-raster::HeightRaster::build(&Worldspace, BlockGrid) -> HeightRaster // block-aligned; width and height multiples of the block size
-lod::LodSettings::{parse(&[u8]), write(&self) -> Vec<u8>}        // per-worldspace .lod settings, round-trips
-```
+CLI: `lodwright doctor | plan | heightmap` (see `--help`). `verify` is designed in TESTING.md and not built.
 
-Properties and golden files for each are listed in TESTING.md. Each function relies on rows in
-`provenance/sources.toml`; code carries `// source:` comments pointing at them.
-
-Second slice: `.btr` reader, then writer (feeds `lodcheck`-style mesh checks). An object-LOD bounds and atlas planner
-(report only, no NIF writer) is the alternative first slice.
+The terrain mesh is our own design: a regular grid with one decimation step per block, the coarsest step whose
+largest vertical error against the raster stays within `quality * 2` world units, with 16-bit indices, no sample
+with data dropped and no quad bridging a hole. It is not a copy of another tool's simplifier, and its quality number
+does not map onto another tool's. Border protection between blocks of different steps, hiding unseen faces and
+water handling are not designed yet.
 
 ## Dependencies
 
@@ -62,7 +60,11 @@ About 3-4 weeks to a terrain-only generator, 4-6 months to full replacement, one
 
 Resolve from allowed inputs only; each answer becomes a provenance row.
 
-- `.btr`/`.bto` container layout (believed NIF).
+- `.btr`/`.bto` container layout (believed NIF). Blocks the mesh and object writers.
 - Tree LOD placement for FNV.
-- Exact `.lod` fields and the block size per LOD level (the raster takes it as a parameter until then).
-- Whether the real VHGT and record layouts differ from the testkit's stand-ins in any detail the tests cover.
+- Exact `.lod` fields. The block sizes per level (4, 8, 16, 32 cells) are used as planning parameters, not as facts.
+- Whether the file names recorded in `lod-block-naming`, `lod-terrain-paths` and `lod-settings-path` match the owner's
+  own output tree (the normal-map suffix is the least certain).
+- Whether real plugins differ from the recorded plugin rows in any detail the tests cover (for example compressed
+  CELL records, or LAND records in groups the walker does not expect).
+- How real seams between cells behave (`max_seam_error` on the owner's data answers it).

@@ -17,17 +17,24 @@ reference output never go in this repository; test fixtures are synthetic.
 
 ## Status
 
-A Cargo workspace (`lodwright-core`, `lodwright-cli`, `lodwright-testkit`), the pipeline and the clean-room
-guardrails. The CLI binary is `lodwright`.
+Implemented, from synthetic fixtures: the plugin reader (groups, compressed records, `WRLD`/`CELL`/`LAND`), the LAND
+height decoder, worldspace assembly across a load order, the block-aligned height raster, terrain LOD planning
+(levels 4, 8, 16 and 32: blocks, decimated meshes, error, vertex cap, texture sizes, output paths) and the CLI
+(`doctor`, `plan`, `heightmap`).
+
+Not implemented, because it needs facts only the owner's real files can give: the `.btr`, `.bto` and `.lod`
+writers, terrain textures and normal maps, object and tree LOD, BSA packing. What to run on real data and what to
+report back: [docs/owner-runbook.md](docs/owner-runbook.md).
 
 ## Scope
 
-Heightfield reader, `.lod` writer and a block-aligned raster (first slice), then terrain meshes, terrain textures,
-object and tree LOD. Out of scope: running the game, and shipping or reading anyone's game data from this
+Heightfield reader, block-aligned raster and terrain planning (done), then terrain meshes on disk, terrain
+textures, object and tree LOD. Out of scope: running the game, and shipping or reading anyone's game data from this
 repository.
 
 ## Where to read next
 
+- [docs/owner-runbook.md](docs/owner-runbook.md): what the owner runs on real data, and what to report back.
 - [docs/design.md](docs/design.md): pipeline, crates, first-slice interfaces, open questions.
 - [docs/clean-room.md](docs/clean-room.md): who may read what; provenance rules; what CI enforces.
 - [docs/TESTING.md](docs/TESTING.md): synthetic fixtures only, properties, oracle plan, `verify` design.

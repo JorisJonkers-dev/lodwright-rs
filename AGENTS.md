@@ -5,10 +5,11 @@ Guidance for any coding agent working in this repository.
 - Agent contract: [CLAUDE.md](CLAUDE.md)
 - Estate conventions: https://github.com/JorisJonkers-dev/workspace/blob/main/CLAUDE.md
 
-This repository is the template other JorisJonkers-dev repositories are bootstrapped from. Template content lives in `templates/`; `docs/REPO_SETUP.md` explains how a new repo is set up from it.
+xlodgen-rs is a planned clean-room Rust port of xLODGen. Read [docs/clean-room.md](docs/clean-room.md) (written
+in a following pull request) before touching a format or reading any xLODGen source: the clean-room rule decides
+which inputs are allowed.
 
 ## Build and test
 
-- Validate the templates: `scripts/validate-templates.sh`
-- Apply the branch ruleset: `scripts/apply-ruleset.sh`
-- Install the push-protection git hooks: `scripts/install-git-hooks.sh`
+- Everything CI runs: `task check` (arrives with the Cargo workspace)
+- Apply the repository settings and ruleset: `scripts/setup-repo.sh` (owner only)

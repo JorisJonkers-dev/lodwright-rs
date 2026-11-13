@@ -17,6 +17,7 @@ pub struct Header {
     pub four_cc: [u8; 4],
 }
 
+// source: dds-header-layout, dds-pixel-format
 /// Build a legacy (non-DX10) header for `header`.
 #[must_use]
 pub fn build_header(header: &Header) -> Vec<u8> {
@@ -34,6 +35,7 @@ pub fn build_header(header: &Header) -> Vec<u8> {
     b
 }
 
+// source: dds-header-layout
 /// Read the fields back. `None` if the magic, the sizes or the length are wrong.
 #[must_use]
 pub fn parse_header(bytes: &[u8]) -> Option<Header> {

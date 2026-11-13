@@ -31,6 +31,7 @@ impl Heights {
     }
 }
 
+// source: land-vhgt-layout, land-vhgt-integration
 /// Encode heights as VHGT bytes. Heights are quantised to multiples of [`SCALE`]; each delta between
 /// neighbouring quantised heights must fit a signed byte, otherwise it is clamped (a synthetic fixture should not
 /// ask for more).
@@ -57,6 +58,7 @@ pub fn encode_vhgt(heights: &Heights) -> Vec<u8> {
     out
 }
 
+// source: land-vhgt-layout, land-vhgt-integration
 /// Decode VHGT bytes made by [`encode_vhgt`]. `None` if the length is wrong.
 #[must_use]
 pub fn reference_decode(bytes: &[u8]) -> Option<Heights> {

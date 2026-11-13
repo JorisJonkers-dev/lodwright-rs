@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Command line of the xLODGen port. The logic is here so tests can drive it without a process.
+//! Command line of lodwright. The logic is here so tests can drive it without a process.
 //!
 //! Exit codes: 0 success, 1 a check failed, 2 usage error.
 
@@ -13,10 +13,10 @@ pub const EXIT_FAILED: u8 = 1;
 /// Exit code: the arguments were not understood.
 pub const EXIT_USAGE: u8 = 2;
 
-const HELP: &str = "xlodgen: clean-room Rust port of xLODGen (not implemented yet)
+const HELP: &str = "lodwright: clean-room terrain and object LOD generator (not implemented yet)
 
-Usage: xlodgen [--help | --version]
-       xlodgen doctor <data-folder>
+Usage: lodwright [--help | --version]
+       lodwright doctor <data-folder>
 
 Commands:
   doctor <data-folder>  check that the folder exists; prints nothing taken from it
@@ -35,7 +35,7 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
         ["--version" | "-V"] => write_all(
             out,
             err,
-            &format!("xlodgen {}\n", env!("CARGO_PKG_VERSION")),
+            &format!("lodwright {}\n", env!("CARGO_PKG_VERSION")),
         ),
         ["doctor", folder] => doctor(Path::new(folder), out, err),
         [] => usage(err, "no command given"),
@@ -48,14 +48,14 @@ fn write_all(out: &mut dyn Write, err: &mut dyn Write, text: &str) -> u8 {
     match out.write_all(text.as_bytes()) {
         Ok(()) => EXIT_OK,
         Err(e) => {
-            let _ = writeln!(err, "xlodgen: cannot write output: {e}");
+            let _ = writeln!(err, "lodwright: cannot write output: {e}");
             EXIT_FAILED
         }
     }
 }
 
 fn usage(err: &mut dyn Write, problem: &str) -> u8 {
-    let _ = writeln!(err, "xlodgen: {problem}\nTry 'xlodgen --help'.");
+    let _ = writeln!(err, "lodwright: {problem}\nTry 'lodwright --help'.");
     EXIT_USAGE
 }
 
@@ -66,7 +66,7 @@ fn doctor(folder: &Path, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     } else {
         let _ = writeln!(
             err,
-            "xlodgen: the data folder does not exist or is not a directory"
+            "lodwright: the data folder does not exist or is not a directory"
         );
         EXIT_FAILED
     }
@@ -91,7 +91,7 @@ mod tests {
     fn version_prints_the_package_version() {
         let (code, out, _) = go(&["--version"]);
         assert_eq!(code, EXIT_OK);
-        assert_eq!(out, format!("xlodgen {}\n", env!("CARGO_PKG_VERSION")));
+        assert_eq!(out, format!("lodwright {}\n", env!("CARGO_PKG_VERSION")));
     }
 
     #[test]

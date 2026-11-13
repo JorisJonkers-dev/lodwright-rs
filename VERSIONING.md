@@ -1,6 +1,6 @@
 # Versioning and release
 
-xlodgen-rs is versioned with SemVer and released by release-please (`release-type: simple`, see
+lodwright-rs is versioned with SemVer and released by release-please (`release-type: simple`, see
 `docs/PRACTICES.md` for why). Nothing is published to crates.io or any package registry.
 
 1. Land changes through squash-merged pull requests with Conventional Commit titles

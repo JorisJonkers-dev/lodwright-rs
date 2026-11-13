@@ -2,7 +2,7 @@
 
 One target per parser the port will have: `plugin_records`, `land_vhgt`, `lod_settings`, `dds_header`,
 `btr_mesh`, `bto_mesh`. Today each is an empty-but-compiling harness (the readers do not exist; where the testkit
-has a reference reader the harness runs it). Seed inputs come from `xlodgen-testkit` builders, never from game
+has a reference reader the harness runs it). Seed inputs come from `lodwright-testkit` builders, never from game
 files; corpora and crashes are git-ignored (`fuzz/.gitignore`) and the data guard refuses committed binaries.
 
 This directory is its own Cargo workspace, so `libfuzzer-sys` stays out of the shipped crates.

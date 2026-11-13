@@ -15,7 +15,7 @@ set -euo pipefail
 
 mode=apply
 if [ "${1:-}" = "--audit" ]; then mode=audit; shift; fi
-repo=${1:-JorisJonkers-dev/xlodgen-rs}
+repo=${1:-JorisJonkers-dev/lodwright-rs}
 here=$(dirname "$(readlink -f "$0")")
 dry=${DRY_RUN:-0}
 missing=0

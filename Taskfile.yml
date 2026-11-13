@@ -42,7 +42,7 @@ tasks:
       - zizmor --offline --no-progress .github/workflows/
 
   guards:
-    desc: Clean-room guards on the whole tree (SPDX headers, provenance references, game-data guard, .gitignore)
+    desc: Clean-room guards on the whole tree (SPDX headers, provenance references, game-data guard, .gitignore, retired name)
     cmd: python3 -I scripts/cleanroom_guards.py all
 
   scripts:

@@ -310,6 +310,37 @@ class DataGuardTests(unittest.TestCase):
         self.assertEqual(len(repo.check("data")), 1)
 
 
+class NameTests(unittest.TestCase):
+    def test_the_old_name_in_a_source_file_fails(self) -> None:
+        repo = Repo(self)
+        repo.write("lib.rs", SPDX + "// port of xLODGen\n")
+        repo.commit()
+        self.assertEqual(len(repo.check("names")), 1)
+
+    def test_the_old_name_in_a_path_fails(self) -> None:
+        repo = Repo(self)
+        repo.write("docs/xlodgen-notes.txt", "notes\n")
+        repo.commit()
+        self.assertEqual(len(repo.check("names")), 1)
+
+    def test_the_old_name_in_provenance_notes_and_the_process_document_passes(self) -> None:
+        repo = Repo(self)
+        repo.write("provenance/LOG.md", LOG + "Read about LODGen.\n")
+        repo.write("docs/clean-room.md", "never read the LODGen source\n")
+        repo.commit()
+        self.assertEqual(repo.check("names"), [])
+
+    def test_case_does_not_hide_the_old_name(self) -> None:
+        repo = Repo(self)
+        repo.write("README.md", "XLODGEN\n")
+        repo.commit()
+        self.assertEqual(len(repo.check("names")), 1)
+
+    def test_the_real_tree_is_free_of_the_old_name(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        self.assertEqual(list(g.run(root, "names", None)), [])
+
+
 class GitignoreTests(unittest.TestCase):
     def test_a_missing_extension_is_reported(self) -> None:
         repo = Repo(self)

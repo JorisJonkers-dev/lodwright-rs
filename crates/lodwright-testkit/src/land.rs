@@ -4,7 +4,7 @@
 //! Layout used: a little-endian `f32` offset, then 33 x 33 signed byte deltas, then three padding bytes. Row
 //! `y`, column `x`: the first column integrates downwards (each row's first delta is added to the previous
 //! row's first height), every other column integrates along the row. Heights are the running sum plus the
-//! offset, times a scale of 8.
+//! offset (in steps), times a scale of 8.
 
 /// Vertices per cell edge.
 pub const SIDE: usize = 33;
@@ -38,7 +38,7 @@ impl Heights {
 #[must_use]
 pub fn encode_vhgt(heights: &Heights) -> Vec<u8> {
     let steps: Vec<i32> = heights.0.iter().map(|h| quantise(*h)).collect();
-    let offset = f32::from(i16::try_from(steps[0]).unwrap_or(i16::MAX)) * SCALE;
+    let offset = f32::from(i16::try_from(steps[0]).unwrap_or(i16::MAX));
     let mut out = Vec::with_capacity(VHGT_LEN);
     out.extend_from_slice(&offset.to_le_bytes());
     let base = steps[0];
@@ -67,7 +67,7 @@ pub fn reference_decode(bytes: &[u8]) -> Option<Heights> {
     }
     let offset = f32::from_le_bytes(bytes[0..4].try_into().ok()?);
     let mut heights = vec![0.0_f32; SIDE * SIDE];
-    let mut column_start = offset / SCALE;
+    let mut column_start = offset;
     for y in 0..SIDE {
         let mut running = column_start;
         for x in 0..SIDE {

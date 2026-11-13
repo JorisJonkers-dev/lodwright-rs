@@ -1,0 +1,18 @@
+[package]
+name = "xlodgen-cli"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Command line of the xLODGen port."
+
+[[bin]]
+name = "xlodgen"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true

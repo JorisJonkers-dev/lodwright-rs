@@ -7,6 +7,7 @@ use lodwright_core::worldspace::Worldspace;
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+use std::fmt::Write as _;
 use std::path::Path;
 
 fn hill(cx: f32, cy: f32) -> Heights {
@@ -32,15 +33,14 @@ fn a_synthetic_world_plans_to_the_stored_blocks() {
         ("Test.esp".to_owned(), plugin),
     ])
     .unwrap();
-    let test = worlds.iter().find(|w| w.name() == "Testland").unwrap();
-    let plan = plan_world(test, &TerrainSettings::default()).unwrap();
+    let found = worlds.iter().find(|w| w.name() == "Testland").unwrap();
+    let plan = plan_world(found, &TerrainSettings::default()).unwrap();
     let mut text = format!("world {} settings {}\n", plan.world, plan.settings_path);
     for b in &plan.blocks {
-        text.push_str(&format!(
-            "L{} ({},{}) step {} vertices {} triangles {} error {:.2} heights {}..{} textures {}/{} mips {} {}\n",
+        writeln!(text, "L{} ({},{}) step {} vertices {} triangles {} error {:.2} heights {}..{} textures {}/{} mips {} {}",
             b.id.level, b.id.x, b.id.y, b.step, b.vertices, b.triangles, b.max_error,
             b.height_range.0, b.height_range.1, b.diffuse_size, b.normal_size, b.mip_levels, b.mesh_path
-        ));
+        ).unwrap();
     }
     assert_golden(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/terrain_plan.txt"),

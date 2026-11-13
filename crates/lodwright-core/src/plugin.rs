@@ -434,7 +434,7 @@ mod tests {
         let mut rng = Rng::new(0x00C0_FFEE);
         for _ in 0..300 {
             let mut bytes = original.clone();
-            for _ in 0..1 + rng.below(4) {
+            for _ in 0..=rng.below(3) {
                 let at = usize::try_from(rng.below(u32::try_from(bytes.len()).unwrap())).unwrap();
                 bytes[at] = u8::try_from(rng.below(256)).unwrap();
             }

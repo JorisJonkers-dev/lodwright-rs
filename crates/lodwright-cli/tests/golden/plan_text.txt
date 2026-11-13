@@ -1,0 +1,11 @@
+world Testland (form 00000A00): 3 cells, x -5..1 y 0..3, max seam error 216.00
+  level 4: 2 blocks, 2149 vertices, 4098 triangles, max error 0.00
+  level 8: 1 blocks, 2145 vertices, 4096 triangles, max error 0.00
+  level 16: 1 blocks, 2145 vertices, 4096 triangles, max error 0.00
+  level 32: 1 blocks, 2145 vertices, 4096 triangles, max error 0.00
+  settings: lodsettings/Testland.lod
+  block L4 (-8,0) step 32 vertices 4 triangles 2 error 0.00 meshes/landscape/lod/Testland/blocks/Testland.4.-8.0.btr
+  block L4 (0,0) step 1 vertices 2145 triangles 4096 error 0.00 meshes/landscape/lod/Testland/blocks/Testland.4.0.0.btr
+  block L8 (0,0) step 1 vertices 2145 triangles 4096 error 0.00 meshes/landscape/lod/Testland/blocks/Testland.8.0.0.btr
+  block L16 (0,0) step 1 vertices 2145 triangles 4096 error 0.00 meshes/landscape/lod/Testland/blocks/Testland.16.0.0.btr
+  block L32 (0,0) step 1 vertices 2145 triangles 4096 error 0.00 meshes/landscape/lod/Testland/blocks/Testland.32.0.0.btr

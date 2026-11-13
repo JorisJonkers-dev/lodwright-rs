@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = ["crates/xlodgen-core", "crates/xlodgen-cli", "crates/xlodgen-testkit"]
+# fuzz/ is its own workspace (libfuzzer-sys stays out of the shipped crates).
+exclude = ["fuzz"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+license = "MPL-2.0"
+repository = "https://github.com/JorisJonkers-dev/xlodgen-rs"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[workspace.dependencies]
+xlodgen-core = { path = "crates/xlodgen-core" }
+xlodgen-testkit = { path = "crates/xlodgen-testkit" }

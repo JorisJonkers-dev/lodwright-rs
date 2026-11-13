@@ -53,8 +53,6 @@ scratchpads/
 .claude/commands/speckit*.md
 .claude/skills/speckit*/
 .agents/skills/speckit*/
-templates/**/.specify/
-templates/**/.claude/commands/speckit*.md
 
 # Agent worktrees. `.claude/worktrees/<name>/` is a full git worktree checked
 # out beside the sources; it is machine-local scratch, several MB, and being

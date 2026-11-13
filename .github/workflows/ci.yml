@@ -19,8 +19,8 @@
 # the one thing parallel jobs were actually good for.
 #
 # WHEN TO ADD A SECOND JOB: only when you must. A reusable workflow (`uses:`)
-# cannot be a step, so calling one requires its own job — see the typed
-# callers in templates/workflows/. In that case something has to gate it, and
+# cannot be a step, so calling one requires its own job — see the
+# hygiene caller. In that case something has to gate it, and
 # you have two options:
 #
 #   1. Keep this job as the gate: add `needs: [<that-job>]` and, as the LAST
@@ -40,7 +40,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
   # A skipped test whose quarantine ran out, names no issue, or lasts over 14 days fails the build
   # (workspace docs/testing-standards.md, section 7). A reusable workflow, so its own job.
   quarantine:
-    uses: JorisJonkers-dev/github-workflows/.github/workflows/quarantine-check.yml@48fcba8b143567e12716f4b77b9a3ab211719ffd # v0.50.1
+    uses: JorisJonkers-dev/github-workflows/.github/workflows/quarantine-check.yml@8e402cc4904be3f6bdb53bad3d9b5d7951bed491 # v0.50.3
 
   pipeline-complete:
     name: Pipeline Complete
@@ -62,22 +62,6 @@ jobs:
       # Add `fetch-depth: 0` if any check below needs history (a full-history
       # secret scan, or a diff against the base ref).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Lint
-        if: ${{ !cancelled() }}
-        run: echo "replace with real lint"
-
-      - name: Test
-        if: ${{ !cancelled() }}
-        run: scripts/validate-templates.sh
-
-      - name: Coverage
-        if: ${{ !cancelled() }}
-        run: echo "replace with the repo's real coverage gate — jacocoTestCoverageVerification >=80% for Gradle, or vitest/c8 --lines 80 for Node"
-
-      - name: Build
-        if: ${{ !cancelled() }}
-        run: echo "replace with real build"
 
       - name: Download actionlint
         id: actionlint

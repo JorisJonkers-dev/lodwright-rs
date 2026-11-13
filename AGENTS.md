@@ -11,5 +11,5 @@ which inputs are allowed.
 
 ## Build and test
 
-- Everything CI runs: `task check` (arrives with the Cargo workspace)
+- Everything CI runs: `task check`
 - Apply the repository settings and ruleset: `scripts/setup-repo.sh` (owner only)

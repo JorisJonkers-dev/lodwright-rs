@@ -138,6 +138,57 @@ adjustments plugin that overrides the worldspace); they use synthetic plugins na
   (LAND cells, LOD). Open question; the default is no inheritance, the option `FlaggedDefaults` takes only the default heights.
 - `plugin-record-override` (existing row) is applied to WRLD: a later plugin's WRLD record replaces the earlier one whole.
 
+## 2026-11-14: second reader pass over the BSA, LAND and worldspace rows
+
+Second-reader entry, role held: second reader only. The facts were re-derived before the implementation was read, from
+the UESP pages (raw wikitext of the Skyrim BSA, Oblivion BSA, LAND, WRLD, CELL and FormID pages) and from xEdit
+`Core/wbDefinitionsCommon.pas`, `Core/wbDefinitionsFNV.pas` and `Core/wbInterface.pas` at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0). Not read: the 2016 generator C# repository, decompiled binaries,
+GPL or leaked code, the GECK wiki.
+
+Flipped to `verified = true` (the re-derivation agrees with the row): `bsa-v104-header`, `bsa-v104-folder-records`,
+`bsa-v104-file-records` (one wording fix: bit 31 is stated on the Oblivion page, not the Skyrim page), `bsa-path-form`,
+`land-vclr-layout`, `land-layer-header`, `land-quadrant-grid`, `ltex-texture-set`, `txst-texture-paths`, `wrld-parent`,
+`wrld-land-data`, `cell-water`. Open points recorded in those rows (FormID byte order, which of TNAM and ICON wins, what an
+XCLW of 'Default' means) stay open and are not what was verified.
+
+Left `verified = false`, with an issue each: `bsa-v104-data-blocks` (no source says whether the size counts the embedded
+path), `land-vnml-layout` and `land-vtxt-layout` and `wrld-child-inherits` (the row states something neither source
+states), `plugin-record-override` ('as a whole' is not in the cited page), `wrld-bounds` (the note's xEdit display factor
+is the Starfield branch; for FO3 and FNV xEdit uses 1/4096).
+
+## 2026-11-14: contract v1 and release assets
+
+The plan and result documents, their schemas, the digests and the release assets are our own design
+(`docs/research/lod-pipeline-architecture.md` section 7 in the NV-Linux-Modding repository): no format fact was read
+or recorded, so there is no new row. The author held the implementer role only; no input from the forbidden list was
+read. The documents carry numbers, digests and relative output names, never game content.
+
+## 2026-11-14: NIF 20.2.0.7 container and shape blocks (lodwright-nif)
+
+Specifier entry for the generic NIF reader and writer. Read: `Core/wbDataFormatNif.pas` and
+`Core/wbDataFormatNifTypes.pas` of TES5Edit/TES5Edit (the MPL-2.0 xEdit repository, not the unlicensed xLODGen
+repository) at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, both under an MPL-2.0 file header. Only the
+20.2.0.7 branch of each definition was recorded. The niftools `nif.xml` was not used as a source: its repository
+(niftools/nifxml) carries a GPL-3.0 licence file, so it is not an allowed input. The first 2.5 KB of it (the
+version-expression macros at the top) were downloaded and looked at before that licence was noticed, and the file was
+deleted unused; none of its content is in any row. No decompiled output, game file or other tool's NIF source was read.
+
+- `nif-header-magic-version`: the first line and the version `u32`.
+- `nif-header-fields`: endian, user versions, block count, the Bethesda export info and which fields depend on user version 2.
+- `nif-block-table`: block type table, per-block type index and size, string table, groups, then the block bodies.
+- `nif-footer-roots`: the footer.
+- `nif-primitive-encodings`: strings and links as `i32` indices, bool as one byte, the small vector, colour and triangle types.
+- `nif-objectnet-avobject-ninode`: `NiObjectNET`, `NiAVObject`, `NiNode`.
+- `nif-trishape-geometry`: `NiGeometry` and `NiTriShape`.
+- `nif-geometry-data-layout`: `NiGeometryData`, `NiTriBasedGeomData`, `NiTriShapeData`.
+- `nif-property-layout`: `NiAlphaProperty`, `NiZBufferProperty`, `NiMaterialProperty`.
+
+Roles: the same author recorded the rows and wrote the crate, so no second reader has re-derived the facts and every
+row stays `verified = false`; the pull request says so. Open: whether the short-string length byte counts the trailing
+NUL (the crate carries those bytes raw), and what the game itself accepts: nothing here was loaded by the engine.
+No block profile for New Vegas LOD meshes is recorded; that waits for the owner's block NIF measurements.
+
 ## 2026-11-14: DDS legacy header, mip chain and BC1, BC3, BC5 layout (lodwright-dds)
 
 Specifier entry, written from Microsoft's public DDS and Direct3D 10 block compression pages (Microsoft Learn), each page

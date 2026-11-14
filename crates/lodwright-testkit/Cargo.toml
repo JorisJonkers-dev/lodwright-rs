@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "Synthetic fixture builders (plugin bytes, LAND heights, DDS headers): the only test data this repository allows."
+description = "Synthetic fixture builders (plugin bytes, LAND heights, DDS headers, shape sets): the only test data this repository allows."
 
 [dependencies]
 miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }

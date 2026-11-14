@@ -1,0 +1,15 @@
+[package]
+name = "lodwright-nif"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Clean-room generic reader and writer for the NIF 20.2.0.7 container, with typed shape blocks."
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
+
+[lints]
+workspace = true

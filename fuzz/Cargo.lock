@@ -152,8 +152,13 @@ dependencies = [
  "lodwright-assets",
  "lodwright-core",
  "lodwright-dds",
+ "lodwright-nif",
  "lodwright-testkit",
 ]
+
+[[package]]
+name = "lodwright-nif"
+version = "0.1.0"
 
 [[package]]
 name = "lodwright-testkit"

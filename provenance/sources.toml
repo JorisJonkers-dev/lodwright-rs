@@ -346,8 +346,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The same page states that v104 is also the Fallout 3 and Fallout: New Vegas version (Oblivion is v103). Read in full on the date above; the layout agrees with the Oblivion page https://en.uesp.net/wiki/Tes4Mod:BSA_File_Format (v103, same licence, last edited 17 April 2021)."
+verified = true
+note = "The same page states that v104 is also the Fallout 3 and Fallout: New Vegas version (Oblivion is v103). Read in full on the date above; the layout agrees with the Oblivion page https://en.uesp.net/wiki/Tes4Mod:BSA_File_Format (v103, same licence, last edited 17 April 2021). Second reader 2026-11-14: re-derived without the implementation: header layout, flag bits and endianness re-read from the UESP Skyrim BSA page; agrees."
 
 [[source]]
 id = "bsa-v104-folder-records"
@@ -357,19 +357,19 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The 24-byte folder record with padding is v105 only. The page gives no explicit statement that blocks are contiguous; the reader locates the name block from the counts and lengths, which assumes they are."
+verified = true
+note = "The 24-byte folder record with padding is v105 only. The page gives no explicit statement that blocks are contiguous; the reader locates the name block from the counts and lengths, which assumes they are. Second reader 2026-11-14: re-derived without the implementation: 16-byte record, offset rule and block layout re-read from the UESP Skyrim BSA page (contiguity follows from the structure table); agrees."
 
 [[source]]
 id = "bsa-v104-file-records"
-fact = "A file record is 16 bytes: u64 name hash, u32 size, u32 offset from the start of the archive. In the size, bit 30 (0x40000000) inverts the archive's compressed-by-default flag for this file; the page says bit 31 is used internally. The file names follow the last folder block as one block of lower-case NUL-terminated names without paths, in the order of the file records, when flag 0x2 is set."
+fact = "A file record is 16 bytes: u64 name hash, u32 size, u32 offset from the start of the archive. In the size, bit 30 (0x40000000) inverts the archive's compressed-by-default flag for this file; the Oblivion page (Tes4Mod:BSA_File_Format) says bit 31 is used internally. The file names follow the last folder block as one block of lower-case NUL-terminated names without paths, in the order of the file records, when flag 0x2 is set."
 url = "https://en.uesp.net/wiki/Skyrim_Mod:Archive_File_Format"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Reading bit 31 as 'not part of the size' comes from the Oblivion page (Tes4Mod:BSA_File_Format): 'the top two bits have special meaning and are not actually part of the size'. Hashes are not computed or checked; names come from the name block."
+verified = true
+note = "Reading bit 31 as 'not part of the size' comes from the Oblivion page (Tes4Mod:BSA_File_Format): 'the top two bits have special meaning and are not actually part of the size'. Hashes are not computed or checked; names come from the name block. Second reader 2026-11-14: re-derived without the implementation: 16-byte record, bit 30 and name block re-read from the UESP Skyrim BSA page; bit 31 re-read from the Oblivion page; agrees."
 
 [[source]]
 id = "bsa-v104-data-blocks"
@@ -390,8 +390,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game."
+verified = true
+note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game. Second reader 2026-11-14: re-derived without the implementation: lower case and backslash re-read from the UESP Skyrim BSA page (hash inputs, name block, embedded path example); agrees."
 
 [[source]]
 id = "land-vnml-layout"
@@ -412,8 +412,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandColors at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): 33 rows of 33 structs of u8 red, green, blue."
+verified = true
+note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandColors at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): 33 rows of 33 structs of u8 red, green, blue. Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP LAND page and xEdit wbLandColors; agrees."
 
 [[source]]
 id = "land-layer-header"
@@ -423,8 +423,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit (Core/wbDefinitionsCommon.pas wbLandLayers at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) reads FormID, u8 quadrant, one unused byte and s16 layer, which is used here. FormIDs are read little endian like every other FormID in a record (plugin-record-header)."
+verified = true
+note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit (Core/wbDefinitionsCommon.pas wbLandLayers at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) reads FormID, u8 quadrant, one unused byte and s16 layer, which is used here. FormIDs are read little endian like every other FormID in a record (plugin-record-header). Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP LAND page and xEdit wbLandLayers (BTXT and ATXT structs); agrees."
 
 [[source]]
 id = "land-vtxt-layout"
@@ -445,8 +445,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The page gives the quadrant numbering, the 17 x 17 grid and the bottom-left-first row order; the mapping to vertex coordinates is arithmetic on those facts (two 16-interval halves of a 32-interval cell)."
+verified = true
+note = "The page gives the quadrant numbering, the 17 x 17 grid and the bottom-left-first row order; the mapping to vertex coordinates is arithmetic on those facts (two 16-interval halves of a 32-interval cell). Second reader 2026-11-14: re-derived without the implementation: quadrant numbering and 17 x 17 grid re-read from the UESP LAND page; 17 + 16 = 33 checked; agrees."
 
 [[source]]
 id = "ltex-texture-set"
@@ -456,8 +456,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(LTEX, ...) in wbDefinitionsFNV.pas. The Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LTEX (CC-BY-SA-2.5) lists ICON as the texture path and has no TNAM. OPEN: which of TNAM and ICON the game prefers when both exist; the resolver takes the texture set's TX00 first and falls back to ICON."
+verified = true
+note = "Read RegisterRecordDef(LTEX, ...) in wbDefinitionsFNV.pas. The Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LTEX (CC-BY-SA-2.5) lists ICON as the texture path and has no TNAM. OPEN: which of TNAM and ICON the game prefers when both exist; the resolver takes the texture set's TX00 first and falls back to ICON. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(LTEX); agrees."
 
 [[source]]
 id = "txst-texture-paths"
@@ -467,8 +467,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the paths are relative to the textures folder is not stated; the code keeps them as stored."
+verified = true
+note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the paths are relative to the textures folder is not stated; the code keeps them as stored. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(TXST); agrees."
 
 [[source]]
 id = "plugin-record-override"
@@ -489,8 +489,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(WRLD, ...): the 'Parent Worldspace' struct with WNAM and the PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'. The UESP Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD (CC-BY-SA-2.5) lists WNAM as the parent and has no PNAM."
+verified = true
+note = "Read RegisterRecordDef(WRLD, ...): the 'Parent Worldspace' struct with WNAM and the PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'. The UESP Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD (CC-BY-SA-2.5) lists WNAM as the parent and has no PNAM. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(WRLD), Parent Worldspace struct; agrees."
 
 [[source]]
 id = "wrld-land-data"
@@ -500,8 +500,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read wbWorldLandData in wbDefinitionsCommon.pas. xEdit shows the default land height with default -2048 for these games; the unit and whether 'default water height' is in world units are not stated."
+verified = true
+note = "Read wbWorldLandData in wbDefinitionsCommon.pas. xEdit shows the default land height with default -2048 for these games; the unit and whether 'default water height' is in world units are not stated. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit wbWorldLandData; agrees."
 
 [[source]]
 id = "wrld-bounds"
@@ -522,8 +522,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water height (if not 0.00)'. xEdit wbDefinitionsFNV.pas (revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) declares wbFloat(XCLW, 'Water Height') and the after-load that adds XCLW 'Default' when DATA and 2 is set. OPEN: what 'Default' resolves to; the reader assumes the worldspace default water height."
+verified = true
+note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water height (if not 0.00)'. xEdit wbDefinitionsFNV.pas (revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) declares wbFloat(XCLW, 'Water Height') and the after-load that adds XCLW 'Default' when DATA and 2 is set. OPEN: what 'Default' resolves to; the reader assumes the worldspace default water height. Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP CELL page and xEdit (CELL DATA flags, XCLW, wbCELLAfterLoad); agrees."
 
 [[source]]
 id = "wrld-child-inherits"
@@ -535,6 +535,105 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "No public source read says that a child worldspace uses its parent's LAND cells, or what the game does for LOD with a flagged parent. OPEN QUESTION, recorded in docs/design.md. The conservative rule (no inheritance) is the default; the option FlaggedDefaults only lets a child with the 'use land data' flag take the parent's default land and water height (the DNAM struct that xEdit names 'Land Data')."
+
+[[source]]
+id = "nif-header-magic-version"
+fact = "A NIF starts with the text line 'Gamebryo File Format, Version 20.2.0.7' ended by a line feed (0x0A), then the version as a u32 (0x14020007). The NetImmerse magic is the alternative first line for older files and is not handled."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "NiHeader definition: Magic (terminator 0x0A) and Version (u32, default 20.2.0.7); TwbNifFile.UnSerialize checks the magic constant sNifMagicGamebryo."
+
+[[source]]
+id = "nif-header-fields"
+fact = "After the version: endian type (u8, 1 = little endian, present since 20.0.0.4), user version (u32, since 10.0.1.8), block count (u32); then, when the version is 20.2.0.7 and the user version is 3 or more, user version 2 (u32) and the export info: author (short string), an unknown u32 only when user version 2 is above 130, process script (short string) only when user version 2 is below 131, export script (short string), max file path (short string) only when user version 2 is 103 or more. A short string is a u8 length then that many bytes."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "NiHeader definition and NiHeader_EnBSHeader and the NiHeader_EnExport* conditions; wbShortString is dfChars with a one byte length prefix. Whether the length byte counts a trailing NUL is not decided here: the bytes are carried raw."
+
+[[source]]
+id = "nif-block-table"
+fact = "Next in the header: block type count (u16) and that many sized strings (u32 length, then the bytes, no terminator); one u16 type index per block; one u32 size per block (since 20.2.0.7); string count (u32), maximum string length (u32), that many sized strings; group count (u32) and that many u32. The block bodies follow in order, each exactly its size."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "NiHeader definition (Block Types, Block Type Index, Block Size, Num Strings, Max String Length, Strings, Num Groups, Groups) and wbSizedString (u32 length prefix, no terminator) in wbDataFormatNifTypes.pas; TwbNifFile.UpdateHeader computes Max String Length as the longest string."
+
+[[source]]
+id = "nif-footer-roots"
+fact = "After the last block comes the footer: a u32 count of roots and that many block links (i32)."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "NiFooter definition: Roots as an array with a u32 count of NiRef."
+
+[[source]]
+id = "nif-primitive-encodings"
+fact = "In 20.2.0.7 a string field is an i32 index into the header string table (-1 for none), a block link is an i32 block index (-1 for none), a bool is one byte, a vector is 3 f32, a texture coordinate 2 f32, a colour with alpha 4 f32, a triangle 3 u16, a rotation 9 f32 in the stored order m11 m21 m31 m12 m22 m32 m13 m23 m33, a bounding sphere is centre (3 f32) then radius (f32); all little endian."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "wbString (S32 index from version 20.1.0.3, sized string before), wbNiRef (S32, default -1), wbBool (u8 from 4.1.0.1) in wbDataFormatNif.pas; wbVector3, wbTexCoord, wbColor4, wbRotMatrix33, wbNiBound, wbTriangle in wbDataFormatNifTypes.pas (at the same revision)."
+
+[[source]]
+id = "nif-objectnet-avobject-ninode"
+fact = "NiObjectNET is name (string index), extra data list (u32 count, links), controller (link). NiAVObject adds flags (u32 when user version 2 is above 26, else u16), translation (3 f32), rotation (9 f32), scale (f32), the property list (u32 count, links) only when user version 2 is 34 or less, and the collision object (link). NiNode adds children (u32 count, links) and effects (u32 count, links) only when user version 2 is below 130."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "wbDefineNiObjectNET, wbDefineNiAVObject (NiAVObject_DecideFlags, NiAVObject_EnProperties), wbDefineNiNode (NiNode_EnEffects), version 20.2.0.7 branches only; the transform is stored translation, rotation, scale."
+
+[[source]]
+id = "nif-trishape-geometry"
+fact = "NiTriShape adds nothing to NiGeometry. NiGeometry after the NiAVObject part: data link, skin instance link, then (user version 2 below 100) u32 material count, that many material name string indices, that many material extra data links (i32), active material (i32), a material-needs-update bool; then, when user version is 12, shader property link and alpha property link."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "wbDefineNiGeometry and wbDefineNiTriShape, 20.2.0.7 branch (Has Shader and Shader Name exist only up to 20.1.0.3; Material Needs Update exists only at exactly 20.2.0.7)."
+
+[[source]]
+id = "nif-geometry-data-layout"
+fact = "NiGeometryData: group id (i32), vertex count (u16), keep flags (u8), compress flags (u8), has-vertices bool and the vertices, vector flags (u16), material CRC (u32) only when user version is 12, has-normals bool and the normals, tangents then bitangents only when there are normals and bit 0x1000 of the vector flags is set, bounding sphere, has-vertex-colours bool and the RGBA colours, the UV sets (their number is bit 0 of the vector flags at 20.2.0.7), consistency flags (u16), additional data link. NiTriBasedGeomData adds triangle count (u16). NiTriShapeData adds triangle point count (u32), a has-triangles bool and the triangles, match group count (u16) and for each group a u16 count and that many u16 vertex indices."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "wbDefineNiGeometryData (NiGeometryData_EnTangents, NiGeometryData_GetCountUVSets with mask 1 at version 20.2.0.7), wbDefineNiTriBasedGeomData, wbDefineNiTriShapeData; wbConsistencyType is a u16."
+
+[[source]]
+id = "nif-property-layout"
+fact = "NiAlphaProperty: NiObjectNET part, flags (u16), threshold (u8). NiZBufferProperty: NiObjectNET part, flags (u16); its compare function field ends at 20.0.0.5. NiMaterialProperty: NiObjectNET part, no flags at this version, ambient and diffuse colours (3 f32 each) only when user version 2 is below 26, specular and emissive colours (3 f32 each), glossiness (f32), alpha (f32), emissive multiplier (f32) only when user version 2 is above 21."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "wbDefineNiAlphaProperty, wbDefineNiZBufferProperty (NiZBufferProperty_EnFunction), wbDefineNiMaterialProperty (EnBefore10012 for flags, NiMaterialProperty_EnAmbientColor, NiMaterialProperty_EnEmissiveMult)."
 
 [[source]]
 id = "dds-header-flags-caps"

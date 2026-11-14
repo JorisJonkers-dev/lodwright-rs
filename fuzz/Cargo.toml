@@ -13,6 +13,7 @@ libfuzzer-sys = "0.4"
 lodwright-assets = { path = "../crates/lodwright-assets" }
 lodwright-core = { path = "../crates/lodwright-core" }
 lodwright-dds = { path = "../crates/lodwright-dds" }
+lodwright-nif = { path = "../crates/lodwright-nif" }
 lodwright-testkit = { path = "../crates/lodwright-testkit" }
 
 # Own workspace root: keeps libfuzzer-sys out of the shipped crates and the root lockfile.
@@ -76,6 +77,13 @@ bench = false
 [[bin]]
 name = "land_layers"
 path = "fuzz_targets/land_layers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nif_read"
+path = "fuzz_targets/nif_read.rs"
 test = false
 doc = false
 bench = false

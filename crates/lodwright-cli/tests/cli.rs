@@ -42,3 +42,18 @@ fn doctor_on_a_missing_folder_exits_one() {
 fn unknown_command_exits_two() {
     assert_eq!(lodwright(&["nope"]).status.code(), Some(2));
 }
+
+#[test]
+fn contracts_json_lists_each_contract_with_its_versions() {
+    let out = lodwright(&["contracts", "--json"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "{\"contracts\":[{\"name\":\"lodwright-plan\",\"versions\":[1]},{\"name\":\"lodwright-result\",\"versions\":[1]}]}\n"
+    );
+}
+
+#[test]
+fn contracts_without_json_is_a_usage_error() {
+    assert_eq!(lodwright(&["contracts"]).status.code(), Some(2));
+}

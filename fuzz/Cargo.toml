@@ -87,3 +87,24 @@ path = "fuzz_targets/nif_read.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "probe_nif"
+path = "fuzz_targets/probe_nif.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "probe_dds"
+path = "fuzz_targets/probe_dds.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "probe_flat"
+path = "fuzz_targets/probe_flat.rs"
+test = false
+doc = false
+bench = false

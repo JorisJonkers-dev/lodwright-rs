@@ -15,6 +15,7 @@ mod commands;
 mod failure;
 mod load;
 mod options;
+mod probe;
 
 /// Exit code: success.
 pub const EXIT_OK: u8 = 0;
@@ -34,6 +35,7 @@ Usage: lodwright [--help | --version [--json]]
        lodwright generate [--data <data-folder> --plugin NAME ...] [--json] [--schema-version N]
        lodwright schema <plan|result> [--schema-version N]
        lodwright contracts --json
+       lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
                       --out <file.pgm> [--level N] [--allow-in-repo]
 
@@ -45,6 +47,9 @@ Commands:
   schema                print the JSON Schema of a document (plan or result)
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
+  probe                 print only structure and numbers of one file (NIF header and shapes, DDS header and channel
+                        statistics, settings or .dtl size and leading integers); refuses a file inside a git working
+                        tree unless --allow-in-repo
   heightmap             write the world's height raster as a 16-bit PGM (north up) for inspection
 
 Plugins are read from the data folder; nothing is written there. Output is numbers and file names only.
@@ -79,6 +84,14 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
         ["generate", rest @ ..] => generate_command(rest, out, err),
         ["schema", rest @ ..] => schema_command(rest, out, err),
         ["heightmap", rest @ ..] => heightmap_command(rest, out, err),
+        ["probe", rest @ ..] => match probe::run(rest, out) {
+            Ok(()) => EXIT_OK,
+            Err(probe::Outcome::Usage(problem)) => usage(err, &problem),
+            Err(probe::Outcome::Failed(problem)) => {
+                let _ = writeln!(err, "lodwright: probe: {problem}");
+                EXIT_FAILED
+            }
+        },
         [] => usage(err, "no command given"),
         ["doctor", ..] => usage(err, "doctor takes exactly one argument: the data folder"),
         [other, ..] => usage(err, &format!("unknown argument: {other}")),

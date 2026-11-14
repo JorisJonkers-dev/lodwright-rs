@@ -35,6 +35,93 @@ pub fn build_header(header: &Header) -> Vec<u8> {
     b
 }
 
+/// Pixel data for [`build_file`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pixels {
+    /// BC1 (DXT1) with every texel set to colour 0 (RGB 5:6:5) of a four-colour block (colour 1 is 0).
+    Bc1Solid {
+        /// The 5:6:5 colour; it must be greater than 0 for the block to be four-colour.
+        colour: u16,
+    },
+    /// BC1 three-colour blocks whose every texel is the transparent code.
+    Bc1Transparent,
+    /// BC3 (DXT5): white colour blocks, alpha 255 and 0 as references and the codes 0 to 7 repeating over the texels.
+    Bc3Gradient,
+    /// Uncompressed 32-bit pixels, each `[red, green, blue, alpha]`, masks `00FF0000 0000FF00 000000FF FF000000`.
+    Argb32(Vec<[u8; 4]>),
+    /// A DX10 header with this DXGI format and eight bytes of zero data.
+    Dx10 {
+        /// The DXGI format number.
+        dxgi_format: u32,
+    },
+}
+
+// source: probe-bc1-block-layout, probe-bc3-block-layout, dds-pixel-format-masks, dds-header-dxt10
+/// A whole DDS file: header for `width`, `height` and `mips`, and the mip level 0 data for `pixels` (no other mips).
+///
+/// # Panics
+/// Never for test-sized input.
+#[must_use]
+pub fn build_file(width: u32, height: u32, mips: u32, pixels: &Pixels) -> Vec<u8> {
+    let four_cc = match pixels {
+        Pixels::Bc1Solid { .. } | Pixels::Bc1Transparent => *b"DXT1",
+        Pixels::Bc3Gradient => *b"DXT5",
+        Pixels::Dx10 { .. } => *b"DX10",
+        Pixels::Argb32(_) => *b"\0\0\0\0",
+    };
+    let mut b = build_header(&Header {
+        width,
+        height,
+        mip_count: mips,
+        four_cc,
+    });
+    let blocks = (width.div_ceil(4) * height.div_ceil(4)) as usize;
+    match pixels {
+        Pixels::Bc1Solid { colour } => {
+            for _ in 0..blocks {
+                b.extend_from_slice(&colour.to_le_bytes());
+                b.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+            }
+        }
+        Pixels::Bc1Transparent => {
+            for _ in 0..blocks {
+                b.extend_from_slice(&[0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+            }
+        }
+        Pixels::Bc3Gradient => {
+            let codes: u64 = (0..16_u64).fold(0, |acc, t| acc | ((t % 8) << (3 * t)));
+            for _ in 0..blocks {
+                b.extend_from_slice(&[255, 0]);
+                b.extend_from_slice(&codes.to_le_bytes()[..6]);
+                b.extend_from_slice(&[0xFF, 0xFF, 0, 0, 0, 0, 0, 0]);
+            }
+        }
+        Pixels::Argb32(texels) => {
+            put(&mut b, 80, 0x41); // RGB | ALPHAPIXELS
+            put(&mut b, 88, 32);
+            put(&mut b, 92, 0x00FF_0000);
+            put(&mut b, 96, 0x0000_FF00);
+            put(&mut b, 100, 0x0000_00FF);
+            put(&mut b, 104, 0xFF00_0000);
+            b[84..88].copy_from_slice(&[0; 4]);
+            for [r, g, bl, a] in texels {
+                let value =
+                    u32::from(*a) << 24 | u32::from(*r) << 16 | u32::from(*g) << 8 | u32::from(*bl);
+                b.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+        Pixels::Dx10 { dxgi_format } => {
+            b.extend_from_slice(&dxgi_format.to_le_bytes());
+            b.extend_from_slice(&3_u32.to_le_bytes()); // resource dimension
+            b.extend_from_slice(&0_u32.to_le_bytes());
+            b.extend_from_slice(&1_u32.to_le_bytes()); // array size
+            b.extend_from_slice(&0_u32.to_le_bytes());
+            b.extend_from_slice(&[0; 8]);
+        }
+    }
+    b
+}
+
 // source: dds-header-layout
 /// Read the fields back. `None` if the magic, the sizes or the length are wrong.
 #[must_use]

@@ -3,8 +3,20 @@
 
 use std::path::{Path, PathBuf};
 
+use lodwright_contract::Sha256Stream;
 use lodwright_core::plugin;
 use lodwright_core::worldspace::Worldspace;
+
+use crate::failure::Failure;
+
+/// The plugins of a load order, parsed, and the digest of the files they came from.
+#[derive(Debug)]
+pub struct LoadedPlugins {
+    /// Plugin names (as given) and contents, in load order.
+    pub plugins: Vec<(String, plugin::Plugin)>,
+    /// `sha256:` over each plugin's lowercase name, size and contents, in load order. A hash, never content.
+    pub inputs_digest: String,
+}
 
 /// Plugin names from a load-order text file: one per line, blank lines and `#` comments skipped, a leading `*`
 /// (the active marker of a plugins list) removed.
@@ -19,12 +31,19 @@ pub fn parse_load_order(text: &str) -> Vec<String> {
 
 /// The file of plugin `name` in `data`, matched without regard to case (a Windows game folder on Linux often
 /// differs in case from the names in a load order).
-pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, String> {
+pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Failure> {
     if name.contains(['/', '\\']) || name == ".." || name == "." {
-        return Err(format!("plugin name {name:?} must be a file name"));
+        return Err(Failure::new(
+            "plugin_name_invalid",
+            format!("plugin name {name:?} must be a file name"),
+        ));
     }
-    let entries =
-        std::fs::read_dir(data).map_err(|e| format!("cannot read the data folder: {e}"))?;
+    let entries = std::fs::read_dir(data).map_err(|e| {
+        Failure::new(
+            "data_unreadable",
+            format!("cannot read the data folder: {e}"),
+        )
+    })?;
     let mut found = None;
     for entry in entries.flatten() {
         if entry
@@ -39,36 +58,55 @@ pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, String> {
             }
         }
     }
-    found.ok_or_else(|| format!("plugin {name} not found in the data folder"))
+    found.ok_or_else(|| {
+        Failure::new(
+            "plugin_not_found",
+            format!("plugin {name} not found in the data folder"),
+        )
+    })
 }
 
 /// Read every plugin of the load order, in order.
-pub fn load_plugins(
-    data: &Path,
-    names: &[String],
-) -> Result<Vec<(String, plugin::Plugin)>, String> {
+pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Failure> {
     if names.is_empty() {
-        return Err("no plugins given: use --plugin NAME (repeatable) or --load-order FILE".into());
+        return Err(Failure::new(
+            "no_plugins",
+            "no plugins given: use --plugin NAME (repeatable) or --load-order FILE",
+        ));
     }
     let mut plugins = Vec::with_capacity(names.len());
+    let mut digest = Sha256Stream::new();
     for name in names {
         let path = find_plugin(data, name)?;
-        let bytes = std::fs::read(&path).map_err(|e| format!("cannot read plugin {name}: {e}"))?;
-        let parsed = plugin::read(&bytes).map_err(|e| format!("plugin {name}: {e}"))?;
+        let bytes = std::fs::read(&path).map_err(|e| {
+            Failure::new(
+                "plugin_unreadable",
+                format!("cannot read plugin {name}: {e}"),
+            )
+        })?;
+        digest.update(name.to_ascii_lowercase().as_bytes());
+        digest.update(&(bytes.len() as u64).to_le_bytes());
+        digest.update(&bytes);
+        let parsed = plugin::read(&bytes)
+            .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         plugins.push((name.clone(), parsed));
     }
-    Ok(plugins)
+    Ok(LoadedPlugins {
+        plugins,
+        inputs_digest: digest.finish(),
+    })
 }
 
 /// Read every plugin of the load order (in order) and assemble all the worldspaces at once.
-pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, String> {
-    let plugins = load_plugins(data, names)?;
-    Worldspace::from_load_order(&plugins).map_err(|e| e.to_string())
+pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, Failure> {
+    let loaded = load_plugins(data, names)?;
+    Worldspace::from_load_order(&loaded.plugins)
+        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{find_plugin, load_worlds, parse_load_order};
+    use super::{find_plugin, load_plugins, load_worlds, parse_load_order};
     use lodwright_testkit::land::Heights;
     use lodwright_testkit::world::{SyntheticWorld, world_plugin};
 
@@ -111,7 +149,8 @@ mod tests {
     fn a_missing_plugin_is_named_and_the_path_is_not_echoed() {
         let dir = temp("missing");
         let err = find_plugin(&dir, "Nope.esm").unwrap_err();
-        assert_eq!(err, "plugin Nope.esm not found in the data folder");
+        assert_eq!(err.code, "plugin_not_found");
+        assert_eq!(err.reason, "plugin Nope.esm not found in the data folder");
     }
 
     #[test]
@@ -125,7 +164,7 @@ mod tests {
     #[test]
     fn an_unreadable_data_folder_is_an_error() {
         let err = find_plugin(std::path::Path::new("/definitely/not/here"), "a.esm").unwrap_err();
-        assert!(err.starts_with("cannot read the data folder"));
+        assert!(err.reason.starts_with("cannot read the data folder"));
     }
 
     #[test]
@@ -145,13 +184,29 @@ mod tests {
     }
 
     #[test]
+    fn the_inputs_digest_changes_with_plugin_contents_and_not_with_the_folder() {
+        let world = SyntheticWorld::new(0xA00, "W").cell(0, 0, Heights::flat(8.0));
+        let other = SyntheticWorld::new(0xA00, "W").cell(0, 0, Heights::flat(16.0));
+        let (one, two, three) = (temp("d1"), temp("d2"), temp("d3"));
+        std::fs::write(one.join("A.esm"), world_plugin(&[], &world, false)).unwrap();
+        std::fs::write(two.join("a.ESM"), world_plugin(&[], &world, false)).unwrap();
+        std::fs::write(three.join("A.esm"), world_plugin(&[], &other, false)).unwrap();
+        let digest =
+            |dir: &std::path::Path| load_plugins(dir, &["A.esm".into()]).unwrap().inputs_digest;
+        assert_eq!(digest(&one), digest(&two));
+        assert_ne!(digest(&one), digest(&three));
+        assert!(digest(&one).starts_with("sha256:"));
+    }
+
+    #[test]
     fn errors_name_the_plugin_that_failed() {
         let dir = temp("bad");
         std::fs::write(dir.join("Bad.esp"), b"not a plugin at all, just text").unwrap();
         let err = load_worlds(&dir, &["Bad.esp".into()]).unwrap_err();
-        assert!(err.starts_with("plugin Bad.esp: "), "{err}");
+        assert_eq!(err.code, "plugin_invalid");
+        assert!(err.reason.starts_with("plugin Bad.esp: "), "{err}");
         let err = load_worlds(&dir, &[]).unwrap_err();
-        assert!(err.contains("no plugins given"));
+        assert!(err.reason.contains("no plugins given"));
         let world = SyntheticWorld::new(1, "W").cell(0, 0, Heights::flat(8.0));
         std::fs::write(
             dir.join("Orphan.esp"),
@@ -159,6 +214,6 @@ mod tests {
         )
         .unwrap();
         let err = load_worlds(&dir, &["Orphan.esp".into()]).unwrap_err();
-        assert_eq!(err, "master Gone.esm is not in the load order");
+        assert_eq!(err.reason, "master Gone.esm is not in the load order");
     }
 }

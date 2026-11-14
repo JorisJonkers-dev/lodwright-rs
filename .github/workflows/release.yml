@@ -1,11 +1,15 @@
 # release-please keeps a release pull request open; merging it tags vX.Y.Z, writes CHANGELOG.md and bumps the
 # version in Cargo.toml and Cargo.lock (release-please-config.json). Nothing is published: no crates.io, no
-# registry, no binaries (the game data needed to use the tool never leaves the owner's machine anyway).
+# registry. Each release gets the Linux x86_64 binary, the contract schemas and a SHA-256 file as release assets,
+# with a build provenance attestation over all of them (scripts/release-assets.sh, VERSIONING.md).
+# `workflow_dispatch` is the dry run: it builds and attests the same assets from the selected ref and keeps them as a
+# workflow artifact instead of a release.
 name: Release
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,7 +21,11 @@ concurrency:
 
 jobs:
   release-please:
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
     steps:
       # Author the release PR with the personal-stack-agents App token (not the
       # default GITHUB_TOKEN) so CI runs on the PR without a manual approval
@@ -61,3 +69,44 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(release): refresh the workspace lock entries"
           git push "https://x-access-token:${PUSH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+
+  assets:
+    needs: release-please
+    # After a release is created from main, or on demand for the dry run.
+    if: ${{ !cancelled() && ((github.event_name == 'push' && needs.release-please.outputs.release_created == 'true') || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
+          persist-credentials: false
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5
+        with:
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: ". -> target"
+          save-if: false
+      - name: Build the assets
+        run: mise exec -- scripts/release-assets.sh dist
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Upload to the release
+        if: ${{ github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Keep the assets of a dry run
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-dry-run
+          path: dist/
+          retention-days: 7

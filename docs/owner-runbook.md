@@ -81,6 +81,9 @@ These need real files and are what the next implementation steps wait for. Each 
 5. **Quality mapping**: if you want parity with an existing generator's look, sweep its quality setting on one
    worldspace and record vertex counts per block next to `lodwright plan --blocks` for several tolerances.
 
+Public-source specs and the measurement protocol for these items are in [spec/](spec/README.md) (M1 to M9). Note
+the finding there: the block meshes are `.nif`, not `.btr`, and the settings file is `.dlodsettings`.
+
 ## 5. Not done and not planned without your decision
 
 Publishing the repository, and contacting the author of the tool whose behaviour is being reimplemented, are your

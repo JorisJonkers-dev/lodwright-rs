@@ -171,7 +171,7 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Recorded from the owner's research notes (the NV-Linux-Modding repository, docs/research/porting); to be checked against the owner's output tree with the planned verify command."
+note = "Recorded from the owner's research notes; to be checked against the owner's output tree with the planned verify command. Public sources (fnv-lod-object-block-names, fnv-lod-terrain-names) give <World>.level<L>.x<X>.y<Y>.nif instead: treat this row as superseded until the owner's tree decides."
 
 [[source]]
 id = "lod-terrain-paths"
@@ -182,7 +182,7 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Same origin and the same open check as lod-block-naming. The exact suffix of the normal map is the least certain part."
+note = "Same origin and the same open check as lod-block-naming. The exact suffix of the normal map is the least certain part. Public sources contradict it: the extension is .nif, not .btr, and the normal map is <World>.n.level<L>... (fnv-lod-terrain-names, fnv-lod-block-container-nif); superseded until the owner's tree decides."
 
 [[source]]
 id = "lod-settings-path"
@@ -193,4 +193,147 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Same origin and the same open check as lod-block-naming; the design notes also mention a .lod next to the meshes."
+note = "Same origin and the same open check as lod-block-naming; the design notes also mention a .lod next to the meshes. Public sources say the Fallout file is LODSettings/<World>.dlodsettings (fnv-lod-settings-dlodsettings); superseded until the owner's tree decides."
+
+[[source]]
+id = "fnv-lod-block-container-nif"
+fact = "In Fallout 3 and New Vegas the per-block LOD meshes are NIF files with the extension .nif; the .btr, .bto and .btt extensions belong to the Skyrim and Fallout 4 engines. Public file listings of New Vegas LOD give block meshes such as wastelandnv.level4.x-20.y-28.nif and no .btr file."
+url = "https://taleoftwowastelands.com/viewtopic.php@t=5035"
+licence = "Forum post; only file names and paths are recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly (post by zilav, 2015-03-21). The statement that .btr/.bto are Skyrim and Fallout 4 formats comes from the DynDOLOD help pages (see fnv-btr-bto-other-games). Contradicts the .btr claim in lod-terrain-paths."
+
+[[source]]
+id = "fnv-lod-object-block-names"
+fact = "Object LOD block meshes are named <world>.level<L>.x<X>.y<Y>.nif in meshes\\landscape\\lod\\<world>\\blocks\\, lower case in the vanilla example (wastelandnv.level4.x-20.y-28.nif); a second file per block, <world>.level4.high.x<X>.y<Y>.nif, holds objects flagged high priority. Negative coordinates carry a minus sign directly after x or y."
+url = "https://taleoftwowastelands.com/viewtopic.php@t=5035"
+licence = "Forum post; only file names and paths are recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly. Only level 4 is shown for objects. Whether terrain and object meshes share these names in one folder is open (see docs/spec/object-lod.md)."
+
+[[source]]
+id = "fnv-lod-folders"
+fact = "Generated LOD lives under meshes\\landscape\\lod\\<world>\\blocks\\ (meshes) and textures\\landscape\\lod\\<world>\\blocks\\ (textures); tree LOD data lives in meshes\\landscape\\lod\\<world>\\trees\\."
+url = "https://taleoftwowastelands.com/viewtopic.php@t=5035"
+licence = "Forum post; only file names and paths are recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly for meshes\\landscape\\lod\\wastelandnv\\blocks and ...\\trees. The textures folder is stated by the search excerpt of https://wiki.nexusmods.com/index.php/LOD_Generation_For_New_Vegas_and_Fallout_3 (page body returned 403, not re-read) and by a generator log excerpt in the xLODGen forum thread (https://stepmodifications.org/forum/topic/13451-xlodgen-terrain-lod-beta-132-for-fnv-fo3-fo4-fo4vr-tes5-sse-tes5vr-enderal-enderalse/page/121/)."
+
+[[source]]
+id = "fnv-lod-terrain-names"
+fact = "Terrain LOD files follow <world>.level<L>.x<X>.y<Y>.nif for L in 4, 8, 16, 32, with the diffuse texture <world>.level<L>.x<X>.y<Y>.dds and the normal map <world>.n.level<L>.x<X>.y<Y>.dds (the n sits after the world name, before level, not as a _n suffix). Example log line: wastelandnv.n.level4.x-40.y-64.dds."
+url = "https://stepmodifications.org/forum/topic/13451-xlodgen-terrain-lod-beta-130-for-fnv-fo3-fo4-fo4vr-tes5-sse-tes5vr-enderal-enderalse/page/108/"
+licence = "Forum post; only file names are recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Known only from a search-result excerpt; the page body was not fetched. Treat as strong lead, not fact: measure on the owner's output (docs/spec/terrain-lod.md section 9). The diffuse name without n is inferred, not seen."
+
+[[source]]
+id = "fnv-lod-levels"
+fact = "Terrain LOD is generated at four levels, 4, 8, 16 and 32, all at once; object LOD has a single level; cell LOD is a loaded/unloaded state, not distance based. A generator run builds terrain first, then objects."
+url = "https://vivanewvegas.moddinglinked.com/lod.html"
+licence = "Guide text; facts only, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly. Block span in cells per level is not stated there; the examples (x-20 y-28 at level 4, x-40 y-64 at level 4, X32 Y32 at level 32) are all multiples of the level."
+
+[[source]]
+id = "fnv-lod-texture-options"
+fact = "Generator guidance for terrain textures: size 512 for level 4 and 256 for the other levels (higher for retextured terrain), options for diffuse, normal, baked normal maps and mipmaps; object LOD uses an atlas whose maximum size and per-texture size limit are options."
+url = "https://vivanewvegas.moddinglinked.com/lod.html"
+licence = "Guide text; facts only, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly. These are tool settings (defaults a user picks), not engine requirements. The DDS compression and mip count of the shipped files are open."
+
+[[source]]
+id = "fnv-lod-atlas-name"
+fact = "A generator log excerpt shows an object LOD atlas written as textures\\landscape\\lod\\WastelandNV\\Blocks\\WastelandNV.Buildings.dds."
+url = "https://stepmodifications.org/forum/topic/13451-xlodgen-terrain-lod-beta-132-for-fnv-fo3-fo4-fo4vr-tes5-sse-tes5vr-enderal-enderalse/page/121/"
+licence = "Forum post; only a file name is recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Known only from a search-result excerpt, not fetched. Single sighting; verify on the owner's output."
+
+[[source]]
+id = "fnv-lod-settings-dlodsettings"
+fact = "The per-world LOD settings file for Fallout 3 and New Vegas is LODSettings\\<world>.dlodsettings under the data folder (extension .dlodsettings, not .lod); the editor creates it when it builds terrain LOD, and a generator only produces LOD for worlds that have one. It holds the cell coordinates of the world's south-west corner. The vanilla wastelandnv file ships inside Fallout - Misc.bsa."
+url = "https://wiki.nexusmods.com/index.php/LOD_Generation_For_New_Vegas_and_Fallout_3"
+licence = "Wiki text; facts only, no text is copied; Nexus Mods wiki, licence not stated on the page"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Known from search-result excerpts of this page, https://www.nexusmods.com/newvegas/mods/58562 and a forum post; none of the page bodies could be fetched (403). Contradicts lod-settings-path (.lod)."
+
+[[source]]
+id = "skyrim-lod-settings-struct"
+fact = "Skyrim's LOD settings file is Data/lodsettings/<world>.lod, a 16-byte struct: signed 16-bit left, signed 16-bit bottom, signed 32-bit stride_pow2, signed 32-bit lowestsize_lod, signed 32-bit highestsize_lod (little endian)."
+url = "https://en.uesp.net/wiki/Tes5Mod:LOD_Settings_File_Format"
+licence = "CC-BY-SA-2.5 (UESP wiki footer; the owner confirms the exact licence when verifying)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly (raw wikitext). Skyrim, not Fallout. Recorded only as the likely shape of the Fallout .dlodsettings; whether Fallout's file is the same is open and must be measured."
+
+[[source]]
+id = "fnv-tree-lod-files"
+fact = "Tree LOD in Fallout 3 and New Vegas uses meshes\\landscape\\lod\\<world>\\trees\\<world>.*.*.*.dtl (block data in a format similar to Skyrim's .btt) and trees\\treetypes.lst; the atlas textures\\landscape\\trees\\treedeadlod.dds is fixed for all worlds, and treeswamplod.dds is used when the world's editor id starts with DLC4."
+url = "https://taleoftwowastelands.com/viewtopic.php@t=5035"
+licence = "Forum post; only file names and paths are recorded, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly (post by zilav, 2015-03-26). Layout of .dtl and treetypes.lst not published there."
+
+[[source]]
+id = "fnv-btr-bto-other-games"
+fact = "The DynDOLOD help pages document terrain LOD as .BTR meshes under Meshes\\Terrain\\<world>\\ with .DDS textures, and object LOD as .BTO; that layout is for the Skyrim and Fallout 4 engines, not Fallout 3 or New Vegas."
+url = "https://dyndolod.info/Help/Terrain-LOD-and-Water-LOD"
+licence = "Documentation text; facts only, no text is copied; licence not stated on the page"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Known from a search-result excerpt; page not fetched. Used only to say why .btr/.bto do not apply to New Vegas."
+
+[[source]]
+id = "fnv-ini-terrainmanager"
+fact = "Fallout.ini [TerrainManager] defaults: bUseNewTerrainSystem=1, bUseDistantObjectBlocks=1, bUseDistantTrees=1, bKeepLowDetailTerrain=1, fLowBlockLoadDistanceLow=25000, fDefaultBlockLoadDistanceLow=50000, fHighBlockLoadDistanceLow=75000, fLowTreeLoadDistance=10000, fDefaultTreeLoadDistance=25000, fHighTreeLoadDistance=40000; FalloutPrefs.ini [TerrainManager]: fBlockLoadDistance=125000, fBlockLoadDistanceLow=50000, fTreeLoadDistance=25000; [LOD] bDisplayLODLand=1."
+url = "https://stepmodifications.org/forum/topic/14866-fallout-new-vegas-default-values-for-all-valid-ini-settings/"
+licence = "Forum post; setting names and default numbers only; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly. No description of what each setting does is given there. bUseLODSettings does not appear on the page."
+
+[[source]]
+id = "fnv-archive-loading"
+fact = "A BSA loads with the plugin that shares its name; archives of one plugin load in alphanumeric order; loose files override archive contents; with the JIP LN plugin, an archive can replace files of earlier archives, which needs an empty .override file. Fallout.ini [Archive] has bInvalidateOlderFiles=1, bUseArchives=1, SInvalidationFile=ArchiveInvalidation.txt and an SArchiveList."
+url = "https://vivanewvegas.moddinglinked.com/lod.html"
+licence = "Guide text; facts only, no text is copied; the site states no licence"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read directly (BSA rules) together with https://stepmodifications.org/forum/topic/14866-fallout-new-vegas-default-values-for-all-valid-ini-settings/ (INI names and defaults). Whether the settings file and LOD meshes are looked up through the archive system exactly like other assets is not stated; measure."

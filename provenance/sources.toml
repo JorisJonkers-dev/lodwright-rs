@@ -634,3 +634,102 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "wbDefineNiAlphaProperty, wbDefineNiZBufferProperty (NiZBufferProperty_EnFunction), wbDefineNiMaterialProperty (EnBefore10012 for flags, NiMaterialProperty_EnAmbientColor, NiMaterialProperty_EnEmissiveMult)."
+
+[[source]]
+id = "dds-header-flags-caps"
+fact = "Writers set DDSD_CAPS (0x1), DDSD_HEIGHT (0x2), DDSD_WIDTH (0x4) and DDSD_PIXELFORMAT (0x1000) in dwFlags, DDSD_MIPMAPCOUNT (0x20000) for a mipmapped texture and DDSD_LINEARSIZE (0x80000) for a compressed one; dwCaps has DDSCAPS_TEXTURE (0x1000), and for more than one surface also DDSCAPS_COMPLEX (0x8) and DDSCAPS_MIPMAP (0x400000). dwPitchOrLinearSize of a compressed texture is the byte size of the top level."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2021-03-15. Readers must not rely on the optional flags being set."
+
+[[source]]
+id = "dds-fourcc-formats"
+fact = "In the legacy pixel format (flags DDPF_FOURCC) BC1 is FourCC 'DXT1', BC3 is 'DXT5' and BC5 (unsigned) is 'ATI2'. The DX10 extension header is used when the basic pixel format cannot express the format, and the standard DDS_PIXELFORMAT is preferred for maximum compatibility for DXT1-5 because not all tools support the DX10 extension."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2020-11-04. Direct3D 9 cannot read a DX10 header; that part is the project's design note, not the page's."
+
+[[source]]
+id = "dds-reader-validation"
+fact = "A reader validates that the file is at least 128 bytes, that the magic is 'DDS ' (0x20534444), that the DDS_HEADER size is 124 and that the DDS_PIXELFORMAT size is 32; with FourCC 'DX10' the file must be at least 148 bytes."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2020-11-04."
+
+[[source]]
+id = "dds-linear-size-pitch"
+fact = "For block-compressed formats the pitch is max(1, ((width+3)/4)) * block size, with 8 bytes for DXT1, BC1 and BC4 and 16 bytes for the other block formats; the size of a mip level is max(1, ((width+3)/4)) * max(1, ((height+3)/4)) * 8 (DXT1) or 16 (DXT2-5)."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The pitch formula is on the programming guide page (updated 2020-11-04), the level size formula on the layout page (updated 2019-08-23); the url field names one page, the note names both."
+
+[[source]]
+id = "dds-mip-chain"
+fact = "If mipmaps are generated, all levels down to 1 by 1 are usually written; each level is half the size of the previous one with a minimum of one pixel (the layout page's 256 by 64 example runs 128x32, 64x16, 32x8, 16x4, 8x2, 4x1, 2x1, 1x1)."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-file-layout-for-textures"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2019-08-23. The page's example sizes are all even: rounding down for an odd size is the Direct3D convention and is not stated there, so it stays open until a reference file answers it."
+
+[[source]]
+id = "bc-block-padding"
+fact = "Block compression works on 4 by 4 texel blocks, so a surface is stored rounded up to whole blocks; sampling uses the declared size and ignores the padding, and a level smaller than 4 by 4 still occupies one block."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2022-08-26."
+
+[[source]]
+id = "bc1-block-layout"
+fact = "A BC1 block is 8 bytes for a 4 by 4 texel block: two 5:6:5 reference colours and sixteen 2-bit indices into a four-colour table of the two references and two interpolants."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2022-08-26. The encoder crate decides which table (four colours or three plus transparent) a block uses."
+
+[[source]]
+id = "bc3-block-layout"
+fact = "A BC3 block is 16 bytes: 64 bits of alpha (two 8-bit reference alphas and sixteen 3-bit indices, with six interpolated values when alpha_0 is greater than alpha_1, otherwise four plus 0 and 255) followed by a colour block laid out as BC1."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2022-08-26."
+
+[[source]]
+id = "bc5-block-layout"
+fact = "A BC5 block is 16 bytes: two single-channel blocks of the BC3 alpha scheme (two 8-bit references and sixteen 3-bit indices each), one for red then one for green."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Page last updated 2022-08-26. The order red then green follows the page's list (red_0, red_1, green_0, green_1)."

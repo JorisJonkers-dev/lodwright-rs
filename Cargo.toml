@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/lodwright-assets",
     "crates/lodwright-core",
+    "crates/lodwright-dds",
     "crates/lodwright-nif",
     "crates/lodwright-contract",
     "crates/lodwright-cli",
@@ -30,6 +31,7 @@ pedantic = { level = "warn", priority = -1 }
 [workspace.dependencies]
 lodwright-assets = { path = "crates/lodwright-assets" }
 lodwright-core = { path = "crates/lodwright-core" }
+lodwright-dds = { path = "crates/lodwright-dds" }
 lodwright-contract = { path = "crates/lodwright-contract" }
 lodwright-nif = { path = "crates/lodwright-nif" }
 lodwright-testkit = { path = "crates/lodwright-testkit" }

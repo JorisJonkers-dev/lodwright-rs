@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Fuzz harness for the DDS header reader.
-//!
-//! The reader does not exist in `lodwright-core` yet, so this runs the testkit's own reference reader (or nothing
-//! where the testkit has none). When the real reader lands, replace the call below with it; the target already
-//! compiles and runs in the weekly fuzz workflow. The only property: arbitrary bytes never panic.
+//! Fuzz harness for the DDS header reader and decoder: arbitrary bytes never panic either, a header the reader
+//! accepts always describes a data run that fits in the input, and decoding does no more work than that.
 
 #![no_main]
 
@@ -11,4 +8,9 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     let _ = lodwright_testkit::dds::parse_header(data);
+    if let Ok(header) = lodwright_dds::read_header(data) {
+        assert!(data.len() >= lodwright_dds::HEADER_LEN + header.data_bytes());
+        let decoded = lodwright_dds::decode(data).expect("a header the reader accepts decodes");
+        assert_eq!(decoded.levels.len(), header.mip_count as usize);
+    }
 });

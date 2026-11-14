@@ -188,3 +188,22 @@ Roles: the same author recorded the rows and wrote the crate, so no second reade
 row stays `verified = false`; the pull request says so. Open: whether the short-string length byte counts the trailing
 NUL (the crate carries those bytes raw), and what the game itself accepts: nothing here was loaded by the engine.
 No block profile for New Vegas LOD meshes is recorded; that waits for the owner's block NIF measurements.
+
+## 2026-11-14: DDS legacy header, mip chain and BC1, BC3, BC5 layout (lodwright-dds)
+
+Specifier entry, written from Microsoft's public DDS and Direct3D 10 block compression pages (Microsoft Learn), each page
+fetched and read on this date; the page's last-updated date is in each row note. No source code of any generator and no
+decompiled output was read. The existing rows `dds-header-layout` and `dds-pixel-format` are relied on unchanged.
+
+- `dds-header-flags-caps`: the header flag and caps values a writer sets.
+- `dds-fourcc-formats`: `DXT1`, `DXT5` and `ATI2` for BC1, BC3 and BC5, and why the legacy header is used.
+- `dds-reader-validation`: what a reader checks before trusting a file.
+- `dds-linear-size-pitch`: pitch and level size of block-compressed surfaces.
+- `dds-mip-chain`: levels halve down to 1 by 1.
+- `bc-block-padding`: surfaces are stored in whole 4 by 4 blocks.
+- `bc1-block-layout`, `bc3-block-layout`, `bc5-block-layout`: the block sizes and their parts.
+
+Roles: the same author recorded the rows and wrote the crate; every row stays `verified = false` and the pull request says
+so. Open: rounding of odd sizes in a mip chain (the page's examples are all even; the crate rounds down, the Direct3D
+convention), and which header fields (caps, flags, linear size) the game's own texture loader insists on: that is the
+owner's measurement M5 on a reference file, by role `oracle:` and numbers only.

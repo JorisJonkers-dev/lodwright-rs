@@ -12,6 +12,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 lodwright-assets = { path = "../crates/lodwright-assets" }
 lodwright-core = { path = "../crates/lodwright-core" }
+lodwright-dds = { path = "../crates/lodwright-dds" }
 lodwright-nif = { path = "../crates/lodwright-nif" }
 lodwright-testkit = { path = "../crates/lodwright-testkit" }
 

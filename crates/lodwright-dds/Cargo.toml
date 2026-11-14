@@ -1,0 +1,23 @@
+[package]
+name = "lodwright-dds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DDS writing with legacy headers, resize, mip chains and BC1, BC3 and BC5 encoding, with a decoder for tests."
+
+[dependencies]
+ddsfile = "0.6.0"
+texpresso = "2.0.2"
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
+
+[[bench]]
+name = "encode"
+harness = false
+
+[lints]
+workspace = true

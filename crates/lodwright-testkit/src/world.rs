@@ -22,6 +22,8 @@ pub struct SyntheticCell {
     pub y: i32,
     /// Heights; `None` writes a cell without a LAND record.
     pub heights: Option<Heights>,
+    /// Further LAND subrecords written after VHGT (VNML, VCLR, BTXT, ATXT, VTXT, anything else).
+    pub extra: Vec<([u8; 4], Vec<u8>)>,
 }
 
 /// A worldspace to write.
@@ -53,6 +55,25 @@ impl SyntheticWorld {
             x,
             y,
             heights: Some(heights),
+            extra: Vec::new(),
+        });
+        self
+    }
+
+    /// Add a cell with LAND heights and further LAND subrecords after VHGT.
+    #[must_use]
+    pub fn cell_with_subrecords(
+        mut self,
+        x: i32,
+        y: i32,
+        heights: Heights,
+        extra: Vec<([u8; 4], Vec<u8>)>,
+    ) -> Self {
+        self.cells.push(SyntheticCell {
+            x,
+            y,
+            heights: Some(heights),
+            extra,
         });
         self
     }
@@ -64,6 +85,7 @@ impl SyntheticWorld {
             x,
             y,
             heights: None,
+            extra: Vec::new(),
         });
         self
     }
@@ -102,6 +124,9 @@ pub fn world_group(world: &SyntheticWorld, compress_land: bool) -> Group {
             let mut land = Record::new(*b"LAND", world.form_id + 0x1000 + offset)
                 .with_subrecord(*b"DATA", 0x1_u32.to_le_bytes().to_vec())
                 .with_subrecord(*b"VHGT", encode_vhgt(heights));
+            for (signature, bytes) in &cell.extra {
+                land = land.with_subrecord(*signature, bytes.clone());
+            }
             if compress_land {
                 land = land.compressed();
             }
@@ -120,6 +145,52 @@ pub fn world_group(world: &SyntheticWorld, compress_land: bool) -> Group {
                 .with_subrecord(*b"EDID", zstring(&world.editor_id)),
         )
         .with(children)
+}
+
+// source: ltex-texture-set
+/// A `LTEX` record: editor id, optional `ICON` path, optional `TNAM` texture-set `FormID`.
+#[must_use]
+pub fn ltex_record(
+    form_id: u32,
+    editor_id: &str,
+    icon: Option<&str>,
+    texture_set: Option<u32>,
+) -> Record {
+    let mut record = Record::new(*b"LTEX", form_id).with_subrecord(*b"EDID", zstring(editor_id));
+    if let Some(icon) = icon {
+        record = record.with_subrecord(*b"ICON", zstring(icon));
+    }
+    if let Some(set) = texture_set {
+        record = record.with_subrecord(*b"TNAM", set.to_le_bytes().to_vec());
+    }
+    record
+}
+
+// source: txst-texture-paths
+/// A `TXST` record with the base image (`TX00`) and normal map (`TX01`) paths.
+#[must_use]
+pub fn txst_record(
+    form_id: u32,
+    editor_id: &str,
+    diffuse: Option<&str>,
+    normal: Option<&str>,
+) -> Record {
+    let mut record = Record::new(*b"TXST", form_id).with_subrecord(*b"EDID", zstring(editor_id));
+    if let Some(path) = diffuse {
+        record = record.with_subrecord(*b"TX00", zstring(path));
+    }
+    if let Some(path) = normal {
+        record = record.with_subrecord(*b"TX01", zstring(path));
+    }
+    record
+}
+
+/// A top-level group of flat records (for example the `LTEX` or `TXST` group).
+#[must_use]
+pub fn record_group(label: [u8; 4], records: Vec<Record>) -> Group {
+    records
+        .into_iter()
+        .fold(Group::new(TOP, label), Group::with)
 }
 
 /// A complete plugin with `masters` and one worldspace.

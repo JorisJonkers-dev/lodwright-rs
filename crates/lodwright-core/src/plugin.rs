@@ -12,6 +12,8 @@
 
 use crate::Error;
 use crate::land::{CellHeights, decode_vhgt};
+use crate::layers::{CellLayers, LayerReader};
+use crate::texture::{LandTexture, TextureSet};
 
 // source: plugin-record-header
 const RECORD_HEADER: usize = 24;
@@ -36,6 +38,9 @@ pub struct LandCell {
     pub y: i32,
     /// The decoded VHGT heights.
     pub heights: CellHeights,
+    /// Normals, colours and texture layers; `Some` only when read with [`ReadOptions::land_layers`].
+    /// Texture `FormID`s are as stored in this plugin.
+    pub layers: Option<CellLayers>,
 }
 
 /// A worldspace as one plugin defines or overrides it.
@@ -56,6 +61,18 @@ pub struct Plugin {
     pub masters: Vec<String>,
     /// Worldspaces this plugin touches.
     pub worlds: Vec<World>,
+    /// `LTEX` records of this plugin (`FormID`s as stored).
+    pub land_textures: Vec<LandTexture>,
+    /// `TXST` records of this plugin (`FormID`s as stored).
+    pub texture_sets: Vec<TextureSet>,
+}
+
+/// What [`read_with`] keeps beyond heights.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ReadOptions {
+    /// Keep vertex normals, vertex colours and texture layers of every LAND record. Off by default: they are
+    /// about six times the size of the heights, so planning does not pay for them.
+    pub land_layers: bool,
 }
 
 /// Read a plugin.
@@ -65,6 +82,14 @@ pub struct Plugin {
 /// [`Error::Decompress`] for a compressed record that does not inflate, and the VHGT errors of
 /// [`crate::land::decode_vhgt`].
 pub fn read(bytes: &[u8]) -> Result<Plugin, Error> {
+    read_with(bytes, ReadOptions::default())
+}
+
+/// Read a plugin, keeping what `options` asks for.
+///
+/// # Errors
+/// As [`read`], plus the decode errors of the LAND layer subrecords when `options.land_layers` is set.
+pub fn read_with(bytes: &[u8], options: ReadOptions) -> Result<Plugin, Error> {
     let (header, rest) = split_record(bytes, "the TES4 header")?;
     if &header.signature != b"TES4" {
         return Err(Error::Malformed("the first record is not TES4"));
@@ -77,11 +102,16 @@ pub fn read(bytes: &[u8]) -> Result<Plugin, Error> {
             masters.push(zstring(payload));
         }
     }
-    let mut walker = Walker::default();
+    let mut walker = Walker {
+        options,
+        ..Walker::default()
+    };
     walker.walk(rest, 0)?;
     Ok(Plugin {
         masters,
         worlds: walker.worlds,
+        land_textures: walker.land_textures,
+        texture_sets: walker.texture_sets,
     })
 }
 
@@ -188,6 +218,9 @@ fn zstring(bytes: &[u8]) -> String {
 
 #[derive(Default)]
 struct Walker {
+    options: ReadOptions,
+    land_textures: Vec<LandTexture>,
+    texture_sets: Vec<TextureSet>,
     worlds: Vec<World>,
     world: Option<usize>,
     cell: Option<(i32, i32)>,
@@ -277,12 +310,53 @@ impl Walker {
                     return Ok(());
                 };
                 let data = record.data()?;
+                let mut heights = None;
+                let mut layers = self.options.land_layers.then(LayerReader::default);
                 for (signature, payload) in subrecords(&data)? {
                     if &signature == b"VHGT" {
-                        let heights = decode_vhgt(payload)?;
-                        self.worlds[world].cells.push(LandCell { x, y, heights });
+                        heights = Some(decode_vhgt(payload)?);
+                    } else if let Some(reader) = &mut layers {
+                        reader.subrecord(signature, payload)?;
                     }
                 }
+                if let Some(heights) = heights {
+                    self.worlds[world].cells.push(LandCell {
+                        x,
+                        y,
+                        heights,
+                        layers: layers.map(LayerReader::finish),
+                    });
+                }
+            }
+            b"LTEX" => {
+                let data = record.data()?;
+                let mut texture = LandTexture::new(record.form_id);
+                // source: ltex-texture-set
+                for (signature, payload) in subrecords(&data)? {
+                    match &signature {
+                        b"EDID" => texture.editor_id = Some(zstring(payload)),
+                        b"ICON" => texture.icon = Some(zstring(payload)),
+                        b"TNAM" if payload.len() >= 4 => {
+                            texture.texture_set = Some(le_u32(payload, 0));
+                        }
+                        _ => {}
+                    }
+                }
+                self.land_textures.push(texture);
+            }
+            b"TXST" => {
+                let data = record.data()?;
+                let mut set = TextureSet::new(record.form_id);
+                // source: txst-texture-paths
+                for (signature, payload) in subrecords(&data)? {
+                    match &signature {
+                        b"EDID" => set.editor_id = Some(zstring(payload)),
+                        b"TX00" => set.diffuse = Some(zstring(payload)),
+                        b"TX01" => set.normal = Some(zstring(payload)),
+                        _ => {}
+                    }
+                }
+                self.texture_sets.push(set);
             }
             _ => {}
         }
@@ -292,7 +366,7 @@ impl Walker {
 
 #[cfg(test)]
 mod tests {
-    use super::read;
+    use super::{ReadOptions, read, read_with};
     use crate::Error;
     use crate::land::SCALE;
     use lodwright_testkit::land::Heights;
@@ -473,5 +547,88 @@ mod tests {
             read(&bytes),
             Err(Error::Malformed("groups nested too deeply"))
         );
+    }
+
+    fn layered_world() -> SyntheticWorld {
+        use lodwright_testkit::land::{
+            encode_atxt, encode_btxt, encode_vclr, encode_vnml, encode_vtxt,
+        };
+        let grid = vec![[1_u8, 2, 3]; 33 * 33];
+        SyntheticWorld::new(0x0100_0010, "Mojave").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(8.0),
+            vec![
+                (*b"VNML", encode_vnml(&grid)),
+                (*b"VCLR", encode_vclr(&grid)),
+                (*b"BTXT", encode_btxt(0x0100_0AAA, 0, 0)),
+                (*b"ATXT", encode_atxt(0x0000_0BBB, 1, 1)),
+                (*b"VTXT", encode_vtxt(&[(1, 0.5)])),
+                (*b"ZZZZ", vec![9; 3]),
+            ],
+        )
+    }
+
+    #[test]
+    fn layers_are_kept_only_when_asked_for() {
+        let bytes = world_plugin(&["FalloutNV.esm"], &layered_world(), true);
+        assert_eq!(read(&bytes).unwrap().worlds[0].cells[0].layers, None);
+        let plugin = read_with(&bytes, ReadOptions { land_layers: true }).unwrap();
+        let layers = plugin.worlds[0].cells[0].layers.as_ref().unwrap();
+        assert_eq!(layers.normals.as_ref().unwrap().get(3, 3), [1, 2, 3]);
+        assert_eq!(layers.colors.as_ref().unwrap().get(0, 0), [1, 2, 3]);
+        assert_eq!(layers.base[0], Some(0x0100_0AAA));
+        assert_eq!(layers.alpha.len(), 1);
+        assert_eq!(layers.alpha[0].quadrant, 1);
+        assert_eq!(layers.alpha[0].point(1, 0), 0.5);
+        // the heights are unchanged by asking for layers
+        assert_eq!(plugin.worlds[0].cells[0].heights.get(1, 1), 8.0);
+    }
+
+    #[test]
+    fn unknown_land_subrecords_are_still_skipped_with_layers_on() {
+        let bytes = world_plugin(&[], &layered_world(), false);
+        let plugin = read_with(&bytes, ReadOptions { land_layers: true }).unwrap();
+        assert_eq!(plugin.worlds[0].cells.len(), 1);
+    }
+
+    #[test]
+    fn a_bad_layer_subrecord_is_an_error_only_when_layers_are_read() {
+        let world = SyntheticWorld::new(0x10, "W").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(8.0),
+            vec![(*b"VNML", vec![0; 5])],
+        );
+        let bytes = world_plugin(&[], &world, false);
+        assert!(read(&bytes).is_ok());
+        assert_eq!(
+            read_with(&bytes, ReadOptions { land_layers: true }),
+            Err(Error::SubrecordLength {
+                what: "VNML",
+                found: 5
+            })
+        );
+    }
+
+    #[test]
+    fn ltex_and_txst_records_are_read_with_their_subrecords() {
+        use lodwright_testkit::world::{ltex_record, record_group, txst_record};
+        let bytes = PluginBuilder::new()
+            .group(record_group(
+                *b"TXST",
+                vec![txst_record(0x20, "Set", Some("a.dds"), Some("a_n.dds"))],
+            ))
+            .group(record_group(
+                *b"LTEX",
+                vec![ltex_record(0x30, "Tex", Some("old.dds"), Some(0x20))],
+            ))
+            .build();
+        let plugin = read(&bytes).unwrap();
+        assert_eq!(plugin.texture_sets[0].diffuse.as_deref(), Some("a.dds"));
+        assert_eq!(plugin.texture_sets[0].normal.as_deref(), Some("a_n.dds"));
+        assert_eq!(plugin.land_textures[0].icon.as_deref(), Some("old.dds"));
+        assert_eq!(plugin.land_textures[0].texture_set, Some(0x20));
+        assert_eq!(plugin.land_textures[0].editor_id.as_deref(), Some("Tex"));
     }
 }

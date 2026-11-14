@@ -392,3 +392,91 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game."
+
+[[source]]
+id = "land-vnml-layout"
+fact = "The VNML subrecord of LAND is 3267 bytes: a 33 x 33 grid of vertex normals, three bytes (x, y, z) per grid point, rows from the south."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandNormals at TES5Edit/TES5Edit revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): array of 33 rows of 33 structs of three u8. The byte encoding of a component (signed or biased) is not stated by either source; the reader keeps the raw bytes."
+
+[[source]]
+id = "land-vclr-layout"
+fact = "The VCLR subrecord of LAND is 3267 bytes: a 33 x 33 grid of 24-bit RGB vertex colours (red, green, blue), rows from the south."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandColors at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): 33 rows of 33 structs of u8 red, green, blue."
+
+[[source]]
+id = "land-layer-header"
+fact = "BTXT (base texture) and ATXT (additional texture) subrecords of LAND are 8 bytes each: u32 LTEX FormID (may be null), u8 quadrant (0 south-west, 1 south-east, 2 north-west, 3 north-east), one unused byte, s16 layer number. Up to four BTXT exist per LAND record, one per quadrant; each ATXT is followed by the VTXT of that quadrant and layer."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit (Core/wbDefinitionsCommon.pas wbLandLayers at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) reads FormID, u8 quadrant, one unused byte and s16 layer, which is used here. FormIDs are read little endian like every other FormID in a record (plugin-record-header)."
+
+[[source]]
+id = "land-vtxt-layout"
+fact = "The VTXT subrecord of LAND is a run of 8-byte points for the preceding ATXT: u16 position (0 to 288, the index in the quadrant's 17 x 17 grid filled row by row from the bottom-left point), two unused bytes, f32 opacity (0.0 to 1.0). Positions not listed have no opacity (zero)."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "xEdit wbLandLayers (same revision, MPL-2.0) reads u16 position, two unused bytes and a float opacity. 'Positions not listed are zero' is an inference from the list being sparse, not a statement of either source."
+
+[[source]]
+id = "land-quadrant-grid"
+fact = "A LAND cell has four quadrants, each a 17 x 17 point grid; quadrants share the middle row and column of the 33 x 33 vertex grid, so quadrant q starts at vertex column (q mod 2) x 16 and row (q div 2) x 16, rows counted from the south."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The page gives the quadrant numbering, the 17 x 17 grid and the bottom-left-first row order; the mapping to vertex coordinates is arithmetic on those facts (two 16-interval halves of a 32-interval cell)."
+
+[[source]]
+id = "ltex-texture-set"
+fact = "In Fallout 3 and New Vegas a LTEX record has EDID, an optional ICON texture path, TNAM (FormID of a TXST texture set), HNAM havok data, SNAM specular exponent and GNAM grass FormIDs."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read RegisterRecordDef(LTEX, ...) in wbDefinitionsFNV.pas. The Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LTEX (CC-BY-SA-2.5) lists ICON as the texture path and has no TNAM. OPEN: which of TNAM and ICON the game prefers when both exist; the resolver takes the texture set's TX00 first and falls back to ICON."
+
+[[source]]
+id = "txst-texture-paths"
+fact = "A FNV TXST record has EDID, OBND, then optional zero-terminated texture paths TX00 (base image), TX01 (normal map, specular in alpha), TX02 (environment map mask), TX03 (glow map), TX04 (parallax map) and TX05 (environment map), DODT decal data and DNAM flags."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the paths are relative to the textures folder is not stated; the code keeps them as stored."
+
+[[source]]
+id = "plugin-record-override"
+fact = "A plugin overrides a record of an earlier plugin by carrying a record with the same (resolved) FormID; the record of the later plugin in load order replaces the earlier one as a whole."
+url = "https://en.uesp.net/wiki/Tes4Mod:FormID"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License')"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master. 'As a whole' (no field merging) is the conservative reading; Bethesda games' conflict resolution is whole-record, but no page read here states it."

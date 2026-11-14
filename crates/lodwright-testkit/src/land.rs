@@ -82,6 +82,62 @@ pub fn reference_decode(bytes: &[u8]) -> Option<Heights> {
     Some(Heights(heights))
 }
 
+// source: land-vnml-layout
+/// A VNML payload: three bytes per vertex of the 33 x 33 grid (`vertices` must hold 1089 triples).
+///
+/// # Panics
+/// If `vertices` is not 1089 long.
+#[must_use]
+pub fn encode_vnml(vertices: &[[u8; 3]]) -> Vec<u8> {
+    assert_eq!(vertices.len(), SIDE * SIDE, "a cell has 33 x 33 vertices");
+    vertices.iter().flatten().copied().collect()
+}
+
+// source: land-vclr-layout
+/// A VCLR payload: red, green, blue per vertex of the 33 x 33 grid.
+///
+/// # Panics
+/// If `vertices` is not 1089 long.
+#[must_use]
+pub fn encode_vclr(vertices: &[[u8; 3]]) -> Vec<u8> {
+    assert_eq!(vertices.len(), SIDE * SIDE, "a cell has 33 x 33 vertices");
+    vertices.iter().flatten().copied().collect()
+}
+
+// source: land-layer-header
+fn layer_header(texture: u32, quadrant: u8, layer: i16) -> Vec<u8> {
+    let mut bytes = texture.to_le_bytes().to_vec();
+    bytes.push(quadrant);
+    bytes.push(0);
+    bytes.extend_from_slice(&layer.to_le_bytes());
+    bytes
+}
+
+/// A BTXT payload: LTEX `FormID`, quadrant, layer.
+#[must_use]
+pub fn encode_btxt(texture: u32, quadrant: u8, layer: i16) -> Vec<u8> {
+    layer_header(texture, quadrant, layer)
+}
+
+/// An ATXT payload: LTEX `FormID`, quadrant, layer.
+#[must_use]
+pub fn encode_atxt(texture: u32, quadrant: u8, layer: i16) -> Vec<u8> {
+    layer_header(texture, quadrant, layer)
+}
+
+// source: land-vtxt-layout
+/// A VTXT payload from (position, opacity) points.
+#[must_use]
+pub fn encode_vtxt(points: &[(u16, f32)]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for (position, opacity) in points {
+        bytes.extend_from_slice(&position.to_le_bytes());
+        bytes.extend_from_slice(&[0, 0]);
+        bytes.extend_from_slice(&opacity.to_le_bytes());
+    }
+    bytes
+}
+
 #[allow(clippy::cast_possible_truncation)]
 fn quantise(height: f32) -> i32 {
     (height / SCALE).round() as i32

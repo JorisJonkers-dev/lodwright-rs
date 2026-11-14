@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use crate::Error;
 use crate::land::{CellHeights, SIDE};
+use crate::layers::CellLayers;
 use crate::plugin::Plugin;
 
 /// One worldspace with the final heights of every exterior cell that has LAND.
@@ -17,6 +18,7 @@ pub struct Worldspace {
     form_id: u32,
     name: String,
     cells: BTreeMap<(i32, i32), CellHeights>,
+    layers: BTreeMap<(i32, i32), CellLayers>,
 }
 
 /// Inclusive cell bounds of a worldspace.
@@ -55,6 +57,13 @@ impl Worldspace {
     #[must_use]
     pub fn cell(&self, x: i32, y: i32) -> Option<&CellHeights> {
         self.cells.get(&(x, y))
+    }
+
+    /// Normals, colours and texture layers of cell (`x`, `y`), with absolute texture `FormID`s. Present only when
+    /// the plugins were read with [`crate::plugin::ReadOptions::land_layers`] and the winning LAND record has them.
+    #[must_use]
+    pub fn layers(&self, x: i32, y: i32) -> Option<&CellLayers> {
+        self.layers.get(&(x, y))
     }
 
     /// All cells in (x, y) order.
@@ -113,6 +122,7 @@ impl Worldspace {
             form_id,
             name: name.to_owned(),
             cells: cells.into_iter().collect(),
+            layers: BTreeMap::new(),
         }
     }
 
@@ -133,12 +143,21 @@ impl Worldspace {
                     form_id: id,
                     name: format!("{id:08X}"),
                     cells: BTreeMap::new(),
+                    layers: BTreeMap::new(),
                 });
                 if let Some(editor_id) = &source.editor_id {
                     world.name.clone_from(editor_id);
                 }
                 for cell in &source.cells {
                     world.cells.insert((cell.x, cell.y), cell.heights.clone());
+                    // a later LAND record replaces the earlier one as a whole, layers included
+                    // source: plugin-record-override
+                    world.layers.remove(&(cell.x, cell.y));
+                    if let Some(layers) = &cell.layers {
+                        let mut layers = layers.clone();
+                        layers.map_textures(|id| absolute(id, &table, own));
+                        world.layers.insert((cell.x, cell.y), layers);
+                    }
                 }
             }
         }
@@ -147,7 +166,10 @@ impl Worldspace {
 }
 
 /// Load-order index of each master of `plugin`, by position in its master list.
-fn master_table(plugins: &[(String, Plugin)], plugin: &Plugin) -> Result<Vec<u32>, Error> {
+pub(crate) fn master_table(
+    plugins: &[(String, Plugin)],
+    plugin: &Plugin,
+) -> Result<Vec<u32>, Error> {
     plugin
         .masters
         .iter()
@@ -162,7 +184,7 @@ fn master_table(plugins: &[(String, Plugin)], plugin: &Plugin) -> Result<Vec<u32
 }
 
 // source: plugin-formid-masters
-fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
+pub(crate) fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
     let index = usize::try_from(form_id >> 24).unwrap_or(usize::MAX);
     let load_index = table.get(index).copied().unwrap_or(own);
     (load_index << 24) | (form_id & 0x00FF_FFFF)
@@ -291,5 +313,62 @@ mod tests {
             [((0, 0), flat()), ((5, 5), CellHeights::flat(99.0))],
         );
         assert!(alone.max_seam_error().abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn layers_come_back_with_absolute_texture_ids_and_the_last_plugin_wins_whole() {
+        use crate::plugin::{ReadOptions, read_with};
+        use lodwright_testkit::land::{encode_atxt, encode_btxt, encode_vtxt};
+        let options = ReadOptions { land_layers: true };
+        let base = SyntheticWorld::new(0x0000_0A00, "Mojave").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(8.0),
+            vec![
+                (*b"BTXT", encode_btxt(0x0000_0001, 0, 0)),
+                (*b"ATXT", encode_atxt(0x0000_0002, 0, 1)),
+                (*b"VTXT", encode_vtxt(&[(3, 1.0)])),
+            ],
+        );
+        let patch = SyntheticWorld::new(0x0000_0A00, "Mojave").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(9.0),
+            // texture 0x01000005 is the patch's own (index 1), 0x00000006 is the master's
+            vec![(*b"BTXT", encode_btxt(0x0100_0005, 2, 0))],
+        );
+        let plugins: Vec<(String, crate::plugin::Plugin)> = vec![
+            (
+                "Base.esm".into(),
+                read_with(&world_plugin(&[], &base, false), options).unwrap(),
+            ),
+            (
+                "Patch.esp".into(),
+                read_with(&world_plugin(&["Base.esm"], &patch, false), options).unwrap(),
+            ),
+        ];
+        let only_base = Worldspace::from_load_order(&plugins[..1]).unwrap();
+        let layers = only_base[0].layers(0, 0).unwrap();
+        assert_eq!(layers.base[0], Some(1));
+        assert_eq!(layers.alpha[0].texture, 2);
+        let both = Worldspace::from_load_order(&plugins).unwrap();
+        let layers = both[0].layers(0, 0).unwrap();
+        assert_eq!(layers.base, [None, None, Some(0x0100_0005), None]);
+        assert!(
+            layers.alpha.is_empty(),
+            "the patch cell replaces the base cell whole"
+        );
+        assert!(both[0].layers(1, 0).is_none());
+    }
+
+    #[test]
+    fn plain_reads_keep_no_layers() {
+        let world = SyntheticWorld::new(0x10, "W").cell(0, 0, Heights::flat(1.0));
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        assert!(
+            Worldspace::from_load_order(&plugins).unwrap()[0]
+                .layers(0, 0)
+                .is_none()
+        );
     }
 }

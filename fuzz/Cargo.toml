@@ -71,3 +71,10 @@ path = "fuzz_targets/bsa_archive.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "land_layers"
+path = "fuzz_targets/land_layers.rs"
+test = false
+doc = false
+bench = false

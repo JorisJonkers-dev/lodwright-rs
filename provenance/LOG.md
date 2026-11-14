@@ -235,3 +235,28 @@ Open: whether the real New Vegas block NIFs match these layouts is exactly what 
 answer with the command. The probe reports `layout_matches: false` for a block whose fields do not add up to its size,
 so a wrong row shows up as a number and not as a wrong count. Open also: the probe widens 5 and 6 bit colours by bit
 replication and interpolates in 8 bits (the page leaves both open), so decoded statistics can be off by one.
+
+## 2026-11-14: second reader pass over the `lodwright probe` rows
+
+Second-reader entry, role held: second reader only. The facts were re-derived before the implementation was read, from
+`Core/wbDataFormatNif.pas` and `Core/wbDataFormatNifTypes.pas` of TES5Edit/TES5Edit at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0) and from the Microsoft documentation repository at revision
+`bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583` (the DDS header, pixel format, DX10 header and programming guide pages, and
+the Direct3D 9 opaque and alpha texture pages). Not read: any niftools file, the 2016 generator C# repository,
+decompiled binaries, GPL or leaked code. The author of the probe had disclosed seeing the first 2.5 KB of a GPL-3.0
+NIF description; none of its content was used here, and every NIF layout below was found in the xEdit definitions
+alone. The probe's NIF reading shows no sign of a source outside the xEdit file.
+
+Flipped to `verified = true`: `nif-header-layout`, `probe-nif-block-table`, `probe-nif-geometry-data-layout`,
+`nif-trishape-strips-data`, `nif-texture-set`, `dds-pixel-format-masks`, `dds-header-dxt10`. Wording fixes made while
+doing so: `probe-nif-geometry-data-layout` now states where the material CRC sits (after the vector flags, before
+has-normals; the probe does not read it, which only matters for user version 12); `dds-pixel-format-masks` names the
+programming guide page that gives the magic and the surface placement. That each block has the size the block size
+array gives is not stated as a rule in xEdit; it holds because xEdit writes the array from each block's serialised size.
+
+Left `verified = false`: `probe-bc1-block-layout` (layout, colour order, bit order and the three- and four-colour rule
+agree with the page; the widening of 5 and 6 bit values by bit replication and the 8-bit interpolation are not in any
+allowed source) and `probe-bc3-block-layout` (the six-alpha formula in the row had an index slip, `(c-1)` for `k`,
+corrected here to match the page and the code; the same widening gap applies to the colour block). An open issue
+covers the widening, and the 8-bit scaling of uncompressed channels and their little-endian pixel assembly, which no
+row states either.

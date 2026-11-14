@@ -77,7 +77,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "miniz_oxide",
 ]
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-testkit"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "miniz_oxide",
 ]

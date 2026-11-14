@@ -748,7 +748,7 @@ licence = "MPL-2.0 (file header of wbDataFormatNif.pas, TES5Edit repository, rev
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in wbDefineNifHeaderFooter, NiHeader_EnBSHeader and the NiHeader_En* conditions. lodwright probe reads only version 20.2.0.7 down to the block table and reports the version number for any other."
 
 [[source]]
@@ -759,18 +759,18 @@ licence = "MPL-2.0 (file header of wbDataFormatNif.pas, TES5Edit repository, rev
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in wbDefineNifHeaderFooter. That block data directly follows the header, in array order, with the stated sizes, is read from the Block Size array being present since 20.2.0.7 and is checked at probe time against the file length."
 
 [[source]]
 id = "probe-nif-geometry-data-layout"
-fact = "For version 20.2.0.7 the fields of NiGeometryData are, in order: group id (s32), number of vertices (u16), keep flags (u8), compress flags (u8), has-vertices (u8 bool), the vertices (three f32 each) when has-vertices is set, the vector flags (u16; bit 0 is the UV-present flag, bit 12 (4096) the tangents flag), has-normals (u8 bool), the normals (three f32 each) when set, tangents then bitangents (three f32 each) when has-normals is set and the tangents flag is set, the bounding sphere (centre three f32 and radius f32), has-vertex-colors (u8 bool), the vertex colours (four f32 each) when set, the UV sets (one set of two f32 per vertex for each UV count, which for this version is the UV-present bit), the consistency flags (u16) and the additional-data reference (s32). The material CRC (u32) exists only when the user version is 12."
+fact = "For version 20.2.0.7 the fields of NiGeometryData are, in order: group id (s32), number of vertices (u16), keep flags (u8), compress flags (u8), has-vertices (u8 bool), the vertices (three f32 each) when has-vertices is set, the vector flags (u16; bit 0 is the UV-present flag, bit 12 (4096) the tangents flag), the material CRC (u32, only when the user version is 12), has-normals (u8 bool), the normals (three f32 each) when set, tangents then bitangents (three f32 each) when has-normals is set and the tangents flag is set, the bounding sphere (centre three f32 and radius f32), has-vertex-colors (u8 bool), the vertex colours (four f32 each) when set, the UV sets (one set of two f32 per vertex for each UV count, which for this version is the UV-present bit), the consistency flags (u16) and the additional-data reference (s32)."
 url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
 licence = "MPL-2.0 (file header of wbDataFormatNif.pas, TES5Edit repository, revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in wbDefineNiGeometryData and its NiGeometryData_* conditions, and wbBool (u8 from version 4.1.0.1)."
 
 [[source]]
@@ -781,7 +781,7 @@ licence = "MPL-2.0 (file header of wbDataFormatNif.pas, TES5Edit repository, rev
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in wbDefineNiTriBasedGeomData, wbDefineNiTriShapeData, wbDefineNiTriStripsData and wbMatchGroup. Indices are u16 in these blocks, so the index width is 16 bits."
 
 [[source]]
@@ -792,7 +792,7 @@ licence = "MPL-2.0 (file header of wbDataFormatNif.pas, TES5Edit repository, rev
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in wbDefineBSShaderTextureSet. lodwright probe counts the non-empty entries and reports their lengths, never the text."
 
 [[source]]
@@ -803,8 +803,8 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583 (dds-pixelformat.md, dds-header.md)."
+verified = true
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583 (dds-pixelformat.md, dds-header.md); the magic and the placement of the first surface after the header and the DX10 extension are from dx-graphics-dds-pguide.md of the same revision."
 
 [[source]]
 id = "dds-header-dxt10"
@@ -814,7 +814,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. lodwright probe only reports these numbers."
 
 [[source]]
@@ -830,7 +830,7 @@ note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2
 
 [[source]]
 id = "probe-bc3-block-layout"
-fact = "A BC3 (DXT4 and DXT5) block is 16 bytes: an 8-byte alpha block, then the 8-byte colour block laid out as BC1 but always decoded in four-colour mode. The alpha block is alpha_0 and alpha_1 (u8 each) and 16 texel codes of 3 bits in the remaining 6 bytes, read as one little-endian 48-bit value with texel [0][0] in the lowest bits, row by row. If alpha_0 is greater than alpha_1 the other six alphas are (k*alpha_0 + (7-k)*alpha_1 + 3)/7 for codes 2..7 with k = 6 down to 1; otherwise codes 2..5 are ((5-c)*alpha_0 + (c-1)*alpha_1 + 2)/5 for c = 1..4, code 6 is 0 and code 7 is 255."
+fact = "A BC3 (DXT4 and DXT5) block is 16 bytes: an 8-byte alpha block, then the 8-byte colour block laid out as BC1 but always decoded in four-colour mode. The alpha block is alpha_0 and alpha_1 (u8 each) and 16 texel codes of 3 bits in the remaining 6 bytes, read as one little-endian 48-bit value with texel [0][0] in the lowest bits, row by row. If alpha_0 is greater than alpha_1 the other six alphas are (k*alpha_0 + (7-k)*alpha_1 + 3)/7 for codes 2..7 with k = 6 down to 1; otherwise codes 2..5 are ((5-k)*alpha_0 + k*alpha_1 + 2)/5 for k = 1..4 (code k+1), code 6 is 0 and code 7 is 255."
 url = "https://learn.microsoft.com/en-us/windows/win32/direct3d9/textures-with-alpha-channels"
 licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14

@@ -9,6 +9,7 @@
 pub mod bsa;
 pub mod dds;
 pub mod golden;
+pub mod image;
 pub mod land;
 pub mod plugin;
 pub mod rng;

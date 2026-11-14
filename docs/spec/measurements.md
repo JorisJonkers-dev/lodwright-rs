@@ -3,6 +3,11 @@
 Everything below runs on your machine, on your own files, under `capped`. Report numbers and names only; never paste or
 commit file content. Existing generator output is allowed as black-box input (`oracle:` rows).
 
+`lodwright probe <nif|dds|settings|dtl> <file>` takes M1, M5, M7 and M8 for you: it prints only structure and numbers
+(NIF header and block table, per-shape vertex and triangle counts, DDS header and channel statistics, the size and
+first 64 bytes as little-endian integers of a settings or `.dtl` file), and refuses a file inside a git working tree.
+Add `--json` for one line of JSON. A NIF block whose fields do not add up reports `layout_matches: false`.
+
 Common: pick `WastelandNV` and one small DLC world. Use a hex dump limited to the first 64 bytes unless stated.
 
 - **M1 block NIF.** For three blocks (one per level 4, 16, 32): file size; first line of the file (the NIF header

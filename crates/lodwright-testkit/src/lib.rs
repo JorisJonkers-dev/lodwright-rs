@@ -13,5 +13,6 @@ pub mod image;
 pub mod land;
 pub mod nif;
 pub mod plugin;
+pub mod probe_nif;
 pub mod rng;
 pub mod world;

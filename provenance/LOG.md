@@ -207,3 +207,31 @@ Roles: the same author recorded the rows and wrote the crate; every row stays `v
 so. Open: rounding of odd sizes in a mip chain (the page's examples are all even; the crate rounds down, the Direct3D
 convention), and which header fields (caps, flags, linear size) the game's own texture loader insists on: that is the
 owner's measurement M5 on a reference file, by role `oracle:` and numbers only.
+
+
+
+## 2026-11-14: `lodwright probe` (NIF header and geometry, DDS pixel format and BC1/BC3, no game file)
+
+Recorded by J.W. Jonkers as specifier, read in the sources themselves (not from memory): the NIF rows from
+`Core/wbDataFormatNif.pas` of the TES5Edit repository at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`
+(MPL-2.0; the reader below was written from the rows, not translated), the DDS and block-compression rows from the
+Microsoft documentation repository. The reader was then written as implementer from the rows only. Disclosure: to look for a
+permissively licensed NIF description the author opened the niftools nifxml repository (GPL-3.0) and saw the first
+2,500 bytes of its `nif.xml` (version-expression tokens) and its licence; that repository is a forbidden input, nothing
+from it was used or recorded, and every NIF fact above comes from the xEdit file. The owner may want the second reader
+to re-derive the NIF rows from the xEdit file alone. No game file was opened; every test builds its bytes with the testkit.
+
+- `nif-header-layout`: the text line, version, endian, user versions, block count and the Bethesda export info.
+- `probe-nif-block-table`: block types, indices, sizes, strings and groups; block data follows the header.
+- `probe-nif-geometry-data-layout`: the NiGeometryData fields for 20.2.0.7 and the vector flags.
+- `nif-trishape-strips-data`: the triangle and strip data blocks (16-bit indices).
+- `nif-texture-set`: the texture path array.
+- `dds-pixel-format-masks`: bit count, masks, flags and where mip 0 starts.
+- `dds-header-dxt10`: the DX10 extension, reported only.
+- `probe-bc1-block-layout`: the 8-byte block, the four- and three-colour rule and the bit order.
+- `probe-bc3-block-layout`: the alpha block and the colour block that follows it.
+
+Open: whether the real New Vegas block NIFs match these layouts is exactly what the owner's measurements M1 and M5
+answer with the command. The probe reports `layout_matches: false` for a block whose fields do not add up to its size,
+so a wrong row shows up as a number and not as a wrong count. Open also: the probe widens 5 and 6 bit colours by bit
+replication and interpolates in 8 bits (the page leaves both open), so decoded statistics can be off by one.

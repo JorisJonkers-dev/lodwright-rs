@@ -20,7 +20,7 @@ reference output never go in this repository; test fixtures are synthetic.
 Implemented, from synthetic fixtures: the plugin reader (groups, compressed records, `WRLD`/`CELL`/`LAND`), the LAND
 height decoder, worldspace assembly across a load order, the block-aligned height raster, terrain LOD planning
 (levels 4, 8, 16 and 32: blocks, decimated meshes, error, vertex cap, texture sizes, output paths) and the CLI
-(`doctor`, `plan`, `heightmap`, `schema`, and a `generate` that answers `unsupported`). The documents the CLI prints
+(`doctor`, `plan`, `heightmap`, `schema`, `probe`, and a `generate` that answers `unsupported`). The documents the CLI prints
 for callers (plan v1, result v1) are typed and schema-checked in `crates/lodwright-contract`; the schemas are under
 `schemas/` and ship as release assets (`VERSIONING.md`).
 

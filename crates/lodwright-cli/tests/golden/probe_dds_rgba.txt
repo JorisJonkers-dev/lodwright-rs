@@ -1,0 +1,33 @@
+file_bytes: 144
+width: 2
+height: 2
+depth: 0
+mip_count: 1
+header_flags: 135175
+pitch_or_linear_size: 0
+pixel_format_flags: 65
+four_cc_value: 0
+rgb_bit_count: 32
+masks:
+  red: 16711680
+  green: 65280
+  blue: 255
+  alpha: 4278190080
+format: uncompressed
+mip0:
+  red:
+    mean: 116.250
+    min: 0
+    max: 255
+  green:
+    mean: 62.000
+    min: 0
+    max: 128
+  blue:
+    mean: 20.000
+    min: 0
+    max: 50
+  alpha:
+    mean: 137.500
+    min: 0
+    max: 255

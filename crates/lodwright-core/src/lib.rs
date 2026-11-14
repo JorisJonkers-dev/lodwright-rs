@@ -7,7 +7,8 @@
 //!
 //! Pipeline so far: [`plugin`] reads plugins, [`worldspace`] assembles worlds across a load order, [`land`] decodes
 //! heights (and, on request, [`layers`] and [`texture`] paths), [`raster`] puts them on a block-aligned grid, [`terrain`] plans the LOD blocks and meshes, [`layout`] names the
-//! output files. [`lod`] and [`dds`] are still contracts only.
+//! output files. [`probe`] holds the numbers-only readers behind `lodwright probe`. [`lod`] and [`dds`] are still
+//! contracts only.
 
 pub mod dds;
 pub mod error;
@@ -16,6 +17,7 @@ pub mod layers;
 pub mod layout;
 pub mod lod;
 pub mod plugin;
+pub mod probe;
 pub mod raster;
 pub mod terrain;
 pub mod texture;

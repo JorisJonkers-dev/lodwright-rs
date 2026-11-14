@@ -42,8 +42,11 @@ pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, String> {
     found.ok_or_else(|| format!("plugin {name} not found in the data folder"))
 }
 
-/// Read every plugin of the load order (in order) and assemble the worldspaces.
-pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, String> {
+/// Read every plugin of the load order, in order.
+pub fn load_plugins(
+    data: &Path,
+    names: &[String],
+) -> Result<Vec<(String, plugin::Plugin)>, String> {
     if names.is_empty() {
         return Err("no plugins given: use --plugin NAME (repeatable) or --load-order FILE".into());
     }
@@ -54,6 +57,12 @@ pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, Str
         let parsed = plugin::read(&bytes).map_err(|e| format!("plugin {name}: {e}"))?;
         plugins.push((name.clone(), parsed));
     }
+    Ok(plugins)
+}
+
+/// Read every plugin of the load order (in order) and assemble all the worldspaces at once.
+pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, String> {
+    let plugins = load_plugins(data, names)?;
     Worldspace::from_load_order(&plugins).map_err(|e| e.to_string())
 }
 

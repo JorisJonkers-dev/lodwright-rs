@@ -7,9 +7,9 @@ use std::path::Path;
 
 use lodwright_core::raster::{BlockGrid, HeightRaster};
 use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
-use lodwright_core::worldspace::Worldspace;
+use lodwright_core::worldspace::{Inheritance, WorldIndex, Worldspace};
 
-use crate::load::load_worlds;
+use crate::load::{load_plugins, load_worlds};
 
 /// The version of the JSON that `plan --format json` prints; it grows only on a breaking change.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -40,6 +40,34 @@ fn select<'a>(
         }
         None if worlds.is_empty() => Err("the plugins define no worldspace with terrain".into()),
         None => Ok(worlds.iter().collect()),
+    }
+}
+
+/// The worlds `wanted` names (all when `None`), as `FormID`s from the index.
+fn select_ids(index: &WorldIndex, wanted: Option<&str>) -> Result<Vec<u32>, String> {
+    let names = || {
+        index
+            .worlds()
+            .map(|(_, name)| name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if let Some(name) = wanted {
+        let found: Vec<u32> = index
+            .worlds()
+            .filter(|(_, world)| world.eq_ignore_ascii_case(name))
+            .map(|(id, _)| id)
+            .collect();
+        if found.is_empty() {
+            return Err(format!("no worldspace named {name}; found: {}", names()));
+        }
+        return Ok(found);
+    }
+    let all: Vec<u32> = index.worlds().map(|(id, _)| id).collect();
+    if all.is_empty() {
+        Err("the plugins define no worldspace with terrain".into())
+    } else {
+        Ok(all)
     }
 }
 
@@ -182,16 +210,21 @@ fn json_report(world: &Worldspace, plan: &TerrainPlan, blocks: bool) -> String {
 
 /// `plan`: read the plugins, plan the terrain LOD of the chosen worlds, print the plan.
 pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), String> {
-    let worlds = load_worlds(&options.data, &options.plugins)?;
-    let chosen = select(&worlds, options.world.as_deref())?;
+    let plugins = load_plugins(&options.data, &options.plugins)?;
+    let index = WorldIndex::new(&plugins).map_err(|e| e.to_string())?;
+    let chosen = select_ids(&index, options.world.as_deref())?;
     let settings = TerrainSettings::default();
     let mut reports = Vec::new();
-    for world in chosen {
+    // one world at a time: each assembled world is dropped before the next is built
+    for id in chosen {
+        let Some(world) = index.build(&plugins, id, Inheritance::None) else {
+            continue;
+        };
         let plan =
-            plan_world(world, &settings).map_err(|e| format!("world {}: {e}", world.name()))?;
+            plan_world(&world, &settings).map_err(|e| format!("world {}: {e}", world.name()))?;
         reports.push(match options.format {
-            Format::Text => text_report(world, &plan, options.blocks),
-            Format::Json => json_report(world, &plan, options.blocks),
+            Format::Text => text_report(&world, &plan, options.blocks),
+            Format::Json => json_report(&world, &plan, options.blocks),
         });
     }
     let text = match options.format {

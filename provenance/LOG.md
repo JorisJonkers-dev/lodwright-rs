@@ -120,3 +120,20 @@ used. The same person wrote the rows and the code, so every row stays `verified 
 - `ltex-texture-set`: LTEX has TNAM (TXST) and ICON in FNV; which wins is open, TXST first is the implemented choice.
 - `txst-texture-paths`: TX00 and TX01 are the base and normal paths.
 - `plugin-record-override`: a later plugin's LTEX, TXST or LAND replaces the earlier one as a whole.
+
+## 2026-11-14: worldspace data for TTW (WRLD parent, land data, bounds, cell water)
+
+Specifier entry from the UESP CELL and WRLD pages (CC-BY-SA-2.5, last edited 30 July 2024) and xEdit
+(`TES5Edit/TES5Edit` revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016 generator C#
+repository, decompiled binaries, leaked or GPL code. The same person wrote the rows and the code; all rows stay
+`verified = false` until a second reader re-derives them. The TTW cases come from `research-lod.md` section 6 of the
+umbrella repository (worlds `Wasteland` and `DCworld01`..`DCworld18`, the master chain through `Fallout3.esm`, an
+adjustments plugin that overrides the worldspace); they use synthetic plugins named like the real ones, nothing else.
+
+- `wrld-parent`: WNAM and the PNAM flag bits (xEdit).
+- `wrld-land-data`: DNAM, default land and water height.
+- `wrld-bounds`: NAM0 and NAM9. Open: the unit of the stored floats; not used by the planner.
+- `cell-water`: DATA has-water flag and XCLW. Open: what an XCLW of 'Default' resolves to.
+- `wrld-child-inherits`: what the sources say a child inherits (climate, water, map data) and what they do not say
+  (LAND cells, LOD). Open question; the default is no inheritance, the option `FlaggedDefaults` takes only the default heights.
+- `plugin-record-override` (existing row) is applied to WRLD: a later plugin's WRLD record replaces the earlier one whole.

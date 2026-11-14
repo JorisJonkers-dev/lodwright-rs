@@ -54,3 +54,31 @@ Specifier entries, written before the planner and the layout module. All rows ar
 Open: the three layout rows are the first thing the owner checks on their machine (list the output folder of an
 existing run, compare names). The contents of `.btr`, `.dds` normal maps and `.lod` are not specified yet, so the
 planner writes no such file: it computes what would be written.
+
+## 2026-11-14: public-source study of the LOD file formats (docs/spec)
+
+Specifier entry, written from public documentation only: the UESP wiki, the Tale of Two Wastelands forum, the Viva New
+Vegas guide, the STEP default-INI list, and search-result excerpts of the Nexus Mods wiki and the generator's forum
+thread. No source code, binary or decompiled output of any generator was read. Several pages (the GECK wiki, the Nexus
+wiki and mod pages, UESP behind its bot filter) answered 403 or a challenge page, so facts known only from a search
+excerpt say so in their row and stay `verified = false`; every row here is unverified until a second reader re-reads
+the page, or the owner's output tree answers it.
+
+- `fnv-lod-block-container-nif`: block meshes are `.nif` in these games; `.btr`/`.bto` are not New Vegas files.
+- `fnv-lod-object-block-names`: `<world>.level4.x-20.y-28.nif` and the `.high.` variant.
+- `fnv-lod-folders`: meshes and textures folders under `landscape/lod/<world>/blocks`, and `trees`.
+- `fnv-lod-terrain-names`: terrain names for levels 4, 8, 16, 32 and the `.n.` normal-map name.
+- `fnv-lod-levels`: the four terrain levels, one object level, terrain before objects.
+- `fnv-lod-texture-options`: generator texture-size guidance.
+- `fnv-lod-atlas-name`: one sighting of an object atlas name.
+- `fnv-lod-settings-dlodsettings`: the settings file is `LODSettings/<world>.dlodsettings`.
+- `skyrim-lod-settings-struct`: the Skyrim 16-byte `.lod` struct, as the likely shape only.
+- `fnv-tree-lod-files`: `.dtl`, `treetypes.lst` and the fixed atlas.
+- `fnv-btr-bto-other-games`: why `.btr`/`.bto` do not apply.
+- `fnv-ini-terrainmanager`: INI names and defaults.
+- `fnv-archive-loading`: archive and loose-file precedence.
+
+Result for the three older layout rows `lod-block-naming`, `lod-terrain-paths` and `lod-settings-path`: public sources
+contradict all three (extension, level prefix, normal-map name, settings extension). Their notes say superseded; the
+owner's tree decides (docs/owner-runbook.md section 2, extended in docs/spec/measurements.md). Open: byte layouts of
+the block NIFs, `.dlodsettings` and `.dtl`, which no public document gives.

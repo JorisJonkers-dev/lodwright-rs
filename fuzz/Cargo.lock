@@ -96,8 +96,13 @@ dependencies = [
  "libfuzzer-sys",
  "lodwright-assets",
  "lodwright-core",
+ "lodwright-nif",
  "lodwright-testkit",
 ]
+
+[[package]]
+name = "lodwright-nif"
+version = "0.1.0"
 
 [[package]]
 name = "lodwright-testkit"

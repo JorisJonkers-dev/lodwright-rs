@@ -13,6 +13,9 @@ use crate::load::{load_plugins, load_worlds};
 
 /// The version of the JSON that `plan --format json` prints; it grows only on a breaking change.
 pub const SCHEMA_VERSION: u32 = 1;
+
+/// The contract name `plan --format json` carries as `contract`, next to `schema_version`.
+pub const PLAN_CONTRACT: &str = "lodwright-plan";
 use crate::options::{Format, Options};
 
 fn select<'a>(
@@ -208,6 +211,15 @@ fn json_report(world: &Worldspace, plan: &TerrainPlan, blocks: bool) -> String {
     out
 }
 
+/// The answer to `contracts --json`: every contract this build emits with the schema versions it can emit.
+/// The handshake of ADR-0006: a consumer picks the highest version both sides list that it was tested with.
+#[must_use]
+pub fn contracts_json() -> String {
+    format!(
+        "{{\"contracts\":[{{\"name\":\"{PLAN_CONTRACT}\",\"versions\":[{SCHEMA_VERSION}]}}]}}\n"
+    )
+}
+
 /// `plan`: read the plugins, plan the terrain LOD of the chosen worlds, print the plan.
 pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), String> {
     let plugins = load_plugins(&options.data, &options.plugins)?;
@@ -230,7 +242,7 @@ pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), String> {
     let text = match options.format {
         Format::Text => reports.concat(),
         Format::Json => format!(
-            "{{\"schema_version\":{SCHEMA_VERSION},\"worlds\":[{}]}}\n",
+            "{{\"schema_version\":{SCHEMA_VERSION},\"contract\":\"{PLAN_CONTRACT}\",\"worlds\":[{}]}}\n",
             reports.join(",")
         ),
     };

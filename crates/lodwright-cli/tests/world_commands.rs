@@ -101,7 +101,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
         "--blocks",
     ]);
     assert_eq!(code, EXIT_OK);
-    assert!(out.starts_with("{\"schema_version\":1,\"worlds\":["));
+    assert!(out.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\",\"worlds\":["));
     assert!(out.contains("\"mesh\":\"meshes/landscape/lod/Island/blocks/Island.4.0.0.btr\""));
     assert!(out.contains("\"texture_size\":[512,512]"));
 }
@@ -304,4 +304,23 @@ fn heightmap_refuses_to_write_inside_a_git_working_tree() {
     forced.push("--allow-in-repo");
     assert_eq!(go(&forced).0, EXIT_OK);
     assert!(target.exists());
+}
+
+#[test]
+fn the_contract_the_plan_names_is_one_the_handshake_lists() {
+    let dir = data_folder("handshake");
+    let (_, plan, _) = go(&[
+        "plan",
+        "--data",
+        dir.to_str().unwrap(),
+        "--plugin",
+        "Other.esp",
+        "--format",
+        "json",
+    ]);
+    let (code, handshake, _) = go(&["contracts", "--json"]);
+    assert_eq!(code, EXIT_OK);
+    // The plan carries `"contract":"<name>"` and the handshake lists that name with the plan's version.
+    assert!(plan.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\","));
+    assert!(handshake.contains("{\"name\":\"lodwright-plan\",\"versions\":[1]}"));
 }

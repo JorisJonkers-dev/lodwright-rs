@@ -101,6 +101,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
         "--blocks",
     ]);
     assert_eq!(code, EXIT_OK);
+    assert!(out.starts_with("{\"schema_version\":1,\"worlds\":["));
     assert!(out.contains("\"mesh\":\"meshes/landscape/lod/Island/blocks/Island.4.0.0.btr\""));
     assert!(out.contains("\"texture_size\":[512,512]"));
 }

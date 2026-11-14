@@ -10,6 +10,9 @@ use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
 use lodwright_core::worldspace::Worldspace;
 
 use crate::load::load_worlds;
+
+/// The version of the JSON that `plan --format json` prints; it grows only on a breaking change.
+pub const SCHEMA_VERSION: u32 = 1;
 use crate::options::{Format, Options};
 
 fn select<'a>(
@@ -193,7 +196,10 @@ pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), String> {
     }
     let text = match options.format {
         Format::Text => reports.concat(),
-        Format::Json => format!("{{\"worlds\":[{}]}}\n", reports.join(",")),
+        Format::Json => format!(
+            "{{\"schema_version\":{SCHEMA_VERSION},\"worlds\":[{}]}}\n",
+            reports.join(",")
+        ),
     };
     out.write_all(text.as_bytes())
         .map_err(|e| format!("cannot write output: {e}"))

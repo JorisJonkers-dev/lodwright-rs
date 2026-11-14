@@ -346,8 +346,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The same page states that v104 is also the Fallout 3 and Fallout: New Vegas version (Oblivion is v103). Read in full on the date above; the layout agrees with the Oblivion page https://en.uesp.net/wiki/Tes4Mod:BSA_File_Format (v103, same licence, last edited 17 April 2021)."
+verified = true
+note = "The same page states that v104 is also the Fallout 3 and Fallout: New Vegas version (Oblivion is v103). Read in full on the date above; the layout agrees with the Oblivion page https://en.uesp.net/wiki/Tes4Mod:BSA_File_Format (v103, same licence, last edited 17 April 2021). Second reader 2026-11-14: re-derived without the implementation: header layout, flag bits and endianness re-read from the UESP Skyrim BSA page; agrees."
 
 [[source]]
 id = "bsa-v104-folder-records"
@@ -357,19 +357,19 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The 24-byte folder record with padding is v105 only. The page gives no explicit statement that blocks are contiguous; the reader locates the name block from the counts and lengths, which assumes they are."
+verified = true
+note = "The 24-byte folder record with padding is v105 only. The page gives no explicit statement that blocks are contiguous; the reader locates the name block from the counts and lengths, which assumes they are. Second reader 2026-11-14: re-derived without the implementation: 16-byte record, offset rule and block layout re-read from the UESP Skyrim BSA page (contiguity follows from the structure table); agrees."
 
 [[source]]
 id = "bsa-v104-file-records"
-fact = "A file record is 16 bytes: u64 name hash, u32 size, u32 offset from the start of the archive. In the size, bit 30 (0x40000000) inverts the archive's compressed-by-default flag for this file; the page says bit 31 is used internally. The file names follow the last folder block as one block of lower-case NUL-terminated names without paths, in the order of the file records, when flag 0x2 is set."
+fact = "A file record is 16 bytes: u64 name hash, u32 size, u32 offset from the start of the archive. In the size, bit 30 (0x40000000) inverts the archive's compressed-by-default flag for this file; the Oblivion page (Tes4Mod:BSA_File_Format) says bit 31 is used internally. The file names follow the last folder block as one block of lower-case NUL-terminated names without paths, in the order of the file records, when flag 0x2 is set."
 url = "https://en.uesp.net/wiki/Skyrim_Mod:Archive_File_Format"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Reading bit 31 as 'not part of the size' comes from the Oblivion page (Tes4Mod:BSA_File_Format): 'the top two bits have special meaning and are not actually part of the size'. Hashes are not computed or checked; names come from the name block."
+verified = true
+note = "Reading bit 31 as 'not part of the size' comes from the Oblivion page (Tes4Mod:BSA_File_Format): 'the top two bits have special meaning and are not actually part of the size'. Hashes are not computed or checked; names come from the name block. Second reader 2026-11-14: re-derived without the implementation: 16-byte record, bit 30 and name block re-read from the UESP Skyrim BSA page; bit 31 re-read from the Oblivion page; agrees."
 
 [[source]]
 id = "bsa-v104-data-blocks"
@@ -390,8 +390,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game."
+verified = true
+note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game. Second reader 2026-11-14: re-derived without the implementation: lower case and backslash re-read from the UESP Skyrim BSA page (hash inputs, name block, embedded path example); agrees."
 
 [[source]]
 id = "land-vnml-layout"
@@ -412,8 +412,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandColors at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): 33 rows of 33 structs of u8 red, green, blue."
+verified = true
+note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandColors at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): 33 rows of 33 structs of u8 red, green, blue. Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP LAND page and xEdit wbLandColors; agrees."
 
 [[source]]
 id = "land-layer-header"
@@ -423,8 +423,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit (Core/wbDefinitionsCommon.pas wbLandLayers at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) reads FormID, u8 quadrant, one unused byte and s16 layer, which is used here. FormIDs are read little endian like every other FormID in a record (plugin-record-header)."
+verified = true
+note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit (Core/wbDefinitionsCommon.pas wbLandLayers at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) reads FormID, u8 quadrant, one unused byte and s16 layer, which is used here. FormIDs are read little endian like every other FormID in a record (plugin-record-header). Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP LAND page and xEdit wbLandLayers (BTXT and ATXT structs); agrees."
 
 [[source]]
 id = "land-vtxt-layout"
@@ -445,8 +445,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The page gives the quadrant numbering, the 17 x 17 grid and the bottom-left-first row order; the mapping to vertex coordinates is arithmetic on those facts (two 16-interval halves of a 32-interval cell)."
+verified = true
+note = "The page gives the quadrant numbering, the 17 x 17 grid and the bottom-left-first row order; the mapping to vertex coordinates is arithmetic on those facts (two 16-interval halves of a 32-interval cell). Second reader 2026-11-14: re-derived without the implementation: quadrant numbering and 17 x 17 grid re-read from the UESP LAND page; 17 + 16 = 33 checked; agrees."
 
 [[source]]
 id = "ltex-texture-set"
@@ -456,8 +456,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(LTEX, ...) in wbDefinitionsFNV.pas. The Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LTEX (CC-BY-SA-2.5) lists ICON as the texture path and has no TNAM. OPEN: which of TNAM and ICON the game prefers when both exist; the resolver takes the texture set's TX00 first and falls back to ICON."
+verified = true
+note = "Read RegisterRecordDef(LTEX, ...) in wbDefinitionsFNV.pas. The Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LTEX (CC-BY-SA-2.5) lists ICON as the texture path and has no TNAM. OPEN: which of TNAM and ICON the game prefers when both exist; the resolver takes the texture set's TX00 first and falls back to ICON. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(LTEX); agrees."
 
 [[source]]
 id = "txst-texture-paths"
@@ -467,8 +467,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the paths are relative to the textures folder is not stated; the code keeps them as stored."
+verified = true
+note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the paths are relative to the textures folder is not stated; the code keeps them as stored. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(TXST); agrees."
 
 [[source]]
 id = "plugin-record-override"
@@ -489,8 +489,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read RegisterRecordDef(WRLD, ...): the 'Parent Worldspace' struct with WNAM and the PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'. The UESP Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD (CC-BY-SA-2.5) lists WNAM as the parent and has no PNAM."
+verified = true
+note = "Read RegisterRecordDef(WRLD, ...): the 'Parent Worldspace' struct with WNAM and the PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'. The UESP Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD (CC-BY-SA-2.5) lists WNAM as the parent and has no PNAM. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit RegisterRecordDef(WRLD), Parent Worldspace struct; agrees."
 
 [[source]]
 id = "wrld-land-data"
@@ -500,8 +500,8 @@ licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940c
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read wbWorldLandData in wbDefinitionsCommon.pas. xEdit shows the default land height with default -2048 for these games; the unit and whether 'default water height' is in world units are not stated."
+verified = true
+note = "Read wbWorldLandData in wbDefinitionsCommon.pas. xEdit shows the default land height with default -2048 for these games; the unit and whether 'default water height' is in world units are not stated. Second reader 2026-11-14: re-derived without the implementation: re-read from xEdit wbWorldLandData; agrees."
 
 [[source]]
 id = "wrld-bounds"
@@ -522,8 +522,8 @@ licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License';
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water height (if not 0.00)'. xEdit wbDefinitionsFNV.pas (revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) declares wbFloat(XCLW, 'Water Height') and the after-load that adds XCLW 'Default' when DATA and 2 is set. OPEN: what 'Default' resolves to; the reader assumes the worldspace default water height."
+verified = true
+note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water height (if not 0.00)'. xEdit wbDefinitionsFNV.pas (revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) declares wbFloat(XCLW, 'Water Height') and the after-load that adds XCLW 'Default' when DATA and 2 is set. OPEN: what 'Default' resolves to; the reader assumes the worldspace default water height. Second reader 2026-11-14: re-derived without the implementation: re-read from the UESP CELL page and xEdit (CELL DATA flags, XCLW, wbCELLAfterLoad); agrees."
 
 [[source]]
 id = "wrld-child-inherits"

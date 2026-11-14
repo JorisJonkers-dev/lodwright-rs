@@ -137,3 +137,22 @@ adjustments plugin that overrides the worldspace); they use synthetic plugins na
 - `wrld-child-inherits`: what the sources say a child inherits (climate, water, map data) and what they do not say
   (LAND cells, LOD). Open question; the default is no inheritance, the option `FlaggedDefaults` takes only the default heights.
 - `plugin-record-override` (existing row) is applied to WRLD: a later plugin's WRLD record replaces the earlier one whole.
+
+## 2026-11-14: second reader pass over the BSA, LAND and worldspace rows
+
+Second-reader entry, role held: second reader only. The facts were re-derived before the implementation was read, from
+the UESP pages (raw wikitext of the Skyrim BSA, Oblivion BSA, LAND, WRLD, CELL and FormID pages) and from xEdit
+`Core/wbDefinitionsCommon.pas`, `Core/wbDefinitionsFNV.pas` and `Core/wbInterface.pas` at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0). Not read: the 2016 generator C# repository, decompiled binaries,
+GPL or leaked code, the GECK wiki.
+
+Flipped to `verified = true` (the re-derivation agrees with the row): `bsa-v104-header`, `bsa-v104-folder-records`,
+`bsa-v104-file-records` (one wording fix: bit 31 is stated on the Oblivion page, not the Skyrim page), `bsa-path-form`,
+`land-vclr-layout`, `land-layer-header`, `land-quadrant-grid`, `ltex-texture-set`, `txst-texture-paths`, `wrld-parent`,
+`wrld-land-data`, `cell-water`. Open points recorded in those rows (FormID byte order, which of TNAM and ICON wins, what an
+XCLW of 'Default' means) stay open and are not what was verified.
+
+Left `verified = false`, with an issue each: `bsa-v104-data-blocks` (no source says whether the size counts the embedded
+path), `land-vnml-layout` and `land-vtxt-layout` and `wrld-child-inherits` (the row states something neither source
+states), `plugin-record-override` ('as a whole' is not in the cited page), `wrld-bounds` (the note's xEdit display factor
+is the Starfield branch; for FO3 and FNV xEdit uses 1/4096).

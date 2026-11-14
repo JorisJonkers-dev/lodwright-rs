@@ -25,11 +25,14 @@ Usage: lodwright [--help | --version]
                       [--format text|json] [--blocks]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
                       --out <file.pgm> [--level N] [--allow-in-repo]
+       lodwright contracts --json
 
 Commands:
   doctor <data-folder>  check that the folder exists; prints nothing taken from it
   plan                  read the plugins (in load order, masters first) and print the terrain LOD plan:
                         blocks per level, vertex and triangle counts, errors, output paths
+  contracts --json      print the contracts this build speaks and their schema versions, as
+                        {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
   heightmap             write the world's height raster as a 16-bit PGM (north up) for inspection
 
 Plugins are read from the data folder; nothing is written there. Output is numbers and file names only.
@@ -50,6 +53,8 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
             err,
             &format!("lodwright {}\n", env!("CARGO_PKG_VERSION")),
         ),
+        ["contracts", "--json"] => write_all(out, err, &commands::contracts_json()),
+        ["contracts", ..] => usage(err, "contracts takes exactly one option: --json"),
         ["doctor", folder] => doctor(Path::new(folder), out, err),
         ["plan", rest @ ..] => world_command(rest, out, err, commands::plan),
         ["heightmap", rest @ ..] => world_command(rest, out, err, commands::heightmap),

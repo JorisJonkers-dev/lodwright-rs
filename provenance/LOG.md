@@ -82,3 +82,25 @@ Result for the three older layout rows `lod-block-naming`, `lod-terrain-paths` a
 contradict all three (extension, level prefix, normal-map name, settings extension). Their notes say superseded; the
 owner's tree decides (docs/owner-runbook.md section 2, extended in docs/spec/measurements.md). Open: byte layouts of
 the block NIFs, `.dlodsettings` and `.dtl`, which no public document gives.
+
+## 2026-11-14: BSA v104 layout (lodwright-assets)
+
+Specifier entry for the BSA reader, written from the public UESP pages only (CC-BY-SA-2.5): the Skyrim archive page,
+which states that v104 is also the Fallout 3 and New Vegas version, cross-read with the Oblivion v103 page. No source
+code of any archive tool was read, no xEdit archive code was used, and no game archive was opened. Implementer entry:
+the reader and the testkit builder were written from the rows below by the same person, which clean-room.md
+allows only with a second reader re-deriving the facts (`verified` stays false until then).
+
+- `bsa-v104-header`: the 36-byte header and the archive flags (0x1, 0x2, 0x4, 0x40, 0x100).
+- `bsa-v104-folder-records`: 16-byte folder records and the offset-minus-name-length rule.
+- `bsa-v104-file-records`: 16-byte file records, the size flag bits, the lower-case name block.
+- `bsa-v104-data-blocks`: compressed and uncompressed blocks, embedded paths, zlib. Open: whether the size counts the
+  embedded path.
+- `bsa-path-form`: lower-case, backslash paths; the case-insensitive lookup is a project choice.
+
+The resolver (loose files over archives, archives by plugin and name) relies on `fnv-archive-loading`, which stays
+unverified and says nothing about two points the code has to decide: how an archive name is tied to its plugin (only
+"shares its name") and what `.override` changes (only "an archive can replace files of earlier archives"). The resolver
+therefore offers both readings as a documented option and defaults to later archives winning, as the work item asks.
+Hashes are not computed (no row for the hash function), so the testkit writes stand-in hashes and the reader ignores
+them.

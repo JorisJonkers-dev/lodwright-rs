@@ -60,6 +60,11 @@ About 3-4 weeks to a terrain-only generator, 4-6 months to full replacement, one
 
 Resolve from allowed inputs only; each answer becomes a provenance row.
 
+- BSA v104: whether the file-record size counts the embedded path when archive flag 0x100 is set (`bsa-v104-data-blocks`).
+- Archive pickup: how an archive name is tied to a plugin (only "shares its name" is recorded) and whether an archive
+  without a `.override` file may replace a file of an earlier archive (`fnv-archive-loading`). `lodwright-assets`
+  implements both readings behind `ConflictRule`.
+
 - `.btr`/`.bto` container layout (believed NIF). Blocks the mesh and object writers.
 - Tree LOD placement for FNV.
 - Exact `.lod` fields. The block sizes per level (4, 8, 16, 32 cells) are used as planning parameters, not as facts.

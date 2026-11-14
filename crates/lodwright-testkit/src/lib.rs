@@ -6,6 +6,7 @@
 //! as accurate as their rows in `provenance/sources.toml`; each builder has a reader (or decoder) written here
 //! so that round trips can be tested before the real readers exist.
 
+pub mod bsa;
 pub mod dds;
 pub mod golden;
 pub mod land;

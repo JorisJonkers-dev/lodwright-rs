@@ -84,6 +84,8 @@ fn plan_prints_json_for_every_world() {
         "json",
     ]);
     assert_eq!(code, EXIT_OK);
+    // The tool version changes with every release, so the golden file holds a placeholder.
+    let out = out.replace(env!("CARGO_PKG_VERSION"), "VERSION");
     assert_golden(&golden("plan.json"), &out);
 }
 
@@ -101,7 +103,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
         "--blocks",
     ]);
     assert_eq!(code, EXIT_OK);
-    assert!(out.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\",\"worlds\":["));
+    assert!(out.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\","));
     assert!(out.contains("\"mesh\":\"meshes/landscape/lod/Island/blocks/Island.4.0.0.btr\""));
     assert!(out.contains("\"texture_size\":[512,512]"));
 }

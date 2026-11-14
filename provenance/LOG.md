@@ -156,3 +156,10 @@ Left `verified = false`, with an issue each: `bsa-v104-data-blocks` (no source s
 path), `land-vnml-layout` and `land-vtxt-layout` and `wrld-child-inherits` (the row states something neither source
 states), `plugin-record-override` ('as a whole' is not in the cited page), `wrld-bounds` (the note's xEdit display factor
 is the Starfield branch; for FO3 and FNV xEdit uses 1/4096).
+
+## 2026-11-14: contract v1 and release assets
+
+The plan and result documents, their schemas, the digests and the release assets are our own design
+(`docs/research/lod-pipeline-architecture.md` section 7 in the NV-Linux-Modding repository): no format fact was read
+or recorded, so there is no new row. The author held the implementer role only; no input from the forbidden list was
+read. The documents carry numbers, digests and relative output names, never game content.

@@ -5,23 +5,22 @@ use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
 
+use lodwright_contract::{
+    Bounds, Capabilities, LevelPlan, PLAN_CONTRACT, Plan, PlannedBlock, ResultDoc, Status,
+    ToolInfo, WorldPlan, arguments_digest, peak_memory_mib, round_error,
+};
 use lodwright_core::raster::{BlockGrid, HeightRaster};
 use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
 use lodwright_core::worldspace::{Inheritance, WorldIndex, Worldspace};
 
+use crate::failure::Failure;
 use crate::load::{load_plugins, load_worlds};
-
-/// The version of the JSON that `plan --format json` prints; it grows only on a breaking change.
-pub const SCHEMA_VERSION: u32 = 1;
-
-/// The contract name `plan --format json` carries as `contract`, next to `schema_version`.
-pub const PLAN_CONTRACT: &str = "lodwright-plan";
 use crate::options::{Format, Options};
 
 fn select<'a>(
     worlds: &'a [Worldspace],
     wanted: Option<&str>,
-) -> Result<Vec<&'a Worldspace>, String> {
+) -> Result<Vec<&'a Worldspace>, Failure> {
     let names = || {
         worlds
             .iter()
@@ -36,18 +35,24 @@ fn select<'a>(
                 .filter(|w| w.name().eq_ignore_ascii_case(name))
                 .collect();
             if found.is_empty() {
-                Err(format!("no worldspace named {name}; found: {}", names()))
+                Err(Failure::new(
+                    "world_not_found",
+                    format!("no worldspace named {name}; found: {}", names()),
+                ))
             } else {
                 Ok(found)
             }
         }
-        None if worlds.is_empty() => Err("the plugins define no worldspace with terrain".into()),
+        None if worlds.is_empty() => Err(Failure::new(
+            "no_worlds",
+            "the plugins define no worldspace with terrain",
+        )),
         None => Ok(worlds.iter().collect()),
     }
 }
 
 /// The worlds `wanted` names (all when `None`), as `FormID`s from the index.
-fn select_ids(index: &WorldIndex, wanted: Option<&str>) -> Result<Vec<u32>, String> {
+fn select_ids(index: &WorldIndex, wanted: Option<&str>) -> Result<Vec<u32>, Failure> {
     let names = || {
         index
             .worlds()
@@ -62,13 +67,19 @@ fn select_ids(index: &WorldIndex, wanted: Option<&str>) -> Result<Vec<u32>, Stri
             .map(|(id, _)| id)
             .collect();
         if found.is_empty() {
-            return Err(format!("no worldspace named {name}; found: {}", names()));
+            return Err(Failure::new(
+                "world_not_found",
+                format!("no worldspace named {name}; found: {}", names()),
+            ));
         }
         return Ok(found);
     }
     let all: Vec<u32> = index.worlds().map(|(id, _)| id).collect();
     if all.is_empty() {
-        Err("the plugins define no worldspace with terrain".into())
+        Err(Failure::new(
+            "no_worlds",
+            "the plugins define no worldspace with terrain",
+        ))
     } else {
         Ok(all)
     }
@@ -148,106 +159,174 @@ fn text_report(world: &Worldspace, plan: &TerrainPlan, blocks: bool) -> String {
     out
 }
 
-fn json_string(text: &str) -> String {
-    let mut out = String::from("\"");
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            c if u32::from(c) < 0x20 => {
-                let _ = write!(out, "\\u{:04x}", u32::from(c));
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
-fn json_report(world: &Worldspace, plan: &TerrainPlan, blocks: bool) -> String {
-    let bounds = world.bounds().map_or_else(
-        || "null".to_owned(),
-        |b| {
-            format!(
-                "{{\"min_x\":{},\"min_y\":{},\"max_x\":{},\"max_y\":{}}}",
-                b.min_x, b.min_y, b.max_x, b.max_y
-            )
-        },
-    );
-    let levels: Vec<String> = totals(plan)
+/// The normalised argument lines the arguments digest covers: the load order (names folded to lower case, order
+/// kept), the chosen world, whether blocks are listed and the document version. The data folder is not part of it
+/// (the inputs digest covers what is read from there), so a digest does not depend on where a folder is mounted.
+fn argument_lines(options: &Options, version: u32) -> Vec<String> {
+    let mut lines: Vec<String> = options
+        .plugins
         .iter()
-        .map(|t| {
-            format!(
-                "{{\"level\":{},\"blocks\":{},\"vertices\":{},\"triangles\":{},\"max_error\":{:.3}}}",
-                t.level, t.blocks, t.vertices, t.triangles, t.max_error
-            )
-        })
+        .map(|p| format!("plugin={}", p.to_ascii_lowercase()))
         .collect();
-    let mut out = format!(
-        "{{\"name\":{},\"form_id\":\"{:08X}\",\"cells\":{},\"bounds\":{bounds},\"max_seam_error\":{:.3},\"settings_path\":{},\"levels\":[{}]",
-        json_string(world.name()),
-        world.form_id(),
-        world.cell_count(),
-        world.max_seam_error(),
-        json_string(&plan.settings_path),
-        levels.join(",")
-    );
-    if blocks {
-        let list: Vec<String> = plan
-            .blocks
-            .iter()
-            .map(|b| {
-                format!(
-                    "{{\"level\":{},\"x\":{},\"y\":{},\"step\":{},\"vertices\":{},\"triangles\":{},\"max_error\":{:.3},\"mesh\":{},\"diffuse\":{},\"normal\":{},\"texture_size\":[{},{}],\"mips\":{}}}",
-                    b.id.level, b.id.x, b.id.y, b.step, b.vertices, b.triangles, b.max_error,
-                    json_string(&b.mesh_path), json_string(&b.diffuse_path), json_string(&b.normal_path),
-                    b.diffuse_size, b.normal_size, b.mip_levels
-                )
-            })
-            .collect();
-        let _ = write!(out, ",\"blocks\":[{}]", list.join(","));
-    }
-    out.push('}');
-    out
+    lines.push(format!(
+        "world={}",
+        options
+            .world
+            .as_deref()
+            .map_or_else(String::new, str::to_ascii_lowercase)
+    ));
+    lines.push(format!("include_blocks={}", options.blocks));
+    lines.push(format!("schema_version={version}"));
+    lines
 }
 
-/// The answer to `contracts --json`: every contract this build emits with the schema versions it can emit.
-/// The handshake of ADR-0006: a consumer picks the highest version both sides list that it was tested with.
-#[must_use]
-pub fn contracts_json() -> String {
-    format!(
-        "{{\"contracts\":[{{\"name\":\"{PLAN_CONTRACT}\",\"versions\":[{SCHEMA_VERSION}]}}]}}\n"
-    )
+/// The arguments digest of `options`.
+pub fn arguments_digest_of(options: &Options) -> String {
+    arguments_digest(&argument_lines(options, 1))
+}
+
+fn count(n: usize) -> u64 {
+    u64::try_from(n).unwrap_or(u64::MAX)
+}
+
+fn world_document(world: &Worldspace, plan: &TerrainPlan, blocks: bool) -> WorldPlan {
+    WorldPlan {
+        name: world.name().to_owned(),
+        form_id: format!("{:08X}", world.form_id()),
+        cells: count(world.cell_count()),
+        bounds: world.bounds().map(|b| Bounds {
+            west: b.min_x,
+            south: b.min_y,
+            east: b.max_x,
+            north: b.max_y,
+        }),
+        max_seam_error: round_error(world.max_seam_error()),
+        settings_path: plan.settings_path.clone(),
+        levels: totals(plan)
+            .iter()
+            .map(|t| LevelPlan {
+                level: t.level,
+                blocks: count(t.blocks),
+                vertices: count(t.vertices),
+                triangles: count(t.triangles),
+                max_error: round_error(t.max_error),
+            })
+            .collect(),
+        blocks: blocks.then(|| {
+            plan.blocks
+                .iter()
+                .map(|b| PlannedBlock {
+                    level: b.id.level,
+                    x: b.id.x,
+                    y: b.id.y,
+                    step: count(b.step),
+                    vertices: count(b.vertices),
+                    triangles: count(b.triangles),
+                    max_error: round_error(b.max_error),
+                    mesh: b.mesh_path.clone(),
+                    diffuse: b.diffuse_path.clone(),
+                    normal: b.normal_path.clone(),
+                    texture_size: [b.diffuse_size, b.normal_size],
+                    mips: b.mip_levels,
+                })
+                .collect()
+        }),
+    }
+}
+
+fn print(out: &mut dyn Write, text: &str) -> Result<(), Failure> {
+    out.write_all(text.as_bytes())
+        .map_err(|e| Failure::new("output_failed", format!("cannot write output: {e}")))
 }
 
 /// `plan`: read the plugins, plan the terrain LOD of the chosen worlds, print the plan.
-pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), String> {
-    let plugins = load_plugins(&options.data, &options.plugins)?;
-    let index = WorldIndex::new(&plugins).map_err(|e| e.to_string())?;
+pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), Failure> {
+    let loaded = load_plugins(&options.data, &options.plugins)?;
+    let index = WorldIndex::new(&loaded.plugins)
+        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
     let chosen = select_ids(&index, options.world.as_deref())?;
     let settings = TerrainSettings::default();
-    let mut reports = Vec::new();
+    let mut documents = Vec::new();
+    let mut text = String::new();
     // one world at a time: each assembled world is dropped before the next is built
     for id in chosen {
-        let Some(world) = index.build(&plugins, id, Inheritance::None) else {
+        let Some(world) = index.build(&loaded.plugins, id, Inheritance::None) else {
             continue;
         };
-        let plan =
-            plan_world(&world, &settings).map_err(|e| format!("world {}: {e}", world.name()))?;
-        reports.push(match options.format {
-            Format::Text => text_report(&world, &plan, options.blocks),
-            Format::Json => json_report(&world, &plan, options.blocks),
-        });
+        let plan = plan_world(&world, &settings)
+            .map_err(|e| Failure::new("plan_failed", format!("world {}: {e}", world.name())))?;
+        match options.format {
+            Format::Text => text.push_str(&text_report(&world, &plan, options.blocks)),
+            Format::Json => documents.push(world_document(&world, &plan, options.blocks)),
+        }
     }
-    let text = match options.format {
-        Format::Text => reports.concat(),
-        Format::Json => format!(
-            "{{\"schema_version\":{SCHEMA_VERSION},\"contract\":\"{PLAN_CONTRACT}\",\"worlds\":[{}]}}\n",
-            reports.join(",")
+    if options.format == Format::Json {
+        let document = Plan {
+            schema_version: 1,
+            contract: PLAN_CONTRACT.to_owned(),
+            tool: ToolInfo::new(env!("CARGO_PKG_VERSION")),
+            arguments_digest: arguments_digest_of(options),
+            inputs_digest: loaded.inputs_digest,
+            capabilities: Capabilities::default(),
+            worlds: documents,
+            warnings: Vec::new(),
+        };
+        text = serde_json::to_string(&document)
+            .map_err(|e| Failure::new("output_failed", e.to_string()))?
+            + "\n";
+    }
+    print(out, &text)
+}
+
+/// `generate`: no writer exists yet, so the answer is an `unsupported` result naming the missing capabilities.
+/// Nothing is written. When a data folder and plugins are given they are read, only to digest them.
+pub fn generate(options: &Options) -> ResultDoc {
+    let version = env!("CARGO_PKG_VERSION");
+    let has_data = !options.data.as_os_str().is_empty();
+    let mut doc = unsupported(version);
+    if has_data && !options.plugins.is_empty() {
+        match load_plugins(&options.data, &options.plugins) {
+            Ok(loaded) => doc.inputs_digest = Some(loaded.inputs_digest),
+            Err(failure) => {
+                doc = ResultDoc::new(version, Status::Failed, failure.code, &failure.reason);
+            }
+        }
+    }
+    if has_data || !options.plugins.is_empty() {
+        doc.arguments_digest = Some(arguments_digest_of(options));
+    }
+    doc.peak_memory_mib = peak_memory_mib();
+    doc
+}
+
+fn unsupported(version: &str) -> ResultDoc {
+    let missing = Capabilities::default().missing();
+    let mut doc = ResultDoc::new(
+        version,
+        Status::Unsupported,
+        "capability_missing",
+        &format!(
+            "generate cannot write {} yet, and takes no request document yet",
+            missing.join(", ")
         ),
-    };
-    out.write_all(text.as_bytes())
-        .map_err(|e| format!("cannot write output: {e}"))
+    );
+    doc.missing_capabilities = missing;
+    doc
+}
+
+/// The failure document of a command that failed with `failure` (for `--json`).
+pub fn failed_document(options: &Options, failure: &Failure) -> ResultDoc {
+    let mut doc = ResultDoc::new(
+        env!("CARGO_PKG_VERSION"),
+        Status::Failed,
+        failure.code,
+        &failure.reason,
+    );
+    if !options.plugins.is_empty() {
+        doc.arguments_digest = Some(arguments_digest_of(options));
+    }
+    doc.peak_memory_mib = peak_memory_mib();
+    doc
 }
 
 /// Whether `path` (a file to be written) lies inside a git working tree.
@@ -283,48 +362,50 @@ fn encode_pgm(raster: &HeightRaster) -> (Vec<u8>, (f32, f32)) {
 }
 
 /// `heightmap`: write a 16-bit PGM of one world's height raster.
-pub fn heightmap(options: &Options, out: &mut dyn Write) -> Result<(), String> {
+pub fn heightmap(options: &Options, out: &mut dyn Write) -> Result<(), Failure> {
     let target = options
         .out
         .as_deref()
-        .ok_or("--out <file.pgm> is required")?;
+        .ok_or_else(|| Failure::new("out_required", "--out <file.pgm> is required"))?;
     if !options.allow_in_repo && inside_git_tree(target) {
-        return Err(
+        return Err(Failure::new(
+            "output_in_repo",
             "refusing to write inside a git working tree (heights derived from game data must not enter a repository); \
-             pass --allow-in-repo to override"
-                .into(),
-        );
+             pass --allow-in-repo to override",
+        ));
     }
     let worlds = load_worlds(&options.data, &options.plugins)?;
     let chosen = select(&worlds, options.world.as_deref())?;
     let [world] = chosen.as_slice() else {
-        return Err("choose one worldspace with --world".into());
+        return Err(Failure::new(
+            "world_required",
+            "choose one worldspace with --world",
+        ));
     };
-    let grid = BlockGrid::new(options.level).map_err(|e| e.to_string())?;
+    let grid =
+        BlockGrid::new(options.level).map_err(|e| Failure::new("level_invalid", e.to_string()))?;
     let raster = HeightRaster::build(world, grid)
-        .map_err(|e| e.to_string())?
-        .ok_or("the worldspace has no cells with terrain")?;
+        .map_err(|e| Failure::new("raster_failed", e.to_string()))?
+        .ok_or_else(|| Failure::new("no_terrain", "the worldspace has no cells with terrain"))?;
     let (bytes, (low, high)) = encode_pgm(&raster);
-    std::fs::write(target, bytes).map_err(|e| format!("cannot write the output file: {e}"))?;
+    std::fs::write(target, bytes).map_err(|e| {
+        Failure::new(
+            "output_failed",
+            format!("cannot write the output file: {e}"),
+        )
+    })?;
     let message = format!(
         "wrote {}x{} samples; 0 is {low} and 65535 is {high} world units; origin cell {:?}\n",
         raster.width(),
         raster.height(),
         raster.origin_cell()
     );
-    out.write_all(message.as_bytes())
-        .map_err(|e| format!("cannot write output: {e}"))
+    print(out, &message)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{inside_git_tree, json_string};
-
-    #[test]
-    fn json_strings_are_escaped() {
-        assert_eq!(json_string("a\"b\\c\n"), "\"a\\\"b\\\\c\\u000a\"");
-        assert_eq!(json_string("plain"), "\"plain\"");
-    }
+    use super::inside_git_tree;
 
     #[test]
     fn a_folder_with_a_git_directory_is_inside_a_tree() {

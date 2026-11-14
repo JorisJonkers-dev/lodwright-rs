@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "contract": "lodwright-result",
+  "tool": {
+    "name": "lodwright",
+    "version": "0.0.0-test"
+  },
+  "status": "ok",
+  "code": "ok",
+  "reason": "written",
+  "written": [
+    {
+      "world": "Island",
+      "kind": "terrain_mesh",
+      "files": 3,
+      "bytes": 1024
+    }
+  ],
+  "manifest": "manifest.json"
+}

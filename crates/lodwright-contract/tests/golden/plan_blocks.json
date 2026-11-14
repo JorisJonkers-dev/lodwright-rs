@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "contract": "lodwright-plan",
+  "tool": {
+    "name": "lodwright",
+    "version": "0.0.0-test"
+  },
+  "arguments_digest": "sha256:aba784e2a1cb0f1024d7d925f0ea07a4335f3f150e93e4e2be5488f9a82b250c",
+  "inputs_digest": "sha256:026092cfd752dc8c9782a3b8cb08f8b870fce5fb23fdcd3f6e571ba387a7d586",
+  "capabilities": {
+    "terrain_mesh": false,
+    "terrain_texture": false,
+    "settings": false,
+    "object_lod": false,
+    "tree_lod": false
+  },
+  "worlds": [
+    {
+      "name": "Island",
+      "form_id": "02000B00",
+      "cells": 1,
+      "bounds": {
+        "west": 2,
+        "south": 2,
+        "east": 2,
+        "north": 2
+      },
+      "max_seam_error": 0.0,
+      "settings_path": "lodsettings/Island.lod",
+      "levels": [
+        {
+          "level": 4,
+          "blocks": 1,
+          "vertices": 4,
+          "triangles": 2,
+          "max_error": 0.0
+        }
+      ],
+      "blocks": [
+        {
+          "level": 4,
+          "x": 0,
+          "y": 0,
+          "step": 1,
+          "vertices": 4,
+          "triangles": 2,
+          "max_error": 0.0,
+          "mesh": "meshes/landscape/lod/Island/blocks/Island.4.0.0.btr",
+          "diffuse": "textures/landscape/lod/Island/diffuse/Island.4.0.0.dds",
+          "normal": "textures/landscape/lod/Island/normals/Island.4.0.0_n.dds",
+          "texture_size": [
+            512,
+            512
+          ],
+          "mips": 10
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

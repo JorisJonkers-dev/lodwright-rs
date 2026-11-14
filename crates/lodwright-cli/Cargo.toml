@@ -14,6 +14,9 @@ path = "src/main.rs"
 
 [dependencies]
 lodwright-core = { workspace = true }
+lodwright-contract = { workspace = true }
+serde = "1.0.228"
+serde_json = "1.0.150"
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

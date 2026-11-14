@@ -60,6 +60,19 @@ About 3-4 weeks to a terrain-only generator, 4-6 months to full replacement, one
 
 Resolve from allowed inputs only; each answer becomes a provenance row.
 
+- Worldspace inheritance: what a child worldspace takes from its parent for LOD (`wrld-child-inherits`). No public
+  source says that LAND cells are inherited. `Inheritance::None` is the default; `Inheritance::FlaggedDefaults` takes
+  only the default land and water height of a parent when the child's PNAM has "use land data". Also open: the unit of
+  the WRLD corners NAM0 and NAM9 (`wrld-bounds`) and what a cell XCLW of "Default" resolves to (`cell-water`).
+
+- LAND and textures: the byte encoding of VNML normals; whether the game prefers a LTEX's TNAM texture set or its ICON
+  when both exist (`ltex-texture-set`); whether VTXT positions not listed mean zero opacity (`land-vtxt-layout`).
+
+- BSA v104: whether the file-record size counts the embedded path when archive flag 0x100 is set (`bsa-v104-data-blocks`).
+- Archive pickup: how an archive name is tied to a plugin (only "shares its name" is recorded) and whether an archive
+  without a `.override` file may replace a file of an earlier archive (`fnv-archive-loading`). `lodwright-assets`
+  implements both readings behind `ConflictRule`.
+
 - `.btr`/`.bto` container layout (believed NIF). Blocks the mesh and object writers.
 - Tree LOD placement for FNV.
 - Exact `.lod` fields. The block sizes per level (4, 8, 16, 32 cells) are used as planning parameters, not as facts.

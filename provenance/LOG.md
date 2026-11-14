@@ -83,6 +83,87 @@ contradict all three (extension, level prefix, normal-map name, settings extensi
 owner's tree decides (docs/owner-runbook.md section 2, extended in docs/spec/measurements.md). Open: byte layouts of
 the block NIFs, `.dlodsettings` and `.dtl`, which no public document gives.
 
+## 2026-11-14: BSA v104 layout (lodwright-assets)
+
+Specifier entry for the BSA reader, written from the public UESP pages only (CC-BY-SA-2.5): the Skyrim archive page,
+which states that v104 is also the Fallout 3 and New Vegas version, cross-read with the Oblivion v103 page. No source
+code of any archive tool was read, no xEdit archive code was used, and no game archive was opened. Implementer entry:
+the reader and the testkit builder were written from the rows below by the same person, which clean-room.md
+allows only with a second reader re-deriving the facts (`verified` stays false until then).
+
+- `bsa-v104-header`: the 36-byte header and the archive flags (0x1, 0x2, 0x4, 0x40, 0x100).
+- `bsa-v104-folder-records`: 16-byte folder records and the offset-minus-name-length rule.
+- `bsa-v104-file-records`: 16-byte file records, the size flag bits, the lower-case name block.
+- `bsa-v104-data-blocks`: compressed and uncompressed blocks, embedded paths, zlib. Open: whether the size counts the
+  embedded path.
+- `bsa-path-form`: lower-case, backslash paths; the case-insensitive lookup is a project choice.
+
+The resolver (loose files over archives, archives by plugin and name) relies on `fnv-archive-loading`, which stays
+unverified and says nothing about two points the code has to decide: how an archive name is tied to its plugin (only
+"shares its name") and what `.override` changes (only "an archive can replace files of earlier archives"). The resolver
+therefore offers both readings as a documented option and defaults to later archives winning, as the work item asks.
+Hashes are not computed (no row for the hash function), so the testkit writes stand-in hashes and the reader ignores
+them.
+
+## 2026-11-14: LAND layers, LTEX and TXST
+
+Specifier entry, from the UESP LAND page (CC-BY-SA-2.5, last edited 3 August 2024) and from xEdit's FNV and common
+definitions (`TES5Edit/TES5Edit` revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016
+generator C# repository, decompiled binaries, any GPL or leaked code. The GECK wiki returned a bot challenge and was not
+used. The same person wrote the rows and the code, so every row stays `verified = false` until a second reader re-derives it.
+
+- `land-vnml-layout`, `land-vclr-layout`: 33 x 33 grids of three bytes. The byte encoding of a normal is open; raw bytes are kept.
+- `land-layer-header`: BTXT and ATXT, 8 bytes; the UESP "big-endian FormID" claim was not followed (xEdit and the
+  rest of the reader use little endian).
+- `land-vtxt-layout`: position, unused, opacity; sparse, so unlisted positions are zero (an inference).
+- `land-quadrant-grid`: the quadrant to vertex mapping used by the opacity lookup.
+- `ltex-texture-set`: LTEX has TNAM (TXST) and ICON in FNV; which wins is open, TXST first is the implemented choice.
+- `txst-texture-paths`: TX00 and TX01 are the base and normal paths.
+- `plugin-record-override`: a later plugin's LTEX, TXST or LAND replaces the earlier one as a whole.
+
+## 2026-11-14: worldspace data for TTW (WRLD parent, land data, bounds, cell water)
+
+Specifier entry from the UESP CELL and WRLD pages (CC-BY-SA-2.5, last edited 30 July 2024) and xEdit
+(`TES5Edit/TES5Edit` revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016 generator C#
+repository, decompiled binaries, leaked or GPL code. The same person wrote the rows and the code; all rows stay
+`verified = false` until a second reader re-derives them. The TTW cases come from `research-lod.md` section 6 of the
+umbrella repository (worlds `Wasteland` and `DCworld01`..`DCworld18`, the master chain through `Fallout3.esm`, an
+adjustments plugin that overrides the worldspace); they use synthetic plugins named like the real ones, nothing else.
+
+- `wrld-parent`: WNAM and the PNAM flag bits (xEdit).
+- `wrld-land-data`: DNAM, default land and water height.
+- `wrld-bounds`: NAM0 and NAM9. Open: the unit of the stored floats; not used by the planner.
+- `cell-water`: DATA has-water flag and XCLW. Open: what an XCLW of 'Default' resolves to.
+- `wrld-child-inherits`: what the sources say a child inherits (climate, water, map data) and what they do not say
+  (LAND cells, LOD). Open question; the default is no inheritance, the option `FlaggedDefaults` takes only the default heights.
+- `plugin-record-override` (existing row) is applied to WRLD: a later plugin's WRLD record replaces the earlier one whole.
+
+## 2026-11-14: second reader pass over the BSA, LAND and worldspace rows
+
+Second-reader entry, role held: second reader only. The facts were re-derived before the implementation was read, from
+the UESP pages (raw wikitext of the Skyrim BSA, Oblivion BSA, LAND, WRLD, CELL and FormID pages) and from xEdit
+`Core/wbDefinitionsCommon.pas`, `Core/wbDefinitionsFNV.pas` and `Core/wbInterface.pas` at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0). Not read: the 2016 generator C# repository, decompiled binaries,
+GPL or leaked code, the GECK wiki.
+
+Flipped to `verified = true` (the re-derivation agrees with the row): `bsa-v104-header`, `bsa-v104-folder-records`,
+`bsa-v104-file-records` (one wording fix: bit 31 is stated on the Oblivion page, not the Skyrim page), `bsa-path-form`,
+`land-vclr-layout`, `land-layer-header`, `land-quadrant-grid`, `ltex-texture-set`, `txst-texture-paths`, `wrld-parent`,
+`wrld-land-data`, `cell-water`. Open points recorded in those rows (FormID byte order, which of TNAM and ICON wins, what an
+XCLW of 'Default' means) stay open and are not what was verified.
+
+Left `verified = false`, with an issue each: `bsa-v104-data-blocks` (no source says whether the size counts the embedded
+path), `land-vnml-layout` and `land-vtxt-layout` and `wrld-child-inherits` (the row states something neither source
+states), `plugin-record-override` ('as a whole' is not in the cited page), `wrld-bounds` (the note's xEdit display factor
+is the Starfield branch; for FO3 and FNV xEdit uses 1/4096).
+
+## 2026-11-14: contract v1 and release assets
+
+The plan and result documents, their schemas, the digests and the release assets are our own design
+(`docs/research/lod-pipeline-architecture.md` section 7 in the NV-Linux-Modding repository): no format fact was read
+or recorded, so there is no new row. The author held the implementer role only; no input from the forbidden list was
+read. The documents carry numbers, digests and relative output names, never game content.
+
 ## 2026-11-14: NIF 20.2.0.7 container and shape blocks (lodwright-nif)
 
 Specifier entry for the generic NIF reader and writer. Read: `Core/wbDataFormatNif.pas` and

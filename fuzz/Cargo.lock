@@ -76,6 +76,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lodwright-assets"
+version = "0.1.0"
+dependencies = [
+ "miniz_oxide",
+]
+
+[[package]]
 name = "lodwright-core"
 version = "0.1.0"
 dependencies = [
@@ -87,6 +94,7 @@ name = "lodwright-fuzz"
 version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
+ "lodwright-assets",
  "lodwright-core",
  "lodwright-nif",
  "lodwright-testkit",

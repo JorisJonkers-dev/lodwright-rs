@@ -23,6 +23,10 @@ pub struct Options {
     pub world: Option<String>,
     /// `plan` output format.
     pub format: Format,
+    /// `--json` was given (an alias of `--format json`; `generate` always prints JSON).
+    pub json: bool,
+    /// `--schema-version N`: the version of the document to print, when one was asked for.
+    pub schema_version: Option<u32>,
     /// `plan`: list every block.
     pub blocks: bool,
     /// `heightmap`: cells per block edge of the raster grid.
@@ -33,8 +37,8 @@ pub struct Options {
     pub allow_in_repo: bool,
 }
 
-/// Parse `args` (after the command name).
-pub fn parse(args: &[&str]) -> Result<Options, String> {
+/// Parse `args` (after the command name). `--data` is required when `require_data` is set.
+pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
     let mut data = None;
     let mut plugins = Vec::new();
     let mut options = Options {
@@ -42,6 +46,8 @@ pub fn parse(args: &[&str]) -> Result<Options, String> {
         plugins: Vec::new(),
         world: None,
         format: Format::Text,
+        json: false,
+        schema_version: None,
         blocks: false,
         level: 32,
         out: None,
@@ -71,6 +77,16 @@ pub fn parse(args: &[&str]) -> Result<Options, String> {
                     other => return Err(format!("unknown format {other:?}: use text or json")),
                 };
             }
+            "--json" => {
+                options.json = true;
+                options.format = Format::Json;
+            }
+            "--schema-version" => {
+                let text = value("--schema-version")?;
+                options.schema_version = Some(text.parse::<u32>().map_err(|_| {
+                    format!("--schema-version must be a whole number, got {text:?}")
+                })?);
+            }
             "--level" => {
                 let text = value("--level")?;
                 options.level = text.parse::<u32>().ok().filter(|n| *n > 0).ok_or_else(|| {
@@ -83,14 +99,22 @@ pub fn parse(args: &[&str]) -> Result<Options, String> {
             other => return Err(format!("unknown option {other}")),
         }
     }
-    options.data = data.ok_or("--data <data-folder> is required")?;
+    options.data = match data {
+        Some(data) => data,
+        None if require_data => return Err("--data <data-folder> is required".into()),
+        None => PathBuf::new(),
+    };
     options.plugins = plugins;
     Ok(options)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, parse};
+    use super::{Format, parse as parse_with};
+
+    fn parse(args: &[&str]) -> Result<super::Options, String> {
+        parse_with(args, true)
+    }
 
     #[test]
     fn data_is_required() {
@@ -133,6 +157,27 @@ mod tests {
         assert_eq!(o.level, 8);
         assert_eq!(o.out.as_deref(), Some(std::path::Path::new("o.pgm")));
         assert!(o.blocks && o.allow_in_repo);
+    }
+
+    #[test]
+    fn json_is_an_alias_of_the_json_format_and_the_schema_version_is_read() {
+        let o = parse(&["--data", "d", "--json", "--schema-version", "1"]).unwrap();
+        assert!(o.json);
+        assert_eq!(o.format, Format::Json);
+        assert_eq!(o.schema_version, Some(1));
+        assert!(
+            parse(&["--data", "d", "--schema-version", "x"])
+                .unwrap_err()
+                .contains("whole number")
+        );
+        assert!(!parse(&["--data", "d", "--format", "json"]).unwrap().json);
+    }
+
+    #[test]
+    fn data_is_optional_when_the_command_does_not_need_it() {
+        let o = parse_with(&["--json"], false).unwrap();
+        assert!(o.data.as_os_str().is_empty());
+        assert!(parse_with(&[], true).is_err());
     }
 
     #[test]

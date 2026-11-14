@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "contract": "lodwright-result",
+  "tool": {
+    "name": "lodwright",
+    "version": "0.0.0-test"
+  },
+  "status": "unsupported",
+  "code": "capability_missing",
+  "reason": "generate cannot write terrain_mesh yet",
+  "arguments_digest": "sha256:aba784e2a1cb0f1024d7d925f0ea07a4335f3f150e93e4e2be5488f9a82b250c",
+  "inputs_digest": "sha256:026092cfd752dc8c9782a3b8cb08f8b870fce5fb23fdcd3f6e571ba387a7d586",
+  "peak_memory_mib": 12,
+  "missing_capabilities": [
+    "terrain_mesh",
+    "terrain_texture",
+    "settings",
+    "object_lod",
+    "tree_lod"
+  ],
+  "written": []
+}

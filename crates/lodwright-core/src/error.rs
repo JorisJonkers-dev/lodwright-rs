@@ -30,6 +30,19 @@ pub enum Error {
     BadWorldName(String),
     /// A LOD level of zero cells was requested.
     ZeroLevel,
+    /// A LAND layer subrecord (VNML, VCLR, BTXT, ATXT or VTXT) has a length that subrecord cannot have.
+    SubrecordLength {
+        /// Subrecord signature.
+        what: &'static str,
+        /// Bytes found.
+        found: usize,
+    },
+    /// A LAND layer names a quadrant above 3.
+    LayerQuadrant(u8),
+    /// A VTXT point is beyond position 288 of the 17 x 17 quadrant grid.
+    LayerPosition(u16),
+    /// A VTXT opacity is NaN or infinite.
+    LayerOpacity,
     /// A raster over the worldspace would need more samples than the allowed maximum.
     RasterTooLarge {
         /// Samples the raster would hold.
@@ -57,6 +70,14 @@ impl fmt::Display for Error {
                 write!(f, "worldspace name {name:?} cannot be used in a path")
             }
             Self::ZeroLevel => f.write_str("a LOD level must span at least one cell"),
+            Self::SubrecordLength { what, found } => {
+                write!(f, "a {what} subrecord cannot be {found} bytes long")
+            }
+            Self::LayerQuadrant(q) => write!(f, "a LAND layer names quadrant {q}, the last is 3"),
+            Self::LayerPosition(p) => {
+                write!(f, "a VTXT point is at position {p}, the last is 288")
+            }
+            Self::LayerOpacity => f.write_str("a VTXT opacity is not a finite number"),
             Self::RasterTooLarge { samples } => write!(
                 f,
                 "the height raster would need {samples} samples, more than {}",
@@ -124,6 +145,30 @@ mod tests {
         assert_eq!(
             Error::ZeroLevel.to_string(),
             "a LOD level must span at least one cell"
+        );
+    }
+
+    #[test]
+    fn layer_errors_name_the_problem() {
+        assert_eq!(
+            Error::SubrecordLength {
+                what: "VNML",
+                found: 5
+            }
+            .to_string(),
+            "a VNML subrecord cannot be 5 bytes long"
+        );
+        assert_eq!(
+            Error::LayerQuadrant(4).to_string(),
+            "a LAND layer names quadrant 4, the last is 3"
+        );
+        assert_eq!(
+            Error::LayerPosition(300).to_string(),
+            "a VTXT point is at position 300, the last is 288"
+        );
+        assert_eq!(
+            Error::LayerOpacity.to_string(),
+            "a VTXT opacity is not a finite number"
         );
     }
 

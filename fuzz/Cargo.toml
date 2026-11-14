@@ -10,6 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+lodwright-assets = { path = "../crates/lodwright-assets" }
 lodwright-core = { path = "../crates/lodwright-core" }
 lodwright-nif = { path = "../crates/lodwright-nif" }
 lodwright-testkit = { path = "../crates/lodwright-testkit" }
@@ -61,6 +62,20 @@ bench = false
 [[bin]]
 name = "bto_mesh"
 path = "fuzz_targets/bto_mesh.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bsa_archive"
+path = "fuzz_targets/bsa_archive.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "land_layers"
+path = "fuzz_targets/land_layers.rs"
 test = false
 doc = false
 bench = false

@@ -2,14 +2,20 @@
 //! Worldspaces assembled across a load order: `FormID`s resolved through master lists, later plugins overriding
 //! the cells of earlier ones.
 //!
-//! Derived from: the `FormID` and load-order rules on the UESP pages (`provenance/sources.toml`:
-//! `plugin-formid-masters`).
+//! A [`WorldIndex`] lists the worlds of a load order and their `WRLD` fields cheaply; [`WorldIndex::build`] then
+//! assembles one world at a time, so a load order with dozens of worlds never holds more than one world's
+//! assembled heights beside the plugins themselves.
+//!
+//! Derived from: the `FormID` and load-order rules on the UESP pages and xEdit's definitions
+//! (`provenance/sources.toml`: `plugin-formid-masters`, `plugin-record-override`, `wrld-parent`, `wrld-land-data`,
+//! `wrld-bounds`, `cell-water`, `wrld-child-inherits`).
 
 use std::collections::BTreeMap;
 
 use crate::Error;
 use crate::land::{CellHeights, SIDE};
-use crate::plugin::Plugin;
+use crate::layers::CellLayers;
+use crate::plugin::{DeclaredBounds, Plugin, WorldRecord};
 
 /// One worldspace with the final heights of every exterior cell that has LAND.
 #[derive(Debug, Clone, PartialEq)]
@@ -17,7 +23,44 @@ pub struct Worldspace {
     form_id: u32,
     name: String,
     cells: BTreeMap<(i32, i32), CellHeights>,
+    layers: BTreeMap<(i32, i32), CellLayers>,
+    water: BTreeMap<(i32, i32), CellWater>,
+    record: ResolvedRecord,
 }
+
+/// The water of a cell as its CELL record states it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct CellWater {
+    has_water: bool,
+    height: Option<f32>,
+}
+
+/// The `WRLD` fields of the winning record, with the parent made absolute.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct ResolvedRecord {
+    parent: Option<u32>,
+    parent_flags: Option<u16>,
+    default_land_height: Option<f32>,
+    default_water_height: Option<f32>,
+    bounds: Option<DeclaredBounds>,
+}
+
+/// What a child worldspace takes from its parent. The public sources do not say that LAND cells are inherited
+/// (`wrld-child-inherits`), so no variant inherits cells.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Inheritance {
+    /// A child uses only its own data (the default).
+    #[default]
+    None,
+    /// A child whose `PNAM` has "use land data" takes its parent's default land and water height (followed up the
+    /// chain of parents).
+    FlaggedDefaults,
+}
+
+/// The `PNAM` flag bit 0, "use land data" (`wrld-parent`).
+const USE_LAND_DATA: u16 = 0x1;
+/// Longest chain of parents followed; a longer chain or a cycle stops there.
+const MAX_PARENT_DEPTH: usize = 16;
 
 /// Inclusive cell bounds of a worldspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +98,57 @@ impl Worldspace {
     #[must_use]
     pub fn cell(&self, x: i32, y: i32) -> Option<&CellHeights> {
         self.cells.get(&(x, y))
+    }
+
+    /// Absolute `FormID` of the parent worldspace (`WNAM`), when the winning `WRLD` record names one.
+    #[must_use]
+    pub fn parent(&self) -> Option<u32> {
+        self.record.parent
+    }
+
+    /// The `PNAM` flags of the winning `WRLD` record.
+    #[must_use]
+    pub fn parent_flags(&self) -> Option<u16> {
+        self.record.parent_flags
+    }
+
+    /// Default land height (`DNAM`), after [`Inheritance`] was applied.
+    #[must_use]
+    pub fn default_land_height(&self) -> Option<f32> {
+        self.record.default_land_height
+    }
+
+    /// Default water height (`DNAM`), after [`Inheritance`] was applied.
+    #[must_use]
+    pub fn default_water_height(&self) -> Option<f32> {
+        self.record.default_water_height
+    }
+
+    /// The corners `NAM0` and `NAM9` as stored (unit not established).
+    #[must_use]
+    pub fn declared_bounds(&self) -> Option<DeclaredBounds> {
+        self.record.bounds
+    }
+
+    /// The water height of cell (`x`, `y`) for the mesh stage: its `XCLW`, else the world's default water
+    /// height when the cell has the has-water flag, else `None` (no water). `None` too for a cell without LAND.
+    #[must_use]
+    pub fn water_height(&self, x: i32, y: i32) -> Option<f32> {
+        // source: cell-water
+        let water = self.water.get(&(x, y))?;
+        water.height.or_else(|| {
+            water
+                .has_water
+                .then_some(self.record.default_water_height)
+                .flatten()
+        })
+    }
+
+    /// Normals, colours and texture layers of cell (`x`, `y`), with absolute texture `FormID`s. Present only when
+    /// the plugins were read with [`crate::plugin::ReadOptions::land_layers`] and the winning LAND record has them.
+    #[must_use]
+    pub fn layers(&self, x: i32, y: i32) -> Option<&CellLayers> {
+        self.layers.get(&(x, y))
     }
 
     /// All cells in (x, y) order.
@@ -113,41 +207,180 @@ impl Worldspace {
             form_id,
             name: name.to_owned(),
             cells: cells.into_iter().collect(),
+            layers: BTreeMap::new(),
+            water: BTreeMap::new(),
+            record: ResolvedRecord::default(),
         }
     }
 
-    /// Assemble the worldspaces of a load order. Each item is a plugin's file name and its contents, in load
-    /// order. Cells of later plugins replace those of earlier ones; the last editor id seen names the world.
-    /// Worldspaces come back sorted by absolute `FormID`.
+    /// Assemble every worldspace of a load order with no inheritance. Each item is a plugin's file name and its
+    /// contents, in load order. Cells of later plugins replace those of earlier ones; the last editor id seen
+    /// names the world. Worldspaces come back sorted by absolute `FormID`. Prefer [`WorldIndex`] when the load
+    /// order has many worlds and they can be handled one at a time.
     ///
     /// # Errors
     /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
     pub fn from_load_order(plugins: &[(String, Plugin)]) -> Result<Vec<Self>, Error> {
-        let mut worlds: BTreeMap<u32, Self> = BTreeMap::new();
+        let index = WorldIndex::new(plugins)?;
+        let ids: Vec<u32> = index.worlds().map(|(id, _)| id).collect();
+        Ok(ids
+            .into_iter()
+            .filter_map(|id| index.build(plugins, id, Inheritance::None))
+            .collect())
+    }
+}
+
+/// The worlds of a load order, listed without assembling any cells.
+#[derive(Debug, Clone)]
+pub struct WorldIndex {
+    worlds: BTreeMap<u32, IndexEntry>,
+    tables: Vec<Vec<u32>>,
+}
+
+#[derive(Debug, Clone)]
+struct IndexEntry {
+    name: String,
+    record: ResolvedRecord,
+}
+
+impl WorldIndex {
+    /// List the worlds of `plugins` (file name and contents, in load order): absolute `FormID`, name (the last
+    /// editor id seen) and the winning `WRLD` record (the last plugin that carries one replaces the earlier
+    /// records as a whole).
+    ///
+    /// # Errors
+    /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+    pub fn new(plugins: &[(String, Plugin)]) -> Result<Self, Error> {
+        let mut worlds: BTreeMap<u32, IndexEntry> = BTreeMap::new();
+        let mut tables = Vec::with_capacity(plugins.len());
         for (index, (_, plugin)) in plugins.iter().enumerate() {
             let table = master_table(plugins, plugin)?;
             let own = u32::try_from(index).map_err(|_| Error::Malformed("too many plugins"))?;
             for source in &plugin.worlds {
                 let id = absolute(source.form_id, &table, own);
-                let world = worlds.entry(id).or_insert_with(|| Self {
-                    form_id: id,
+                let entry = worlds.entry(id).or_insert_with(|| IndexEntry {
                     name: format!("{id:08X}"),
-                    cells: BTreeMap::new(),
+                    record: ResolvedRecord::default(),
                 });
                 if let Some(editor_id) = &source.editor_id {
-                    world.name.clone_from(editor_id);
+                    entry.name.clone_from(editor_id);
                 }
+                if let Some(record) = &source.record {
+                    // source: plugin-record-override
+                    entry.record = resolve_record(record, &table, own);
+                }
+            }
+            tables.push(table);
+        }
+        Ok(Self { worlds, tables })
+    }
+
+    /// The worlds as (absolute `FormID`, name), sorted by `FormID`.
+    pub fn worlds(&self) -> impl Iterator<Item = (u32, &str)> {
+        self.worlds.iter().map(|(id, e)| (*id, e.name.as_str()))
+    }
+
+    /// Assemble world `id` from `plugins`, which must be the plugins the index was made from. `None` when the
+    /// index has no such world.
+    #[must_use]
+    pub fn build(
+        &self,
+        plugins: &[(String, Plugin)],
+        id: u32,
+        inheritance: Inheritance,
+    ) -> Option<Worldspace> {
+        let entry = self.worlds.get(&id)?;
+        let mut world = Worldspace {
+            form_id: id,
+            name: entry.name.clone(),
+            cells: BTreeMap::new(),
+            layers: BTreeMap::new(),
+            water: BTreeMap::new(),
+            record: entry.record.clone(),
+        };
+        if inheritance == Inheritance::FlaggedDefaults {
+            self.inherit_defaults(&mut world);
+        }
+        for (index, (_, plugin)) in plugins.iter().enumerate() {
+            let own = u32::try_from(index).ok()?;
+            let table = self.tables.get(index)?;
+            for source in plugin
+                .worlds
+                .iter()
+                .filter(|w| absolute(w.form_id, table, own) == id)
+            {
                 for cell in &source.cells {
-                    world.cells.insert((cell.x, cell.y), cell.heights.clone());
+                    let key = (cell.x, cell.y);
+                    world.cells.insert(key, cell.heights.clone());
+                    // a later LAND record replaces the earlier one as a whole, layers included
+                    // source: plugin-record-override
+                    world.layers.remove(&key);
+                    if let Some(layers) = &cell.layers {
+                        let mut layers = layers.clone();
+                        layers.map_textures(|id| absolute(id, table, own));
+                        world.layers.insert(key, layers);
+                    }
+                    world.water.insert(
+                        key,
+                        CellWater {
+                            has_water: cell.has_water,
+                            height: cell.water_height,
+                        },
+                    );
                 }
             }
         }
-        Ok(worlds.into_values().collect())
+        Some(world)
+    }
+
+    /// Apply [`Inheritance::FlaggedDefaults`]: follow "use land data" up the parents.
+    fn inherit_defaults(&self, world: &mut Worldspace) {
+        // source: wrld-child-inherits
+        let mut record = &world.record;
+        let mut seen = vec![world.form_id];
+        for _ in 0..MAX_PARENT_DEPTH {
+            let flagged = record.parent_flags.is_some_and(|f| f & USE_LAND_DATA != 0);
+            let Some(parent) = record.parent.filter(|_| flagged) else {
+                return;
+            };
+            if seen.contains(&parent) {
+                return;
+            }
+            let Some(entry) = self.worlds.get(&parent) else {
+                return;
+            };
+            seen.push(parent);
+            record = &entry.record;
+            let inherited_flags = record.parent_flags.is_some_and(|f| f & USE_LAND_DATA != 0)
+                && record.parent.is_some();
+            if !inherited_flags {
+                if let (Some(land), water) =
+                    (record.default_land_height, record.default_water_height)
+                {
+                    world.record.default_land_height = Some(land);
+                    world.record.default_water_height = water;
+                }
+                return;
+            }
+        }
+    }
+}
+
+fn resolve_record(record: &WorldRecord, table: &[u32], own: u32) -> ResolvedRecord {
+    ResolvedRecord {
+        parent: record.parent.map(|p| absolute(p, table, own)),
+        parent_flags: record.parent_flags,
+        default_land_height: record.default_land_height,
+        default_water_height: record.default_water_height,
+        bounds: record.bounds,
     }
 }
 
 /// Load-order index of each master of `plugin`, by position in its master list.
-fn master_table(plugins: &[(String, Plugin)], plugin: &Plugin) -> Result<Vec<u32>, Error> {
+pub(crate) fn master_table(
+    plugins: &[(String, Plugin)],
+    plugin: &Plugin,
+) -> Result<Vec<u32>, Error> {
     plugin
         .masters
         .iter()
@@ -162,7 +395,7 @@ fn master_table(plugins: &[(String, Plugin)], plugin: &Plugin) -> Result<Vec<u32
 }
 
 // source: plugin-formid-masters
-fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
+pub(crate) fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
     let index = usize::try_from(form_id >> 24).unwrap_or(usize::MAX);
     let load_index = table.get(index).copied().unwrap_or(own);
     (load_index << 24) | (form_id & 0x00FF_FFFF)
@@ -170,7 +403,7 @@ fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bounds, Worldspace};
+    use super::{Bounds, Inheritance, WorldIndex, Worldspace};
     use crate::Error;
     use crate::land::CellHeights;
     use crate::plugin::read;
@@ -291,5 +524,272 @@ mod tests {
             [((0, 0), flat()), ((5, 5), CellHeights::flat(99.0))],
         );
         assert!(alone.max_seam_error().abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn layers_come_back_with_absolute_texture_ids_and_the_last_plugin_wins_whole() {
+        use crate::plugin::{ReadOptions, read_with};
+        use lodwright_testkit::land::{encode_atxt, encode_btxt, encode_vtxt};
+        let options = ReadOptions { land_layers: true };
+        let base = SyntheticWorld::new(0x0000_0A00, "Mojave").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(8.0),
+            vec![
+                (*b"BTXT", encode_btxt(0x0000_0001, 0, 0)),
+                (*b"ATXT", encode_atxt(0x0000_0002, 0, 1)),
+                (*b"VTXT", encode_vtxt(&[(3, 1.0)])),
+            ],
+        );
+        let patch = SyntheticWorld::new(0x0000_0A00, "Mojave").cell_with_subrecords(
+            0,
+            0,
+            Heights::flat(9.0),
+            // texture 0x01000005 is the patch's own (index 1), 0x00000006 is the master's
+            vec![(*b"BTXT", encode_btxt(0x0100_0005, 2, 0))],
+        );
+        let plugins: Vec<(String, crate::plugin::Plugin)> = vec![
+            (
+                "Base.esm".into(),
+                read_with(&world_plugin(&[], &base, false), options).unwrap(),
+            ),
+            (
+                "Patch.esp".into(),
+                read_with(&world_plugin(&["Base.esm"], &patch, false), options).unwrap(),
+            ),
+        ];
+        let only_base = Worldspace::from_load_order(&plugins[..1]).unwrap();
+        let layers = only_base[0].layers(0, 0).unwrap();
+        assert_eq!(layers.base[0], Some(1));
+        assert_eq!(layers.alpha[0].texture, 2);
+        let both = Worldspace::from_load_order(&plugins).unwrap();
+        let layers = both[0].layers(0, 0).unwrap();
+        assert_eq!(layers.base, [None, None, Some(0x0100_0005), None]);
+        assert!(
+            layers.alpha.is_empty(),
+            "the patch cell replaces the base cell whole"
+        );
+        assert!(both[0].layers(1, 0).is_none());
+    }
+
+    #[test]
+    fn plain_reads_keep_no_layers() {
+        let world = SyntheticWorld::new(0x10, "W").cell(0, 0, Heights::flat(1.0));
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        assert!(
+            Worldspace::from_load_order(&plugins).unwrap()[0]
+                .layers(0, 0)
+                .is_none()
+        );
+    }
+
+    fn chain(items: &[(&str, Vec<u8>)]) -> Vec<(String, crate::plugin::Plugin)> {
+        load(items)
+    }
+
+    #[test]
+    fn world_record_fields_and_cell_water_are_read() {
+        let world = SyntheticWorld::new(0x0A00, "Mojave")
+            .land_data(-2048.0, -4096.0)
+            .bounds([-10.0, -20.0], [30.0, 40.0])
+            .cell(0, 0, Heights::flat(8.0))
+            .cell(1, 0, Heights::flat(8.0))
+            .cell(2, 0, Heights::flat(8.0))
+            .cell(3, 0, Heights::flat(8.0))
+            .cell_water(0, 0, true, Some(-512.0))
+            .cell_water(1, 0, true, None)
+            .cell_water(2, 0, false, Some(64.0));
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        let world = &Worldspace::from_load_order(&plugins).unwrap()[0];
+        assert_eq!(world.parent(), None);
+        assert_eq!(world.default_land_height(), Some(-2048.0));
+        assert_eq!(world.default_water_height(), Some(-4096.0));
+        let bounds = world.declared_bounds().unwrap();
+        assert_eq!((bounds.min, bounds.max), ([-10.0, -20.0], [30.0, 40.0]));
+        // an XCLW is used as is, a has-water cell without one takes the default, a dry cell has none
+        assert_eq!(world.water_height(0, 0), Some(-512.0));
+        assert_eq!(world.water_height(1, 0), Some(-4096.0));
+        assert_eq!(world.water_height(2, 0), Some(64.0));
+        assert_eq!(world.water_height(3, 0), None);
+        assert_eq!(world.water_height(9, 9), None);
+    }
+
+    #[test]
+    fn a_has_water_cell_without_any_default_has_no_height() {
+        let world = SyntheticWorld::new(0x0A00, "W")
+            .cell(0, 0, Heights::flat(8.0))
+            .cell_water(0, 0, true, None);
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        assert_eq!(
+            Worldspace::from_load_order(&plugins).unwrap()[0].water_height(0, 0),
+            None
+        );
+    }
+
+    fn parent_and_child(child_flags: u16) -> Vec<(String, crate::plugin::Plugin)> {
+        let parent = SyntheticWorld::new(0x0B00, "Wasteland")
+            .land_data(-1000.0, -200.0)
+            .cell(0, 0, Heights::flat(8.0));
+        let child = SyntheticWorld::new(0x0B10, "DCworld01")
+            .parent(0x0B00, child_flags)
+            .cell(5, 5, Heights::flat(16.0));
+        load(&[
+            ("Base.esm", world_plugin(&[], &parent, false)),
+            ("Child.esm", world_plugin(&["Base.esm"], &child, false)),
+        ])
+    }
+
+    fn named<'a>(worlds: &'a [Worldspace], name: &str) -> &'a Worldspace {
+        worlds.iter().find(|w| w.name() == name).unwrap()
+    }
+
+    #[test]
+    fn a_child_names_its_parent_and_keeps_only_its_own_data_by_default() {
+        let worlds = Worldspace::from_load_order(&parent_and_child(0x1)).unwrap();
+        let child = named(&worlds, "DCworld01");
+        assert_eq!(child.parent(), Some(0x0B00));
+        assert_eq!(child.parent_flags(), Some(0x1));
+        assert_eq!(child.default_land_height(), None);
+        assert_eq!(child.cell_count(), 1);
+        assert!(child.cell(0, 0).is_none(), "LAND cells are never inherited");
+        assert_eq!(named(&worlds, "Wasteland").parent(), None);
+    }
+
+    #[test]
+    fn a_flagged_child_takes_the_parents_default_heights_only_when_asked() {
+        let plugins = parent_and_child(0x1);
+        let index = WorldIndex::new(&plugins).unwrap();
+        let (child_id, _) = index.worlds().find(|(_, n)| *n == "DCworld01").unwrap();
+        let plain = index.build(&plugins, child_id, Inheritance::None).unwrap();
+        assert_eq!(plain.default_land_height(), None);
+        let inherited = index
+            .build(&plugins, child_id, Inheritance::FlaggedDefaults)
+            .unwrap();
+        assert_eq!(inherited.default_land_height(), Some(-1000.0));
+        assert_eq!(inherited.default_water_height(), Some(-200.0));
+        assert!(inherited.cell(0, 0).is_none());
+    }
+
+    #[test]
+    fn an_unflagged_child_inherits_nothing_even_when_asked() {
+        let plugins = parent_and_child(0x8);
+        let index = WorldIndex::new(&plugins).unwrap();
+        let (child_id, _) = index.worlds().find(|(_, n)| *n == "DCworld01").unwrap();
+        let child = index
+            .build(&plugins, child_id, Inheritance::FlaggedDefaults)
+            .unwrap();
+        assert_eq!(child.default_land_height(), None);
+    }
+
+    #[test]
+    fn inheritance_follows_a_chain_and_survives_a_cycle() {
+        let root = SyntheticWorld::new(0x0A, "A").land_data(1.0, 2.0);
+        let middle = SyntheticWorld::new(0x0B, "B").parent(0x0A, 0x1);
+        let leaf = SyntheticWorld::new(0x0C, "C").parent(0x0B, 0x1);
+        let mut bytes = lodwright_testkit::plugin::PluginBuilder::new();
+        for w in [&root, &middle, &leaf] {
+            bytes = bytes.group(lodwright_testkit::world::world_group(w, false));
+        }
+        let plugins = load(&[("Chain.esm", bytes.build())]);
+        let index = WorldIndex::new(&plugins).unwrap();
+        let built = index
+            .build(&plugins, 0x0C, Inheritance::FlaggedDefaults)
+            .unwrap();
+        assert_eq!(built.default_land_height(), Some(1.0));
+
+        let first = SyntheticWorld::new(0x01, "X").parent(0x02, 0x1);
+        let second = SyntheticWorld::new(0x02, "Y").parent(0x01, 0x1);
+        let mut bytes = lodwright_testkit::plugin::PluginBuilder::new();
+        for w in [&first, &second] {
+            bytes = bytes.group(lodwright_testkit::world::world_group(w, false));
+        }
+        let plugins = load(&[("Loop.esm", bytes.build())]);
+        let index = WorldIndex::new(&plugins).unwrap();
+        let built = index
+            .build(&plugins, 0x01, Inheritance::FlaggedDefaults)
+            .unwrap();
+        assert_eq!(built.default_land_height(), None);
+    }
+
+    #[test]
+    fn a_world_missing_from_the_index_builds_to_none() {
+        let plugins = parent_and_child(0);
+        let index = WorldIndex::new(&plugins).unwrap();
+        assert!(index.build(&plugins, 0xDEAD, Inheritance::None).is_none());
+    }
+
+    /// TTW-shaped load order: both games' masters, the merged plugin that masters both, many child worlds, and a
+    /// plugin that overrides the `WRLD` record of the Capital Wasteland.
+    fn ttw_load_order() -> Vec<(String, crate::plugin::Plugin)> {
+        use lodwright_testkit::plugin::PluginBuilder;
+        use lodwright_testkit::world::world_group;
+        let mojave = SyntheticWorld::new(0x0A00, "WastelandNV")
+            .land_data(-2048.0, 0.0)
+            .cell(0, 0, Heights::flat(8.0));
+        let capital = SyntheticWorld::new(0x0B00, "Wasteland")
+            .land_data(-2048.0, -100.0)
+            .cell(0, 0, Heights::flat(16.0))
+            .cell(1, 0, Heights::flat(16.0));
+        // TTW's own plugin: masters FalloutNV.esm (index 0) and Fallout3.esm (index 1); its children name the
+        // Capital Wasteland through master index 1
+        let mut ttw = PluginBuilder::new()
+            .master("FalloutNV.esm")
+            .master("Fallout3.esm");
+        for n in 1..=18_u32 {
+            let child = SyntheticWorld::new(0x0200_0000 + n * 0x100, &format!("DCworld{n:02}"))
+                .parent(0x0100_0B00, 0x1)
+                .cell(i32::try_from(n).unwrap(), 0, Heights::flat(32.0));
+            ttw = ttw.group(world_group(&child, false));
+        }
+        // the adjustments plugin overrides Wasteland (master index 2 = TTW, but the world itself is from
+        // Fallout3.esm, index 1) with a changed record and one more cell
+        let adjusted = SyntheticWorld::new(0x0100_0B00, "Wasteland")
+            .land_data(-3000.0, -50.0)
+            .cell(2, 0, Heights::flat(24.0));
+        let mut adjustments = PluginBuilder::new()
+            .master("FalloutNV.esm")
+            .master("Fallout3.esm")
+            .master("TaleOfTwoWastelands.esm");
+        adjustments = adjustments.group(world_group(&adjusted, false));
+        chain(&[
+            ("FalloutNV.esm", world_plugin(&[], &mojave, false)),
+            ("Fallout3.esm", world_plugin(&[], &capital, false)),
+            ("TaleOfTwoWastelands.esm", ttw.build()),
+            ("CapitalAdjustments.esp", adjustments.build()),
+        ])
+    }
+
+    #[test]
+    fn ttw_children_resolve_their_parent_through_the_fallout_3_master() {
+        let worlds = Worldspace::from_load_order(&ttw_load_order()).unwrap();
+        assert_eq!(worlds.len(), 2 + 18);
+        let dc = named(&worlds, "DCworld07");
+        // master index 1 is Fallout3.esm, load index 1
+        assert_eq!(dc.parent(), Some(0x0100_0B00 & 0x0100_FFFF));
+        assert_eq!(dc.form_id() >> 24, 2);
+        assert_eq!(named(&worlds, "WastelandNV").form_id(), 0x0A00);
+    }
+
+    #[test]
+    fn a_plugin_overriding_wrld_replaces_the_record_and_adds_cells() {
+        let worlds = Worldspace::from_load_order(&ttw_load_order()).unwrap();
+        let capital = named(&worlds, "Wasteland");
+        assert_eq!(capital.form_id(), 0x0100_0B00);
+        assert_eq!(capital.default_land_height(), Some(-3000.0));
+        assert_eq!(capital.default_water_height(), Some(-50.0));
+        assert_eq!(capital.cell_count(), 3);
+        assert!(capital.cell(2, 0).is_some());
+    }
+
+    #[test]
+    fn ttw_children_inherit_the_overridden_defaults_when_flagged() {
+        let plugins = ttw_load_order();
+        let index = WorldIndex::new(&plugins).unwrap();
+        let (id, _) = index.worlds().find(|(_, n)| *n == "DCworld03").unwrap();
+        let dc = index
+            .build(&plugins, id, Inheritance::FlaggedDefaults)
+            .unwrap();
+        assert_eq!(dc.default_land_height(), Some(-3000.0));
+        assert_eq!(index.worlds().count(), 20);
     }
 }

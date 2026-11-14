@@ -1,0 +1,18 @@
+[package]
+name = "lodwright-assets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "BSA v104 archive reader and the loose-over-archive resolver of lodwright."
+
+[dependencies]
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
+
+[lints]
+workspace = true

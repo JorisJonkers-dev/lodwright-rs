@@ -480,3 +480,58 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master. 'As a whole' (no field merging) is the conservative reading; Bethesda games' conflict resolution is whole-record, but no page read here states it."
+
+[[source]]
+id = "wrld-parent"
+fact = "A FNV WRLD record names its parent worldspace in WNAM (a WRLD FormID) and carries PNAM, a u16 of flags telling what the child takes from the parent: bit 0 land data, bit 1 LOD data, bit 2 map data, bit 3 water data, bit 4 climate data, bit 5 image space data."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read RegisterRecordDef(WRLD, ...): the 'Parent Worldspace' struct with WNAM and the PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'. The UESP Oblivion page https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD (CC-BY-SA-2.5) lists WNAM as the parent and has no PNAM."
+
+[[source]]
+id = "wrld-land-data"
+fact = "A FNV WRLD record's DNAM subrecord ('Land Data') is two f32 values: the default land height, then the default water height."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsCommon.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read wbWorldLandData in wbDefinitionsCommon.pas. xEdit shows the default land height with default -2048 for these games; the unit and whether 'default water height' is in world units are not stated."
+
+[[source]]
+id = "wrld-bounds"
+fact = "A FNV WRLD record's NAM0 and NAM9 subrecords are the minimum and maximum corner of the worldspace, each two f32 values (x, then y)."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsCommon.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read wbWorldObjectBounds. The UESP Oblivion page calls NAM0 and NAM9 'long[2]' (cell coordinates); xEdit reads floats for FNV with a display factor of 1/100 for these games. OPEN: the unit of the stored floats (cells or world units); the reader keeps them as stored and the planner does not use them."
+
+[[source]]
+id = "cell-water"
+fact = "A CELL has DATA flags (0x02 = has water) and an optional XCLW f32 water height; xEdit's after-load for FNV adds an XCLW with the value 'Default' to a has-water cell that lacks one."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/CELL"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 30 July 2024), and MPL-2.0 for the xEdit part"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water height (if not 0.00)'. xEdit wbDefinitionsFNV.pas (revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b, MPL-2.0) declares wbFloat(XCLW, 'Water Height') and the after-load that adds XCLW 'Default' when DATA and 2 is set. OPEN: what 'Default' resolves to; the reader assumes the worldspace default water height."
+
+[[source]]
+id = "wrld-child-inherits"
+fact = "A child worldspace inherits climate, water and map data from its parent; the PNAM flags (bit 0 land data, bit 1 LOD data, bit 3 water data and others) say which groups of data a child takes."
+url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 30 July 2024), and MPL-2.0 for the xEdit flag names"
+date = 2026-11-14
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "No public source read says that a child worldspace uses its parent's LAND cells, or what the game does for LOD with a flagged parent. OPEN QUESTION, recorded in docs/design.md. The conservative rule (no inheritance) is the default; the option FlaggedDefaults only lets a child with the 'use land data' flag take the parent's default land and water height (the DNAM struct that xEdit names 'Land Data')."

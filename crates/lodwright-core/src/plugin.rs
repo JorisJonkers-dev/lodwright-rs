@@ -41,6 +41,34 @@ pub struct LandCell {
     /// Normals, colours and texture layers; `Some` only when read with [`ReadOptions::land_layers`].
     /// Texture `FormID`s are as stored in this plugin.
     pub layers: Option<CellLayers>,
+    /// Whether the CELL's `DATA` has the has-water flag.
+    pub has_water: bool,
+    /// The CELL's `XCLW` water height, when it has one.
+    pub water_height: Option<f32>,
+}
+
+/// The corners of a worldspace as stored in `NAM0` and `NAM9` (unit not established, see `wrld-bounds`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeclaredBounds {
+    /// `NAM0`: x and y of the minimum corner.
+    pub min: [f32; 2],
+    /// `NAM9`: x and y of the maximum corner.
+    pub max: [f32; 2],
+}
+
+/// The fields of a `WRLD` record the pipeline uses; `FormID`s as stored in the plugin.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct WorldRecord {
+    /// `WNAM`: parent worldspace, when the record has one.
+    pub parent: Option<u32>,
+    /// `PNAM`: which data the child takes from its parent.
+    pub parent_flags: Option<u16>,
+    /// `DNAM`: default land height.
+    pub default_land_height: Option<f32>,
+    /// `DNAM`: default water height.
+    pub default_water_height: Option<f32>,
+    /// `NAM0` and `NAM9`, when both are present.
+    pub bounds: Option<DeclaredBounds>,
 }
 
 /// A worldspace as one plugin defines or overrides it.
@@ -50,6 +78,8 @@ pub struct World {
     pub form_id: u32,
     /// Editor id (`EDID`), when the plugin carries the `WRLD` record.
     pub editor_id: Option<String>,
+    /// The `WRLD` record's fields, when the plugin carries the record.
+    pub record: Option<WorldRecord>,
     /// Exterior cells with LAND, in file order.
     pub cells: Vec<LandCell>,
 }
@@ -223,7 +253,59 @@ struct Walker {
     texture_sets: Vec<TextureSet>,
     worlds: Vec<World>,
     world: Option<usize>,
-    cell: Option<(i32, i32)>,
+    cell: Option<CellInfo>,
+}
+
+#[derive(Clone, Copy)]
+struct CellInfo {
+    x: i32,
+    y: i32,
+    has_water: bool,
+    water_height: Option<f32>,
+}
+
+fn le_f32(bytes: &[u8], at: usize) -> Option<f32> {
+    let chunk = bytes.get(at..at + 4)?;
+    Some(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])).filter(|v| v.is_finite())
+}
+
+/// The fields of a `WRLD` record's subrecords.
+fn world_record(data: &[u8]) -> Result<(Option<String>, WorldRecord), Error> {
+    let mut editor_id = None;
+    let mut record = WorldRecord::default();
+    let (mut min, mut max) = (None, None);
+    for (signature, payload) in subrecords(data)? {
+        match &signature {
+            // source: wrld-edid
+            b"EDID" => editor_id = Some(zstring(payload)),
+            // source: wrld-parent
+            b"WNAM" if payload.len() >= 4 => {
+                record.parent = Some(le_u32(payload, 0)).filter(|id| *id != 0);
+            }
+            b"PNAM" if payload.len() >= 2 => {
+                record.parent_flags = Some(u16::from_le_bytes([payload[0], payload[1]]));
+            }
+            // source: wrld-land-data
+            b"DNAM" if payload.len() >= 8 => {
+                record.default_land_height = le_f32(payload, 0);
+                record.default_water_height = le_f32(payload, 4);
+            }
+            // source: wrld-bounds
+            b"NAM0" => {
+                min = le_f32(payload, 0)
+                    .zip(le_f32(payload, 4))
+                    .map(|(x, y)| [x, y]);
+            }
+            b"NAM9" => {
+                max = le_f32(payload, 0)
+                    .zip(le_f32(payload, 4))
+                    .map(|(x, y)| [x, y]);
+            }
+            _ => {}
+        }
+    }
+    record.bounds = min.zip(max).map(|(min, max)| DeclaredBounds { min, max });
+    Ok((editor_id, record))
 }
 
 impl Walker {
@@ -234,6 +316,7 @@ impl Walker {
         self.worlds.push(World {
             form_id,
             editor_id: None,
+            record: None,
             cells: Vec::new(),
         });
         self.worlds.len() - 1
@@ -285,28 +368,44 @@ impl Walker {
             b"WRLD" => {
                 let index = self.world_index(record.form_id);
                 let data = record.data()?;
-                // source: wrld-edid
-                for (signature, payload) in subrecords(&data)? {
-                    if &signature == b"EDID" {
-                        self.worlds[index].editor_id = Some(zstring(payload));
-                    }
+                let (editor_id, fields) = world_record(&data)?;
+                if editor_id.is_some() {
+                    self.worlds[index].editor_id = editor_id;
                 }
+                self.worlds[index].record = Some(fields);
             }
             b"CELL" => {
                 let data = record.data()?;
                 self.cell = None;
+                let (mut grid, mut has_water, mut water_height) = (None, false, None);
                 for (signature, payload) in subrecords(&data)? {
-                    // source: cell-xclc-grid
-                    if &signature == b"XCLC" && payload.len() >= 8 {
-                        self.cell = Some((
-                            i32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]),
-                            i32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]),
-                        ));
+                    match &signature {
+                        // source: cell-xclc-grid
+                        b"XCLC" if payload.len() >= 8 => {
+                            grid = Some((
+                                i32::from_le_bytes([
+                                    payload[0], payload[1], payload[2], payload[3],
+                                ]),
+                                i32::from_le_bytes([
+                                    payload[4], payload[5], payload[6], payload[7],
+                                ]),
+                            ));
+                        }
+                        // source: cell-water
+                        b"DATA" => has_water = payload.first().is_some_and(|f| f & 0x02 != 0),
+                        b"XCLW" => water_height = le_f32(payload, 0),
+                        _ => {}
                     }
                 }
+                self.cell = grid.map(|(x, y)| CellInfo {
+                    x,
+                    y,
+                    has_water,
+                    water_height,
+                });
             }
             b"LAND" => {
-                let (Some(world), Some((x, y))) = (self.world, self.cell) else {
+                let (Some(world), Some(cell)) = (self.world, self.cell) else {
                     return Ok(());
                 };
                 let data = record.data()?;
@@ -321,10 +420,12 @@ impl Walker {
                 }
                 if let Some(heights) = heights {
                     self.worlds[world].cells.push(LandCell {
-                        x,
-                        y,
+                        x: cell.x,
+                        y: cell.y,
                         heights,
                         layers: layers.map(LayerReader::finish),
+                        has_water: cell.has_water,
+                        water_height: cell.water_height,
                     });
                 }
             }

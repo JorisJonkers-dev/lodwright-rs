@@ -24,6 +24,8 @@ pub struct SyntheticCell {
     pub heights: Option<Heights>,
     /// Further LAND subrecords written after VHGT (VNML, VCLR, BTXT, ATXT, VTXT, anything else).
     pub extra: Vec<([u8; 4], Vec<u8>)>,
+    /// Water: the CELL `DATA` has-water flag and the `XCLW` height, when written.
+    pub water: Option<(bool, Option<f32>)>,
 }
 
 /// A worldspace to write.
@@ -35,6 +37,12 @@ pub struct SyntheticWorld {
     pub editor_id: String,
     /// Exterior cells.
     pub cells: Vec<SyntheticCell>,
+    /// Parent worldspace `FormID` (`WNAM`) and `PNAM` flags, when written.
+    pub parent: Option<(u32, u16)>,
+    /// Default land height and default water height (`DNAM`), when written.
+    pub land_data: Option<(f32, f32)>,
+    /// Bottom-left (`NAM0`) and top-right (`NAM9`) corner as two float pairs, when written.
+    pub bounds: Option<([f32; 2], [f32; 2])>,
 }
 
 impl SyntheticWorld {
@@ -45,7 +53,46 @@ impl SyntheticWorld {
             form_id,
             editor_id: editor_id.to_owned(),
             cells: Vec::new(),
+            parent: None,
+            land_data: None,
+            bounds: None,
         }
+    }
+
+    /// Write a parent worldspace (`WNAM`) and its flags (`PNAM`).
+    #[must_use]
+    pub fn parent(mut self, parent: u32, flags: u16) -> Self {
+        self.parent = Some((parent, flags));
+        self
+    }
+
+    /// Write the default land and water heights (`DNAM`).
+    #[must_use]
+    pub fn land_data(mut self, land: f32, water: f32) -> Self {
+        self.land_data = Some((land, water));
+        self
+    }
+
+    /// Write the worldspace corners (`NAM0`, `NAM9`).
+    #[must_use]
+    pub fn bounds(mut self, min: [f32; 2], max: [f32; 2]) -> Self {
+        self.bounds = Some((min, max));
+        self
+    }
+
+    /// Set the water of the cell at (`x`, `y`) (the cell must exist): the has-water flag and an optional `XCLW`.
+    ///
+    /// # Panics
+    /// If there is no such cell.
+    #[must_use]
+    pub fn cell_water(mut self, x: i32, y: i32, has_water: bool, height: Option<f32>) -> Self {
+        let cell = self
+            .cells
+            .iter_mut()
+            .find(|c| c.x == x && c.y == y)
+            .expect("the cell exists");
+        cell.water = Some((has_water, height));
+        self
     }
 
     /// Add a cell with LAND heights.
@@ -56,6 +103,7 @@ impl SyntheticWorld {
             y,
             heights: Some(heights),
             extra: Vec::new(),
+            water: None,
         });
         self
     }
@@ -74,6 +122,7 @@ impl SyntheticWorld {
             y,
             heights: Some(heights),
             extra,
+            water: None,
         });
         self
     }
@@ -86,6 +135,7 @@ impl SyntheticWorld {
             y,
             heights: None,
             extra: Vec::new(),
+            water: None,
         });
         self
     }
@@ -103,6 +153,29 @@ fn i16_pair(a: i32, b: i32) -> [u8; 4] {
     [a[0], a[1], b[0], b[1]]
 }
 
+// source: wrld-parent, wrld-land-data, wrld-bounds
+fn world_record(world: &SyntheticWorld) -> Record {
+    let mut record =
+        Record::new(*b"WRLD", world.form_id).with_subrecord(*b"EDID", zstring(&world.editor_id));
+    if let Some((parent, flags)) = world.parent {
+        record = record
+            .with_subrecord(*b"WNAM", parent.to_le_bytes().to_vec())
+            .with_subrecord(*b"PNAM", flags.to_le_bytes().to_vec());
+    }
+    if let Some((land, water)) = world.land_data {
+        let mut bytes = land.to_le_bytes().to_vec();
+        bytes.extend_from_slice(&water.to_le_bytes());
+        record = record.with_subrecord(*b"DNAM", bytes);
+    }
+    if let Some((min, max)) = world.bounds {
+        let pair = |p: [f32; 2]| [p[0].to_le_bytes(), p[1].to_le_bytes()].concat();
+        record = record
+            .with_subrecord(*b"NAM0", pair(min))
+            .with_subrecord(*b"NAM9", pair(max));
+    }
+    record
+}
+
 // source: plugin-group-types, cell-xclc-grid, wrld-edid
 /// The top-level `WRLD` group of `world`. Cell `FormID`s are `world.form_id + 1 + index`; LAND ones follow them
 /// at `world.form_id + 0x1000 + index`. `compress_land` writes the LAND records zlib-compressed.
@@ -116,9 +189,14 @@ pub fn world_group(world: &SyntheticWorld, compress_land: bool) -> Group {
         xclc.extend_from_slice(&cell.x.to_le_bytes());
         xclc.extend_from_slice(&cell.y.to_le_bytes());
         xclc.extend_from_slice(&0_u32.to_le_bytes());
-        let cell_record = Record::new(*b"CELL", cell_id)
-            .with_subrecord(*b"DATA", vec![0])
-            .with_subrecord(*b"XCLC", xclc);
+        // source: cell-water
+        let (has_water, water_height) = cell.water.unwrap_or((false, None));
+        let mut cell_record = Record::new(*b"CELL", cell_id)
+            .with_subrecord(*b"DATA", vec![if has_water { 0x02 } else { 0 }]);
+        if let Some(height) = water_height {
+            cell_record = cell_record.with_subrecord(*b"XCLW", height.to_le_bytes().to_vec());
+        }
+        let cell_record = cell_record.with_subrecord(*b"XCLC", xclc);
         let mut cell_children = Group::new(CELL_CHILDREN, cell_id.to_le_bytes());
         if let Some(heights) = &cell.heights {
             let mut land = Record::new(*b"LAND", world.form_id + 0x1000 + offset)
@@ -140,10 +218,7 @@ pub fn world_group(world: &SyntheticWorld, compress_land: bool) -> Group {
             .with(Group::new(EXTERIOR_BLOCK, i16_pair(cell.y >> 3, cell.x >> 3)).with(sub_block));
     }
     Group::new(TOP, *b"WRLD")
-        .with(
-            Record::new(*b"WRLD", world.form_id)
-                .with_subrecord(*b"EDID", zstring(&world.editor_id)),
-        )
+        .with(world_record(world))
         .with(children)
 }
 

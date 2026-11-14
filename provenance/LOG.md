@@ -82,3 +82,28 @@ Result for the three older layout rows `lod-block-naming`, `lod-terrain-paths` a
 contradict all three (extension, level prefix, normal-map name, settings extension). Their notes say superseded; the
 owner's tree decides (docs/owner-runbook.md section 2, extended in docs/spec/measurements.md). Open: byte layouts of
 the block NIFs, `.dlodsettings` and `.dtl`, which no public document gives.
+
+## 2026-11-14: NIF 20.2.0.7 container and shape blocks (lodwright-nif)
+
+Specifier entry for the generic NIF reader and writer. Read: `Core/wbDataFormatNif.pas` and
+`Core/wbDataFormatNifTypes.pas` of TES5Edit/TES5Edit (the MPL-2.0 xEdit repository, not the unlicensed xLODGen
+repository) at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, both under an MPL-2.0 file header. Only the
+20.2.0.7 branch of each definition was recorded. The niftools `nif.xml` was not used as a source: its repository
+(niftools/nifxml) carries a GPL-3.0 licence file, so it is not an allowed input. The first 2.5 KB of it (the
+version-expression macros at the top) were downloaded and looked at before that licence was noticed, and the file was
+deleted unused; none of its content is in any row. No decompiled output, game file or other tool's NIF source was read.
+
+- `nif-header-magic-version`: the first line and the version `u32`.
+- `nif-header-fields`: endian, user versions, block count, the Bethesda export info and which fields depend on user version 2.
+- `nif-block-table`: block type table, per-block type index and size, string table, groups, then the block bodies.
+- `nif-footer-roots`: the footer.
+- `nif-primitive-encodings`: strings and links as `i32` indices, bool as one byte, the small vector, colour and triangle types.
+- `nif-objectnet-avobject-ninode`: `NiObjectNET`, `NiAVObject`, `NiNode`.
+- `nif-trishape-geometry`: `NiGeometry` and `NiTriShape`.
+- `nif-geometry-data-layout`: `NiGeometryData`, `NiTriBasedGeomData`, `NiTriShapeData`.
+- `nif-property-layout`: `NiAlphaProperty`, `NiZBufferProperty`, `NiMaterialProperty`.
+
+Roles: the same author recorded the rows and wrote the crate, so no second reader has re-derived the facts and every
+row stays `verified = false`; the pull request says so. Open: whether the short-string length byte counts the trailing
+NUL (the crate carries those bytes raw), and what the game itself accepts: nothing here was loaded by the engine.
+No block profile for New Vegas LOD meshes is recorded; that waits for the owner's block NIF measurements.

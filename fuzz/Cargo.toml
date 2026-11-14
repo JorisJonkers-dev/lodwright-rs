@@ -11,6 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 lodwright-core = { path = "../crates/lodwright-core" }
+lodwright-nif = { path = "../crates/lodwright-nif" }
 lodwright-testkit = { path = "../crates/lodwright-testkit" }
 
 # Own workspace root: keeps libfuzzer-sys out of the shipped crates and the root lockfile.
@@ -60,6 +61,13 @@ bench = false
 [[bin]]
 name = "bto_mesh"
 path = "fuzz_targets/bto_mesh.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nif_read"
+path = "fuzz_targets/nif_read.rs"
 test = false
 doc = false
 bench = false

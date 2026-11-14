@@ -25,6 +25,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lodwright-nif"
+version = "0.1.0"
+dependencies = [
+ "lodwright-testkit",
+]
+
+[[package]]
 name = "lodwright-testkit"
 version = "0.1.0"
 dependencies = [

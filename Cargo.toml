@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lodwright-core", "crates/lodwright-cli", "crates/lodwright-testkit"]
+members = ["crates/lodwright-core", "crates/lodwright-cli", "crates/lodwright-nif", "crates/lodwright-testkit"]
 # fuzz/ is its own workspace (libfuzzer-sys stays out of the shipped crates).
 exclude = ["fuzz"]
 
@@ -22,4 +22,5 @@ pedantic = { level = "warn", priority = -1 }
 
 [workspace.dependencies]
 lodwright-core = { path = "crates/lodwright-core" }
+lodwright-nif = { path = "crates/lodwright-nif" }
 lodwright-testkit = { path = "crates/lodwright-testkit" }

@@ -9,6 +9,7 @@
 pub mod dds;
 pub mod golden;
 pub mod land;
+pub mod nif;
 pub mod plugin;
 pub mod rng;
 pub mod world;

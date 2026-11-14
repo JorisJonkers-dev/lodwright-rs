@@ -104,3 +104,19 @@ unverified and says nothing about two points the code has to decide: how an arch
 therefore offers both readings as a documented option and defaults to later archives winning, as the work item asks.
 Hashes are not computed (no row for the hash function), so the testkit writes stand-in hashes and the reader ignores
 them.
+
+## 2026-11-14: LAND layers, LTEX and TXST
+
+Specifier entry, from the UESP LAND page (CC-BY-SA-2.5, last edited 3 August 2024) and from xEdit's FNV and common
+definitions (`TES5Edit/TES5Edit` revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016
+generator C# repository, decompiled binaries, any GPL or leaked code. The GECK wiki returned a bot challenge and was not
+used. The same person wrote the rows and the code, so every row stays `verified = false` until a second reader re-derives it.
+
+- `land-vnml-layout`, `land-vclr-layout`: 33 x 33 grids of three bytes. The byte encoding of a normal is open; raw bytes are kept.
+- `land-layer-header`: BTXT and ATXT, 8 bytes; the UESP "big-endian FormID" claim was not followed (xEdit and the
+  rest of the reader use little endian).
+- `land-vtxt-layout`: position, unused, opacity; sparse, so unlisted positions are zero (an inference).
+- `land-quadrant-grid`: the quadrant to vertex mapping used by the opacity lookup.
+- `ltex-texture-set`: LTEX has TNAM (TXST) and ICON in FNV; which wins is open, TXST first is the implemented choice.
+- `txst-texture-paths`: TX00 and TX01 are the base and normal paths.
+- `plugin-record-override`: a later plugin's LTEX, TXST or LAND replaces the earlier one as a whole.

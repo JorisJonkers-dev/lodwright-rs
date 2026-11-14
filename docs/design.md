@@ -60,6 +60,9 @@ About 3-4 weeks to a terrain-only generator, 4-6 months to full replacement, one
 
 Resolve from allowed inputs only; each answer becomes a provenance row.
 
+- LAND and textures: the byte encoding of VNML normals; whether the game prefers a LTEX's TNAM texture set or its ICON
+  when both exist (`ltex-texture-set`); whether VTXT positions not listed mean zero opacity (`land-vtxt-layout`).
+
 - BSA v104: whether the file-record size counts the embedded path when archive flag 0x100 is set (`bsa-v104-data-blocks`).
 - Archive pickup: how an archive name is tied to a plugin (only "shares its name" is recorded) and whether an archive
   without a `.override` file may replace a file of an earlier archive (`fnv-archive-loading`). `lodwright-assets`

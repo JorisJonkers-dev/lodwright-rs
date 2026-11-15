@@ -208,6 +208,46 @@ so. Open: rounding of odd sizes in a mip chain (the page's examples are all even
 convention), and which header fields (caps, flags, linear size) the game's own texture loader insists on: that is the
 owner's measurement M5 on a reference file, by role `oracle:` and numbers only.
 
+## 2026-11-14: second reading of the NIF and DDS rows
+
+Second reader for `lodwright-nif` and `lodwright-dds`, independent of the specifier and the implementer of both. The
+facts were re-derived before the crates were opened, then compared with the rows and with the code.
+
+NIF: the only inputs were `Core/wbDataFormatNif.pas`, `Core/wbDataFormatNifTypes.pas` and, for the primitive types,
+`Core/wbDataFormat.pas` of TES5Edit/TES5Edit at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file
+headers). No `nif.xml` and no GPL source was opened. Every condition and field order below was read from the `NiHeader`,
+`NiFooter`, `NiObjectNET`, `NiAVObject`, `NiNode`, `NiGeometry`, `NiGeometryData`, `NiTriBasedGeomData`,
+`NiTriShapeData`, `NiAlphaProperty`, `NiMaterialProperty` and `NiZBufferProperty` definitions and the `NiHeader_En*`,
+`NiAVObject_*`, `NiGeometry_En*`, `NiGeometryData_*` and `NiMaterialProperty_En*` conditions, and agreed with the row and
+with the crate: `nif-header-magic-version`, `nif-header-fields`, `nif-block-table`, `nif-footer-roots`,
+`nif-primitive-encodings`, `nif-objectnet-avobject-ninode`, `nif-trishape-geometry`, `nif-geometry-data-layout` and
+`nif-property-layout` are now `verified = true`. Points checked with care: the user version 2 condition of the Bethesda
+header block (20.2.0.7 with user version 3 or more); the three export-info conditions on user version 2 (130, 131, 103);
+the u16 or u32 flags switch at user version 2 of 26; the property list at 34 or less; effects below 130; the UV set count
+as `(Num UV Sets and 63) or (Vector Flags and 1)` where the first field exists only before 4.2.2.0; the tangent test on
+bit 0x1000 with normals present; the block size array being filled from each block's serialised size.
+
+Nothing in the crate encodes a NIF fact that the xEdit sources do not support, so there is no sign that anything was
+derived from outside the allowed set, and no taint review issue was needed. Two remarks, neither a discrepancy: the crate
+keeps shapes and geometry data at user version 2 of 100 or more opaque, which is more cautious than xEdit (it keeps the
+material data for non-particle shapes at those versions), and the `nif-trishape-geometry` note now says its row covers
+the below-100 case only. The crate rejects a block whose parsed length differs from its declared size and rejects bytes
+after the footer: those are the crate's own strictness, not format facts, and the sources do not contradict them.
+
+The open question of the short-string length byte is answered by `TdfChars.ReadChars` in `wbDataFormat.pas`: a prefixed
+string defined as terminated drops its last byte from the value only when that byte is the terminator, so the length byte
+covers a trailing NUL whenever one is stored. The header short strings are defined that way and the block type and string
+table entries (sized strings) are not. Carrying the bytes raw, as the crate does, is consistent with that.
+
+DDS: re-derived from Microsoft Learn's DDS_HEADER, DDS_PIXELFORMAT, Programming Guide for DDS, DDS Texture Example and
+Block Compression (Direct3D 10) pages (the MicrosoftDocs/win32 sources of those pages, plus the three layout diagrams of
+the block compression page for the order of the BC3 and BC5 parts). `dds-header-flags-caps`, `dds-fourcc-formats`,
+`dds-reader-validation`, `dds-linear-size-pitch`, `bc-block-padding`, `bc1-block-layout`, `bc3-block-layout` and
+`bc5-block-layout` agree and are `verified = true`. The BC3 diagram shows the alpha block first and the colour block
+second, the BC5 diagram red first and green second, as the rows say. `dds-mip-chain` stays `verified = false`: the row is
+accurate, but the crate rounds odd sizes down and cites that row for it while the row says that rounding is open; the
+60 by 40 example on the block compression page (30x20, 15x10) does not settle it either. Issue 60 tracks it.
+
 
 
 ## 2026-11-14: `lodwright probe` (NIF header and geometry, DDS pixel format and BC1/BC3, no game file)

@@ -544,7 +544,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "NiHeader definition: Magic (terminator 0x0A) and Version (u32, default 20.2.0.7); TwbNifFile.UnSerialize checks the magic constant sNifMagicGamebryo."
 
 [[source]]
@@ -555,7 +555,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "NiHeader definition and NiHeader_EnBSHeader and the NiHeader_EnExport* conditions; wbShortString is dfChars with a one byte length prefix. Whether the length byte counts a trailing NUL is not decided here: the bytes are carried raw."
 
 [[source]]
@@ -566,7 +566,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "NiHeader definition (Block Types, Block Type Index, Block Size, Num Strings, Max String Length, Strings, Num Groups, Groups) and wbSizedString (u32 length prefix, no terminator) in wbDataFormatNifTypes.pas; TwbNifFile.UpdateHeader computes Max String Length as the longest string."
 
 [[source]]
@@ -577,7 +577,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "NiFooter definition: Roots as an array with a u32 count of NiRef."
 
 [[source]]
@@ -588,7 +588,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "wbString (S32 index from version 20.1.0.3, sized string before), wbNiRef (S32, default -1), wbBool (u8 from 4.1.0.1) in wbDataFormatNif.pas; wbVector3, wbTexCoord, wbColor4, wbRotMatrix33, wbNiBound, wbTriangle in wbDataFormatNifTypes.pas (at the same revision)."
 
 [[source]]
@@ -599,7 +599,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "wbDefineNiObjectNET, wbDefineNiAVObject (NiAVObject_DecideFlags, NiAVObject_EnProperties), wbDefineNiNode (NiNode_EnEffects), version 20.2.0.7 branches only; the transform is stored translation, rotation, scale."
 
 [[source]]
@@ -610,8 +610,8 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "wbDefineNiGeometry and wbDefineNiTriShape, 20.2.0.7 branch (Has Shader and Shader Name exist only up to 20.1.0.3; Material Needs Update exists only at exactly 20.2.0.7)."
+verified = true
+note = "wbDefineNiGeometry and wbDefineNiTriShape, 20.2.0.7 branch (Has Shader and Shader Name exist only up to 20.1.0.3; Material Needs Update exists only at exactly 20.2.0.7). The second reader notes that xEdit also keeps the material data for non-particle shapes at user version 2 of 100 or more; this row states the below-100 case only."
 
 [[source]]
 id = "nif-geometry-data-layout"
@@ -621,7 +621,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "wbDefineNiGeometryData (NiGeometryData_EnTangents, NiGeometryData_GetCountUVSets with mask 1 at version 20.2.0.7), wbDefineNiTriBasedGeomData, wbDefineNiTriShapeData; wbConsistencyType is a u16."
 
 [[source]]
@@ -632,7 +632,7 @@ licence = "MPL-2.0 (file header; TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "wbDefineNiAlphaProperty, wbDefineNiZBufferProperty (NiZBufferProperty_EnFunction), wbDefineNiMaterialProperty (EnBefore10012 for flags, NiMaterialProperty_EnAmbientColor, NiMaterialProperty_EnEmissiveMult)."
 
 [[source]]
@@ -643,7 +643,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2021-03-15. Readers must not rely on the optional flags being set."
 
 [[source]]
@@ -654,7 +654,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2020-11-04. Direct3D 9 cannot read a DX10 header; that part is the project's design note, not the page's."
 
 [[source]]
@@ -665,7 +665,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2020-11-04."
 
 [[source]]
@@ -676,7 +676,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "The pitch formula is on the programming guide page (updated 2020-11-04), the level size formula on the layout page (updated 2019-08-23); the url field names one page, the note names both."
 
 [[source]]
@@ -698,7 +698,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2022-08-26."
 
 [[source]]
@@ -709,7 +709,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2022-08-26. The encoder crate decides which table (four colours or three plus transparent) a block uses."
 
 [[source]]
@@ -720,7 +720,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2022-08-26."
 
 [[source]]
@@ -731,7 +731,7 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
 note = "Page last updated 2022-08-26. The order red then green follows the page's list (red_0, red_1, green_0, green_1)."
 
 

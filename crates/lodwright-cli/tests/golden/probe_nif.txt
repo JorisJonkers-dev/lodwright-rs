@@ -1,0 +1,65 @@
+header_version: 20.2.0.7
+version: 335675399
+file_bytes: 796
+endian_type: 1
+layout_supported: true
+user_version: 11
+block_count: 4
+user_version_2: 34
+string_count: 1
+max_string_length: 5
+group_count: 0
+block_bytes: 598
+trailing_bytes: 4
+block_types:
+  -
+    name: BSShaderTextureSet
+    count: 1
+  -
+    name: NiNode
+    count: 1
+  -
+    name: NiTriShapeData
+    count: 1
+  -
+    name: NiTriStripsData
+    count: 1
+geometry:
+  -
+    block: 1
+    type: NiTriShapeData
+    topology: list
+    index_bits: 16
+    vertices: 4
+    triangles: 2
+    triangle_points: 6
+    vector_flags: 4097
+    uv_sets: 1
+    has_normals: true
+    has_tangents: true
+    has_vertex_colors: true
+    keep_flags: 0
+    compress_flags: 0
+    layout_matches: true
+  -
+    block: 2
+    type: NiTriStripsData
+    topology: strip
+    index_bits: 16
+    vertices: 5
+    triangles: 3
+    strips: 2
+    strip_points: 7
+    vector_flags: 1
+    uv_sets: 1
+    has_normals: true
+    has_tangents: false
+    has_vertex_colors: false
+    keep_flags: 0
+    compress_flags: 0
+    layout_matches: true
+texture_paths:
+  sets: 1
+  paths: 2
+  lengths: [5, 7]
+  layout_matches: true

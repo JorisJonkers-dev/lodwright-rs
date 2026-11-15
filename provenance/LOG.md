@@ -247,3 +247,56 @@ the block compression page for the order of the BC3 and BC5 parts). `dds-header-
 second, the BC5 diagram red first and green second, as the rows say. `dds-mip-chain` stays `verified = false`: the row is
 accurate, but the crate rounds odd sizes down and cites that row for it while the row says that rounding is open; the
 60 by 40 example on the block compression page (30x20, 15x10) does not settle it either. Issue 60 tracks it.
+
+
+
+## 2026-11-14: `lodwright probe` (NIF header and geometry, DDS pixel format and BC1/BC3, no game file)
+
+Recorded by J.W. Jonkers as specifier, read in the sources themselves (not from memory): the NIF rows from
+`Core/wbDataFormatNif.pas` of the TES5Edit repository at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`
+(MPL-2.0; the reader below was written from the rows, not translated), the DDS and block-compression rows from the
+Microsoft documentation repository. The reader was then written as implementer from the rows only. Disclosure: to look for a
+permissively licensed NIF description the author opened the niftools nifxml repository (GPL-3.0) and saw the first
+2,500 bytes of its `nif.xml` (version-expression tokens) and its licence; that repository is a forbidden input, nothing
+from it was used or recorded, and every NIF fact above comes from the xEdit file. The owner may want the second reader
+to re-derive the NIF rows from the xEdit file alone. No game file was opened; every test builds its bytes with the testkit.
+
+- `nif-header-layout`: the text line, version, endian, user versions, block count and the Bethesda export info.
+- `probe-nif-block-table`: block types, indices, sizes, strings and groups; block data follows the header.
+- `probe-nif-geometry-data-layout`: the NiGeometryData fields for 20.2.0.7 and the vector flags.
+- `nif-trishape-strips-data`: the triangle and strip data blocks (16-bit indices).
+- `nif-texture-set`: the texture path array.
+- `dds-pixel-format-masks`: bit count, masks, flags and where mip 0 starts.
+- `dds-header-dxt10`: the DX10 extension, reported only.
+- `probe-bc1-block-layout`: the 8-byte block, the four- and three-colour rule and the bit order.
+- `probe-bc3-block-layout`: the alpha block and the colour block that follows it.
+
+Open: whether the real New Vegas block NIFs match these layouts is exactly what the owner's measurements M1 and M5
+answer with the command. The probe reports `layout_matches: false` for a block whose fields do not add up to its size,
+so a wrong row shows up as a number and not as a wrong count. Open also: the probe widens 5 and 6 bit colours by bit
+replication and interpolates in 8 bits (the page leaves both open), so decoded statistics can be off by one.
+
+## 2026-11-14: second reader pass over the `lodwright probe` rows
+
+Second-reader entry, role held: second reader only. The facts were re-derived before the implementation was read, from
+`Core/wbDataFormatNif.pas` and `Core/wbDataFormatNifTypes.pas` of TES5Edit/TES5Edit at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0) and from the Microsoft documentation repository at revision
+`bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583` (the DDS header, pixel format, DX10 header and programming guide pages, and
+the Direct3D 9 opaque and alpha texture pages). Not read: any niftools file, the 2016 generator C# repository,
+decompiled binaries, GPL or leaked code. The author of the probe had disclosed seeing the first 2.5 KB of a GPL-3.0
+NIF description; none of its content was used here, and every NIF layout below was found in the xEdit definitions
+alone. The probe's NIF reading shows no sign of a source outside the xEdit file.
+
+Flipped to `verified = true`: `nif-header-layout`, `probe-nif-block-table`, `probe-nif-geometry-data-layout`,
+`nif-trishape-strips-data`, `nif-texture-set`, `dds-pixel-format-masks`, `dds-header-dxt10`. Wording fixes made while
+doing so: `probe-nif-geometry-data-layout` now states where the material CRC sits (after the vector flags, before
+has-normals; the probe does not read it, which only matters for user version 12); `dds-pixel-format-masks` names the
+programming guide page that gives the magic and the surface placement. That each block has the size the block size
+array gives is not stated as a rule in xEdit; it holds because xEdit writes the array from each block's serialised size.
+
+Left `verified = false`: `probe-bc1-block-layout` (layout, colour order, bit order and the three- and four-colour rule
+agree with the page; the widening of 5 and 6 bit values by bit replication and the 8-bit interpolation are not in any
+allowed source) and `probe-bc3-block-layout` (the six-alpha formula in the row had an index slip, `(c-1)` for `k`,
+corrected here to match the page and the code; the same widening gap applies to the colour block). An open issue
+covers the widening, and the 8-bit scaling of uncompressed channels and their little-endian pixel assembly, which no
+row states either.

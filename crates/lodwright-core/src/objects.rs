@@ -36,6 +36,10 @@ pub struct Instance {
     pub has_tree_lod: bool,
     /// Absolute `FormID` of the reference.
     pub reference: u32,
+    /// Load-order index of the plugin whose reference record won.
+    pub reference_plugin: usize,
+    /// Load-order index of the plugin whose base object record won.
+    pub base_plugin: usize,
     /// A part of a static collection: used only when the collection's own model has no LOD model.
     pub part: bool,
 }
@@ -68,8 +72,8 @@ fn compose(outer: &Placement, inner: &Placement) -> Placement {
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
 pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec<Instance>, Error> {
-    let mut bases: HashMap<u32, BaseObject> = HashMap::new();
-    let mut refs: HashMap<u32, (u32, u32, Placement)> = HashMap::new();
+    let mut bases: HashMap<u32, (BaseObject, usize)> = HashMap::new();
+    let mut refs: HashMap<u32, (u32, u32, Placement, usize)> = HashMap::new();
     let mut order: Vec<u32> = Vec::new();
     for (index, (_, plugin)) in plugins.iter().enumerate() {
         let table = master_table(plugins, plugin)?;
@@ -80,7 +84,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
             for part in &mut base.parts {
                 part.0 = absolute(part.0, &table, own);
             }
-            bases.insert(base.form_id, base);
+            bases.insert(base.form_id, (base, index));
         }
         for source in plugin
             .worlds
@@ -90,7 +94,10 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
             for r in &source.refs {
                 let id = absolute(r.form_id, &table, own);
                 if refs
-                    .insert(id, (absolute(r.base, &table, own), r.flags, r.placement))
+                    .insert(
+                        id,
+                        (absolute(r.base, &table, own), r.flags, r.placement, index),
+                    )
                     .is_none()
                 {
                     order.push(id);
@@ -100,8 +107,8 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
     }
     let mut out = Vec::new();
     for id in order {
-        let (base_id, flags, placement) = refs[&id];
-        let Some(base) = bases.get(&base_id) else {
+        let (base_id, flags, placement, reference_plugin) = refs[&id];
+        let Some((base, base_plugin)) = bases.get(&base_id) else {
             continue;
         };
         if base.flags & VISIBLE_WHEN_DISTANT == 0 && flags & VISIBLE_WHEN_DISTANT == 0 {
@@ -118,11 +125,16 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
                 high_priority,
                 has_tree_lod,
                 reference: id,
+                reference_plugin,
+                base_plugin: *base_plugin,
                 part: false,
             });
         }
         for (part_id, placements) in &base.parts {
-            let Some(model) = bases.get(part_id).and_then(|p| p.model.clone()) else {
+            let Some((part_base, part_plugin)) = bases.get(part_id) else {
+                continue;
+            };
+            let Some(model) = part_base.model.clone() else {
                 continue;
             };
             for inner in placements {
@@ -134,6 +146,8 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
                     high_priority,
                     has_tree_lod,
                     reference: id,
+                    reference_plugin,
+                    base_plugin: *part_plugin,
                     part: true,
                 });
             }

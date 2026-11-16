@@ -36,6 +36,10 @@ pub struct Options {
     pub out: Option<PathBuf>,
     /// `heightmap`: allow writing inside a git working tree.
     pub allow_in_repo: bool,
+    /// `generate --request FILE`: the request document.
+    pub request: Option<PathBuf>,
+    /// `generate`: write into a non-empty output folder that has no manifest.
+    pub overwrite: bool,
     /// `generate`: write only terrain LOD, no object LOD.
     pub terrain_only: bool,
     /// `generate`: leave land textures out of the diffuse maps (vertex colours only; less memory and time).
@@ -60,6 +64,8 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         out: None,
         allow_in_repo: false,
         threads: 0,
+        request: None,
+        overwrite: false,
         terrain_only: false,
         no_land_textures: false,
     };
@@ -115,6 +121,8 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
             }
             "--out" => options.out = Some(PathBuf::from(value("--out")?)),
             "--blocks" => options.blocks = true,
+            "--request" => options.request = Some(PathBuf::from(value("--request")?)),
+            "--overwrite" => options.overwrite = true,
             "--terrain-only" => options.terrain_only = true,
             "--no-land-textures" => options.no_land_textures = true,
             "--allow-in-repo" => options.allow_in_repo = true,

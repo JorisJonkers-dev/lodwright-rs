@@ -143,7 +143,7 @@ fn schema_prints_the_generated_schema_for_both_documents() {
 fn schema_rejects_a_missing_or_unknown_document_name() {
     for args in [
         vec!["schema"],
-        vec!["schema", "request"],
+        vec!["schema", "manifest"],
         vec!["schema", "plan", "result"],
         vec!["schema", "plan", "--schema-version"],
         vec!["schema", "plan", "--schema-version", "x"],
@@ -164,7 +164,8 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
             doc["contracts"],
             serde_json::json!([
                 {"name": "lodwright-plan", "versions": [1]},
-                {"name": "lodwright-result", "versions": [1]}
+                {"name": "lodwright-result", "versions": [1]},
+                {"name": "lodwright-request", "versions": [1]}
             ])
         );
     }
@@ -241,7 +242,7 @@ fn generate_without_json_puts_the_reason_on_stderr_and_the_document_on_stdout() 
     let (code, out, err) = go(&["generate"]);
     assert_eq!(code, EXIT_UNSUPPORTED);
     assert_eq!(json(&out)["status"], "unsupported");
-    assert!(err.contains("generate cannot write"), "{err}");
+    assert!(err.contains("generate needs"), "{err}");
 }
 
 #[test]

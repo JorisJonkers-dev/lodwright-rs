@@ -13,6 +13,7 @@ use lodwright_contract::{DocumentKind, Handshake, VersionInfo, schema_json};
 
 mod commands;
 mod failure;
+mod generate;
 mod load;
 mod options;
 mod probe;
@@ -33,9 +34,11 @@ Usage: lodwright [--help | --version [--json]]
        lodwright plan --data <data-folder> (--plugin NAME ... | --load-order FILE) [--world NAME]
                       [--format text|json | --json] [--schema-version N] [--blocks]
        lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
-                      [--world NAME] [--threads N] [--json] [--schema-version N]
+                      [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--overwrite]
+                      [--json] [--schema-version N]
+       lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--json]
        lodwright verify <folder> [--reference <folder>] [--json]
-       lodwright schema <plan|result> [--schema-version N]
+       lodwright schema <plan|result|request> [--schema-version N]
        lodwright contracts --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
@@ -46,8 +49,10 @@ Commands:
   plan                  read the plugins (in load order, masters first) and print the terrain LOD plan:
                         blocks per level, vertex and triangle counts, errors, output paths
   generate              write the terrain LOD (block meshes, textures, settings file) of the chosen worlds into
-                        --out, which must not be inside the data folder; prints a result document. Without
-                        data, plugins and --out it answers `unsupported` (exit 3) and writes nothing
+                        --out, which must not be inside the data folder, plus manifest.json; prints a result
+                        document. --request reads a lodwright-request document instead (see `schema request`).
+                        A second run with the same request and plugins does nothing. Without data, plugins and
+                        --out, or a request, it answers `unsupported` (exit 3) and writes nothing
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
                         --reference also compare names and block types with another folder. Exit 1 on findings
@@ -170,7 +175,7 @@ fn generate_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> 
     if let Err(problem) = check_version(DocumentKind::Result, options.schema_version) {
         return usage(err, &problem);
     }
-    let doc = commands::generate(&options);
+    let doc = generate::generate(&options);
     if !options.json {
         let _ = writeln!(err, "lodwright: {}", doc.reason);
     }

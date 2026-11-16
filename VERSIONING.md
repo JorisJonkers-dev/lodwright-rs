@@ -23,9 +23,9 @@ JorisJonkers-dev/lodwright-rs`).
 | `lodwright-x86_64-unknown-linux-gnu` | the binary |
 | `lodwright-plan.v1.json` | JSON Schema of the plan document (`lodwright plan --json`) |
 | `lodwright-result.v1.json` | JSON Schema of the result and error document (`lodwright generate --json`) |
+| `lodwright-request.v1.json` | JSON Schema of the request document (`lodwright generate --request`) |
 | `SHA256SUMS` | SHA-256 of every asset above, in `sha256sum` format |
 
-The request schema (`lodwright-request.v1.json`) joins them when the `generate` item adds the request document.
 The schemas are generated from the types of `crates/lodwright-contract` and committed under `schemas/`; a test fails
 when they drift, and the release build fails when the binary prints a different schema than the committed file.
 `lodwright --version --json` prints the contract versions a binary speaks.

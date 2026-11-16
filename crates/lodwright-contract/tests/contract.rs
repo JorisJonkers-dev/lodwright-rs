@@ -114,7 +114,11 @@ fn the_ok_result_equals_its_golden_file() {
 
 #[test]
 fn committed_schemas_equal_the_generated_ones() {
-    for kind in [DocumentKind::Plan, DocumentKind::Result] {
+    for kind in [
+        DocumentKind::Plan,
+        DocumentKind::Result,
+        DocumentKind::Request,
+    ] {
         let generated = schema_json(kind, 1).unwrap();
         // UPDATE_GOLDEN=1 rewrites the committed file; without it a drift fails here.
         assert_golden(&schemas(&schema_file_name(kind, 1)), &generated);
@@ -134,6 +138,7 @@ fn golden_documents_pass_their_own_schema_check() {
         let outcome = match kind {
             DocumentKind::Plan => check_plan(&value),
             DocumentKind::Result => check_result(&value),
+            DocumentKind::Request => unreachable!("no golden request"),
         };
         assert_eq!(outcome, Ok(()), "{name}");
     }

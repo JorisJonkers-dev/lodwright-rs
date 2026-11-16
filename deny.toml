@@ -21,6 +21,7 @@ yanked = "warn"
 version = 2
 allow = [
     "MPL-2.0",
+    "GPL-3.0", # deprecated spelling used by esplugin
     "GPL-3.0-only",
     "GPL-3.0-or-later",
     "MIT",

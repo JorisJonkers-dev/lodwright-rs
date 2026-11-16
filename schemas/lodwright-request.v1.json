@@ -62,6 +62,13 @@
         "levels": []
       }
     },
+    "trees": {
+      "description": "Tree LOD settings.",
+      "$ref": "#/$defs/TreesRequest",
+      "default": {
+        "enabled": true
+      }
+    },
     "worlds": {
       "description": "Worlds to generate (editor ids); empty means every world with terrain.",
       "type": "array",
@@ -215,6 +222,17 @@
           "items": {
             "$ref": "#/$defs/LevelRequest"
           }
+        }
+      }
+    },
+    "TreesRequest": {
+      "description": "Tree LOD settings.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Write tree LOD: billboard atlas, type list and block files. Needs billboard textures that mods ship in\nthe data folder (see docs/spec/object-lod.md); a world without any gets no tree LOD.",
+          "type": "boolean",
+          "default": true
         }
       }
     }

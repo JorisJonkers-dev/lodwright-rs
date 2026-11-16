@@ -34,7 +34,7 @@ Usage: lodwright [--help | --version [--json]]
        lodwright plan --data <data-folder> (--plugin NAME ... | --load-order FILE) [--world NAME]
                       [--format text|json | --json] [--schema-version N] [--blocks]
        lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
-                      [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--overwrite] [--events FILE|-]
+                      [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--json]
        lodwright verify <folder> [--reference <folder>] [--json]
@@ -269,6 +269,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
             "ok": ok,
             "terrain_blocks": verification.terrain_blocks,
             "object_blocks": verification.object_blocks,
+            "tree_blocks": verification.tree_blocks,
             "textures": verification.textures,
             "settings": verification.settings,
             "errors": findings(&verification.errors),
@@ -278,9 +279,10 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     } else {
         let _ = writeln!(
             out,
-            "{} terrain blocks, {} object blocks, {} textures, {} settings files: {} errors, {} differences",
+            "{} terrain blocks, {} object blocks, {} tree blocks, {} textures, {} settings files: {} errors, {} differences",
             verification.terrain_blocks,
             verification.object_blocks,
+            verification.tree_blocks,
             verification.textures,
             verification.settings,
             verification.errors.len(),

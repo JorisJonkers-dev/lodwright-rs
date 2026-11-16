@@ -15,7 +15,8 @@ mod image;
 mod resize;
 
 pub use dds::{
-    Decoded, EncodeOptions, Format, HEADER_LEN, Header, Quality, decode, encode, psnr, read_header,
+    Decoded, EncodeOptions, Format, HEADER_LEN, Header, Quality, decode, decode_image, encode,
+    psnr, read_header,
 };
 pub use error::{DdsError, Result};
 pub use image::{Image, MAX_DIMENSION, adjust_brightness_contrast, apply_gamma, check_dimensions};

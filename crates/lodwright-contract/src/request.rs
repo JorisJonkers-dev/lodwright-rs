@@ -66,6 +66,21 @@ impl Default for ObjectsRequest {
     }
 }
 
+/// Tree LOD settings.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TreesRequest {
+    /// Write tree LOD: billboard atlas, type list and block files. Needs billboard textures that mods ship in
+    /// the data folder (see docs/spec/object-lod.md); a world without any gets no tree LOD.
+    #[serde(default = "yes")]
+    pub enabled: bool,
+}
+
+impl Default for TreesRequest {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 /// Which objects enter object LOD, beyond the game's own rule (visible when distant).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Inclusion {
@@ -119,6 +134,9 @@ pub struct Request {
     /// Object LOD settings.
     #[serde(default)]
     pub objects: ObjectsRequest,
+    /// Tree LOD settings.
+    #[serde(default)]
+    pub trees: TreesRequest,
     /// Inclusion rules.
     #[serde(default)]
     pub inclusion: Inclusion,
@@ -140,6 +158,7 @@ impl Request {
             output_dir: output_dir.to_owned(),
             terrain: TerrainRequest::default(),
             objects: ObjectsRequest::default(),
+            trees: TreesRequest::default(),
             inclusion: Inclusion::default(),
             limits: Limits::default(),
         }
@@ -240,7 +259,9 @@ mod tests {
             r#"{"schema_version":1,"contract":"lodwright-request","data_folder":"/d","plugins":["A.esm"],"output_dir":"/o"}"#,
         )
         .unwrap();
-        assert!(r.terrain.enabled && r.objects.enabled && r.terrain.land_textures);
+        assert!(
+            r.terrain.enabled && r.objects.enabled && r.trees.enabled && r.terrain.land_textures
+        );
         assert!(r.worlds.is_empty() && r.terrain.levels.is_empty());
     }
 

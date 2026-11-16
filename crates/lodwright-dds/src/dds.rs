@@ -295,6 +295,78 @@ pub fn decode(bytes: &[u8]) -> Result<Decoded> {
     })
 }
 
+// source: dds-header-layout, dds-pixel-format, dds-pixel-format-masks
+fn decode_masked(bytes: &[u8]) -> Result<Image> {
+    if bytes.len() < HEADER_LEN
+        || &bytes[0..4] != b"DDS "
+        || le32(bytes, 4) != 124
+        || le32(bytes, 76) != 32
+    {
+        return Err(DdsError::BadHeader);
+    }
+    let (height, width) = (le32(bytes, 12), le32(bytes, 16));
+    check_dimensions(width, height)?;
+    let flags = le32(bytes, 80);
+    let bits = le32(bytes, 88);
+    if flags & 0x40 == 0 || !matches!(bits, 16 | 24 | 32) {
+        return Err(DdsError::UnsupportedFormat([0; 4]));
+    }
+    let masks = [
+        le32(bytes, 92),
+        le32(bytes, 96),
+        le32(bytes, 100),
+        if flags & 0x1 != 0 {
+            le32(bytes, 104)
+        } else {
+            0
+        },
+    ];
+    let step = (bits / 8) as usize;
+    let count = width as usize * height as usize;
+    if bytes.len() - HEADER_LEN < count * step {
+        return Err(DdsError::Truncated);
+    }
+    let channel = |px: u32, mask: u32, otherwise: u8| -> u8 {
+        if mask == 0 {
+            return otherwise;
+        }
+        let shift = mask.trailing_zeros();
+        let max = mask >> shift;
+        u8::try_from(((px & mask) >> shift) * 255 / max).unwrap_or(255)
+    };
+    let mut rgba = Vec::with_capacity(count * 4);
+    for i in 0..count {
+        let at = HEADER_LEN + i * step;
+        let mut px = 0_u32;
+        for (k, b) in bytes[at..at + step].iter().enumerate() {
+            px |= u32::from(*b) << (8 * k);
+        }
+        rgba.extend_from_slice(&[
+            channel(px, masks[0], 0),
+            channel(px, masks[1], 0),
+            channel(px, masks[2], 0),
+            channel(px, masks[3], 255),
+        ]);
+    }
+    Image::new(width, height, rgba)
+}
+
+/// Decode the largest level of a DDS to RGBA: a block-compressed file (as [`decode`]) or an uncompressed 16, 24 or
+/// 32 bit one described by its colour masks.
+///
+/// # Errors
+/// Anything [`read_header`] refuses, or a mask format that is not 16, 24 or 32 bit RGB.
+pub fn decode_image(bytes: &[u8]) -> Result<Image> {
+    if bytes.len() >= 84 && le32(bytes, 80) & 0x4 == 0 {
+        return decode_masked(bytes);
+    }
+    decode(bytes)?
+        .levels
+        .into_iter()
+        .next()
+        .ok_or(DdsError::Truncated)
+}
+
 /// The mean squared error to peak signal-to-noise ratio, in decibels, over the channels in `channels` (indices
 /// 0 to 3). Identical images give infinity.
 ///

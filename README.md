@@ -19,13 +19,13 @@ reference output never go in this repository; test fixtures are synthetic.
 
 Working end to end for terrain and object LOD of a world: `lodwright generate` reads a load order and the data folder
 (archives and loose files), and writes terrain block meshes, terrain diffuse and normal maps (land texture layers,
-vertex colours, heights), the world settings file, object LOD blocks with their atlas pair, and a manifest. Output
+vertex colours, heights), the world settings file, object LOD blocks with their atlas pair, tree LOD (billboard atlas,
+type list and block files, from billboard textures that mods ship), and a manifest. Output
 matches the game's own tree in file names, counts and structure (see `docs/gap-list.md` for the measurements);
 `lodwright verify` checks a folder against the formats and can compare it with another tree. A request document
 (`lodwright schema request`) and the `lodwright-gen` library are the integration points for a mod manager.
 
-Not done: tree LOD (needs more samples than are on hand), water planes in terrain blocks, reuse of unchanged blocks
-inside a run, and loading in the game (owner only). The gap list has each item with its state.
+Not done: water planes in terrain blocks, reuse of unchanged blocks inside a run, and loading in the game (owner only). The gap list has each item with its state.
 
 ## Scope
 

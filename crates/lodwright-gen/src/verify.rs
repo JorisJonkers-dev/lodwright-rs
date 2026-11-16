@@ -33,6 +33,8 @@ pub struct Verification {
     pub terrain_blocks: usize,
     /// Object block meshes checked.
     pub object_blocks: usize,
+    /// Tree block files checked.
+    pub tree_blocks: usize,
     /// Textures checked.
     pub textures: usize,
     /// Settings files checked.
@@ -170,6 +172,98 @@ impl Ctx {
         }
     }
 
+    // source: xedit-tree-lod-files, game-tree-lod-dtl, game-tree-lod-lst
+    fn check_trees(
+        &mut self,
+        names: &BTreeMap<String, &PathBuf>,
+        lists: &[(String, Vec<u8>)],
+        trees: &[(String, Vec<u8>)],
+    ) {
+        let mut types: BTreeMap<String, Vec<u32>> = BTreeMap::new();
+        for (rel, bytes) in lists {
+            let world = rel.split('/').nth(3).unwrap_or("").to_ascii_lowercase();
+            let Ok(list) = lodwright_core::trees::parse_types(bytes) else {
+                self.err(rel, "not a readable tree type list");
+                continue;
+            };
+            let mut seen = Vec::new();
+            for t in &list {
+                let [u0, v0, u1, v1] = t.uv;
+                let in_range = [u0, v0, u1, v1].iter().all(|v| (0.0..=1.0).contains(v));
+                if !in_range || u0 >= u1 || v0 >= v1 {
+                    self.err(
+                        rel,
+                        format!("type {} has an atlas rectangle outside the atlas", t.index),
+                    );
+                }
+                if !(t.width.is_finite() && t.height.is_finite())
+                    || t.width <= 0.0
+                    || t.height <= 0.0
+                {
+                    self.err(
+                        rel,
+                        format!("type {} has no usable billboard size", t.index),
+                    );
+                }
+                if seen.contains(&t.index) {
+                    self.err(rel, format!("type {} is listed twice", t.index));
+                }
+                seen.push(t.index);
+            }
+            let atlas = if world.starts_with("dlc4") {
+                "treeswamplod"
+            } else {
+                "treedeadlod"
+            };
+            if !names.contains_key(&format!("textures/landscape/trees/{atlas}.dds")) {
+                self.err(
+                    rel,
+                    format!("missing atlas textures/landscape/trees/{atlas}.dds"),
+                );
+            }
+            types.insert(world, seen);
+        }
+        for (rel, bytes) in trees {
+            let world = rel.split('/').nth(3).unwrap_or("").to_ascii_lowercase();
+            let name = rel.rsplit('/').next().unwrap_or("");
+            let Some((level, x, y, _)) = parse_block(name) else {
+                self.err(rel, "the name is not a block name");
+                continue;
+            };
+            if level != 8 {
+                self.err(rel, "tree blocks are level 8");
+            }
+            let Ok(block) = lodwright_core::trees::parse_block(bytes) else {
+                self.err(rel, "not a readable tree block");
+                continue;
+            };
+            let Some(known) = types.get(&world) else {
+                self.err(rel, "no treetypes.lst beside the block");
+                continue;
+            };
+            let size = level as f32 * 4096.0;
+            let (west, south) = (x as f32 * 4096.0, y as f32 * 4096.0);
+            for (index, trees) in &block.groups {
+                if !known.contains(index) {
+                    self.err(rel, format!("type {index} is not in the list"));
+                }
+                for t in trees {
+                    let inside = (west - 1024.0..west + size + 1024.0).contains(&t.pos[0])
+                        && (south - 1024.0..south + size + 1024.0).contains(&t.pos[1]);
+                    if !inside || !t.pos.iter().all(|v| v.is_finite()) {
+                        self.err(rel, "a tree stands outside its block");
+                        break;
+                    }
+                    let turn_ok = (0.0..=std::f32::consts::TAU + 1e-4).contains(&t.rotation);
+                    if !turn_ok || t.scale.is_nan() || t.scale <= 0.0 {
+                        self.err(rel, "a tree has a rotation outside 0 to 2 pi or no scale");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     fn check_texture(&mut self, path: &str, bytes: &[u8], want: Option<(u32, u32, Format)>) {
         self.out.textures += 1;
         match read_header(bytes) {
@@ -210,6 +304,8 @@ pub fn verify_folder(root: &Path) -> Verification {
     let files = files_below(root);
     let names: BTreeMap<String, &PathBuf> = files.iter().map(|(n, p)| (n.clone(), p)).collect();
     let mut terrain: Vec<(String, u32, i32, i32)> = Vec::new();
+    let mut trees: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut lists: Vec<(String, Vec<u8>)> = Vec::new();
     for (rel, path) in &files {
         let lower = rel.to_ascii_lowercase();
         let Ok(bytes) = std::fs::read(path) else {
@@ -251,6 +347,15 @@ pub fn verify_folder(root: &Path) -> Verification {
                 None
             };
             ctx.check_texture(rel, &bytes, want);
+        } else if lower.starts_with("meshes/landscape/lod/") && lower.contains("/trees/") {
+            if lower.ends_with(".dtl") {
+                ctx.out.tree_blocks += 1;
+                trees.push((rel.clone(), bytes));
+            } else if lower.ends_with("/treetypes.lst") {
+                lists.push((rel.clone(), bytes));
+            }
+        } else if lower.starts_with("textures/landscape/trees/") && lower.ends_with(".dds") {
+            ctx.check_texture(rel, &bytes, None);
         } else if lower.starts_with("lodsettings/") && lower.ends_with(".dlodsettings") {
             ctx.out.settings += 1;
             match LodSettings::parse(&bytes) {
@@ -281,6 +386,7 @@ pub fn verify_folder(root: &Path) -> Verification {
             }
         }
     }
+    ctx.check_trees(&names, &lists, &trees);
     ctx.out
         .errors
         .sort_by(|a, b| (&a.path, &a.problem).cmp(&(&b.path, &b.problem)));
@@ -316,6 +422,22 @@ pub fn compare_folders(folder: &Path, reference: &Path) -> Vec<Finding> {
         let Some(other) = theirs.get(name) else {
             continue;
         };
+        if name.ends_with(".dtl") {
+            let (Ok(a), Ok(b)) = (std::fs::read(path), std::fs::read(other)) else {
+                continue;
+            };
+            if let (Ok(a), Ok(b)) = (
+                lodwright_core::trees::parse_block(&a),
+                lodwright_core::trees::parse_block(&b),
+            ) && a.len() != b.len()
+            {
+                out.push(Finding {
+                    path: name.clone(),
+                    problem: format!("{} trees, the reference has {}", a.len(), b.len()),
+                });
+            }
+            continue;
+        }
         if !name.ends_with(".nif") {
             continue;
         }

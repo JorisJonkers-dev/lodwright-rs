@@ -20,7 +20,9 @@ pub use manifest::{MANIFEST_CONTRACT, MANIFEST_FILE, Manifest, ManifestFile};
 pub use plan::{
     Bounds, Capabilities, LevelPlan, Plan, PlannedBlock, ToolInfo, WorldPlan, round_error,
 };
-pub use request::{Inclusion, LevelRequest, Limits, ObjectsRequest, Request, TerrainRequest};
+pub use request::{
+    Inclusion, LevelRequest, Limits, ObjectsRequest, Request, TerrainRequest, TreesRequest,
+};
 pub use result::{
     ContractInfo, Handshake, ResultDoc, Status, VersionInfo, Written, peak_memory_mib,
 };

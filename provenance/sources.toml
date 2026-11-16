@@ -988,3 +988,58 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "These are the water planes of the block. Their derivation (which cells, the polygon outline, the height) is not established, so generate does not write them yet; verify reports the missing blocks as structure differences from the game's own tree."
+
+[[source]]
+id = "xedit-tree-lod-files"
+fact = "For Fallout 3 and New Vegas the tree LOD of a world is `meshes\\landscape\\lod\\<world>\\trees\\TreeTypes.lst` plus one `<world>.level8.x<X>.y<Y>.dtl` per block of 8 cells, and the billboard atlas is `textures\\landscape\\trees\\TreeDeadLod.dds` (`TreeSwampLod.dds` when the world's editor id starts with DLC4). A list file is a 32-bit count followed by that many entries of eight 32-bit fields (index, width, height, four atlas fractions as floats, one unknown). A block file is a 32-bit count of types, then for each type its index, its tree count and the trees: x, y, z, rotation (0 to 2 pi), scale as floats, the reference form id, two unknown 32-bit values."
+url = "https://github.com/TES5Edit/TES5Edit/blob/081cd8672bd366306eaafbbc8771f3a72c6cea7a/Core/wbLOD.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 081cd8672bd366306eaafbbc8771f3a72c6cea7a)"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in TwbLodTES5TreeType, TwbLodTES5TreeRef, TwbLodTES5TreeList (list and atlas names) and TwbLodTES5TreeBlock (block names and layout). The code translated from it says so in its header and stays MPL-2.0. Re-measured on real files in game-tree-lod-dtl and game-tree-lod-lst."
+
+[[source]]
+id = "xedit-tree-lod-selection"
+fact = "A tree reference enters tree LOD when its base record (statics, activators and trees, master records only) has the has-tree-LOD flag (bit 6) in its winning version and a billboard texture exists for it. Blocks exist for every cell group a candidate reference stands in, also when the reference is initially disabled, deleted or has an enable parent (these add no tree, so a block can be empty); such a block is written, which lets it replace a block of an earlier archive. A reference tilted more than 30 degrees about x or y is left out. The tree is written at the reference position plus the billboard's shift, with the reference's scale times the billboard's scale factor, a random rotation, and the reference form id (a reference its own plugin defines keeps its absolute id, an overridden one gets load-order index 1). A reference whose object id was already used is dropped. A block is the 8 by 8 cell group aligned to the south-west cell of the world's LOD settings; references below that cell are dropped. Types are numbered in the order the billboards are collected: per plugin in load order, statics, then activators, then trees."
+url = "https://github.com/TES5Edit/TES5Edit/blob/081cd8672bd366306eaafbbc8771f3a72c6cea7a/Core/wbLOD.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 081cd8672bd366306eaafbbc8771f3a72c6cea7a)"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in wbGenerateLODTES5 (the trees section) and TwbLodTES5TreeBlock.AddReference. The rotation is drawn at random by the original; lodwright derives one from the form id so that a run is repeatable. The order of references inside a block follows the reference enumeration of the original and is not reproduced: the measured blocks agree as sets (game-tree-lod-dtl)."
+
+[[source]]
+id = "xedit-tree-lod-atlas"
+fact = "The billboard of a tree base is the texture `textures\\terrain\\lodgen\\<plugin file name>\\<model file name without extension>_<form id without load-order byte, eight hex digits>.dds`, supplied by mods; a base without one has no tree LOD. A text file of the same name with `[LOD]` keys Width, Height, ShiftX, ShiftY, ShiftZ and Scale adjusts it (a Width or Height of zero keeps the default, which is the base's object bounds: x2 minus x1 and z2 minus z1). Equal pictures (by CRC32 of the file) share one rectangle. The atlas starts at 512 by 512, rectangles are sorted by their longer side, largest first, and packed with a binary tree packer; while one does not fit the smaller side of the atlas doubles, up to 8192. The list holds one entry per tree that has a billboard, with the rectangle as fractions of the atlas."
+url = "https://github.com/TES5Edit/TES5Edit/blob/081cd8672bd366306eaafbbc8771f3a72c6cea7a/Core/wbLOD.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 081cd8672bd366306eaafbbc8771f3a72c6cea7a)"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in TwbLodTES5TreeList.BuildAtlas, TwbLodTES5Tree and the LoadBillboard routine of wbGenerateLODTES5. Measured differences, recorded in game-tree-lod-lst: the rectangles of the game-side lists keep 12 to 16 pixels between billboards and round a width up to a multiple of 4."
+
+[[source]]
+id = "game-tree-lod-dtl"
+fact = "Measured on 172 and 193 block files of two sets of tree LOD that mods ship for 25 and 33 worlds, and 29 files of a third set for 11 interior-style worlds: every file is the count of types followed by (type index, tree count, 32-byte trees) groups with no byte left over, a world without trees in a block gives a file of four zero bytes, and groups come in the order the types first occur in a block, not sorted. Of 19,420 trees of the main world 17,404 stand at the exact position, scale and form id of a reference of the base game's plugin (position within 5e-7 units, scale exact); the others carry load-order index 1, as for a reference that a later plugin overrides. A shift of -1 on height appears wherever the billboard's settings file states ShiftZ=-1. The rotation is spread evenly over 0 to 2 pi (mean 3.14 over 17,419 trees) and is not the reference's rotation (which is zero for these references). The last two 32-bit fields of every tree are zero. Each tree stands in the block of 8 by 8 cells that holds its position."
+url = "oracle:tree-lod-files"
+licence = "Structure, counts and number ranges of the owner's own mod-shipped output files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Generating the main world's tree LOD from the records and billboards and comparing with the shipped blocks: 17,419 of 18,065 trees are in the shipped block files with the same position, 17,404 with the same type; the shipped files hold 1,820 more from plugins that the comparison did not load."
+
+[[source]]
+id = "game-tree-lod-lst"
+fact = "Measured on the lists of the same files: every list of one set is identical across worlds (a set that ships one list for 34 worlds), a list has one entry per billboard of the whole load order, not per world, and the entry fields are the index, the billboard width and height from the settings file or object bounds, and the atlas rectangle as fractions of the atlas (512 by 512 in the sets measured, written as DXT5 with a full mip chain). Billboards of 168 by 128 and 256 by 172 pixels have rectangles of exactly those sizes; a source width of 193 appears as 196; neighbouring rectangles are 12 to 16 pixels apart."
+url = "oracle:tree-lod-files"
+licence = "Structure, counts and number ranges of the owner's own mod-shipped output files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The game's own atlases are DXT3; the sets measured use DXT5. lodwright writes DXT5."

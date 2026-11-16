@@ -23,6 +23,7 @@ mod images;
 mod lodmodel;
 mod objects;
 mod terrain;
+mod trees;
 mod verify;
 
 pub use assets::{Assets, FolderAssets};
@@ -34,4 +35,5 @@ pub use images::{diffuse_image, normal_image};
 pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{BLOCK_CELLS, ObjectReport, generate_objects};
 pub use terrain::{FileRecord, Options, Report, generate_terrain};
+pub use trees::{TreeReport, billboard_path, generate_trees};
 pub use verify::{Finding, Verification, compare_folders, verify_folder};

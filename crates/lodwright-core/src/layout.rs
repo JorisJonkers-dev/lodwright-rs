@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Where the game expects LOD output: folder and file names, relative to the data folder, with forward slashes.
 //!
-//! Names are lower-case folders and the world's editor id verbatim; the game reads them through a
-//! case-insensitive file system, and the paths here are what the generator creates on a case-sensitive one.
+//! Names are lower case throughout, as in the game's own archives, so a case-sensitive file system needs no
+//! guessing. The strings written inside a NIF keep the world's editor-id case ([`nif_texture_paths`]).
 //!
-//! Derived from: `provenance/sources.toml` rows `lod-block-naming`, `lod-terrain-paths`, `lod-settings-path`
-//! (all unverified until the owner compares them with their own output tree).
+//! Derived from the rows `game-lod-terrain-layout` and `game-lod-object-layout` in `provenance/sources.toml`.
 
 use crate::Error;
 
@@ -38,12 +37,12 @@ pub fn check_world_name(name: &str) -> Result<(), Error> {
     }
 }
 
-// source: lod-block-naming
+// source: game-lod-terrain-layout
 fn stem(world: &str, id: BlockId) -> String {
-    format!("{world}.{}.{}.{}", id.level, id.x, id.y)
+    format!("{world}.level{}.x{}.y{}", id.level, id.x, id.y).to_ascii_lowercase()
 }
 
-// source: lod-terrain-paths
+// source: game-lod-terrain-layout
 /// Path of the terrain mesh of `id`.
 ///
 /// # Errors
@@ -51,12 +50,18 @@ fn stem(world: &str, id: BlockId) -> String {
 pub fn mesh_path(world: &str, id: BlockId) -> Result<String, Error> {
     check_world_name(world)?;
     Ok(format!(
-        "meshes/landscape/lod/{world}/blocks/{}.btr",
+        "meshes/landscape/lod/{}/{}.nif",
+        world.to_ascii_lowercase(),
         stem(world, id)
     ))
 }
 
-// source: lod-terrain-paths
+// source: game-lod-terrain-layout
+fn texture_name(world: &str, id: BlockId) -> String {
+    format!("{world}.n.level{}.x{}.y{}", id.level, id.x, id.y).to_ascii_lowercase()
+}
+
+// source: game-lod-terrain-layout
 /// Path of the diffuse texture of `id`.
 ///
 /// # Errors
@@ -64,12 +69,13 @@ pub fn mesh_path(world: &str, id: BlockId) -> Result<String, Error> {
 pub fn diffuse_path(world: &str, id: BlockId) -> Result<String, Error> {
     check_world_name(world)?;
     Ok(format!(
-        "textures/landscape/lod/{world}/blocks/{}.dds",
-        stem(world, id)
+        "textures/landscape/lod/{}/diffuse/{}.dds",
+        world.to_ascii_lowercase(),
+        texture_name(world, id)
     ))
 }
 
-// source: lod-terrain-paths
+// source: game-lod-terrain-layout
 /// Path of the normal map of `id`.
 ///
 /// # Errors
@@ -77,19 +83,38 @@ pub fn diffuse_path(world: &str, id: BlockId) -> Result<String, Error> {
 pub fn normal_path(world: &str, id: BlockId) -> Result<String, Error> {
     check_world_name(world)?;
     Ok(format!(
-        "textures/landscape/lod/{world}/blocks/{}_n.dds",
-        stem(world, id)
+        "textures/landscape/lod/{}/normals/{}.dds",
+        world.to_ascii_lowercase(),
+        texture_name(world, id)
     ))
 }
 
-// source: lod-settings-path
+// source: game-lod-terrain-block-nif
+/// The two texture paths a terrain block NIF carries, diffuse then normal, as the game's own files write them:
+/// backslashes, a `Data` prefix and the world's editor-id case.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn nif_texture_paths(world: &str, id: BlockId) -> Result<[String; 2], Error> {
+    check_world_name(world)?;
+    let name = format!("{world}.n.Level{}.X{}.Y{}.dds", id.level, id.x, id.y);
+    Ok([
+        format!("Data\\Textures\\Landscape\\LOD\\{world}\\Diffuse\\{name}"),
+        format!("Data\\Textures\\Landscape\\LOD\\{world}\\Normals\\{name}"),
+    ])
+}
+
+// source: game-dlodsettings-layout
 /// Path of the per-world LOD settings file.
 ///
 /// # Errors
 /// [`Error::BadWorldName`] when `world` is not a usable name.
 pub fn settings_path(world: &str) -> Result<String, Error> {
     check_world_name(world)?;
-    Ok(format!("lodsettings/{world}.lod"))
+    Ok(format!(
+        "lodsettings/{}.dlodsettings",
+        world.to_ascii_lowercase()
+    ))
 }
 
 #[cfg(test)]
@@ -107,25 +132,35 @@ mod tests {
     fn a_mesh_path_carries_world_level_and_coordinates() {
         assert_eq!(
             mesh_path("WastelandNV", ID).unwrap(),
-            "meshes/landscape/lod/WastelandNV/blocks/WastelandNV.4.-8.12.btr"
+            "meshes/landscape/lod/wastelandnv/wastelandnv.level4.x-8.y12.nif"
         );
     }
 
     #[test]
-    fn texture_paths_end_in_dds_and_the_normal_map_has_the_n_suffix() {
+    fn texture_paths_sit_in_diffuse_and_normals_folders() {
         assert_eq!(
             diffuse_path("W", ID).unwrap(),
-            "textures/landscape/lod/W/blocks/W.4.-8.12.dds"
+            "textures/landscape/lod/w/diffuse/w.n.level4.x-8.y12.dds"
         );
         assert_eq!(
             normal_path("W", ID).unwrap(),
-            "textures/landscape/lod/W/blocks/W.4.-8.12_n.dds"
+            "textures/landscape/lod/w/normals/w.n.level4.x-8.y12.dds"
         );
+    }
+
+    #[test]
+    fn the_paths_inside_a_nif_keep_the_world_case_and_use_backslashes() {
+        let [d, n] = super::nif_texture_paths("WastelandNV", ID).unwrap();
+        assert_eq!(
+            d,
+            "Data\\Textures\\Landscape\\LOD\\WastelandNV\\Diffuse\\WastelandNV.n.Level4.X-8.Y12.dds"
+        );
+        assert!(n.contains("\\Normals\\"));
     }
 
     #[test]
     fn the_settings_path_is_one_file_per_world() {
-        assert_eq!(settings_path("W").unwrap(), "lodsettings/W.lod");
+        assert_eq!(settings_path("W").unwrap(), "lodsettings/w.dlodsettings");
     }
 
     #[test]

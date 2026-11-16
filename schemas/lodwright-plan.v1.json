@@ -103,7 +103,7 @@
           "type": "boolean"
         },
         "terrain_mesh": {
-          "description": "Writes terrain meshes (`.btr`).",
+          "description": "Writes terrain meshes (`.nif`).",
           "type": "boolean"
         },
         "terrain_texture": {

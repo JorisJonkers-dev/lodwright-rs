@@ -300,3 +300,15 @@ allowed source) and `probe-bc3-block-layout` (the six-alpha formula in the row h
 corrected here to match the page and the code; the same widening gap applies to the colour block). An open issue
 covers the widening, and the 8-bit scaling of uncompressed channels and their little-endian pixel assembly, which no
 row states either.
+
+## 2026-11-16: layout, terrain block structure, textures and settings from the owner's own game files
+
+Specifier entry, oracle input class 3 of clean-room.md: the owner's install was read read-only (archive listings and
+three extracted blocks in a scratch folder outside the repository, removed afterwards; nothing copied in). Only names,
+counts and numbers were kept. No xLODGen source or binary was read. Rows: `game-lod-terrain-layout`,
+`game-lod-terrain-block-nif`, `game-lod-terrain-textures`, `game-dlodsettings-layout`, `game-lod-object-layout`.
+They supersede `lod-block-naming`, `lod-terrain-paths` and `lod-settings-path` and settle M1 (block structure), M2/M3
+(names, span: the coordinates are the south-west cell and multiples of the level), M5 (texture formats) and the first
+part of M8 (the 24-byte settings layout). Open: the contents of the additional-data block beyond its per-vertex float
+channel, the sentinel low heights in some blocks, the object block structure (M4, M6) and the tree files (M7). A second
+reader has not verified these rows.

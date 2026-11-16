@@ -838,3 +838,56 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. The byte table of the page lists the codes of row 0 first in byte 2, which is the little-endian reading used here."
+
+[[source]]
+id = "game-lod-terrain-layout"
+fact = "In the game's own archives a terrain LOD block is meshes/landscape/lod/<world>/<world>.level<L>.x<X>.y<Y>.nif, with the world folder and file name in lower case; L is 4, 8, 16 or 32 and X, Y are the signed cell coordinates of the block's south-west cell, always multiples of L. Terrain blocks sit directly in the world folder; object LOD blocks sit in a blocks subfolder of it. The diffuse texture is textures/landscape/lod/<world>/diffuse/<world>.n.level<L>.x<X>.y<Y>.dds and the normal map the same name in a normals folder."
+url = "oracle:game-lod-files"
+licence = "Facts about file names and counts in the owner's own game archives; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read from the archive listings of the owner's install (names only). Supersedes lod-block-naming, lod-terrain-paths and the block-folder statement of the public rows."
+
+[[source]]
+id = "game-lod-terrain-block-nif"
+fact = "A terrain LOD block NIF is version 20.2.0.7, user version 11, user version 2 34, with eight blocks in this order: BSMultiBoundNode (root, translation = the block's south-west corner in world units), NiTriShape, BSShaderPPLightingProperty, BSShaderTextureSet (two paths: diffuse then normal), NiTriShapeData, NiAdditionalGeometryData, BSMultiBound, BSMultiBoundAABB. The data block has vertices in block-local world units spanning 0 to level*4096 on x and y, one UV set over 0..1, no normals, no vertex colours, 16-bit triangle lists, a bounding sphere, and links the additional data block, which holds one float channel with one value per vertex. The texture set paths read Data\\Textures\\Landscape\\LOD\\<World>\\Diffuse\\<World>.n.Level<L>.X<X>.Y<Y>.dds and the same under Normals, in the world's editor-id case."
+url = "oracle:game-lod-files"
+licence = "Structure and counts of the owner's own game files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on three blocks (levels 4, 8, 32) with lodwright's NIF reader and a throwaway dumper. Vertex counts were 807 to 857 for blocks of 3600 to 3700 triangles."
+
+[[source]]
+id = "game-lod-terrain-textures"
+fact = "Terrain LOD diffuse and normal maps are 256 by 256 pixels, DXT1 (BC1) with 9 mip levels, at levels 4 and 32 alike; the normal map is mostly blue (mean red and green near 128, blue near 245)."
+url = "oracle:game-lod-files"
+licence = "Header fields and channel statistics of the owner's own game files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "game-dlodsettings-layout"
+fact = "A .dlodsettings file is 24 bytes, little endian: u32 lowest level, u32 highest level, u32 world width in cells, i16 south-west cell x, i16 south-west cell y, i16 north-east cell x, i16 north-east cell y, u32 (4 in both files read). Two worlds were read: (4, 32, 128, -64, -64, 63, 63, 4) and (4, 16, 64, -32, -32, 31, 31, 4). The file sits in lodsettings/<world>.dlodsettings."
+url = "oracle:game-lod-files"
+licence = "Numbers read from two of the owner's own game files; the files are not recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The meaning of the last field is not known; it equals the object LOD level in both files."
+
+[[source]]
+id = "game-lod-object-layout"
+fact = "Object LOD blocks are meshes/landscape/lod/<world>/blocks/<world>.level4.x<X>.y<Y>.nif, with a few <world>.level4.high.x<X>.y<Y>.nif beside them; the shared object atlas is textures/landscape/lod/<world>/blocks/<world>.buildings.dds (DXT3, 2048 by 1024, 12 mips) with a <world>.buildings_n.dds normal atlas."
+url = "oracle:game-lod-files"
+licence = "File names and header fields of the owner's own game files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false

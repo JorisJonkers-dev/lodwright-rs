@@ -364,6 +364,13 @@ vertex share was an artefact of comparing vertices rounded to a 0.05 grid; a one
 99.98 percent, all 295 blocks with equal counts and 291 with every vertex matched. Open: four blocks with one displaced
 object each.
 
+## 2026-11-16: water planes
+
+`game-lod-water-height` and the extended `game-lod-water-shape`: measured on the game's own terrain blocks (read-only,
+numbers only) by comparing the water shapes' structure, heights and covered ground with the cells' water records.
+The planes lodwright writes are its own design (flat rectangles over the ground below water); the overlap with the
+game's planes is 0.986 at level 4 and 0.91 to 0.98 above. Open: the game's outline and edge slopes.
+
 ## 2026-11-16: water shapes in terrain blocks
 
 `game-lod-water-shape`: found by running `lodwright verify --reference` on the game's own tree against the generated

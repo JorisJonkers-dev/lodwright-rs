@@ -25,6 +25,7 @@ mod objects;
 mod terrain;
 mod trees;
 mod verify;
+mod water;
 
 pub use assets::{Assets, FolderAssets};
 pub use atlas::{Atlas, Rect, pack};

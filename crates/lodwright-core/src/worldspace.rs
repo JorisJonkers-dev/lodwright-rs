@@ -136,7 +136,9 @@ impl Worldspace {
     pub fn water_height(&self, x: i32, y: i32) -> Option<f32> {
         // source: cell-water
         let water = self.water.get(&(x, y))?;
-        water.height.or_else(|| {
+        // source: game-lod-water-height
+        // an XCLW of the largest float stands for "no height of its own": the game's blocks use the default there
+        water.height.filter(|h| *h < f32::MAX).or_else(|| {
             water
                 .has_water
                 .then_some(self.record.default_water_height)
@@ -227,6 +229,12 @@ impl Worldspace {
             }
         }
         worst
+    }
+
+    /// Set the water of cell (`x`, `y`) as a CELL record would: the has-water flag and an optional `XCLW` (for
+    /// tests and tools).
+    pub fn set_cell_water(&mut self, x: i32, y: i32, has_water: bool, height: Option<f32>) {
+        self.water.insert((x, y), CellWater { has_water, height });
     }
 
     /// Build a world directly from cells (for tests and tools).

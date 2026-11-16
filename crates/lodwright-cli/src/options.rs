@@ -48,6 +48,8 @@ pub struct Options {
     pub no_land_textures: bool,
     /// `--no-trees`: leave tree LOD out.
     pub no_trees: bool,
+    /// `--no-water`: leave the water planes out of the terrain blocks.
+    pub no_water: bool,
     /// `generate`: worker threads; 0 chooses from the machine (at most 4).
     pub threads: usize,
 }
@@ -73,6 +75,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         overwrite: false,
         terrain_only: false,
         no_land_textures: false,
+        no_water: false,
         no_trees: false,
     };
     let mut iter = args.iter();
@@ -132,6 +135,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
             "--events" => options.events = Some(value("--events")?),
             "--terrain-only" => options.terrain_only = true,
             "--no-land-textures" => options.no_land_textures = true,
+            "--no-water" => options.no_water = true,
             "--no-trees" => options.no_trees = true,
             "--allow-in-repo" => options.allow_in_repo = true,
             other => return Err(format!("unknown option {other}")),

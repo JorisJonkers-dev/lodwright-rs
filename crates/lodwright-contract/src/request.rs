@@ -40,6 +40,9 @@ pub struct TerrainRequest {
     /// Blend the land textures into the diffuse maps (off: vertex colours only).
     #[serde(default = "yes")]
     pub land_textures: bool,
+    /// Write water planes into the terrain blocks that have ground below water.
+    #[serde(default = "yes")]
+    pub water: bool,
 }
 
 impl Default for TerrainRequest {
@@ -48,6 +51,7 @@ impl Default for TerrainRequest {
             enabled: true,
             levels: Vec::new(),
             land_textures: true,
+            water: true,
         }
     }
 }
@@ -260,7 +264,11 @@ mod tests {
         )
         .unwrap();
         assert!(
-            r.terrain.enabled && r.objects.enabled && r.trees.enabled && r.terrain.land_textures
+            r.terrain.enabled
+                && r.objects.enabled
+                && r.trees.enabled
+                && r.terrain.land_textures
+                && r.terrain.water
         );
         assert!(r.worlds.is_empty() && r.terrain.levels.is_empty());
     }

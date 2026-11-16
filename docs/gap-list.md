@@ -19,7 +19,7 @@ pipeline the community generators provide for this game. Each row is one work it
 | 12 | Determinism, incremental runs | Deterministic output for any thread count; manifest with digests; an unchanged request and input is detected and skipped, a changed one replaces exactly the old manifest's files | Reuse of unchanged blocks inside a run |
 | 13 | Performance | Parallel terrain blocks, bounded worker count; the main worldspace takes about 9 seconds and 0.5 GiB with four workers | Memory cap option, streaming of large plugins |
 | 14 | CLI | `plan`, `heightmap`, `probe`, `generate`, `verify`, `schema` | Nothing known |
-| 17 | Water planes in terrain blocks | Structure measured (`game-lod-water-shape`): 164 of 1360 blocks carry one or two extra shapes | Outline and height rules; not written yet |
+| 17 | Water planes in terrain blocks | Done: flat planes at each cell's water height over the ground below it, written as the game's blocks do (`game-lod-water-shape`, `game-lod-water-height`); the covered ground overlaps the game's planes by 0.986 at level 4 and 0.91 to 0.98 above | The game's own outline and sloped edges, in-game check (owner) |
 | 15 | Integration for the mod manager | Plan, result, request and manifest contracts; `lodwright-gen` library; stable exit codes; progress events (`--events FILE|-`, one line per terrain block) | Events for object LOD |
 | 16 | In-game acceptance | Owner only | Loading generated blocks in the game |
 

@@ -33,6 +33,7 @@ fn request_from_options(options: &Options) -> Request {
     request.objects.enabled = !options.terrain_only;
     request.trees.enabled = !options.terrain_only && !options.no_trees;
     request.terrain.land_textures = !options.no_land_textures;
+    request.terrain.water = !options.no_water;
     request.limits.threads = u32::try_from(options.threads).ok().filter(|n| *n > 0);
     request
 }
@@ -302,6 +303,7 @@ fn run_request(
                     threads,
                     land: Some(&tiles),
                     progress: Some(&progress),
+                    water: request.terrain.water,
                 },
             )
             .map_err(|e| Failure::new("generate_failed", e.to_string()))?;

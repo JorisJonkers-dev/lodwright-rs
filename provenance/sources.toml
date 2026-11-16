@@ -979,6 +979,17 @@ verified = false
 note = "Open: which objects make up the remaining difference in the eight blocks that still differ; some of the difference may come from DLC plugins the game's blocks were built with."
 
 [[source]]
+id = "game-object-shape-offset"
+fact = "A vertex v of a LOD model shape lands in the game's own object LOD blocks at pos + R * (s * v' + T), where v' is v turned by the shape's own rotation, s the reference's scale, R the reference's rotation (game-object-rotation), pos the reference position and T the sum of the node and shape translations of the model: the reference scale does not scale the translation, and the rotations of the model's nodes are ignored (a rotated root node changes no vertex of the blocks measured)."
+url = "oracle:game-lod-files"
+licence = "Numbers compared between models, reference placements and blocks of the owner's own game files; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Found by fitting the per-model offset between generated and shipped vertices: over the 295 blocks of the main world the median share of vertices within 0.05 units rose from 0.881 to 0.940 with the unscaled translation and to 0.942 with node rotations ignored (lowest block from 0.108 to 0.814). The scale of a shape's own transform is still applied with s; only seven models carry one."
+
+[[source]]
 id = "game-lod-water-shape"
 fact = "In 164 of the 1360 terrain block NIFs of the main worldspace (86 with ten blocks, 78 with twelve) the root node has one or two further children after the terrain shape: a NiTriShape without properties whose data block has no UVs and a handful of vertices (4 vertices and 3 triangles in the block measured) at one constant height, with the shape's translation equal to the block origin."
 url = "oracle:game-lod-files"

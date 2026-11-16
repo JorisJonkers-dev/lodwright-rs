@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Reading the small LOD models that sit beside the full models: geometry with the node transforms applied, plus
-//! the texture paths and whether the shape is alpha tested.
+//! Reading the small LOD models that sit beside the full models: geometry with the shape rotations and the scales
+//! applied, the translations kept apart as an offset the placement scale does not touch, node rotations ignored
+//! (`game-object-shape-offset`), plus the texture paths and whether the shape is alpha tested.
 
 use lodwright_nif::{Body, NiNode, NiTriShape, NifFile};
 
 /// One shape of a LOD model, in the model's own space.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Part {
-    /// Positions.
+    /// Positions with the node rotations and scales applied, but not the translations.
     pub vertices: Vec<[f32; 3]>,
+    /// The sum of the node translations: the game's own blocks apply the placement scale to the positions but
+    /// not to this offset.
+    pub offset: [f32; 3],
     /// Normals, when the model has them.
     pub normals: Option<Vec<[f32; 3]>>,
     /// Tangents and bitangents, when the model has them.
@@ -73,16 +77,14 @@ impl Xf {
             scale: self.scale * child.scale,
         }
     }
-
-    fn point(&self, v: [f32; 3]) -> [f32; 3] {
-        let p = apply(&self.rot, v.map(|c| c * self.scale));
-        [self.pos[0] + p[0], self.pos[1] + p[1], self.pos[2] + p[2]]
-    }
 }
 
+// source: game-object-shape-offset
+/// A node's transform without its rotation: the game's own blocks ignore the rotation of the model's nodes (a node
+/// rotation in a model changes no vertex of the blocks measured) and keep only the shapes' own transforms.
 fn node_xf(node: &NiNode) -> Xf {
     Xf {
-        rot: mat_of(&node.av.rotation),
+        rot: Xf::IDENTITY.rot,
         pos: node.av.translation,
         scale: node.av.scale,
     }
@@ -188,7 +190,12 @@ impl Ctx<'_> {
         let turn = |v: &[f32; 3]| apply(&xf.rot, *v);
         let (diffuse, normal_map, alpha) = self.textures(shape);
         self.parts.push(Part {
-            vertices: vertices.iter().map(|v| xf.point(*v)).collect(),
+            // source: game-object-shape-offset
+            vertices: vertices
+                .iter()
+                .map(|v| apply(&xf.rot, v.map(|c| c * xf.scale)))
+                .collect(),
+            offset: xf.pos,
             normals: geometry.normals.map(|ns| ns.iter().map(turn).collect()),
             tangents: geometry
                 .tangents
@@ -227,7 +234,7 @@ impl Ctx<'_> {
     }
 }
 
-/// Parse a LOD model into shapes with every transform applied.
+/// Parse a LOD model into shapes in the model's own space (see [`Part`] for what is applied).
 ///
 /// # Errors
 /// A message when the bytes are not a NIF this reader understands or have no geometry.

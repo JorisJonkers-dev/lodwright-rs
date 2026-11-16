@@ -218,7 +218,17 @@ fn add_instance(
             .or_else(|| atlas.rects.get(NONE))
             .copied();
         for i in 0..part.vertices.len() {
-            let p = turn(&rot, part.vertices[i].map(|c| c * placement.scale));
+            let v = part.vertices[i];
+            let o = part.offset;
+            // source: game-object-shape-offset
+            let p = turn(
+                &rot,
+                [
+                    v[0] * placement.scale + o[0],
+                    v[1] * placement.scale + o[1],
+                    v[2] * placement.scale + o[2],
+                ],
+            );
             m.vertices.push([
                 placement.pos[0] + p[0] - origin.0,
                 placement.pos[1] + p[1] - origin.1,

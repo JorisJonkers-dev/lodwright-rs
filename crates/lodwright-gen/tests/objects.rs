@@ -39,15 +39,20 @@ fn av(properties: Vec<i32>) -> AvObject {
 }
 
 /// A one-triangle LOD model with a texture set: node, strips shape, strips data, lighting property, texture set.
-#[allow(clippy::too_many_lines)] // one literal NIF
 fn lod_model(texture: &str) -> Vec<u8> {
+    lod_model_with(texture, av(vec![]), av(vec![3]))
+}
+
+/// The same model with the given node and shape transforms.
+#[allow(clippy::too_many_lines)] // one literal NIF
+fn lod_model_with(texture: &str, node_av: AvObject, shape_av: AvObject) -> Vec<u8> {
     let node = NiNode {
-        av: av(vec![]),
+        av: node_av,
         children: vec![1],
         effects: vec![],
     };
     let shape = NiTriShape {
-        av: av(vec![3]),
+        av: shape_av,
         data: 2,
         skin_instance: -1,
         material_names: vec![],
@@ -306,4 +311,45 @@ fn nothing_is_written_when_no_model_can_be_read_and_output_is_deterministic() {
     let a = generate_objects("Mojave", &list, &assets(), &one).unwrap();
     let b = generate_objects("Mojave", &list, &assets(), &two).unwrap();
     assert_eq!(a, b);
+}
+
+// source: game-object-shape-offset
+#[test]
+fn the_shape_offset_is_not_scaled_and_node_rotations_are_ignored() {
+    let out = temp("offset");
+    // the root node turns the model a quarter turn about z, which the game's blocks ignore
+    let mut node = av(vec![]);
+    node.rotation = [0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+    let mut shape = av(vec![3]);
+    shape.translation = [10.0, 20.0, 30.0];
+    let mut m = assets();
+    m.0.insert(
+        "meshes/a/post_lod.nif".to_owned(),
+        lod_model_with("Data\\Textures\\a\\wall.dds", node, shape),
+    );
+    let list = vec![instance(
+        "a\\Post.nif",
+        1000.0,
+        1000.0,
+        std::f32::consts::FRAC_PI_2,
+        1,
+        false,
+    )];
+    generate_objects("Mojave", &list, &m, &out).unwrap();
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif",
+    );
+    let Body::TriShapeData(d) = &block.blocks[4].body else {
+        panic!("data block");
+    };
+    let v = d.geometry.vertices.as_ref().unwrap();
+    // pos + R * (s * v + T) with v = (100, 0, 0), s = 2, T = (10, 20, 30) and R the reference's quarter turn
+    // (Rz(-z): x goes to -y): (1000, 1000, 10) + (20, -210, 30)
+    let want = [1020.0, 790.0, 40.0];
+    assert!(
+        v[1].iter().zip(want).all(|(a, b)| (a - b).abs() < 0.01),
+        "{:?}",
+        v[1]
+    );
 }

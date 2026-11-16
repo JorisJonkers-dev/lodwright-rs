@@ -327,3 +327,29 @@ const GRADIENT_BC5: f64 = 54.4;
 const NOISE_BC1: f64 = 13.4;
 const NOISE_BC3: f64 = 14.6;
 const NOISE_BC5: f64 = 29.1;
+
+#[test]
+fn an_uncompressed_32_bit_file_is_read_through_its_masks() {
+    let mut file = vec![0_u8; 128];
+    file[0..4].copy_from_slice(b"DDS ");
+    file[4..8].copy_from_slice(&124_u32.to_le_bytes());
+    file[12..16].copy_from_slice(&1_u32.to_le_bytes());
+    file[16..20].copy_from_slice(&2_u32.to_le_bytes());
+    file[76..80].copy_from_slice(&32_u32.to_le_bytes());
+    file[80..84].copy_from_slice(&0x41_u32.to_le_bytes());
+    file[88..92].copy_from_slice(&32_u32.to_le_bytes());
+    for (at, mask) in [
+        (92, 0x00FF_0000_u32),
+        (96, 0x0000_FF00),
+        (100, 0x0000_00FF),
+        (104, 0xFF00_0000),
+    ] {
+        file[at..at + 4].copy_from_slice(&mask.to_le_bytes());
+    }
+    // blue, green, red, alpha per pixel
+    file.extend_from_slice(&[10, 20, 30, 255, 1, 2, 3, 128]);
+    let image = lodwright_dds::decode_image(&file).unwrap();
+    assert_eq!((image.width(), image.height()), (2, 1));
+    assert_eq!(image.pixel(0, 0), Some([30, 20, 10, 255]));
+    assert_eq!(image.pixel(1, 0), Some([3, 2, 1, 128]));
+}

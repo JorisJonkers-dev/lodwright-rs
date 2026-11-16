@@ -23,6 +23,7 @@ pub mod raster;
 pub mod rtin;
 pub mod terrain;
 pub mod texture;
+pub mod trees;
 pub mod worldspace;
 
 pub use error::Error;

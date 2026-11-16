@@ -108,3 +108,10 @@ path = "fuzz_targets/probe_flat.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "tree_lod"
+path = "fuzz_targets/tree_lod.rs"
+test = false
+doc = false
+bench = false

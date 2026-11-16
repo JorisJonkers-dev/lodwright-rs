@@ -31,6 +31,7 @@ fn request_from_options(options: &Options) -> Request {
     );
     request.worlds = options.world.iter().cloned().collect();
     request.objects.enabled = !options.terrain_only;
+    request.trees.enabled = !options.terrain_only && !options.no_trees;
     request.terrain.land_textures = !options.no_land_textures;
     request.limits.threads = u32::try_from(options.threads).ok().filter(|n| *n > 0);
     request
@@ -108,6 +109,8 @@ fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
 fn kind_of(path: &str) -> &'static str {
     if path.ends_with(".dlodsettings") {
         "settings"
+    } else if path.contains("/trees/") {
+        "tree_lod"
     } else if path.contains("/blocks/") {
         "object_lod"
     } else if path.to_ascii_lowercase().ends_with(".nif") {
@@ -118,7 +121,13 @@ fn kind_of(path: &str) -> &'static str {
 }
 
 fn written_of(world: &str, files: &[ManifestFile], doc: &mut ResultDoc) {
-    for kind in ["terrain_mesh", "terrain_texture", "settings", "object_lod"] {
+    for kind in [
+        "terrain_mesh",
+        "terrain_texture",
+        "settings",
+        "object_lod",
+        "tree_lod",
+    ] {
         let of: Vec<_> = files.iter().filter(|f| kind_of(&f.path) == kind).collect();
         if !of.is_empty() {
             doc.written.push(Written {
@@ -176,7 +185,7 @@ fn run_request(
         Path::new(&request.output_dir),
     );
     let read = lodwright_core::plugin::ReadOptions {
-        objects: request.objects.enabled,
+        objects: request.objects.enabled || request.trees.enabled,
         land_layers: request.terrain.land_textures,
     };
     if let Some(limit) = request.limits.memory_mib {
@@ -244,7 +253,8 @@ fn run_request(
         || std::thread::available_parallelism().map_or(1, |n| n.get().min(4)),
         |n| n as usize,
     );
-    let need_assets = request.objects.enabled || request.terrain.land_textures;
+    let need_assets =
+        request.objects.enabled || request.trees.enabled || request.terrain.land_textures;
     let assets = if need_assets {
         Some(
             lodwright_gen::FolderAssets::open(data, &request.plugins)
@@ -308,6 +318,26 @@ fn run_request(
                 .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
             add_warnings(&mut doc, objects.warnings.clone());
             files.extend(objects.files.iter().map(to_manifest_file));
+        }
+        if let (Some(assets), true) = (&assets, request.trees.enabled) {
+            let bases = lodwright_core::trees::tree_bases(&loaded.plugins)
+                .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
+            let refs =
+                lodwright_core::trees::tree_references(&loaded.plugins, world.form_id(), &bases)
+                    .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
+            let south_west = world.bounds().map_or((0, 0), |b| (b.min_x, b.min_y));
+            let trees = lodwright_gen::generate_trees(
+                world.name(),
+                south_west,
+                &bases,
+                &refs,
+                &request.plugins,
+                assets,
+                out,
+            )
+            .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
+            add_warnings(&mut doc, trees.warnings.clone());
+            files.extend(trees.files.iter().map(to_manifest_file));
         }
         written_of(world.name(), &files, &mut doc);
         all.extend(files);

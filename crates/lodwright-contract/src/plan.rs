@@ -41,7 +41,7 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    /// This build: terrain meshes, terrain textures, the settings file and object LOD are written; tree LOD is not.
+    /// This build: terrain meshes, terrain textures, the settings file, object LOD and tree LOD are written.
     #[must_use]
     pub fn current() -> Self {
         Self {
@@ -49,7 +49,7 @@ impl Capabilities {
             terrain_texture: true,
             settings: true,
             object_lod: true,
-            tree_lod: false,
+            tree_lod: true,
         }
     }
 

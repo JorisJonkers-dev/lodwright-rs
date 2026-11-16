@@ -358,3 +358,17 @@ a water plane. Open: how the outline and height of the plane are derived.
 ## 2026-11-16: land texture diffuse
 
 The diffuse blend is our own design (base texture per quadrant, layers by opacity point, times vertex colour, textures reduced to 32 by 32 tiles). No new format facts; checked against the game's own diffuse maps for three blocks: channel correlation 0.85 to 0.95 and means within 3 of 255.
+
+## 2026-11-16: tree LOD
+
+`xedit-tree-lod-files`, `xedit-tree-lod-selection`, `xedit-tree-lod-atlas`: read in the tree sections of `wbLOD.pas` of
+xEdit (MPL-2.0, revision 081cd8672bd366306eaafbbc8771f3a72c6cea7a); the code translated from it says so. Specifier and
+implementer were the same person, so the rows are unverified and want a second reader.
+
+`game-tree-lod-dtl`, `game-tree-lod-lst`: tree LOD files that mods ship (three sets, 29 to 193 block files each) were read
+read-only and compared by numbers with output generated from the base game's records and the billboard textures of two
+mods; no file, mod name or content is recorded here. Result: list layout, block layout, positions, scales, form ids and
+types agree; the rotation is random in the original and lodwright derives it from the form id. The packed rectangles
+differ in placement (gaps of 12 to 16 pixels against 2 in the original code, widths rounded to 4), which does not
+change what the game reads. Open: the order of references inside a block (the sets agree with ours as sets only) and
+the in-game result (owner).

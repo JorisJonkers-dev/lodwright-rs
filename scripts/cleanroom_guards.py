@@ -60,6 +60,8 @@ FORBIDDEN_SOURCES = ("github.com/tes5edit/xlodgen", "decompil", "disassembl", "l
 OLD_NAME_RE = re.compile(r"lodgen", re.IGNORECASE)
 NAME_ALLOWED_PREFIXES = ("provenance/",)
 NAME_ALLOWED_FILES = {
+    # the folder under which mods ship tree billboards is named after the old tool: a path the data folder uses
+    "crates/lodwright-gen/src/trees.rs",
     "docs/clean-room.md",
     "scripts/cleanroom_guards.py",
     "scripts/test_cleanroom_guards.py",

@@ -97,6 +97,8 @@ pub struct BaseObject {
     pub flags: u32,
     /// For a static collection: each part's static (`FormID` as stored) and its placements.
     pub parts: Vec<(u32, Vec<Placement>)>,
+    /// `OBND`: object bounds as x1, y1, z1, x2, y2, z2 in world units.
+    pub bounds: Option<[i16; 6]>,
 }
 
 /// A placed reference.
@@ -110,6 +112,8 @@ pub struct PlacedRef {
     pub flags: u32,
     /// Where it stands.
     pub placement: Placement,
+    /// The reference has an enable parent (`XESP`).
+    pub enable_parent: bool,
 }
 
 /// A worldspace as one plugin defines or overrides it.
@@ -561,9 +565,10 @@ fn placement_at(bytes: &[u8], at: usize) -> Option<Placement> {
 
 // source: fnv-object-records
 fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, Error> {
-    let (mut base, mut placement, mut scale) = (None, None, 1.0);
+    let (mut base, mut placement, mut scale, mut enable_parent) = (None, None, 1.0, false);
     for (signature, payload) in subrecords(data)? {
         match &signature {
+            b"XESP" => enable_parent = true,
             b"NAME" if payload.len() >= 4 => base = Some(le_u32(payload, 0)),
             b"DATA" if payload.len() >= 24 => placement = placement_at(payload, 0),
             b"XSCL" => scale = le_f32(payload, 0).unwrap_or(1.0),
@@ -577,6 +582,7 @@ fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, 
             base,
             flags: record.flags,
             placement,
+            enable_parent,
         }
     }))
 }
@@ -594,11 +600,16 @@ fn base_object(
         model: None,
         flags: record.flags,
         parts: Vec::new(),
+        bounds: None,
     };
     for (sub, payload) in subrecords(data)? {
         match &sub {
             b"EDID" => base.editor_id = Some(zstring(payload)),
             b"MODL" => base.model = Some(zstring(payload)),
+            b"OBND" if payload.len() >= 12 => {
+                let v = |i: usize| i16::from_le_bytes([payload[i * 2], payload[i * 2 + 1]]);
+                base.bounds = Some([v(0), v(1), v(2), v(3), v(4), v(5)]);
+            }
             b"ONAM" if signature == *b"SCOL" && payload.len() >= 4 => {
                 base.parts.push((le_u32(payload, 0), Vec::new()));
             }

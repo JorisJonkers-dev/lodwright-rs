@@ -145,6 +145,47 @@ pub fn nif_atlas_paths(world: &str) -> Result<[String; 2], Error> {
     Ok([format!("{base}.dds"), format!("{base}_n.dds")])
 }
 
+// source: xedit-tree-lod-files, game-tree-lod-dtl
+/// Path of a tree LOD block: level 8, at south-west cell (`x`, `y`).
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn tree_block_path(world: &str, x: i32, y: i32) -> Result<String, Error> {
+    check_world_name(world)?;
+    let w = world.to_ascii_lowercase();
+    Ok(format!(
+        "meshes/landscape/lod/{w}/trees/{w}.level8.x{x}.y{y}.dtl"
+    ))
+}
+
+// source: xedit-tree-lod-files, game-tree-lod-lst
+/// Path of the tree type list of a world.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn tree_list_path(world: &str) -> Result<String, Error> {
+    check_world_name(world)?;
+    Ok(format!(
+        "meshes/landscape/lod/{}/trees/treetypes.lst",
+        world.to_ascii_lowercase()
+    ))
+}
+
+// source: xedit-tree-lod-files
+/// Path of the tree billboard atlas: the swamp atlas for worlds whose name starts with `DLC4`, the dead-tree
+/// atlas for the others.
+#[must_use]
+pub fn tree_atlas_path(world: &str) -> &'static str {
+    if world
+        .get(..4)
+        .is_some_and(|p| p.eq_ignore_ascii_case("DLC4"))
+    {
+        "textures/landscape/trees/treeswamplod.dds"
+    } else {
+        "textures/landscape/trees/treedeadlod.dds"
+    }
+}
+
 // source: game-dlodsettings-layout
 /// Path of the per-world LOD settings file.
 ///

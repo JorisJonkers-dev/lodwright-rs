@@ -74,7 +74,8 @@ Resolve from allowed inputs only; each answer becomes a provenance row.
   implements both readings behind `ConflictRule`.
 
 - `.btr`/`.bto` container layout (believed NIF). Blocks the mesh and object writers.
-- Tree LOD placement for FNV.
+- Tree LOD: placement, file layouts and selection are settled (`docs/spec/object-lod.md`, section 3); the order of trees inside
+  a block and the in-game result are open.
 - Exact `.lod` fields. The block sizes per level (4, 8, 16, 32 cells) are used as planning parameters, not as facts.
 - Whether the file names recorded in `lod-block-naming`, `lod-terrain-paths` and `lod-settings-path` match the owner's
   own output tree (the normal-map suffix is the least certain).

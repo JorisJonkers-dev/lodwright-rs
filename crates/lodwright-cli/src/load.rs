@@ -76,6 +76,7 @@ pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Fail
     }
     let mut plugins = Vec::with_capacity(names.len());
     let mut digest = Sha256Stream::new();
+    let mut headers = Vec::with_capacity(names.len());
     for name in names {
         let path = find_plugin(data, name)?;
         let bytes = std::fs::read(&path).map_err(|e| {
@@ -87,10 +88,16 @@ pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Fail
         digest.update(name.to_ascii_lowercase().as_bytes());
         digest.update(&(bytes.len() as u64).to_le_bytes());
         digest.update(&bytes);
+        // The header read by esplugin (GPL-3.0 crate) is used to check the order of masters.
+        let header = lodwright_plugin_meta::read_header(name, &bytes)
+            .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
+        headers.push((name.clone(), header));
         let parsed = plugin::read(&bytes)
             .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         plugins.push((name.clone(), parsed));
     }
+    lodwright_plugin_meta::check_master_order(&headers)
+        .map_err(|reason| Failure::new("master_order", reason))?;
     Ok(LoadedPlugins {
         plugins,
         inputs_digest: digest.finish(),

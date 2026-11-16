@@ -46,8 +46,9 @@ LOG entry names who held which role. The pull request checklist asks for the sta
   kind.
 - Leaked, forum-pasted or NDA'd source.
 - Anything under an unknown licence. If the licence of a source cannot be stated, it cannot be a row.
-- GPL, LGPL or AGPL code, including `esplugin` (GPL-3.0): not as a dependency and not copied. This project is
-  MPL-2.0 and its tools stay permissive.
+- GPL, LGPL or AGPL *source* is not a clean-room input: reading it to learn a format taints the work. Linking a
+  GPL-3.0 crate as a dependency (for example `esplugin`) is allowed under the licence map in
+  [LICENSING.md](LICENSING.md); copying its code is not.
 
 If you have already seen forbidden material, say so in the pull request before writing anything about that area:
 the format becomes someone else's to implement. Nobody is penalised for disclosing; hiding it taints the work.

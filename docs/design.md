@@ -47,8 +47,8 @@ water handling are not designed yet.
 
 - NIF subset reader/writer (FO3/FNV, NIF 20.2.0.7), purpose-built; no mature Rust crate is known.
 - DDS: `texpresso` (MIT) or `intel_tex_2` (MIT/Apache-2.0) for BC1/BC3/BC5, `ddsfile` (MIT) for containers,
-  `image_dds` (MIT) as a convenience layer. `binrw` (MIT) for layouts. Do not depend on `esplugin` (GPL-3.0; banned
-  in `deny.toml`).
+  `image_dds` (MIT) as a convenience layer. `binrw` (MIT) for layouts. `esplugin` (GPL-3.0) is used for plugin
+  headers in the `lodwright-plugin-meta` crate (see LICENSING.md).
 - Every new dependency must pass `cargo deny` (permissive or MPL-2.0 licences only) and be at least seven days old
   on the registry.
 

@@ -34,6 +34,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--format text|json | --json] [--schema-version N] [--blocks]
        lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
                       [--world NAME] [--threads N] [--json] [--schema-version N]
+       lodwright verify <folder> [--reference <folder>] [--json]
        lodwright schema <plan|result> [--schema-version N]
        lodwright contracts --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
@@ -47,6 +48,9 @@ Commands:
   generate              write the terrain LOD (block meshes, textures, settings file) of the chosen worlds into
                         --out, which must not be inside the data folder; prints a result document. Without
                         data, plugins and --out it answers `unsupported` (exit 3) and writes nothing
+  verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
+                        byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
+                        --reference also compare names and block types with another folder. Exit 1 on findings
   schema                print the JSON Schema of a document (plan or result)
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
@@ -87,6 +91,7 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
         ["generate", rest @ ..] => generate_command(rest, out, err),
         ["schema", rest @ ..] => schema_command(rest, out, err),
         ["heightmap", rest @ ..] => heightmap_command(rest, out, err),
+        ["verify", rest @ ..] => verify_command(rest, out, err),
         ["probe", rest @ ..] => match probe::run(rest, out) {
             Ok(()) => EXIT_OK,
             Err(probe::Outcome::Usage(problem)) => usage(err, &problem),
@@ -218,6 +223,69 @@ fn write_all(out: &mut dyn Write, err: &mut dyn Write, text: &str) -> u8 {
             EXIT_FAILED
         }
     }
+}
+
+fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let (mut folder, mut reference, mut json) = (None, None, false);
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match *arg {
+            "--json" => json = true,
+            "--reference" => match iter.next() {
+                Some(r) => reference = Some(*r),
+                None => return usage(err, "--reference needs a folder"),
+            },
+            other if folder.is_none() && !other.starts_with("--") => folder = Some(other),
+            other => return usage(err, &format!("unknown argument: {other}")),
+        }
+    }
+    let Some(folder) = folder else {
+        return usage(err, "verify needs the folder to check");
+    };
+    if !Path::new(folder).is_dir() {
+        let _ = writeln!(err, "lodwright: verify: {folder} is not a folder");
+        return EXIT_FAILED;
+    }
+    let mut verification = lodwright_gen::verify_folder(Path::new(folder));
+    if let Some(reference) = reference {
+        verification.differences =
+            lodwright_gen::compare_folders(Path::new(folder), Path::new(reference));
+    }
+    let findings = |list: &[lodwright_gen::Finding]| -> Vec<serde_json::Value> {
+        list.iter()
+            .map(|f| serde_json::json!({"path": f.path, "problem": f.problem}))
+            .collect()
+    };
+    let ok = verification.errors.is_empty();
+    if json {
+        let doc = serde_json::json!({
+            "schema_version": 1,
+            "contract": "lodwright-verify",
+            "ok": ok,
+            "terrain_blocks": verification.terrain_blocks,
+            "object_blocks": verification.object_blocks,
+            "textures": verification.textures,
+            "settings": verification.settings,
+            "errors": findings(&verification.errors),
+            "differences": findings(&verification.differences),
+        });
+        let _ = writeln!(out, "{doc}");
+    } else {
+        let _ = writeln!(
+            out,
+            "{} terrain blocks, {} object blocks, {} textures, {} settings files: {} errors, {} differences",
+            verification.terrain_blocks,
+            verification.object_blocks,
+            verification.textures,
+            verification.settings,
+            verification.errors.len(),
+            verification.differences.len()
+        );
+        for f in verification.errors.iter().chain(&verification.differences) {
+            let _ = writeln!(out, "{}: {}", f.path, f.problem);
+        }
+    }
+    if ok { EXIT_OK } else { EXIT_FAILED }
 }
 
 fn usage(err: &mut dyn Write, problem: &str) -> u8 {

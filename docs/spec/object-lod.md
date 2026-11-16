@@ -21,7 +21,13 @@ textures are collected into the atlas: no public document. M6 gives the protocol
 
 Measured on the game's own blocks: a reference turns its model by `game-object-rotation`; a vertex lands at
 `pos + R * (s * v + T)`, where the model's translations `T` are not scaled by the reference scale `s` and the rotations
-of the model's nodes are ignored (`game-object-shape-offset`).
+of the model's nodes are ignored (`game-object-shape-offset`). A temporary reference counts in the block of the cell that holds it, a persistent one in
+the block of the cell under its position (`game-object-block-cell`).
+
+Remaining differences from the game's own blocks of the main world (#77), all counts equal: four blocks each hold one
+object whose vertices differ as a whole: one shifted by 0.09 units in height (160 vertices), one shifted by about 23
+units (137 vertices), and two turned and moved (94 and 16 vertices). The records place these objects differently from
+the game's blocks, which most likely were built before the placements last changed; lodwright follows the records.
 
 ## 3. Tree LOD
 

@@ -182,6 +182,7 @@ fn instance(model: &str, x: f32, y: f32, rot_z: f32, reference: u32, high: bool)
         reference_plugin: 0,
         base_plugin: 0,
         part: false,
+        cell: None,
     }
 }
 
@@ -351,5 +352,29 @@ fn the_shape_offset_is_not_scaled_and_node_rotations_are_ignored() {
         v[1].iter().zip(want).all(|(a, b)| (a - b).abs() < 0.01),
         "{:?}",
         v[1]
+    );
+}
+
+// source: game-object-block-cell
+#[test]
+fn a_temporary_reference_goes_to_the_block_of_its_cell() {
+    let out = temp("cell");
+    let mut held = instance("a\\Wall.nif", 100.0, -0.0001, 0.0, 1, false);
+    held.cell = Some((0, 0));
+    let loose = instance("a\\Wall.nif", 200.0, -0.0001, 0.0, 2, false);
+    generate_objects("Mojave", &[held, loose], &assets(), &out).unwrap();
+    let count = |rel: &str| {
+        let Body::TriShapeData(d) = &read_block(&out, rel).blocks[4].body else {
+            panic!("data block");
+        };
+        d.geometry.vertices.as_ref().unwrap().len()
+    };
+    assert_eq!(
+        count("meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif"),
+        3
+    );
+    assert_eq!(
+        count("meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y-4.nif"),
+        3
     );
 }

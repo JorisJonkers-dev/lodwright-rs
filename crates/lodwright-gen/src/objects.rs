@@ -175,6 +175,16 @@ struct Merged {
     row_triangles: [u32; 4],
 }
 
+// source: game-object-block-cell
+/// The cell an instance counts in for its block: the cell that holds a temporary reference, else the cell under
+/// its position.
+fn cell_of(i: &Instance) -> (i32, i32) {
+    i.cell.unwrap_or_else(|| {
+        let cell = |v: f32| (v / CELL_UNITS).floor() as i32;
+        (cell(i.placement.pos[0]), cell(i.placement.pos[1]))
+    })
+}
+
 fn rect_uv(r: &Rect, atlas: &Atlas, uv: [f32; 2]) -> [f32; 2] {
     // tiling textures cannot be shared in an atlas: the fractional part of the coordinate is used
     let (u, v) = (uv[0] - uv[0].floor(), uv[1] - uv[1].floor());
@@ -411,8 +421,7 @@ pub fn generate_objects(
             report.skipped += 1;
             continue;
         }
-        let cell = |v: f32| (v / CELL_UNITS).floor() as i32;
-        let (cx, cy) = (cell(i.placement.pos[0]), cell(i.placement.pos[1]));
+        let (cx, cy) = cell_of(i);
         let key = (
             cx.div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
             cy.div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
@@ -426,17 +435,14 @@ pub fn generate_objects(
     let [diffuse_ref, normal_ref] = layout::nif_atlas_paths(world)?;
     for ((bx, by, high), mut members) in groups {
         members.sort_by_key(|i| {
-            let row = (i.placement.pos[1] / CELL_UNITS).floor() as i32 - by;
+            let row = cell_of(i).1 - by;
             (row.clamp(0, 3), i.reference, i.base)
         });
         let origin = (bx as f32 * CELL_UNITS, by as f32 * CELL_UNITS);
         let mut merged = Merged::default();
         let mut dropped = 0;
         for i in members {
-            let row = usize::try_from(
-                ((i.placement.pos[1] / CELL_UNITS).floor() as i32 - by).clamp(0, 3),
-            )
-            .unwrap_or(0);
+            let row = usize::try_from((cell_of(i).1 - by).clamp(0, 3)).unwrap_or(0);
             let Some(model) = models
                 .get(&lod_model_path(&i.model))
                 .and_then(Option::as_ref)

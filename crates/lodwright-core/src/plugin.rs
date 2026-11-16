@@ -25,6 +25,9 @@ const COMPRESSED_FLAG: u32 = 0x0004_0000;
 const DELETED_FLAG: u32 = 0x0000_0020;
 // source: plugin-group-types
 const GROUP_WORLD_CHILDREN: u32 = 1;
+const GROUP_CELL_PERSISTENT: u32 = 8;
+const GROUP_CELL_TEMPORARY: u32 = 9;
+const GROUP_CELL_DISTANT: u32 = 10;
 const MAX_DEPTH: usize = 32;
 /// Largest decompressed record this reader accepts; the records it decodes are far smaller.
 const MAX_RECORD_BYTES: usize = 16 * 1024 * 1024;
@@ -114,6 +117,9 @@ pub struct PlacedRef {
     pub placement: Placement,
     /// The reference has an enable parent (`XESP`).
     pub enable_parent: bool,
+    /// The grid of the exterior cell whose temporary children hold the reference; `None` for persistent references
+    /// and references outside an exterior cell (`game-object-block-cell`).
+    pub cell: Option<(i32, i32)>,
 }
 
 /// A worldspace as one plugin defines or overrides it.
@@ -320,6 +326,8 @@ struct Walker {
     worlds: Vec<World>,
     world: Option<usize>,
     cell: Option<CellInfo>,
+    /// Inside a cell's temporary or visible-distant children.
+    temporary: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -407,15 +415,21 @@ impl Walker {
                 }
                 // source: plugin-group-types
                 let group_type = le_u32(data, 12);
-                let saved = (self.world, self.cell);
+                let saved = (self.world, self.cell, self.temporary);
                 if group_type == GROUP_WORLD_CHILDREN {
                     let label = le_u32(data, 8);
                     self.world = Some(self.world_index(label));
                     self.cell = None;
                 }
+                self.temporary = match group_type {
+                    GROUP_CELL_PERSISTENT => false,
+                    GROUP_CELL_TEMPORARY | GROUP_CELL_DISTANT => true,
+                    _ => self.temporary,
+                };
                 self.walk(&data[GROUP_HEADER..size], depth + 1)?;
+                self.temporary = saved.2;
                 if group_type == GROUP_WORLD_CHILDREN {
-                    (self.world, self.cell) = saved;
+                    (self.world, self.cell) = (saved.0, saved.1);
                 }
                 data = &data[size..];
             } else {
@@ -532,7 +546,9 @@ impl Walker {
                     return Ok(());
                 };
                 let data = record.data()?;
-                if let Some(placed) = placed_ref(record, &data)? {
+                if let Some(mut placed) = placed_ref(record, &data)? {
+                    // source: game-object-block-cell
+                    placed.cell = self.cell.filter(|_| self.temporary).map(|c| (c.x, c.y));
                     self.worlds[world].refs.push(placed);
                 }
             }
@@ -583,6 +599,7 @@ fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, 
             flags: record.flags,
             placement,
             enable_parent,
+            cell: None,
         }
     }))
 }
@@ -686,6 +703,51 @@ mod tests {
         assert_eq!(r.placement.scale, 2.0);
         let off = read_with(&bytes, ReadOptions::default()).unwrap();
         assert!(off.objects.is_empty() && off.worlds.iter().all(|w| w.refs.is_empty()));
+    }
+
+    // source: game-object-block-cell
+    #[test]
+    fn temporary_references_keep_their_cell_and_persistent_ones_do_not() {
+        use super::{ReadOptions, read_with};
+        let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+        let refr = |id: u32| {
+            Record::new(*b"REFR", id)
+                .with_subrecord(*b"NAME", 0x0100_0001_u32.to_le_bytes().to_vec())
+                .with_subrecord(*b"DATA", f32s(&[0.0, -1e-7, 0.0, 0.0, 0.0, 0.0]))
+        };
+        let mut grid = 3_i32.to_le_bytes().to_vec();
+        grid.extend_from_slice(&(-2_i32).to_le_bytes());
+        grid.extend_from_slice(&[0; 4]);
+        let cell = Record::new(*b"CELL", 0x0100_0020).with_subrecord(*b"XCLC", grid);
+        let children = Group::new(6, 0x0100_0020_u32.to_le_bytes())
+            .with(Group::new(8, 0x0100_0020_u32.to_le_bytes()).with(refr(0x0100_0100)))
+            .with(Group::new(9, 0x0100_0020_u32.to_le_bytes()).with(refr(0x0100_0101)));
+        let world = Group::new(1, 0x0100_0010_u32.to_le_bytes())
+            .with(cell)
+            .with(children)
+            .with(refr(0x0100_0102));
+        let bytes = PluginBuilder::new().group(world).build();
+        let plugin = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        let cells: Vec<_> = plugin.worlds[0]
+            .refs
+            .iter()
+            .map(|r| (r.form_id, r.cell))
+            .collect();
+        assert_eq!(
+            cells,
+            vec![
+                (0x0100_0100, None),
+                (0x0100_0101, Some((3, -2))),
+                (0x0100_0102, None)
+            ]
+        );
     }
 
     #[test]

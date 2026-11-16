@@ -319,3 +319,10 @@ reader has not verified these rows.
 not match; the reader now falls back to raw inflate for that failure only and still checks the stated size. Found by
 running `lodwright plan` on the real file (numbers only: the reader failed before the fix, then read 16 386 cells of
 the main worldspace).
+
+## 2026-11-16: object LOD block structure
+
+`game-lod-object-block-nif`: one object block of the game's own tree was read read-only (structure, counts and
+number ranges only; the file was removed afterwards). Settles part of M6: block structure and atlas reference. Open:
+the segment table meaning, the atlas packing rule and UV scale, which references and which `_lod` models enter a
+block (692 `_lod` models exist in the base archive), tree LOD files (M7).

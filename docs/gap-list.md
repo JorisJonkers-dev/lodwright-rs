@@ -13,7 +13,7 @@ pipeline the community generators provide for this game. Each row is one work it
 | 6 | Terrain textures | Normal maps done (correlate 0.95 with the game's own); diffuse is vertex colours only | Layer blending of land textures into the diffuse |
 | 7 | Settings file | Done; byte-identical to the game's own file for the main world | Check against the game's loading |
 | 8 | Output layout | Done, matches the game's own tree; files appear atomically | Manifest, resume |
-| 9 | Object LOD | Layout measured, nothing built | Selecting references (base record flag, high-priority flag), decoding `STAT`, `SCOL`, `REFR`, loading small LOD models from archives, merging per block, removing faces under terrain, atlas packing with UV remap, writing the block NIFs and the atlas DDS pair |
+| 9 | Object LOD | Block structure measured (`game-lod-object-block-nif`), nothing built | Selecting references (base record flag, high-priority flag), decoding `STAT`, `SCOL`, `REFR`, loading small LOD models from archives, merging per block, removing faces under terrain, atlas packing with UV remap, writing the block NIFs and the atlas DDS pair |
 | 10 | Tree and billboard LOD | Not measured | `.dtl` and `treetypes.lst` layouts, tree record decoding, the fixed atlas |
 | 11 | Inclusion rules | Not built | Per plugin and per record include and exclude lists, reading them from a request file |
 | 12 | Determinism, incremental runs | Terrain ready to build on | Stable ordering everywhere, content hashes per block, a manifest and reuse of unchanged blocks |

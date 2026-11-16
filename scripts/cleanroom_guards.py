@@ -31,7 +31,7 @@ from datetime import date
 from pathlib import Path
 
 SOURCE_EXTS = {".rs", ".py", ".sh"}
-SPDX_RE = re.compile(r"SPDX-License-Identifier:\s*MPL-2\.0(?![\w.-])")
+SPDX_RE = re.compile(r"SPDX-License-Identifier:\s*(MPL-2\.0|GPL-3\.0-or-later)(?![\w.-])")
 SPDX_LINES = 5
 
 # `// source:` in Rust, `# source:` where # starts a comment.
@@ -133,7 +133,7 @@ def check_spdx(root: Path, files: list[str], v: Violations) -> None:
             continue
         head = "\n".join(text.splitlines()[:SPDX_LINES])
         if not SPDX_RE.search(head):
-            v.add(rel, f"no `SPDX-License-Identifier: MPL-2.0` in the first {SPDX_LINES} lines")
+            v.add(rel, f"no `SPDX-License-Identifier: MPL-2.0` (or GPL-3.0-or-later, see docs/LICENSING.md) in the first {SPDX_LINES} lines")
 
 
 # --- provenance ---------------------------------------------------------------------------------------------------

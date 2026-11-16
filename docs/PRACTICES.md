@@ -9,7 +9,7 @@ Mirror of nv-rs `docs/fork/PRACTICES.md`, for a project that is a clean-room rei
 | Actions pinned by SHA | every workflow | The org's reusable workflows at github-workflows v0.50.3 (`8e402cc`), whose actions are SHA-pinned; Renovate proposes bumps |
 | Branch protection | `.github/rulesets/`, `scripts/apply-ruleset.sh`, `scripts/setup-repo.sh` | Pull requests only, squash, linear history, no force push, `Pipeline Complete` required; `v*` tags immutable. Prepared here, applied by the owner (`--audit` first) |
 | Format, clippy, tests, coverage | `task fmt`, `clippy`, `test` | clippy pedantic with warnings denied; 80% line coverage gate (cargo-llvm-cov) |
-| Licences, bans, sources, advisories | `deny.toml`, `task deny`, `.github/workflows/security.yml` | MPL-2.0 project: permissive and MPL-2.0 dependencies only; `esplugin` (GPL-3.0) banned; the fuzz workspace is checked too; RustSec daily |
+| Licences, bans, sources, advisories | `deny.toml`, `task deny`, `.github/workflows/security.yml` | permissive, MPL-2.0 and GPL-3.0 dependencies allowed (docs/LICENSING.md); the fuzz workspace is checked too; RustSec daily |
 | Secret scanning | `.gitleaks.toml`, `task secrets` | Every commit |
 | Workflow lint and security | `actionlint`, `zizmor` in `task lint:actions` | |
 | Fuzzing | `fuzz/`, `.github/workflows/fuzz.yml` | Own workspace; one empty-but-compiling harness per future parser, type-checked on every pull request, run weekly; needs `cargo +nightly` |

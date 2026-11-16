@@ -1,0 +1,18 @@
+[package]
+name = "lodwright-plugin-meta"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "GPL-3.0-or-later"
+repository.workspace = true
+publish.workspace = true
+description = "Plugin header summaries (masters, master and light flags) read with the esplugin crate."
+
+[dependencies]
+esplugin = "=6.1.4"
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
+
+[lints]
+workspace = true

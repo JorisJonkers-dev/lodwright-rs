@@ -90,23 +90,40 @@ impl Ctx {
     }
 
     fn check_geometry(&mut self, path: &str, nif: &NifFile, size: Option<f32>, object: bool) {
-        let expected_blocks = if object { 7 } else { 8 };
-        if nif.blocks.len() != expected_blocks {
+        // a terrain block with a water plane has two more (`game-lod-water-shape`)
+        let expected: &[usize] = if object { &[7] } else { &[8, 10] };
+        if !expected.contains(&nif.blocks.len()) {
             self.err(
                 path,
-                format!("{} blocks, expected {expected_blocks}", nif.blocks.len()),
+                format!("{} blocks, expected {}", nif.blocks.len(), expected[0]),
             );
         }
         if nif.header.user_version != 11 || nif.header.bethesda.as_ref().map(|b| b.0) != Some(34) {
             self.err(path, "user versions are not 11 and 34");
         }
-        let Some(data) = nif.blocks.iter().find_map(|b| match &b.body {
-            Body::TriShapeData(d) => Some(d),
-            _ => None,
-        }) else {
+        let datas: Vec<_> = nif
+            .blocks
+            .iter()
+            .filter_map(|b| match &b.body {
+                Body::TriShapeData(d) => Some(d),
+                _ => None,
+            })
+            .collect();
+        if datas.is_empty() {
             self.err(path, "no triangle data block");
-            return;
-        };
+        }
+        for data in datas {
+            self.check_data(path, data, size, object);
+        }
+    }
+
+    fn check_data(
+        &mut self,
+        path: &str,
+        data: &lodwright_nif::NiTriShapeData,
+        size: Option<f32>,
+        object: bool,
+    ) {
         let g = &data.geometry;
         let verts = g.vertices.as_deref().unwrap_or(&[]);
         if verts.is_empty() || verts.len() > 32767 && !object {
@@ -453,13 +470,68 @@ pub fn compare_folders(folder: &Path, reference: &Path) -> Vec<Finding> {
                 problem: "block types differ".into(),
             });
         }
+        if !name.contains("/blocks/")
+            && let Some(problem) = water_difference(water_area(&a), water_area(&b))
+        {
+            out.push(Finding {
+                path: name.clone(),
+                problem,
+            });
+        }
     }
     out
 }
 
+/// The ground area a terrain block's water plane covers: the summed area of the triangles of every data block
+/// after the terrain's, seen from above.
+fn water_area(nif: &NifFile) -> f64 {
+    nif.blocks
+        .iter()
+        .filter_map(|b| match &b.body {
+            Body::TriShapeData(d) => Some(d),
+            _ => None,
+        })
+        .skip(1)
+        .map(|d| {
+            let v = d.geometry.vertices.as_deref().unwrap_or(&[]);
+            d.triangles
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .filter_map(|t| {
+                    let [a, b, c] = t.map(|i| v.get(usize::from(i)).copied());
+                    let (a, b, c) = (a?, b?, c?);
+                    let cross = f64::from(b[0] - a[0]) * f64::from(c[1] - a[1])
+                        - f64::from(b[1] - a[1]) * f64::from(c[0] - a[0]);
+                    Some(cross.abs() / 2.0)
+                })
+                .sum::<f64>()
+        })
+        .sum()
+}
+
+/// The band within which a generated water plane counts as equal to the reference's: half to twice its area.
+/// The planes are our own design (see docs/spec/terrain-lod.md, section 6), so only the covered ground is compared.
+fn water_difference(mine: f64, theirs: f64) -> Option<String> {
+    match (mine > 0.0, theirs > 0.0) {
+        (false, false) => None,
+        (false, true) => Some("no water plane, the reference has one".into()),
+        (true, false) => Some("a water plane the reference does not have".into()),
+        (true, true) => {
+            let ratio = mine / theirs;
+            (!(0.5..=2.0).contains(&ratio)).then(|| {
+                format!(
+                    "the water plane covers {:.0} percent of the reference's area",
+                    ratio * 100.0
+                )
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_block, verify_folder};
+    use super::{parse_block, verify_folder, water_difference};
     use crate::{Options, generate_terrain};
     use lodwright_core::land::CellHeights;
     use lodwright_core::terrain::TerrainSettings;
@@ -528,6 +600,19 @@ mod tests {
         assert!(
             text.iter().any(|t| t.contains("not a readable NIF")),
             "{text:?}"
+        );
+    }
+
+    #[test]
+    fn water_planes_count_as_equal_within_half_to_twice_the_area() {
+        assert_eq!(water_difference(0.0, 0.0), None);
+        assert_eq!(water_difference(150.0, 100.0), None);
+        assert!(water_difference(0.0, 1.0).unwrap().starts_with("no water"));
+        assert!(water_difference(1.0, 0.0).unwrap().starts_with("a water"));
+        assert!(
+            water_difference(300.0, 100.0)
+                .unwrap()
+                .contains("300 percent")
         );
     }
 }

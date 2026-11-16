@@ -184,7 +184,7 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
     }
     let _ = ROOT_FLAGS;
     let bodies = [
-        Body::Opaque(root_node(block.origin, 1, 5)),
+        Body::Opaque(root_node(block.origin, &[1], 5)),
         Body::Opaque(shape_bytes(block.segment_triangles)?),
         Body::Opaque(lighting),
         Body::Opaque(texture_set(block.textures)),

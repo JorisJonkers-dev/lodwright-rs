@@ -59,7 +59,8 @@
       "default": {
         "enabled": true,
         "land_textures": true,
-        "levels": []
+        "levels": [],
+        "water": true
       }
     },
     "trees": {
@@ -222,6 +223,11 @@
           "items": {
             "$ref": "#/$defs/LevelRequest"
           }
+        },
+        "water": {
+          "description": "Write water planes into the terrain blocks that have ground below water.",
+          "type": "boolean",
+          "default": true
         }
       }
     },

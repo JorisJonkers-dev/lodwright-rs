@@ -15,11 +15,12 @@ use lodwright_core::raster::{BlockGrid, HeightRaster};
 use lodwright_core::terrain::{LevelSettings, TerrainSettings, build_block_mesh};
 use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
-use lodwright_nif::{TerrainBlock, terrain_block};
+use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
 use crate::images::{diffuse_image, normal_image};
+use crate::water::water_mesh;
 
 const CELL_UNITS: f32 = 4096.0;
 
@@ -33,6 +34,8 @@ pub struct Options<'a> {
     /// Called after each block with the world, the level, the blocks finished at this level and the blocks of
     /// the level; from worker threads, in no fixed order.
     pub progress: Option<&'a (dyn Fn(&str, u32, u64, u64) + Sync)>,
+    /// Write a water plane into each block that has ground below its cells' water height.
+    pub water: bool,
 }
 
 impl Default for Options<'_> {
@@ -41,6 +44,7 @@ impl Default for Options<'_> {
             threads: 1,
             land: None,
             progress: None,
+            water: true,
         }
     }
 }
@@ -108,6 +112,7 @@ fn run_job(
     job: &Job,
     out: &Path,
     tiles: &LandTiles,
+    water: bool,
 ) -> Result<Vec<FileRecord>, GenError> {
     let level = &job.level;
     let grid = raster.grid();
@@ -123,6 +128,12 @@ fn run_job(
     let name = world.name();
     let units = level.level as f32 * CELL_UNITS;
     let [diffuse_ref, normal_ref] = layout::nif_texture_paths(name, id)?;
+    let samples = raster.block_samples(bx, by).unwrap_or_default();
+    let water = if water {
+        water_mesh(world, &samples, level.level, job.cell)
+    } else {
+        None
+    };
     let nif = terrain_block(&TerrainBlock {
         origin: (
             job.cell.0 as f32 * CELL_UNITS,
@@ -132,9 +143,13 @@ fn run_job(
         vertices: &mesh.vertices,
         indices: &mesh.indices,
         textures: [&diffuse_ref, &normal_ref],
+        water: water.as_ref().map(|w| WaterShape {
+            vertices: &w.vertices,
+            indices: &w.indices,
+            segments: w.segments,
+        }),
     })?
     .write()?;
-    let samples = raster.block_samples(bx, by).unwrap_or_default();
     let span = (level.level as usize) * 32 + 1;
     let normals = dds(&normal_image(&samples, span, units, level.normal_size))?;
     let diffuse = dds(&diffuse_image(world, id, level.diffuse_size, tiles))?;
@@ -197,7 +212,7 @@ pub fn generate_terrain(
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         let Some(job) = jobs.get(i) else { break };
-                        let result = run_job(world, &raster, job, out, tiles);
+                        let result = run_job(world, &raster, job, out, tiles, options.water);
                         if let Some(report) = options.progress {
                             let n = finished.fetch_add(1, Ordering::Relaxed) + 1;
                             report(world.name(), level.level, n as u64, jobs.len() as u64);
@@ -290,6 +305,31 @@ mod tests {
     }
 
     #[test]
+    fn a_cell_with_ground_below_its_water_gets_a_water_plane_unless_turned_off() {
+        let mut w = world();
+        w.set_cell_water(0, 0, true, Some(150.0));
+        for (water, blocks) in [(true, 10), (false, 8)] {
+            let out = temp(&format!("water-{water}"));
+            generate_terrain(
+                &w,
+                &TerrainSettings::default(),
+                &out,
+                &Options {
+                    water,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            let nif =
+                std::fs::read(out.join("meshes/landscape/lod/mojave/mojave.level4.x0.y0.nif"))
+                    .unwrap();
+            assert_eq!(NifFile::read(&nif).unwrap().blocks.len(), blocks);
+            let v = crate::verify_folder(&out);
+            assert!(v.errors.is_empty(), "{:?}", v.errors);
+        }
+    }
+
+    #[test]
     fn the_thread_count_does_not_change_a_single_byte() {
         let (one, four) = (temp("t1"), temp("t4"));
         let a = generate_terrain(
@@ -300,6 +340,7 @@ mod tests {
                 threads: 1,
                 land: None,
                 progress: None,
+                water: true,
             },
         )
         .unwrap();
@@ -311,6 +352,7 @@ mod tests {
                 threads: 4,
                 land: None,
                 progress: None,
+                water: true,
             },
         )
         .unwrap();

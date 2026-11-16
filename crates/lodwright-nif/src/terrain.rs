@@ -49,6 +49,21 @@ pub struct TerrainBlock<'a> {
     pub indices: &'a [u16],
     /// The diffuse and the normal map path written into the texture set.
     pub textures: [&'a str; 2],
+    /// A water plane written as a second shape, when the block has one.
+    pub water: Option<WaterShape<'a>>,
+}
+
+/// The water plane of a terrain block (`game-lod-water-shape`): a shape without properties whose data has
+/// positions only, relative to the block origin like the terrain's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaterShape<'a> {
+    /// Positions relative to the block origin.
+    pub vertices: &'a [[f32; 3]],
+    /// Triangle corner indices, three per triangle.
+    pub indices: &'a [u16],
+    /// For a level 4 block, the triangle count of each of its 16 cells in the order x * 4 + y (the triangles
+    /// must come in that order); the shape is then a `BSSegmentedTriShape`. `None` writes a plain `NiTriShape`.
+    pub segments: Option<[u32; 16]>,
 }
 
 pub(crate) fn put_f32(out: &mut Vec<u8>, v: f32) {
@@ -59,7 +74,7 @@ pub(crate) fn put_u32(out: &mut Vec<u8>, v: u32) {
     out.extend_from_slice(&v.to_le_bytes());
 }
 
-pub(crate) fn root_node(origin: (f32, f32), shape: u32, multibound: u32) -> Vec<u8> {
+pub(crate) fn root_node(origin: (f32, f32), children: &[u32], multibound: u32) -> Vec<u8> {
     // source: game-lod-terrain-block-nif
     let mut b = Vec::with_capacity(92);
     put_u32(&mut b, u32::MAX); // name
@@ -74,8 +89,10 @@ pub(crate) fn root_node(origin: (f32, f32), shape: u32, multibound: u32) -> Vec<
     }
     put_u32(&mut b, 0); // properties
     put_u32(&mut b, u32::MAX); // collision
-    put_u32(&mut b, 1); // children
-    put_u32(&mut b, shape); // the shape
+    put_u32(&mut b, u32::try_from(children.len()).unwrap_or(0)); // children
+    for c in children {
+        put_u32(&mut b, *c); // the shapes
+    }
     put_u32(&mut b, 0); // effects
     put_u32(&mut b, multibound); // the multibound
     b
@@ -161,11 +178,119 @@ pub(crate) fn file_header(types: &[&[u8]]) -> Header {
     }
 }
 
+const SEGMENTED: &[u8] = b"BSSegmentedTriShape";
+
+/// The water shape's segment table (if any) and data block.
+fn water_blocks(water: &WaterShape<'_>) -> Result<(Option<[u32; 16]>, NiTriShapeData)> {
+    let verts = water.vertices;
+    if verts.is_empty() || water.indices.is_empty() || !water.indices.len().is_multiple_of(3) {
+        return Err(NifError::Inconsistent("a water plane needs triangles"));
+    }
+    if water.indices.iter().any(|i| usize::from(*i) >= verts.len()) {
+        return Err(NifError::Inconsistent(
+            "a water triangle index is out of range",
+        ));
+    }
+    let triangles = u16::try_from(water.indices.len() / 3)
+        .map_err(|_| NifError::Inconsistent("too many water triangles"))?;
+    if let Some(segments) = water.segments
+        && segments.iter().sum::<u32>() != u32::from(triangles)
+    {
+        return Err(NifError::Inconsistent(
+            "the water segments do not add up to the triangle count",
+        ));
+    }
+    let (mut low, mut high) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
+    for v in verts {
+        for k in 0..3 {
+            low[k] = low[k].min(v[k]);
+            high[k] = high[k].max(v[k]);
+        }
+    }
+    let center = [0, 1, 2].map(|k| f32::midpoint(low[k], high[k]));
+    let radius = verts
+        .iter()
+        .map(|v| {
+            ((v[0] - center[0]).powi(2) + (v[1] - center[1]).powi(2) + (v[2] - center[2]).powi(2))
+                .sqrt()
+        })
+        .fold(0.0_f32, f32::max);
+    let data = NiTriShapeData {
+        geometry: GeometryData {
+            group_id: 0,
+            num_vertices: u16::try_from(verts.len())
+                .map_err(|_| NifError::Inconsistent("too many water vertices"))?,
+            keep_flags: 0,
+            compress_flags: 0,
+            vertices: Some(verts.to_vec()),
+            vector_flags: 0,
+            material_crc: 0,
+            normals: None,
+            tangents: None,
+            center,
+            radius,
+            vertex_colors: None,
+            uv_sets: Vec::new(),
+            consistency: 0,
+            additional_data: -1,
+        },
+        num_triangles: triangles,
+        num_triangle_points: u32::from(triangles) * 3,
+        triangles: Some(water.indices.as_chunks::<3>().0.to_vec()),
+        match_groups: Vec::new(),
+    };
+    Ok((water.segments, data))
+}
+
+/// A `BSSegmentedTriShape`: the shape, then 16 segments of a flag byte, the first triangle point and the triangle
+/// count; an empty segment starts at 0 as in the measured blocks.
+fn segmented(shape: &NiTriShape, segments: &[u32; 16]) -> Result<Vec<u8>> {
+    // source: game-lod-water-shape
+    let mut b = Body::TriShape(shape.clone()).write(crate::block::Profile {
+        user_version: 11,
+        user_version2: 34,
+    })?;
+    put_u32(&mut b, 16);
+    let mut start = 0_u32;
+    for n in segments {
+        b.push(0);
+        put_u32(&mut b, if *n == 0 { 0 } else { start * 3 });
+        put_u32(&mut b, *n);
+        start += n;
+    }
+    Ok(b)
+}
+
+/// Append the water shape and its data (blocks 6 and 7), adding the segmented shape type when it is one.
+fn push_water(
+    blocks: &mut Vec<(u16, Body)>,
+    types: &mut Vec<&[u8]>,
+    origin: (f32, f32),
+    (water_shape, water_data): (Option<[u32; 16]>, NiTriShapeData),
+) -> Result<()> {
+    // source: game-lod-water-shape
+    let mut shape = tri_shape();
+    shape.av.translation = [origin.0, origin.1, 0.0];
+    shape.av.properties = Vec::new();
+    shape.data = 7;
+    let shape = match water_shape {
+        Some(segments) => {
+            types.insert(6, SEGMENTED);
+            (6, Body::Opaque(segmented(&shape, &segments)?))
+        }
+        None => (1, Body::TriShape(shape)),
+    };
+    blocks.push(shape);
+    blocks.push((4, Body::TriShapeData(water_data)));
+    Ok(())
+}
+
 /// Build the NIF of one terrain block.
 ///
 /// # Errors
 /// [`NifError::Inconsistent`] when the mesh has no vertices, more than 65535 vertices or triangles, an index out
-/// of range, or an index count that is not a multiple of three.
+/// of range, or an index count that is not a multiple of three, and the same for the water plane, whose
+/// segments must add up to its triangle count.
 pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
     let verts = block.vertices;
     if verts.is_empty() || block.indices.is_empty() || !block.indices.len().is_multiple_of(3) {
@@ -232,18 +357,32 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
     ] {
         put_f32(&mut aabb, v);
     }
-    let blocks = vec![
-        (0, Body::Opaque(root_node(block.origin, 1, 6))),
+    let water = block.water.as_ref().map(water_blocks).transpose()?;
+    let (children, multibound): (&[u32], u32) = if water.is_some() {
+        (&[1, 6], 8)
+    } else {
+        (&[1], 6)
+    };
+    let mut blocks = vec![
+        (
+            0,
+            Body::Opaque(root_node(block.origin, children, multibound)),
+        ),
         (1, Body::TriShape(shape)),
         (2, Body::Opaque(lighting)),
         (3, Body::Opaque(texture_set(block.textures))),
         (4, Body::TriShapeData(data)),
         (5, Body::Opaque(additional_data(&heights)?)),
-        (6, Body::Opaque(7_u32.to_le_bytes().to_vec())),
-        (7, Body::Opaque(aabb)),
     ];
+    let mut types: Vec<&[u8]> = TYPES.to_vec();
+    if let Some(water) = water {
+        push_water(&mut blocks, &mut types, block.origin, water)?;
+    }
+    let tail = u16::try_from(types.len() - 2).unwrap_or(0);
+    blocks.push((tail, Body::Opaque(7_u32.to_le_bytes().to_vec())));
+    blocks.push((tail + 1, Body::Opaque(aabb)));
     Ok(NifFile {
-        header: file_header(&TYPES),
+        header: file_header(&types),
         blocks: blocks
             .into_iter()
             .map(|(type_index, body)| Block { type_index, body })
@@ -276,6 +415,7 @@ mod tests {
             vertices: v,
             indices: i,
             textures: ["Data\\a.dds", "Data\\b.dds"],
+            water: None,
         }
     }
 
@@ -327,6 +467,50 @@ mod tests {
         };
         assert_eq!(b.len(), 92);
         assert_eq!(&b[16..20], &(-16384.0_f32).to_le_bytes());
+    }
+
+    #[test]
+    fn a_water_plane_adds_a_shape_and_its_data_and_reads_back() {
+        let (v, i) = quad([0.0; 4]);
+        let water_v = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
+        let mut segments = [0; 16];
+        segments[1] = 1;
+        for (segments, shape_type) in [
+            (Some(segments), &b"BSSegmentedTriShape"[..]),
+            (None, b"NiTriShape"),
+        ] {
+            let mut plain = block(&v, &i);
+            plain.water = Some(super::WaterShape {
+                vertices: &water_v,
+                indices: &[0, 1, 2],
+                segments,
+            });
+            let bytes = terrain_block(&plain).unwrap().write().unwrap();
+            let back = NifFile::read(&bytes).unwrap();
+            assert_eq!(back.blocks.len(), 10);
+            assert_eq!(back.write().unwrap(), bytes);
+            let kind = &back.header.block_types[usize::from(back.blocks[6].type_index)];
+            assert_eq!(kind.as_slice(), shape_type);
+            let crate::Body::TriShapeData(data) = &back.blocks[7].body else {
+                panic!("block 7 is the water data");
+            };
+            assert_eq!(data.geometry.vertices.as_deref(), Some(&water_v[..]));
+            assert!(data.geometry.uv_sets.is_empty() && data.geometry.additional_data == -1);
+            assert_eq!(data.geometry.center, [64.0, 64.0, 5.0]);
+            let crate::Body::Opaque(root) = &back.blocks[0].body else {
+                panic!("opaque root");
+            };
+            // two children, then the multibound at 8
+            assert_eq!(&root[76..80], &2_u32.to_le_bytes());
+            assert_eq!(&root[92..96], &8_u32.to_le_bytes());
+        }
+        let mut plain = block(&v, &i);
+        plain.water = Some(super::WaterShape {
+            vertices: &water_v,
+            indices: &[0, 1, 2],
+            segments: Some([0; 16]),
+        });
+        assert!(terrain_block(&plain).is_err());
     }
 
     #[test]

@@ -44,4 +44,31 @@ meshes\landscape\lod\<world>\blocks\<name>.nif
 - Whether terrain and object blocks of level 4 share one name and one file (see object-lod.md). M4.
 - Vertex cap (design.md uses 32767 for 16-bit indices): a NIF constraint of the engine's loader is not documented
   publicly; treat 65535 as the format limit and 32767 as the plan's choice until measured.
-- Water LOD and border handling: not documented in a public source read here.
+- Water LOD and border handling: not documented in a public source read here; see section 6 for what was measured.
+
+## 6. Water planes
+
+Measured on the game's own blocks of the main world (`game-lod-water-shape`, `game-lod-water-height`): a block with
+ground below water carries a second shape after the terrain, without properties, whose data has positions only
+(no UVs, normals or colours). It is a `BSSegmentedTriShape` at level 4, with one segment per cell in the order
+x * 4 + y, and a plain `NiTriShape` at the higher levels. Its translation repeats the block origin. The heights are
+the cells' water heights; an `XCLW` of the largest float means the world's default water height.
+
+The outline the game uses is not established: its planes have sloped edges down to about -14,100 units and inset
+outlines. lodwright writes its own design (`crates/lodwright-gen/src/water.rs`): flat rectangles at each cell's
+water height over the squares (128 units at level 4, doubling per level) whose mean ground height lies below it.
+Against the game's planes, sampled every 128 units at level 4 (every 256, 512 and 1024 units above), the covered
+ground overlaps by these intersection-over-union shares, with the same height wherever both have water:
+
+| level | blocks with water (game, ours) | overlap |
+| --- | --- | --- |
+| 4 | 97, 97 | 0.986 |
+| 8 | 39, 38 | 0.978 |
+| 16 | 18, 18 | 0.913 |
+| 32 | 8, 8 | 0.905 |
+
+`verify --reference` counts a plane as equal when it covers half to twice the reference's area. Outside that band in
+the main world: 16 small ponds where our plane covers 2 to 5 times the game's inset outline, three blocks where the
+game draws water from a neighbouring cell's height and we draw none, and one block where the game has none. 25
+blocks differ in block types because the game adds a second, empty segmented shape of one vertex.
+`--no-water` (request `terrain.water: false`) leaves the planes out.

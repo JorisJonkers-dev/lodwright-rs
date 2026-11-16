@@ -32,7 +32,8 @@ Usage: lodwright [--help | --version [--json]]
        lodwright doctor <data-folder>
        lodwright plan --data <data-folder> (--plugin NAME ... | --load-order FILE) [--world NAME]
                       [--format text|json | --json] [--schema-version N] [--blocks]
-       lodwright generate [--data <data-folder> --plugin NAME ...] [--json] [--schema-version N]
+       lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
+                      [--world NAME] [--threads N] [--json] [--schema-version N]
        lodwright schema <plan|result> [--schema-version N]
        lodwright contracts --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
@@ -43,7 +44,9 @@ Commands:
   doctor <data-folder>  check that the folder exists; prints nothing taken from it
   plan                  read the plugins (in load order, masters first) and print the terrain LOD plan:
                         blocks per level, vertex and triangle counts, errors, output paths
-  generate              not built yet: prints a result document (status unsupported, exit 3), writes nothing
+  generate              write the terrain LOD (block meshes, textures, settings file) of the chosen worlds into
+                        --out, which must not be inside the data folder; prints a result document. Without
+                        data, plugins and --out it answers `unsupported` (exit 3) and writes nothing
   schema                print the JSON Schema of a document (plan or result)
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}

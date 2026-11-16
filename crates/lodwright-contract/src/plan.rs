@@ -24,7 +24,7 @@ impl ToolInfo {
     }
 }
 
-/// What `generate` can do today. All false until a writer exists.
+/// What `generate` can do today.
 #[allow(clippy::struct_excessive_bools)] // one flag per capability is the contract
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Capabilities {
@@ -41,6 +41,18 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
+    /// This build: terrain meshes, terrain textures and the settings file are written; object and tree LOD are not.
+    #[must_use]
+    pub fn terrain() -> Self {
+        Self {
+            terrain_mesh: true,
+            terrain_texture: true,
+            settings: true,
+            object_lod: false,
+            tree_lod: false,
+        }
+    }
+
     /// The names of the capabilities that are false, in a fixed order.
     #[must_use]
     pub fn missing(&self) -> Vec<String> {

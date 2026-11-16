@@ -1,0 +1,21 @@
+[package]
+name = "lodwright-gen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Library entry point of lodwright: generates the LOD files of a worldspace into an output folder."
+
+[dependencies]
+lodwright-core = { workspace = true }
+lodwright-contract = { workspace = true }
+lodwright-dds = { workspace = true }
+lodwright-nif = { workspace = true }
+
+[dev-dependencies]
+lodwright-testkit = { workspace = true }
+
+[lints]
+workspace = true

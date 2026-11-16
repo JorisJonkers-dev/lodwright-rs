@@ -63,7 +63,7 @@ fn json_is_an_alias_of_format_json_and_the_document_passes_the_plan_check() {
     assert_eq!(check_plan(&doc), Ok(()));
     assert_eq!(doc["tool"]["name"], "lodwright");
     assert_eq!(doc["contract"], "lodwright-plan");
-    assert_eq!(doc["capabilities"]["terrain_mesh"], false);
+    assert_eq!(doc["capabilities"]["terrain_mesh"], true);
     assert!(
         doc["arguments_digest"]
             .as_str()
@@ -171,10 +171,14 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
 }
 
 #[test]
-fn generate_is_unsupported_names_the_capabilities_and_writes_nothing() {
+fn generate_writes_the_terrain_files_and_reports_counts_per_kind() {
     let dir = data_folder("generate");
-    let output = data_folder("generate-out");
-    let before = (listing(&dir), listing(&output));
+    let output = std::env::temp_dir().join(format!(
+        "lodwright-contract-{}-generate-out",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&output);
+    let before = listing(&dir);
     let (code, out, err) = go(&[
         "generate",
         "--data",
@@ -185,25 +189,41 @@ fn generate_is_unsupported_names_the_capabilities_and_writes_nothing() {
         output.to_str().unwrap(),
         "--json",
     ]);
-    assert_eq!((code, err.as_str()), (EXIT_UNSUPPORTED, ""));
+    assert_eq!((code, err.as_str()), (0, ""));
     let doc = json(&out);
     assert_eq!(check_result(&doc), Ok(()));
-    assert_eq!(doc["status"], "unsupported");
-    assert_eq!(doc["contract"], "lodwright-result");
-    assert_eq!(doc["code"], "capability_missing");
-    assert_eq!(
-        doc["missing_capabilities"],
-        serde_json::json!([
-            "terrain_mesh",
-            "terrain_texture",
-            "settings",
-            "object_lod",
-            "tree_lod"
-        ])
-    );
+    assert_eq!(doc["status"], "ok");
     assert!(doc["inputs_digest"].as_str().is_some());
-    assert!(doc["arguments_digest"].as_str().is_some());
-    assert_eq!((listing(&dir), listing(&output)), before);
+    let written = doc["written"].as_array().unwrap();
+    let kinds: Vec<&str> = written
+        .iter()
+        .map(|w| w["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["terrain_mesh", "terrain_texture", "settings"]);
+    assert_eq!(written[0]["files"], 4);
+    assert_eq!(written[1]["files"], 8);
+    assert_eq!(written[2]["files"], 1);
+    assert!(output.join("lodsettings/island.dlodsettings").is_file());
+    assert_eq!(listing(&dir), before, "the data folder is untouched");
+}
+
+#[test]
+fn generate_refuses_an_output_folder_inside_the_data_folder() {
+    let dir = data_folder("generate-inside");
+    let inside = dir.join("lod-out");
+    let (code, out, _) = go(&[
+        "generate",
+        "--data",
+        dir.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--out",
+        inside.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 1);
+    assert_eq!(json(&out)["code"], "output_in_data");
+    assert!(!inside.exists());
 }
 
 #[test]

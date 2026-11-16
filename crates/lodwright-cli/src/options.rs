@@ -35,6 +35,8 @@ pub struct Options {
     pub out: Option<PathBuf>,
     /// `heightmap`: allow writing inside a git working tree.
     pub allow_in_repo: bool,
+    /// `generate`: worker threads; 0 chooses from the machine (at most 4).
+    pub threads: usize,
 }
 
 /// Parse `args` (after the command name). `--data` is required when `require_data` is set.
@@ -52,6 +54,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         level: 32,
         out: None,
         allow_in_repo: false,
+        threads: 0,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -92,6 +95,16 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
                 options.level = text.parse::<u32>().ok().filter(|n| *n > 0).ok_or_else(|| {
                     format!("--level must be a positive whole number, got {text:?}")
                 })?;
+            }
+            "--threads" => {
+                let text = value("--threads")?;
+                options.threads =
+                    text.parse::<usize>()
+                        .ok()
+                        .filter(|n| *n > 0)
+                        .ok_or_else(|| {
+                            format!("--threads must be a positive whole number, got {text:?}")
+                        })?;
             }
             "--out" => options.out = Some(PathBuf::from(value("--out")?)),
             "--blocks" => options.blocks = true,

@@ -45,9 +45,9 @@
           "vertices": 4,
           "triangles": 2,
           "max_error": 0.0,
-          "mesh": "meshes/landscape/lod/Island/blocks/Island.4.0.0.btr",
-          "diffuse": "textures/landscape/lod/Island/diffuse/Island.4.0.0.dds",
-          "normal": "textures/landscape/lod/Island/normals/Island.4.0.0_n.dds",
+          "mesh": "meshes/landscape/lod/island/island.level4.x0.y0.nif",
+          "diffuse": "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds",
+          "normal": "textures/landscape/lod/island/normals/island.n.level4.x0.y0.dds",
           "texture_size": [
             512,
             512

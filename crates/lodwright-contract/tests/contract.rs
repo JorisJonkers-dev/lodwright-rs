@@ -30,9 +30,9 @@ fn sample_plan(with_blocks: bool) -> Plan {
         vertices: 4,
         triangles: 2,
         max_error: 0.0,
-        mesh: "meshes/landscape/lod/Island/blocks/Island.4.0.0.btr".into(),
-        diffuse: "textures/landscape/lod/Island/diffuse/Island.4.0.0.dds".into(),
-        normal: "textures/landscape/lod/Island/normals/Island.4.0.0_n.dds".into(),
+        mesh: "meshes/landscape/lod/island/island.level4.x0.y0.nif".into(),
+        diffuse: "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds".into(),
+        normal: "textures/landscape/lod/island/normals/island.n.level4.x0.y0.dds".into(),
         texture_size: [512, 512],
         mips: 10,
     };

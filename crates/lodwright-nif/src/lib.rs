@@ -15,6 +15,7 @@ mod block;
 mod error;
 mod file;
 mod io;
+mod terrain;
 
 pub use block::{
     AvObject, Body, GeometryData, NiAlphaProperty, NiMaterialProperty, NiNode, NiTriShape,
@@ -22,3 +23,4 @@ pub use block::{
 };
 pub use error::{NifError, Result};
 pub use file::{Block, ExportInfo, Header, NifFile};
+pub use terrain::{TerrainBlock, terrain_block};

@@ -28,7 +28,7 @@ impl ToolInfo {
 #[allow(clippy::struct_excessive_bools)] // one flag per capability is the contract
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Capabilities {
-    /// Writes terrain meshes (`.btr`).
+    /// Writes terrain meshes (`.nif`).
     pub terrain_mesh: bool,
     /// Writes terrain textures.
     pub terrain_texture: bool,

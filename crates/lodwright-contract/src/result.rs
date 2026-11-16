@@ -65,6 +65,9 @@ pub struct ResultDoc {
     /// What was written.
     #[serde(default)]
     pub written: Vec<Written>,
+    /// Things that did not go in and why, at most twenty lines (a missing texture, a model without LOD).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
     /// Relative name of the manifest, when one was written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifest: Option<String>,
@@ -86,6 +89,7 @@ impl ResultDoc {
             peak_memory_mib: None,
             missing_capabilities: Vec::new(),
             written: Vec::new(),
+            warnings: Vec::new(),
             manifest: None,
         }
     }

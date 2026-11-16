@@ -7,6 +7,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
     clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
     clippy::many_single_char_names,
     clippy::too_many_lines,
     clippy::type_complexity,
@@ -15,6 +16,7 @@
 
 mod assets;
 mod atlas;
+mod diffuse;
 mod error;
 mod images;
 mod lodmodel;
@@ -24,6 +26,7 @@ mod verify;
 
 pub use assets::{Assets, FolderAssets};
 pub use atlas::{Atlas, Rect, pack};
+pub use diffuse::{LandTiles, Tile, blend};
 pub use error::GenError;
 pub use images::{diffuse_image, normal_image};
 pub use lodmodel::{Part, parse_lod_model};

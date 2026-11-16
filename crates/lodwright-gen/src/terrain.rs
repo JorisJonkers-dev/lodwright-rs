@@ -17,21 +17,27 @@ use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
 use lodwright_nif::{TerrainBlock, terrain_block};
 
+use crate::diffuse::LandTiles;
 use crate::error::GenError;
 use crate::images::{diffuse_image, normal_image};
 
 const CELL_UNITS: f32 = 4096.0;
 
 /// How to run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Options {
+#[derive(Debug, Clone, Copy)]
+pub struct Options<'a> {
     /// Worker threads (at least 1).
     pub threads: usize,
+    /// Land textures for the diffuse maps; `None` leaves the ground to vertex colours.
+    pub land: Option<&'a LandTiles>,
 }
 
-impl Default for Options {
+impl Default for Options<'_> {
     fn default() -> Self {
-        Self { threads: 1 }
+        Self {
+            threads: 1,
+            land: None,
+        }
     }
 }
 
@@ -97,6 +103,7 @@ fn run_job(
     raster: &HeightRaster,
     job: &Job,
     out: &Path,
+    tiles: &LandTiles,
 ) -> Result<Vec<FileRecord>, GenError> {
     let level = &job.level;
     let grid = raster.grid();
@@ -126,7 +133,7 @@ fn run_job(
     let samples = raster.block_samples(bx, by).unwrap_or_default();
     let span = (level.level as usize) * 32 + 1;
     let normals = dds(&normal_image(&samples, span, units, level.normal_size))?;
-    let diffuse = dds(&diffuse_image(world, id, level.diffuse_size))?;
+    let diffuse = dds(&diffuse_image(world, id, level.diffuse_size, tiles))?;
     Ok(vec![
         write_file(out, &layout::mesh_path(name, id)?, &nif)?,
         write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?,
@@ -166,6 +173,8 @@ pub fn generate_terrain(
 ) -> Result<Report, GenError> {
     layout::check_world_name(world.name())?;
     let world = &world.without_outliers();
+    let no_tiles = LandTiles::empty();
+    let tiles = options.land.unwrap_or(&no_tiles);
     let mut files = Vec::new();
     let mut highest = 0;
     for level in &settings.levels {
@@ -183,7 +192,7 @@ pub fn generate_terrain(
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         let Some(job) = jobs.get(i) else { break };
-                        let result = run_job(world, &raster, job, out);
+                        let result = run_job(world, &raster, job, out, tiles);
                         let failed = result.is_err();
                         if let Ok(mut done) = done.lock() {
                             done.push(result);
@@ -278,14 +287,20 @@ mod tests {
             &world(),
             &TerrainSettings::default(),
             &one,
-            &Options { threads: 1 },
+            &Options {
+                threads: 1,
+                land: None,
+            },
         )
         .unwrap();
         let b = generate_terrain(
             &world(),
             &TerrainSettings::default(),
             &four,
-            &Options { threads: 4 },
+            &Options {
+                threads: 4,
+                land: None,
+            },
         )
         .unwrap();
         assert_eq!(a, b);

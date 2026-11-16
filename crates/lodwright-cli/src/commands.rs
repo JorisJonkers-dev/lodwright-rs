@@ -343,11 +343,22 @@ fn refuse_output(options: &Options, out: &Path) -> Result<(), Failure> {
     Ok(())
 }
 
+/// Add warnings to the document, keeping at most twenty lines in all.
+fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
+    for w in warnings {
+        if doc.warnings.len() < 20 {
+            doc.warnings.push(w);
+        } else if doc.warnings.len() == 20 {
+            doc.warnings.push("more warnings were left out".to_owned());
+        }
+    }
+}
+
 fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultDoc, Failure> {
     refuse_output(options, out)?;
     let read = lodwright_core::plugin::ReadOptions {
         objects: !options.terrain_only,
-        ..lodwright_core::plugin::ReadOptions::default()
+        land_layers: !options.no_land_textures,
     };
     let loaded = load_plugins_with(&options.data, &options.plugins, read)?;
     let worlds = Worldspace::from_load_order(&loaded.plugins)
@@ -360,7 +371,7 @@ fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultD
     };
     let mut doc = ResultDoc::new(version, Status::Ok, "generated", "terrain LOD written");
     doc.inputs_digest = Some(loaded.inputs_digest);
-    let assets = if options.terrain_only {
+    let assets = if options.terrain_only && options.no_land_textures {
         None
     } else {
         Some(
@@ -368,12 +379,25 @@ fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultD
                 .map_err(|e| Failure::new("assets_unreadable", e))?,
         )
     };
+    let resolver = lodwright_core::texture::TextureResolver::from_load_order(&loaded.plugins)
+        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
     for world in chosen {
+        let mut warnings = Vec::new();
+        let tiles = match (&assets, options.no_land_textures) {
+            (Some(assets), false) => {
+                lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
+            }
+            _ => lodwright_gen::LandTiles::empty(),
+        };
+        add_warnings(&mut doc, warnings);
         let report = lodwright_gen::generate_terrain(
             world,
             &TerrainSettings::default(),
             out,
-            &lodwright_gen::Options { threads },
+            &lodwright_gen::Options {
+                threads,
+                land: Some(&tiles),
+            },
         )
         .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
         for (kind, suffix) in [
@@ -393,12 +417,13 @@ fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultD
                 bytes: files.iter().map(|f| f.bytes).sum(),
             });
         }
-        if let Some(assets) = &assets {
+        if let (Some(assets), false) = (&assets, options.terrain_only) {
             let instances =
                 lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
                     .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
             let objects = lodwright_gen::generate_objects(world.name(), &instances, assets, out)
                 .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
+            add_warnings(&mut doc, objects.warnings.clone());
             if !objects.files.is_empty() {
                 doc.written.push(Written {
                     world: world.name().to_owned(),

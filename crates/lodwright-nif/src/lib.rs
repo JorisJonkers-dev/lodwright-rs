@@ -15,12 +15,14 @@ mod block;
 mod error;
 mod file;
 mod io;
+mod object;
 mod terrain;
 
 pub use block::{
     AvObject, Body, GeometryData, NiAlphaProperty, NiMaterialProperty, NiNode, NiTriShape,
-    NiTriShapeData, NiZBufferProperty, ObjectNet, Profile, Vec3, names,
+    NiTriShapeData, NiTriStripsData, NiZBufferProperty, ObjectNet, Profile, Vec3, names,
 };
 pub use error::{NifError, Result};
 pub use file::{Block, ExportInfo, Header, NifFile};
+pub use object::{ObjectBlock, SEGMENTS, object_block};
 pub use terrain::{TerrainBlock, terrain_block};

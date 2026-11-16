@@ -95,7 +95,7 @@
       "type": "object",
       "properties": {
         "object_lod": {
-          "description": "Writes object LOD (`.bto`).",
+          "description": "Writes object LOD (`.nif` blocks and the atlas).",
           "type": "boolean"
         },
         "settings": {

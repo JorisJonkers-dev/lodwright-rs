@@ -16,6 +16,7 @@ pub mod land;
 pub mod layers;
 pub mod layout;
 pub mod lod;
+pub mod objects;
 pub mod plugin;
 pub mod probe;
 pub mod raster;

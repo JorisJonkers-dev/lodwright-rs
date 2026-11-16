@@ -590,7 +590,10 @@ mod tests {
     fn layers_come_back_with_absolute_texture_ids_and_the_last_plugin_wins_whole() {
         use crate::plugin::{ReadOptions, read_with};
         use lodwright_testkit::land::{encode_atxt, encode_btxt, encode_vtxt};
-        let options = ReadOptions { land_layers: true };
+        let options = ReadOptions {
+            land_layers: true,
+            ..ReadOptions::default()
+        };
         let base = SyntheticWorld::new(0x0000_0A00, "Mojave").cell_with_subrecords(
             0,
             0,

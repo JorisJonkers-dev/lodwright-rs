@@ -326,3 +326,25 @@ the main worldspace).
 number ranges only; the file was removed afterwards). Settles part of M6: block structure and atlas reference. Open:
 the segment table meaning, the atlas packing rule and UV scale, which references and which `_lod` models enter a
 block (692 `_lod` models exist in the base archive), tree LOD files (M7).
+
+## 2026-11-16: object records
+
+`fnv-object-records`: flags and subrecords of the records that can appear in object LOD, read in the xEdit FNV
+definitions (MPL-2.0) at the pinned revision. Open: the placement record size inside SCOL parts.
+
+## 2026-11-16: BC2
+
+`bc2-block-layout`: the DXT3 block layout from the Microsoft block compression page, used to read and write DXT3 textures. Not yet verified by a second reader.
+
+## 2026-11-16: object LOD selection, rotation and atlas
+
+`game-object-selection`, `game-object-rotation`, `game-object-atlas`: found by generating blocks from the records and
+comparing with the game's own blocks read-only (numbers only). One block matched in vertex count (1715) and triangle
+count (2071) exactly and in every vertex position once the rotation convention was fixed. Open: the meaning of the
+segment table, the shader flag words, and the in-game behaviour of tiling textures inside an atlas.
+
+## 2026-11-16: object block rules
+
+`game-object-block-rules`: the remaining rules (disabled references, high priority in both files, collections drawn
+with their own model) were found by comparing block by block, which raised the blocks with equal counts from 196 to
+287 of 295.

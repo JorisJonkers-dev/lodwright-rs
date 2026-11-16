@@ -21,6 +21,10 @@ pub mod names {
     pub const TRI_SHAPE: &[u8] = b"NiTriShape";
     /// `NiTriShapeData`.
     pub const TRI_SHAPE_DATA: &[u8] = b"NiTriShapeData";
+    /// `NiTriStrips`.
+    pub const TRI_STRIPS: &[u8] = b"NiTriStrips";
+    /// `NiTriStripsData`.
+    pub const TRI_STRIPS_DATA: &[u8] = b"NiTriStripsData";
     /// `NiAlphaProperty`.
     pub const ALPHA_PROPERTY: &[u8] = b"NiAlphaProperty";
     /// `NiMaterialProperty`.
@@ -155,6 +159,39 @@ pub struct NiTriShapeData {
     pub match_groups: Vec<Vec<u16>>,
 }
 
+/// `NiTriStripsData`: geometry with triangle strips.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NiTriStripsData {
+    /// The geometry data part.
+    pub geometry: GeometryData,
+    /// Triangle count as stored.
+    pub num_triangles: u16,
+    /// The strips, when the has-points byte is non-zero.
+    pub strips: Option<Vec<Vec<u16>>>,
+}
+
+impl NiTriStripsData {
+    /// The strips as a triangle list: each strip alternates its winding, and degenerate triangles (a repeated
+    /// index, as strips use to join) are dropped.
+    #[must_use]
+    pub fn to_triangles(&self) -> Vec<[u16; 3]> {
+        let mut out = Vec::new();
+        for strip in self.strips.iter().flatten() {
+            for (i, w) in strip.windows(3).enumerate() {
+                if w[0] == w[1] || w[1] == w[2] || w[0] == w[2] {
+                    continue;
+                }
+                out.push(if i % 2 == 0 {
+                    [w[0], w[1], w[2]]
+                } else {
+                    [w[1], w[0], w[2]]
+                });
+            }
+        }
+        out
+    }
+}
+
 /// `NiAlphaProperty`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NiAlphaProperty {
@@ -203,6 +240,10 @@ pub enum Body {
     Node(NiNode),
     /// A `NiTriShape`.
     TriShape(NiTriShape),
+    /// A `NiTriStrips` (the same fields as a shape).
+    TriStrips(NiTriShape),
+    /// A `NiTriStripsData`.
+    TriStripsData(NiTriStripsData),
     /// A `NiTriShapeData`.
     TriShapeData(NiTriShapeData),
     /// A `NiAlphaProperty`.
@@ -222,6 +263,8 @@ impl Body {
         match self {
             Self::Node(_) => Some(names::NODE),
             Self::TriShape(_) => Some(names::TRI_SHAPE),
+            Self::TriStrips(_) => Some(names::TRI_STRIPS),
+            Self::TriStripsData(_) => Some(names::TRI_STRIPS_DATA),
             Self::TriShapeData(_) => Some(names::TRI_SHAPE_DATA),
             Self::AlphaProperty(_) => Some(names::ALPHA_PROPERTY),
             Self::MaterialProperty(_) => Some(names::MATERIAL_PROPERTY),
@@ -242,6 +285,10 @@ impl Body {
             Self::Node(read_node(&mut r, profile)?)
         } else if name == names::TRI_SHAPE && geometry_ok {
             Self::TriShape(read_tri_shape(&mut r, profile)?)
+        } else if name == names::TRI_STRIPS && geometry_ok {
+            Self::TriStrips(read_tri_shape(&mut r, profile)?)
+        } else if name == names::TRI_STRIPS_DATA && geometry_ok {
+            Self::TriStripsData(read_tri_strips_data(&mut r, profile)?)
         } else if name == names::TRI_SHAPE_DATA && geometry_ok {
             Self::TriShapeData(read_tri_shape_data(&mut r, profile)?)
         } else if name == names::ALPHA_PROPERTY {
@@ -271,7 +318,8 @@ impl Body {
         let mut out = Vec::new();
         match self {
             Self::Node(n) => write_node(&mut out, n, profile)?,
-            Self::TriShape(s) => write_tri_shape(&mut out, s, profile)?,
+            Self::TriShape(s) | Self::TriStrips(s) => write_tri_shape(&mut out, s, profile)?,
+            Self::TriStripsData(d) => write_tri_strips_data(&mut out, d, profile)?,
             Self::TriShapeData(d) => write_tri_shape_data(&mut out, d, profile)?,
             Self::AlphaProperty(p) => {
                 write_net(&mut out, &p.net)?;
@@ -624,6 +672,46 @@ fn write_tri_shape_data(out: &mut Vec<u8>, d: &NiTriShapeData, p: Profile) -> Re
     Ok(())
 }
 
+// source: nif-trishape-strips-data
+fn read_tri_strips_data(r: &mut Reader<'_>, p: Profile) -> Result<NiTriStripsData> {
+    let geometry = read_geometry_data(r, p)?;
+    let num_triangles = r.u16()?;
+    let count = r.count16("strips", 2)?;
+    let lengths = (0..count).map(|_| r.u16()).collect::<Result<Vec<_>>>()?;
+    let strips = if r.u8()? != 0 {
+        let mut strips = Vec::with_capacity(count);
+        for len in lengths {
+            r.check_count("strip points", u32::from(len), 2)?;
+            strips.push((0..len).map(|_| r.u16()).collect::<Result<Vec<_>>>()?);
+        }
+        Some(strips)
+    } else {
+        None
+    };
+    Ok(NiTriStripsData {
+        geometry,
+        num_triangles,
+        strips,
+    })
+}
+
+fn write_tri_strips_data(out: &mut Vec<u8>, d: &NiTriStripsData, p: Profile) -> Result<()> {
+    write_geometry_data(out, &d.geometry, p)?;
+    put_u16(out, d.num_triangles);
+    let strips: &[Vec<u16>] = d.strips.as_deref().unwrap_or(&[]);
+    put_u16(out, len16(strips.len(), "strips")?);
+    for s in strips {
+        put_u16(out, len16(s.len(), "strip points")?);
+    }
+    out.push(u8::from(d.strips.is_some()));
+    for s in strips {
+        for i in s {
+            put_u16(out, *i);
+        }
+    }
+    Ok(())
+}
+
 // source: nif-property-layout
 fn read_material(r: &mut Reader<'_>, p: Profile) -> Result<NiMaterialProperty> {
     let net = read_net(r)?;
@@ -910,5 +998,56 @@ mod tests {
         };
         let (b, used) = Body::parse(names::TRI_SHAPE_DATA, &[1, 2, 3], p).unwrap();
         assert_eq!((b, used), (Body::Opaque(vec![1, 2, 3]), 3));
+    }
+}
+
+#[cfg(test)]
+mod strip_tests {
+    use super::{GeometryData, NiTriStripsData};
+
+    fn data(strips: Option<Vec<Vec<u16>>>) -> NiTriStripsData {
+        NiTriStripsData {
+            geometry: GeometryData {
+                group_id: 0,
+                num_vertices: 5,
+                keep_flags: 0,
+                compress_flags: 0,
+                vertices: Some(vec![[0.0; 3]; 5]),
+                vector_flags: 1,
+                material_crc: 0,
+                normals: None,
+                tangents: None,
+                center: [0.0; 3],
+                radius: 0.0,
+                vertex_colors: None,
+                uv_sets: vec![vec![[0.0; 2]; 5]],
+                consistency: 0,
+                additional_data: -1,
+            },
+            num_triangles: 3,
+            strips,
+        }
+    }
+
+    #[test]
+    fn strips_alternate_winding_and_drop_degenerate_triangles() {
+        let d = data(Some(vec![vec![0, 1, 2, 3, 4], vec![0, 1, 1, 2]]));
+        assert_eq!(d.to_triangles(), [[0, 1, 2], [2, 1, 3], [2, 3, 4]]);
+        assert_eq!(data(None).to_triangles(), Vec::<[u16; 3]>::new());
+    }
+
+    #[test]
+    fn strips_data_round_trips() {
+        let profile = super::Profile {
+            user_version: 11,
+            user_version2: 34,
+        };
+        let d = data(Some(vec![vec![0, 1, 2, 3], vec![1, 2, 3]]));
+        let bytes = super::Body::TriStripsData(d.clone())
+            .write(profile)
+            .unwrap();
+        let (back, used) = super::Body::parse(b"NiTriStripsData", &bytes, profile).unwrap();
+        assert_eq!(used, bytes.len());
+        assert_eq!(back, super::Body::TriStripsData(d));
     }
 }

@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: MPL-2.0
+//! Reading game assets by path: loose files over archives, as the game finds them.
+
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+
+use lodwright_assets::{Archive, ArchiveListing, ConflictRule, Listing, Location, Resolver};
+
+/// Something that can hand over a file by its game path (relative to the data folder).
+pub trait Assets: Sync {
+    /// The bytes of `path` (case-insensitive, either separator), or `None` when no source has it.
+    fn read(&self, path: &str) -> Option<Vec<u8>>;
+}
+
+/// Largest single asset read: a texture or model larger than this is treated as missing.
+const MAX_ASSET: u64 = 256 * 1024 * 1024;
+
+/// The data folder: loose files under `meshes` and `textures`, and the archives next to the plugins.
+pub struct FolderAssets {
+    root: PathBuf,
+    resolver: Resolver,
+    archives: Vec<(PathBuf, Archive)>,
+    loose: HashMap<String, PathBuf>,
+}
+
+impl FolderAssets {
+    /// Index `data`: every `.bsa` in it and every file below its `meshes` and `textures` folders. `plugins` are
+    /// the plugin names in load order (archives load with the plugin that shares their name).
+    ///
+    /// # Errors
+    /// A message when the folder cannot be read.
+    pub fn open(data: &Path, plugins: &[String]) -> Result<Self, String> {
+        let mut listing = Listing::default();
+        let mut archives = Vec::new();
+        let mut names: Vec<_> = std::fs::read_dir(data)
+            .map_err(|e| format!("cannot read the data folder: {e}"))?
+            .flatten()
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x.eq_ignore_ascii_case("bsa"))
+            })
+            .collect();
+        names.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in names {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let Ok(file) = File::open(&path) else {
+                continue;
+            };
+            let Ok(archive) = Archive::open(&mut BufReader::new(file)) else {
+                continue;
+            };
+            let marker = path.with_extension("bsa.override").exists();
+            listing
+                .archives
+                .push(ArchiveListing::from_archive(&name, &archive, marker));
+            archives.push((path, archive));
+        }
+        let mut loose = HashMap::new();
+        for top in ["meshes", "textures"] {
+            let Some(dir) = find_dir(data, top) else {
+                continue;
+            };
+            walk(&dir, &format!("{top}/"), &mut listing.loose, &mut loose);
+        }
+        let resolver = Resolver::new(&listing, plugins, ConflictRule::LaterWins);
+        Ok(Self {
+            root: data.to_path_buf(),
+            resolver,
+            archives,
+            loose,
+        })
+    }
+}
+
+fn find_dir(parent: &Path, name: &str) -> Option<PathBuf> {
+    std::fs::read_dir(parent).ok()?.flatten().find_map(|e| {
+        (e.file_name().to_string_lossy().eq_ignore_ascii_case(name) && e.path().is_dir())
+            .then(|| e.path())
+    })
+}
+
+fn walk(dir: &Path, prefix: &str, listing: &mut Vec<String>, files: &mut HashMap<String, PathBuf>) {
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = read.flatten().collect();
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    for e in entries {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let rel = format!("{prefix}{name}");
+        if e.path().is_dir() {
+            walk(&e.path(), &format!("{rel}/"), listing, files);
+        } else {
+            files.insert(rel.clone(), e.path());
+            listing.push(rel);
+        }
+    }
+}
+
+impl Assets for FolderAssets {
+    fn read(&self, path: &str) -> Option<Vec<u8>> {
+        match self.resolver.resolve(path)? {
+            Location::Loose(listed) => {
+                let file = self.loose.get(listed)?;
+                debug_assert!(file.starts_with(&self.root));
+                if std::fs::metadata(file).ok()?.len() > MAX_ASSET {
+                    return None;
+                }
+                std::fs::read(file).ok()
+            }
+            Location::Archive { archive, path } => {
+                let (file, parsed) = self.archives.get(*archive)?;
+                let entry = parsed.find(path)?;
+                let mut reader = BufReader::new(File::open(file).ok()?);
+                parsed.extract(&mut reader, entry, MAX_ASSET).ok()
+            }
+        }
+    }
+}

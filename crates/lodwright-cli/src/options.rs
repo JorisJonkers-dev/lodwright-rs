@@ -14,6 +14,7 @@ pub enum Format {
 
 /// Everything the world-reading commands accept.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::struct_excessive_bools)] // one flag per command line switch
 pub struct Options {
     /// The game's data folder.
     pub data: PathBuf,
@@ -35,6 +36,8 @@ pub struct Options {
     pub out: Option<PathBuf>,
     /// `heightmap`: allow writing inside a git working tree.
     pub allow_in_repo: bool,
+    /// `generate`: write only terrain LOD, no object LOD.
+    pub terrain_only: bool,
     /// `generate`: worker threads; 0 chooses from the machine (at most 4).
     pub threads: usize,
 }
@@ -55,6 +58,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         out: None,
         allow_in_repo: false,
         threads: 0,
+        terrain_only: false,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -108,6 +112,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
             }
             "--out" => options.out = Some(PathBuf::from(value("--out")?)),
             "--blocks" => options.blocks = true,
+            "--terrain-only" => options.terrain_only = true,
             "--allow-in-repo" => options.allow_in_repo = true,
             other => return Err(format!("unknown option {other}")),
         }

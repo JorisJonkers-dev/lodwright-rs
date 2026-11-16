@@ -21,7 +21,7 @@ pub enum DdsError {
     BadHeader,
     /// The file has a DX10 extension header, which this crate neither writes nor reads.
     Dx10Header,
-    /// A pixel format other than DXT1, DXT5 or ATI2 (BC1, BC3, BC5).
+    /// A pixel format other than DXT1, DXT3, DXT5 or ATI2 (BC1, BC2, BC3, BC5).
     UnsupportedFormat([u8; 4]),
     /// A mip count of zero or more than the sizes allow.
     BadMipCount(u32),

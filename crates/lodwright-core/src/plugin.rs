@@ -170,9 +170,21 @@ impl RawRecord<'_> {
         if claimed > MAX_RECORD_BYTES {
             return Err(Error::Decompress);
         }
-        let plain =
-            miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(&self.data[4..], claimed)
-                .map_err(|_| Error::Decompress)?;
+        let stream = &self.data[4..];
+        // Some of the game's own records carry a zlib checksum that does not match their contents; the
+        // deflate data inside is still sound, so a checksum mismatch falls back to inflating without the
+        // two-byte header and the checksum, and the claimed size remains the check.
+        let plain = match miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(stream, claimed) {
+            Ok(plain) => plain,
+            Err(e) if e.status == miniz_oxide::inflate::TINFLStatus::Adler32Mismatch => {
+                miniz_oxide::inflate::decompress_to_vec_with_limit(
+                    stream.get(2..).ok_or(Error::Decompress)?,
+                    claimed,
+                )
+                .map_err(|_| Error::Decompress)?
+            }
+            Err(_) => return Err(Error::Decompress),
+        };
         if plain.len() != claimed {
             return Err(Error::Decompress);
         }

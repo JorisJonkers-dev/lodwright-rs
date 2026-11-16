@@ -165,6 +165,7 @@ pub fn generate_terrain(
     options: &Options,
 ) -> Result<Report, GenError> {
     layout::check_world_name(world.name())?;
+    let world = &world.without_outliers();
     let mut files = Vec::new();
     let mut highest = 0;
     for level in &settings.levels {

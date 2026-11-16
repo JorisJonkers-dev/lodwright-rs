@@ -156,6 +156,39 @@ impl Worldspace {
         self.cells.iter().map(|(k, v)| (*k, v))
     }
 
+    /// A copy without the outlying cells at the edges: an outer row or column that holds fewer than 2 percent of
+    /// the cells its line could hold is dropped, repeatedly (a couple of stray cells beside a large world would
+    /// otherwise add a row of nearly empty LOD blocks). Small worlds keep their edges.
+    #[must_use]
+    pub fn without_outliers(&self) -> Self {
+        let mut out = self.clone();
+        while let Some(b) = out.bounds() {
+            let width = i64::from(b.max_x) - i64::from(b.min_x) + 1;
+            let height = i64::from(b.max_y) - i64::from(b.min_y) + 1;
+            let count = |on: &dyn Fn(i32, i32) -> bool| {
+                i64::try_from(out.cells.keys().filter(|(x, y)| on(*x, *y)).count()).unwrap_or(0)
+            };
+            let sparse = |n: i64, line: i64| n * 50 < line;
+            let drop = if sparse(count(&|_, y| y == b.max_y), width) {
+                Some((false, b.max_y))
+            } else if sparse(count(&|_, y| y == b.min_y), width) {
+                Some((false, b.min_y))
+            } else if sparse(count(&|x, _| x == b.max_x), height) {
+                Some((true, b.max_x))
+            } else if sparse(count(&|x, _| x == b.min_x), height) {
+                Some((true, b.min_x))
+            } else {
+                None
+            };
+            let Some((by_x, line)) = drop else { break };
+            let keep = |(x, y): &(i32, i32)| if by_x { *x != line } else { *y != line };
+            out.cells.retain(|k, _| keep(k));
+            out.layers.retain(|k, _| keep(k));
+            out.water.retain(|k, _| keep(k));
+        }
+        out
+    }
+
     /// Inclusive bounds, `None` for a world without cells.
     #[must_use]
     pub fn bounds(&self) -> Option<Bounds> {
@@ -403,6 +436,33 @@ pub(crate) fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_stray_cell_beside_a_large_world_is_trimmed_and_small_worlds_are_kept() {
+        let big = Worldspace::from_cells(
+            1,
+            "Big",
+            (0..100)
+                .flat_map(|x| (0..100).map(move |y| ((x, y), CellHeights::flat(1.0))))
+                .chain([
+                    ((5, 100), CellHeights::flat(1.0)),
+                    ((-1, 50), CellHeights::flat(1.0)),
+                ]),
+        );
+        let trimmed = big.without_outliers();
+        assert_eq!(trimmed.cell_count(), 10_000);
+        let b = trimmed.bounds().unwrap();
+        assert_eq!((b.min_x, b.max_x, b.min_y, b.max_y), (0, 99, 0, 99));
+        let small = Worldspace::from_cells(
+            1,
+            "Small",
+            [
+                ((0, 0), CellHeights::flat(1.0)),
+                ((7, 0), CellHeights::flat(1.0)),
+            ],
+        );
+        assert_eq!(small.without_outliers().cell_count(), 2);
+    }
+
     use super::{Bounds, Inheritance, WorldIndex, Worldspace};
     use crate::Error;
     use crate::land::CellHeights;

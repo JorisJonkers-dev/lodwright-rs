@@ -16,7 +16,7 @@ fn main() {
         ("noise", noise_rgba(n, n, 1)),
     ] {
         let image = Image::new(side, side, pixels).expect("synthetic image");
-        for format in [Format::Bc1, Format::Bc3, Format::Bc5] {
+        for format in [Format::Bc1, Format::Bc2, Format::Bc3, Format::Bc5] {
             for quality in [Quality::Fast, Quality::Normal] {
                 let options = EncodeOptions {
                     format,
@@ -30,7 +30,7 @@ fn main() {
                 let decoded = decode(&bytes).expect("decode");
                 let channels: &[usize] = match format {
                     Format::Bc1 => &[0, 1, 2],
-                    Format::Bc3 => &[0, 1, 2, 3],
+                    Format::Bc2 | Format::Bc3 => &[0, 1, 2, 3],
                     Format::Bc5 => &[0, 1],
                 };
                 let db = psnr(&image, &decoded.levels[0], channels);

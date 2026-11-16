@@ -55,7 +55,7 @@ pub struct Report {
     pub files: Vec<FileRecord>,
 }
 
-fn write_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
+pub(crate) fn write_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
     let target: PathBuf = out.join(rel);
     let io = |source| GenError::Io {
         what: rel.to_owned(),

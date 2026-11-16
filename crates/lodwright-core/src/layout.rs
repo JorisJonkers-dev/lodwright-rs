@@ -104,6 +104,47 @@ pub fn nif_texture_paths(world: &str, id: BlockId) -> Result<[String; 2], Error>
     ])
 }
 
+// source: game-lod-object-layout
+/// Path of an object LOD block mesh: level 4, at south-west cell (`x`, `y`); `high` selects the high-priority file.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn object_mesh_path(world: &str, x: i32, y: i32, high: bool) -> Result<String, Error> {
+    check_world_name(world)?;
+    let level = if high { "level4.high" } else { "level4" };
+    Ok(format!(
+        "meshes/landscape/lod/{}/blocks/{}.{level}.x{x}.y{y}.nif",
+        world.to_ascii_lowercase(),
+        world.to_ascii_lowercase()
+    ))
+}
+
+// source: game-lod-object-layout
+/// Paths of the object atlas and its normal atlas.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn atlas_paths(world: &str) -> Result<[String; 2], Error> {
+    check_world_name(world)?;
+    let w = world.to_ascii_lowercase();
+    Ok([
+        format!("textures/landscape/lod/{w}/blocks/{w}.buildings.dds"),
+        format!("textures/landscape/lod/{w}/blocks/{w}.buildings_n.dds"),
+    ])
+}
+
+// source: game-lod-object-block-nif
+/// The two paths an object block NIF carries for the atlas and the normal atlas, as the game's own files write
+/// them.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn nif_atlas_paths(world: &str) -> Result<[String; 2], Error> {
+    check_world_name(world)?;
+    let base = format!("Data\\Textures\\Landscape\\LOD\\{world}\\Blocks\\{world}.Buildings");
+    Ok([format!("{base}.dds"), format!("{base}_n.dds")])
+}
+
 // source: game-dlodsettings-layout
 /// Path of the per-world LOD settings file.
 ///
@@ -156,6 +197,27 @@ mod tests {
             "Data\\Textures\\Landscape\\LOD\\WastelandNV\\Diffuse\\WastelandNV.n.Level4.X-8.Y12.dds"
         );
         assert!(n.contains("\\Normals\\"));
+    }
+
+    #[test]
+    fn object_paths_follow_the_games_tree() {
+        assert_eq!(
+            super::object_mesh_path("W", 24, -12, false).unwrap(),
+            "meshes/landscape/lod/w/blocks/w.level4.x24.y-12.nif"
+        );
+        assert!(
+            super::object_mesh_path("W", 4, 4, true)
+                .unwrap()
+                .contains("level4.high.x4.y4")
+        );
+        assert_eq!(
+            super::atlas_paths("W").unwrap()[1],
+            "textures/landscape/lod/w/blocks/w.buildings_n.dds"
+        );
+        assert_eq!(
+            super::nif_atlas_paths("Mojave").unwrap()[0],
+            "Data\\Textures\\Landscape\\LOD\\Mojave\\Blocks\\Mojave.Buildings.dds"
+        );
     }
 
     #[test]

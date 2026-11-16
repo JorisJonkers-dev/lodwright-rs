@@ -913,3 +913,67 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "One block measured. The meaning of the segment table is not established (a segment count of four with one triangle range each is what the bytes show). The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells."
+
+[[source]]
+id = "fnv-object-records"
+fact = "Record flag bit 15 (0x8000) is Visible When Distant on STAT, SCOL, ACTI, DOOR and REFR records; bit 6 (0x40) is Has Tree LOD on STAT, SCOL and ACTI; bit 16 (0x10000) of a REFR is High Priority LOD and bit 11 (0x800) Initially Disabled. A model record has its path in MODL. A REFR has NAME (the base FormID), DATA (position then rotation, six f32) and optionally XSCL (an f32 scale). A SCOL has repeated parts, each an ONAM (a STAT FormID) followed by placements."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read from the record definitions. The size of one SCOL placement (28 bytes: position, rotation, scale) is not in the file read for this row and is to be confirmed on real data."
+
+[[source]]
+id = "bc2-block-layout"
+fact = "A BC2 block is 16 bytes: 64 bits of explicit alpha (sixteen 4-bit values) followed by a colour block laid out as BC1; the legacy FourCC is DXT3."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Needed to read the game's own object atlas and source textures, which are DXT3."
+
+[[source]]
+id = "game-object-rotation"
+fact = "A reference's rotation angles (x, y, z in radians, as stored in DATA) turn a model by the matrix Rx(-x) * Ry(-y) * Rz(-z), each a right-handed rotation about its axis, applied to the model's vertices after the uniform scale; the result plus the reference position equals the vertex positions in the game's own object LOD blocks."
+url = "oracle:game-lod-files"
+licence = "Numbers compared between a reference placement and a block of the owner's own game files; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Found by trying the sixteen sign, order and transpose variants against one block; exactly one family matches (all 1715 vertices within 0.003 units). Row game-object-selection records the totals the selection rule reproduces."
+
+[[source]]
+id = "game-object-selection"
+fact = "In the main worldspace the objects that enter object LOD are the references whose base object or reference carries Visible When Distant and not Initially Disabled, with static collections expanded into their parts, each drawn with the base model's _lod model (the model path with _lod before the extension). The sum over those instances of the LOD models' triangles (1,717,027) and vertices (2,313,998) is within 0.2 percent of the sums over the game's own 295 object blocks (1,720,010 and 2,310,064). References are placed into 4 by 4 cell blocks by the cell their position lies in, and a block holds the vertices of all its objects in one shape."
+url = "oracle:game-lod-files"
+licence = "Counts compared between records and files of the owner's own game; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "game-object-atlas"
+fact = "The object atlas of the main worldspace is 2048 by 1024 (DXT3, 12 mips) and its normal atlas 1024 by 512 (16 bytes per block); the 130 distinct diffuse textures of the selected LOD models are 64 to 256 pixels (DXT1, DXT3 or DXT5) and together cover 97 percent of the atlas area, so the atlas holds the textures at their native size. The LOD source models are NiTriStrips with a BSFadeNode root."
+url = "oracle:game-lod-files"
+licence = "Header fields and counts of the owner's own game files; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+
+[[source]]
+id = "game-object-block-rules"
+fact = "Against the game's own object blocks of the main worldspace: references that are initially disabled still enter LOD; a reference flagged high priority appears both in its block's standard file and in the high file; a static collection is drawn with its own LOD model and its parts are not added; the six high files named after blocks (x-20 y-28, x-4 y12, x4 y-4, x4 y16, x-8 y20, x-8 y24) are the same six blocks the high-priority references fall in. With these rules 287 of 295 blocks have the same vertex and triangle counts as the game's own and 82 percent of all vertices coincide in position within 0.05 units; the others differ by up to 8 percent in counts."
+url = "oracle:game-lod-files"
+licence = "Counts and positions compared between records and files of the owner's own game; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Open: which objects make up the remaining difference in the eight blocks that still differ; some of the difference may come from DLC plugins the game's blocks were built with."

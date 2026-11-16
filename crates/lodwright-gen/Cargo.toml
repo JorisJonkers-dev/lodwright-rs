@@ -9,6 +9,7 @@ publish.workspace = true
 description = "Library entry point of lodwright: generates the LOD files of a worldspace into an output folder."
 
 [dependencies]
+lodwright-assets = { workspace = true }
 lodwright-core = { workspace = true }
 lodwright-contract = { workspace = true }
 lodwright-dds = { workspace = true }

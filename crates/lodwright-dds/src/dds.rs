@@ -18,6 +18,8 @@ pub const HEADER_LEN: usize = 128;
 const FOURCC_DXT1: [u8; 4] = *b"DXT1";
 // source: dds-fourcc-formats
 const FOURCC_DXT5: [u8; 4] = *b"DXT5";
+// source: bc2-block-layout
+const FOURCC_DXT3: [u8; 4] = *b"DXT3";
 // source: dds-fourcc-formats
 const FOURCC_ATI2: [u8; 4] = *b"ATI2";
 
@@ -26,6 +28,8 @@ const FOURCC_ATI2: [u8; 4] = *b"ATI2";
 pub enum Format {
     /// BC1, written as DXT1: colour with optional 1-bit alpha.
     Bc1,
+    /// BC2, written as DXT3: colour with 4-bit explicit alpha.
+    Bc2,
     /// BC3, written as DXT5: colour with an interpolated 8-bit alpha block.
     Bc3,
     /// BC5, written as ATI2: two interpolated 8-bit channels (red and green).
@@ -38,6 +42,7 @@ impl Format {
     pub fn four_cc(self) -> [u8; 4] {
         match self {
             Self::Bc1 => FOURCC_DXT1,
+            Self::Bc2 => FOURCC_DXT3,
             Self::Bc3 => FOURCC_DXT5,
             Self::Bc5 => FOURCC_ATI2,
         }
@@ -49,7 +54,7 @@ impl Format {
     pub fn block_bytes(self) -> usize {
         match self {
             Self::Bc1 => 8,
-            Self::Bc3 | Self::Bc5 => 16,
+            Self::Bc2 | Self::Bc3 | Self::Bc5 => 16,
         }
     }
 
@@ -64,6 +69,7 @@ impl Format {
     fn texpresso(self) -> texpresso::Format {
         match self {
             Self::Bc1 => texpresso::Format::Bc1,
+            Self::Bc2 => texpresso::Format::Bc2,
             Self::Bc3 => texpresso::Format::Bc3,
             Self::Bc5 => texpresso::Format::Bc5,
         }
@@ -72,6 +78,7 @@ impl Format {
     fn from_four_cc(code: [u8; 4]) -> Result<Self> {
         match &code {
             b"DXT1" => Ok(Self::Bc1),
+            b"DXT3" => Ok(Self::Bc2),
             b"DXT5" => Ok(Self::Bc3),
             b"ATI2" => Ok(Self::Bc5),
             b"DX10" => Err(DdsError::Dx10Header),
@@ -221,10 +228,10 @@ pub fn encode(image: &Image, options: &EncodeOptions) -> Result<Vec<u8>> {
         height: image.height(),
         width: image.width(),
         depth: None,
-        format: if options.format == Format::Bc1 {
-            D3DFormat::DXT1
-        } else {
-            D3DFormat::DXT5
+        format: match options.format {
+            Format::Bc1 => D3DFormat::DXT1,
+            Format::Bc2 => D3DFormat::DXT3,
+            Format::Bc3 | Format::Bc5 => D3DFormat::DXT5,
         },
         mipmap_levels: (levels > 1).then_some(levels),
         caps2: None,

@@ -71,6 +71,47 @@ pub struct WorldRecord {
     pub bounds: Option<DeclaredBounds>,
 }
 
+/// A position, rotation (radians) and uniform scale.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Placement {
+    /// World position.
+    pub pos: [f32; 3],
+    /// Rotation about x, y and z in radians.
+    pub rot: [f32; 3],
+    /// Uniform scale.
+    pub scale: f32,
+}
+
+/// A record that has a model and can appear in the distance: a static, a static collection and the like.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BaseObject {
+    /// `FormID` as stored in this plugin.
+    pub form_id: u32,
+    /// Record signature, for example `STAT`.
+    pub signature: [u8; 4],
+    /// Editor id.
+    pub editor_id: Option<String>,
+    /// `MODL`: the model path relative to `meshes`.
+    pub model: Option<String>,
+    /// Record flags (bit 15 visible when distant, bit 6 has tree LOD).
+    pub flags: u32,
+    /// For a static collection: each part's static (`FormID` as stored) and its placements.
+    pub parts: Vec<(u32, Vec<Placement>)>,
+}
+
+/// A placed reference.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlacedRef {
+    /// `FormID` of the reference as stored in this plugin.
+    pub form_id: u32,
+    /// `NAME`: the base object, as stored in this plugin.
+    pub base: u32,
+    /// Record flags (bit 15 visible when distant, bit 16 high priority LOD, bit 11 initially disabled).
+    pub flags: u32,
+    /// Where it stands.
+    pub placement: Placement,
+}
+
 /// A worldspace as one plugin defines or overrides it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct World {
@@ -82,6 +123,8 @@ pub struct World {
     pub record: Option<WorldRecord>,
     /// Exterior cells with LAND, in file order.
     pub cells: Vec<LandCell>,
+    /// Placed references of the world's cells; only when read with [`ReadOptions::objects`].
+    pub refs: Vec<PlacedRef>,
 }
 
 /// What [`read`] returns.
@@ -95,6 +138,8 @@ pub struct Plugin {
     pub land_textures: Vec<LandTexture>,
     /// `TXST` records of this plugin (`FormID`s as stored).
     pub texture_sets: Vec<TextureSet>,
+    /// Records with a model that may appear in the distance; only when read with [`ReadOptions::objects`].
+    pub objects: Vec<BaseObject>,
 }
 
 /// What [`read_with`] keeps beyond heights.
@@ -103,6 +148,8 @@ pub struct ReadOptions {
     /// Keep vertex normals, vertex colours and texture layers of every LAND record. Off by default: they are
     /// about six times the size of the heights, so planning does not pay for them.
     pub land_layers: bool,
+    /// Keep the placed references of worlds and the base objects that can be seen from afar.
+    pub objects: bool,
 }
 
 /// Read a plugin.
@@ -142,6 +189,7 @@ pub fn read_with(bytes: &[u8], options: ReadOptions) -> Result<Plugin, Error> {
         worlds: walker.worlds,
         land_textures: walker.land_textures,
         texture_sets: walker.texture_sets,
+        objects: walker.objects,
     })
 }
 
@@ -264,6 +312,7 @@ struct Walker {
     options: ReadOptions,
     land_textures: Vec<LandTexture>,
     texture_sets: Vec<TextureSet>,
+    objects: Vec<BaseObject>,
     worlds: Vec<World>,
     world: Option<usize>,
     cell: Option<CellInfo>,
@@ -331,6 +380,7 @@ impl Walker {
             editor_id: None,
             record: None,
             cells: Vec::new(),
+            refs: Vec::new(),
         });
         self.worlds.len() - 1
     }
@@ -373,6 +423,7 @@ impl Walker {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)] // one arm per record type
     fn record(&mut self, record: &RawRecord<'_>) -> Result<(), Error> {
         if record.deleted() {
             return Ok(());
@@ -472,10 +523,101 @@ impl Walker {
                 }
                 self.texture_sets.push(set);
             }
+            b"REFR" if self.options.objects => {
+                let Some(world) = self.world else {
+                    return Ok(());
+                };
+                let data = record.data()?;
+                if let Some(placed) = placed_ref(record, &data)? {
+                    self.worlds[world].refs.push(placed);
+                }
+            }
+            sig if self.options.objects && BASE_SIGNATURES.contains(sig) => {
+                let data = record.data()?;
+                if let Some(base) = base_object(*sig, record, &data)? {
+                    self.objects.push(base);
+                }
+            }
             _ => {}
         }
         Ok(())
     }
+}
+
+// source: fnv-object-records
+/// Record types whose base objects can carry the visible-when-distant flag and a model.
+const BASE_SIGNATURES: [[u8; 4]; 9] = [
+    *b"STAT", *b"SCOL", *b"ACTI", *b"DOOR", *b"MSTT", *b"FURN", *b"CONT", *b"TERM", *b"TREE",
+];
+
+fn placement_at(bytes: &[u8], at: usize) -> Option<Placement> {
+    let f = |i: usize| le_f32(bytes, at + i * 4);
+    Some(Placement {
+        pos: [f(0)?, f(1)?, f(2)?],
+        rot: [f(3)?, f(4)?, f(5)?],
+        scale: 1.0,
+    })
+}
+
+// source: fnv-object-records
+fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, Error> {
+    let (mut base, mut placement, mut scale) = (None, None, 1.0);
+    for (signature, payload) in subrecords(data)? {
+        match &signature {
+            b"NAME" if payload.len() >= 4 => base = Some(le_u32(payload, 0)),
+            b"DATA" if payload.len() >= 24 => placement = placement_at(payload, 0),
+            b"XSCL" => scale = le_f32(payload, 0).unwrap_or(1.0),
+            _ => {}
+        }
+    }
+    Ok(base.zip(placement).map(|(base, mut placement)| {
+        placement.scale = scale;
+        PlacedRef {
+            form_id: record.form_id,
+            base,
+            flags: record.flags,
+            placement,
+        }
+    }))
+}
+
+// source: fnv-object-records
+fn base_object(
+    signature: [u8; 4],
+    record: &RawRecord<'_>,
+    data: &[u8],
+) -> Result<Option<BaseObject>, Error> {
+    let mut base = BaseObject {
+        form_id: record.form_id,
+        signature,
+        editor_id: None,
+        model: None,
+        flags: record.flags,
+        parts: Vec::new(),
+    };
+    for (sub, payload) in subrecords(data)? {
+        match &sub {
+            b"EDID" => base.editor_id = Some(zstring(payload)),
+            b"MODL" => base.model = Some(zstring(payload)),
+            b"ONAM" if signature == *b"SCOL" && payload.len() >= 4 => {
+                base.parts.push((le_u32(payload, 0), Vec::new()));
+            }
+            b"DATA" if signature == *b"SCOL" => {
+                if let Some(part) = base.parts.last_mut() {
+                    for at in (0..payload.len() / 28).map(|i| i * 28) {
+                        if let (Some(mut p), Some(sc)) =
+                            (placement_at(payload, at), le_f32(payload, at + 24))
+                        {
+                            p.scale = sc;
+                            part.1.push(p);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok((base.model.is_some() || !base.parts.is_empty()).then_some(base))
 }
 
 #[cfg(test)]
@@ -492,6 +634,75 @@ mod tests {
         SyntheticWorld::new(0x0100_0010, "Mojave")
             .cell(0, 0, Heights::flat(64.0))
             .cell(-1, 2, Heights::flat(-16.0))
+    }
+
+    #[test]
+    fn statics_and_placed_references_are_read_with_flags_and_placements() {
+        use super::{ReadOptions, read_with};
+        let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+        let stat = Record::new(*b"STAT", 0x0100_0001)
+            .with_subrecord(*b"EDID", b"Wall\0".to_vec())
+            .with_subrecord(*b"MODL", b"architecture\\wall.nif\0".to_vec());
+        let mut stat = stat;
+        stat.flags = 0x8000;
+        let mut refr = Record::new(*b"REFR", 0x0100_0100)
+            .with_subrecord(*b"NAME", 0x0100_0001_u32.to_le_bytes().to_vec())
+            .with_subrecord(*b"XSCL", 2.0_f32.to_le_bytes().to_vec())
+            .with_subrecord(*b"DATA", f32s(&[10.0, 20.0, 30.0, 0.0, 0.0, 1.5]));
+        refr.flags = 0x8000;
+        let world = Group::new(1, 0x0100_0010_u32.to_le_bytes()).with(refr);
+        let bytes = PluginBuilder::new()
+            .group(Group::new(0, *b"STAT").with(stat))
+            .group(world)
+            .build();
+        let plugin = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(plugin.objects.len(), 1);
+        assert_eq!(
+            plugin.objects[0].model.as_deref(),
+            Some("architecture\\wall.nif")
+        );
+        assert_eq!(plugin.objects[0].flags & 0x8000, 0x8000);
+        let r = &plugin.worlds[0].refs[0];
+        assert_eq!((r.base, r.flags), (0x0100_0001, 0x8000));
+        assert_eq!(r.placement.pos, [10.0, 20.0, 30.0]);
+        assert_eq!(r.placement.scale, 2.0);
+        let off = read_with(&bytes, ReadOptions::default()).unwrap();
+        assert!(off.objects.is_empty() && off.worlds.iter().all(|w| w.refs.is_empty()));
+    }
+
+    #[test]
+    fn a_static_collection_keeps_its_parts_and_placements() {
+        use super::{ReadOptions, read_with};
+        let mut data = Vec::new();
+        for v in [1.0_f32, 2.0, 3.0, 0.0, 0.0, 0.0, 0.5] {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        let scol = Record::new(*b"SCOL", 0x0100_0002)
+            .with_subrecord(*b"MODL", b"c.nif\0".to_vec())
+            .with_subrecord(*b"ONAM", 0x0100_0001_u32.to_le_bytes().to_vec())
+            .with_subrecord(*b"DATA", data);
+        let bytes = PluginBuilder::new()
+            .group(Group::new(0, *b"SCOL").with(scol))
+            .build();
+        let plugin = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        let parts = &plugin.objects[0].parts;
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].1.len(), 1);
+        assert_eq!(parts[0].1[0].scale, 0.5);
     }
 
     #[test]
@@ -687,7 +898,14 @@ mod tests {
     fn layers_are_kept_only_when_asked_for() {
         let bytes = world_plugin(&["FalloutNV.esm"], &layered_world(), true);
         assert_eq!(read(&bytes).unwrap().worlds[0].cells[0].layers, None);
-        let plugin = read_with(&bytes, ReadOptions { land_layers: true }).unwrap();
+        let plugin = read_with(
+            &bytes,
+            ReadOptions {
+                land_layers: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
         let layers = plugin.worlds[0].cells[0].layers.as_ref().unwrap();
         assert_eq!(layers.normals.as_ref().unwrap().get(3, 3), [1, 2, 3]);
         assert_eq!(layers.colors.as_ref().unwrap().get(0, 0), [1, 2, 3]);
@@ -702,7 +920,14 @@ mod tests {
     #[test]
     fn unknown_land_subrecords_are_still_skipped_with_layers_on() {
         let bytes = world_plugin(&[], &layered_world(), false);
-        let plugin = read_with(&bytes, ReadOptions { land_layers: true }).unwrap();
+        let plugin = read_with(
+            &bytes,
+            ReadOptions {
+                land_layers: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
         assert_eq!(plugin.worlds[0].cells.len(), 1);
     }
 
@@ -717,7 +942,13 @@ mod tests {
         let bytes = world_plugin(&[], &world, false);
         assert!(read(&bytes).is_ok());
         assert_eq!(
-            read_with(&bytes, ReadOptions { land_layers: true }),
+            read_with(
+                &bytes,
+                ReadOptions {
+                    land_layers: true,
+                    ..ReadOptions::default()
+                }
+            ),
             Err(Error::SubrecordLength {
                 what: "VNML",
                 found: 5

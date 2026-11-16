@@ -14,7 +14,7 @@ use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
 use lodwright_core::worldspace::{Inheritance, WorldIndex, Worldspace};
 
 use crate::failure::Failure;
-use crate::load::{load_plugins, load_worlds};
+use crate::load::{load_plugins, load_plugins_with, load_worlds};
 use crate::options::{Format, Options};
 
 fn select<'a>(
@@ -267,7 +267,7 @@ pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), Failure> {
             tool: ToolInfo::new(env!("CARGO_PKG_VERSION")),
             arguments_digest: arguments_digest_of(options),
             inputs_digest: loaded.inputs_digest,
-            capabilities: Capabilities::terrain(),
+            capabilities: Capabilities::current(),
             worlds: documents,
             warnings: Vec::new(),
         };
@@ -345,7 +345,11 @@ fn refuse_output(options: &Options, out: &Path) -> Result<(), Failure> {
 
 fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultDoc, Failure> {
     refuse_output(options, out)?;
-    let loaded = load_plugins(&options.data, &options.plugins)?;
+    let read = lodwright_core::plugin::ReadOptions {
+        objects: !options.terrain_only,
+        ..lodwright_core::plugin::ReadOptions::default()
+    };
+    let loaded = load_plugins_with(&options.data, &options.plugins, read)?;
     let worlds = Worldspace::from_load_order(&loaded.plugins)
         .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
     let chosen = select(&worlds, options.world.as_deref())?;
@@ -356,6 +360,14 @@ fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultD
     };
     let mut doc = ResultDoc::new(version, Status::Ok, "generated", "terrain LOD written");
     doc.inputs_digest = Some(loaded.inputs_digest);
+    let assets = if options.terrain_only {
+        None
+    } else {
+        Some(
+            lodwright_gen::FolderAssets::open(&options.data, &options.plugins)
+                .map_err(|e| Failure::new("assets_unreadable", e))?,
+        )
+    };
     for world in chosen {
         let report = lodwright_gen::generate_terrain(
             world,
@@ -380,6 +392,21 @@ fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultD
                 files: count(files.len()),
                 bytes: files.iter().map(|f| f.bytes).sum(),
             });
+        }
+        if let Some(assets) = &assets {
+            let instances =
+                lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
+                    .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
+            let objects = lodwright_gen::generate_objects(world.name(), &instances, assets, out)
+                .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
+            if !objects.files.is_empty() {
+                doc.written.push(Written {
+                    world: world.name().to_owned(),
+                    kind: "object_lod".to_owned(),
+                    files: count(objects.files.len()),
+                    bytes: objects.files.iter().map(|f| f.bytes).sum(),
+                });
+            }
         }
     }
     Ok(doc)

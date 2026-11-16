@@ -68,6 +68,15 @@ pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Failure> {
 
 /// Read every plugin of the load order, in order.
 pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Failure> {
+    load_plugins_with(data, names, plugin::ReadOptions::default())
+}
+
+/// Read every plugin of the load order, keeping what `options` asks for.
+pub fn load_plugins_with(
+    data: &Path,
+    names: &[String],
+    options: plugin::ReadOptions,
+) -> Result<LoadedPlugins, Failure> {
     if names.is_empty() {
         return Err(Failure::new(
             "no_plugins",
@@ -92,7 +101,7 @@ pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Fail
         let header = lodwright_plugin_meta::read_header(name, &bytes)
             .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         headers.push((name.clone(), header));
-        let parsed = plugin::read(&bytes)
+        let parsed = plugin::read_with(&bytes, options)
             .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         plugins.push((name.clone(), parsed));
     }

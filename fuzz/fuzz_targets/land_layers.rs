@@ -17,5 +17,8 @@ fuzz_target!(|data: &[u8]| {
         let _ = reader.subrecord(signature, data);
     }
     let _ = reader.finish();
-    let _ = read_with(data, ReadOptions { land_layers: true });
+    let _ = read_with(data, ReadOptions {
+            land_layers: true,
+            objects: true,
+        });
 });

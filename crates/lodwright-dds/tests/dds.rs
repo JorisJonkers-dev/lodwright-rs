@@ -11,7 +11,7 @@ use lodwright_testkit::rng::Rng;
 use std::fmt::Write as _;
 use std::path::Path;
 
-const FORMATS: [Format; 3] = [Format::Bc1, Format::Bc3, Format::Bc5];
+const FORMATS: [Format; 4] = [Format::Bc1, Format::Bc2, Format::Bc3, Format::Bc5];
 
 fn options(format: Format, mips: bool) -> EncodeOptions {
     EncodeOptions {
@@ -33,7 +33,7 @@ fn noise(w: u32, h: u32) -> Image {
 fn channels(format: Format) -> &'static [usize] {
     match format {
         Format::Bc1 => &[0, 1, 2],
-        Format::Bc3 => &[0, 1, 2, 3],
+        Format::Bc2 | Format::Bc3 => &[0, 1, 2, 3],
         Format::Bc5 => &[0, 1],
     }
 }
@@ -192,8 +192,8 @@ fn reading_refuses_each_kind_of_bad_header() {
         Err(DdsError::BadHeader)
     );
     assert_eq!(
-        read_header(&patch(84, b"DXT3")),
-        Err(DdsError::UnsupportedFormat(*b"DXT3"))
+        read_header(&patch(84, b"DXT2")),
+        Err(DdsError::UnsupportedFormat(*b"DXT2"))
     );
     assert_eq!(
         read_header(&patch(80, &0_u32.to_le_bytes())),

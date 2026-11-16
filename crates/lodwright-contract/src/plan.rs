@@ -34,21 +34,21 @@ pub struct Capabilities {
     pub terrain_texture: bool,
     /// Writes the LOD settings file.
     pub settings: bool,
-    /// Writes object LOD (`.bto`).
+    /// Writes object LOD (`.nif` blocks and the atlas).
     pub object_lod: bool,
     /// Writes tree LOD.
     pub tree_lod: bool,
 }
 
 impl Capabilities {
-    /// This build: terrain meshes, terrain textures and the settings file are written; object and tree LOD are not.
+    /// This build: terrain meshes, terrain textures, the settings file and object LOD are written; tree LOD is not.
     #[must_use]
-    pub fn terrain() -> Self {
+    pub fn current() -> Self {
         Self {
             terrain_mesh: true,
             terrain_texture: true,
             settings: true,
-            object_lod: false,
+            object_lod: true,
             tree_lod: false,
         }
     }

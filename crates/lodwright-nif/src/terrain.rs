@@ -23,9 +23,9 @@ const TYPES: [&[u8]; 8] = [
 
 // source: game-lod-terrain-block-nif
 /// Node flags of the root, and of the shape.
-const ROOT_FLAGS: u32 = 0x0008_080e;
+pub(crate) const ROOT_FLAGS: u32 = 0x0008_080e;
 /// Flags of the terrain shape (the same word as the root's in the measured files).
-const SHAPE_FLAGS: u32 = 524_302;
+pub(crate) const SHAPE_FLAGS: u32 = 524_302;
 
 // source: game-lod-terrain-block-nif
 /// The `BSShaderPPLightingProperty` after its empty name, extra data and controller: flags, shader type and the
@@ -51,15 +51,15 @@ pub struct TerrainBlock<'a> {
     pub textures: [&'a str; 2],
 }
 
-fn put_f32(out: &mut Vec<u8>, v: f32) {
+pub(crate) fn put_f32(out: &mut Vec<u8>, v: f32) {
     out.extend_from_slice(&v.to_le_bytes());
 }
 
-fn put_u32(out: &mut Vec<u8>, v: u32) {
+pub(crate) fn put_u32(out: &mut Vec<u8>, v: u32) {
     out.extend_from_slice(&v.to_le_bytes());
 }
 
-fn root_node(origin: (f32, f32)) -> Vec<u8> {
+pub(crate) fn root_node(origin: (f32, f32), shape: u32, multibound: u32) -> Vec<u8> {
     // source: game-lod-terrain-block-nif
     let mut b = Vec::with_capacity(92);
     put_u32(&mut b, u32::MAX); // name
@@ -75,13 +75,13 @@ fn root_node(origin: (f32, f32)) -> Vec<u8> {
     put_u32(&mut b, 0); // properties
     put_u32(&mut b, u32::MAX); // collision
     put_u32(&mut b, 1); // children
-    put_u32(&mut b, 1); // the shape
+    put_u32(&mut b, shape); // the shape
     put_u32(&mut b, 0); // effects
-    put_u32(&mut b, 6); // the multibound
+    put_u32(&mut b, multibound); // the multibound
     b
 }
 
-fn texture_set(paths: [&str; 2]) -> Vec<u8> {
+pub(crate) fn texture_set(paths: [&str; 2]) -> Vec<u8> {
     // source: game-lod-terrain-block-nif
     let mut b = Vec::new();
     put_u32(&mut b, 6);
@@ -116,7 +116,7 @@ fn additional_data(heights: &[f32]) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-fn tri_shape() -> NiTriShape {
+pub(crate) fn tri_shape() -> NiTriShape {
     NiTriShape {
         av: AvObject {
             net: ObjectNet {
@@ -142,7 +142,7 @@ fn tri_shape() -> NiTriShape {
     }
 }
 
-fn file_header() -> Header {
+pub(crate) fn file_header(types: &[&[u8]]) -> Header {
     Header {
         user_version: 11,
         bethesda: Some((
@@ -155,7 +155,7 @@ fn file_header() -> Header {
                 max_filepath: Vec::new(),
             },
         )),
-        block_types: TYPES.iter().map(|t| t.to_vec()).collect(),
+        block_types: types.iter().map(|t| t.to_vec()).collect(),
         strings: Vec::new(),
         groups: Vec::new(),
     }
@@ -233,7 +233,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         put_f32(&mut aabb, v);
     }
     let blocks = vec![
-        (0, Body::Opaque(root_node(block.origin))),
+        (0, Body::Opaque(root_node(block.origin, 1, 6))),
         (1, Body::TriShape(shape)),
         (2, Body::Opaque(lighting)),
         (3, Body::Opaque(texture_set(block.textures))),
@@ -243,7 +243,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         (7, Body::Opaque(aabb)),
     ];
     Ok(NifFile {
-        header: file_header(),
+        header: file_header(&TYPES),
         blocks: blocks
             .into_iter()
             .map(|(type_index, body)| Block { type_index, body })

@@ -18,6 +18,9 @@ pub enum Event {
         done: u64,
         /// Blocks of this level in total.
         of: u64,
+        /// The block's files were kept from an earlier run (its inputs did not change).
+        #[serde(default)]
+        up_to_date: bool,
     },
 }
 
@@ -43,11 +46,12 @@ mod tests {
             level: 4,
             done: 1,
             of: 9,
+            up_to_date: false,
         }
         .to_line();
         assert_eq!(
             line,
-            r#"{"event":"block","world":"W","level":4,"done":1,"of":9}"#
+            r#"{"event":"block","world":"W","level":4,"done":1,"of":9,"up_to_date":false}"#
         );
         assert!(!line.contains('\n'));
     }
@@ -64,7 +68,8 @@ mod tests {
                 world: "W".into(),
                 level: 4,
                 done: 1,
-                of: 9
+                of: 9,
+                up_to_date: false
             }
         );
     }

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use lodwright_contract::sha256_digest;
+use lodwright_contract::{Sha256Stream, sha256_digest};
 use lodwright_core::layout::{self, BlockId};
 use lodwright_core::lod::LodSettings;
 use lodwright_core::raster::{BlockGrid, HeightRaster};
@@ -31,11 +31,14 @@ pub struct Options<'a> {
     pub threads: usize,
     /// Land textures for the diffuse maps; `None` leaves the ground to vertex colours.
     pub land: Option<&'a LandTiles>,
-    /// Called after each block with the world, the level, the blocks finished at this level and the blocks of
-    /// the level; from worker threads, in no fixed order.
-    pub progress: Option<&'a (dyn Fn(&str, u32, u64, u64) + Sync)>,
+    /// Called after each block with the world, the level, the blocks finished at this level, the blocks of the
+    /// level and whether the block was reused; from worker threads, in no fixed order.
+    pub progress: Option<&'a (dyn Fn(&str, u32, u64, u64, bool) + Sync)>,
     /// Write a water plane into each block that has ground below its cells' water height.
     pub water: bool,
+    /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
+    /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
+    pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
 }
 
 impl Default for Options<'_> {
@@ -45,6 +48,7 @@ impl Default for Options<'_> {
             land: None,
             progress: None,
             water: true,
+            reuse: None,
         }
     }
 }
@@ -60,6 +64,19 @@ pub struct FileRecord {
     pub digest: String,
 }
 
+/// One terrain block of a run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockRecord {
+    /// `terrain:<world>:<level>:<x>:<y>`, the world in lower case.
+    pub key: String,
+    /// `sha256:` over everything the block's files depend on (see [`Options::reuse`]).
+    pub inputs: String,
+    /// The block's files.
+    pub files: Vec<FileRecord>,
+    /// The files were kept from an earlier run instead of being built.
+    pub reused: bool,
+}
+
 /// What a run wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
@@ -67,6 +84,8 @@ pub struct Report {
     pub world: String,
     /// Files, sorted by path.
     pub files: Vec<FileRecord>,
+    /// Terrain blocks with files, sorted by key.
+    pub blocks: Vec<BlockRecord>,
 }
 
 pub(crate) fn write_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
@@ -106,30 +125,89 @@ struct Job {
     cell: (i32, i32),
 }
 
+/// The digest of everything a block's files depend on: the generator version, the level settings and switches, the
+/// block's height samples, and per cell its water height, its land layers and the pixels of the land textures those
+/// layers name.
+fn block_inputs(
+    world: &Worldspace,
+    samples: &[f32],
+    job: &Job,
+    tiles: &LandTiles,
+    water: bool,
+) -> String {
+    let mut h = Sha256Stream::new();
+    h.update(env!("CARGO_PKG_VERSION").as_bytes());
+    h.update(format!("{:?} water={water}", job.level).as_bytes());
+    for s in samples {
+        h.update(&s.to_le_bytes());
+    }
+    let cells = i32::try_from(job.level.level).unwrap_or(0);
+    for x in job.cell.0..job.cell.0 + cells {
+        for y in job.cell.1..job.cell.1 + cells {
+            h.update(format!("{x},{y}:{:?}", world.water_height(x, y)).as_bytes());
+            let Some(layers) = world.layers(x, y) else {
+                continue;
+            };
+            h.update(format!("{layers:?}").as_bytes());
+            let ids = layers
+                .base
+                .iter()
+                .flatten()
+                .copied()
+                .chain(layers.alpha.iter().map(|l| l.texture));
+            for id in ids {
+                if let Some(tile) = tiles.get(id) {
+                    h.update(&id.to_le_bytes());
+                    for p in tile.pixels() {
+                        h.update(p);
+                    }
+                }
+            }
+        }
+    }
+    h.finish()
+}
+
 fn run_job(
     world: &Worldspace,
     raster: &HeightRaster,
     job: &Job,
     out: &Path,
     tiles: &LandTiles,
-    water: bool,
-) -> Result<Vec<FileRecord>, GenError> {
+    options: &Options,
+) -> Result<Option<BlockRecord>, GenError> {
     let level = &job.level;
     let grid = raster.grid();
     let (bx, by) = (grid.block_of(job.cell.0), grid.block_of(job.cell.1));
+    let samples = raster.block_samples(bx, by).unwrap_or_default();
+    let name = world.name();
+    let key = format!(
+        "terrain:{}:{}:{}:{}",
+        name.to_ascii_lowercase(),
+        level.level,
+        job.cell.0,
+        job.cell.1
+    );
+    let inputs = block_inputs(world, &samples, job, tiles, options.water);
+    if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
+        return Ok(Some(BlockRecord {
+            key,
+            inputs,
+            files,
+            reused: true,
+        }));
+    }
     let Some((_, mesh, _)) = build_block_mesh(raster, level, bx, by) else {
-        return Ok(Vec::new());
+        return Ok(None);
     };
     let id = BlockId {
         level: level.level,
         x: job.cell.0,
         y: job.cell.1,
     };
-    let name = world.name();
     let units = level.level as f32 * CELL_UNITS;
     let [diffuse_ref, normal_ref] = layout::nif_texture_paths(name, id)?;
-    let samples = raster.block_samples(bx, by).unwrap_or_default();
-    let water = if water {
+    let water = if options.water {
         water_mesh(world, &samples, level.level, job.cell)
     } else {
         None
@@ -153,11 +231,16 @@ fn run_job(
     let span = (level.level as usize) * 32 + 1;
     let normals = dds(&normal_image(&samples, span, units, level.normal_size))?;
     let diffuse = dds(&diffuse_image(world, id, level.diffuse_size, tiles))?;
-    Ok(vec![
-        write_file(out, &layout::mesh_path(name, id)?, &nif)?,
-        write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?,
-        write_file(out, &layout::normal_path(name, id)?, &normals)?,
-    ])
+    Ok(Some(BlockRecord {
+        key,
+        inputs,
+        files: vec![
+            write_file(out, &layout::mesh_path(name, id)?, &nif)?,
+            write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?,
+            write_file(out, &layout::normal_path(name, id)?, &normals)?,
+        ],
+        reused: false,
+    }))
 }
 
 fn jobs_of(raster: &HeightRaster, level: &LevelSettings) -> Vec<Job> {
@@ -195,6 +278,7 @@ pub fn generate_terrain(
     let no_tiles = LandTiles::empty();
     let tiles = options.land.unwrap_or(&no_tiles);
     let mut files = Vec::new();
+    let mut blocks = Vec::new();
     let mut highest = 0;
     for level in &settings.levels {
         let grid = BlockGrid::new(level.level).map_err(|_| lodwright_core::Error::ZeroLevel)?;
@@ -205,17 +289,24 @@ pub fn generate_terrain(
         let jobs = jobs_of(&raster, level);
         let next = AtomicUsize::new(0);
         let finished = AtomicUsize::new(0);
-        let done: Mutex<Vec<Result<Vec<FileRecord>, GenError>>> = Mutex::new(Vec::new());
+        let done: Mutex<Vec<Result<Option<BlockRecord>, GenError>>> = Mutex::new(Vec::new());
         std::thread::scope(|scope| {
             for _ in 0..options.threads.max(1) {
                 scope.spawn(|| {
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         let Some(job) = jobs.get(i) else { break };
-                        let result = run_job(world, &raster, job, out, tiles, options.water);
+                        let result = run_job(world, &raster, job, out, tiles, options);
                         if let Some(report) = options.progress {
                             let n = finished.fetch_add(1, Ordering::Relaxed) + 1;
-                            report(world.name(), level.level, n as u64, jobs.len() as u64);
+                            let reused = matches!(&result, Ok(Some(b)) if b.reused);
+                            report(
+                                world.name(),
+                                level.level,
+                                n as u64,
+                                jobs.len() as u64,
+                                reused,
+                            );
                         }
                         let failed = result.is_err();
                         if let Ok(mut done) = done.lock() {
@@ -229,7 +320,10 @@ pub fn generate_terrain(
             }
         });
         for result in done.into_inner().map_err(|_| GenError::Worker)? {
-            files.extend(result?);
+            if let Some(block) = result? {
+                files.extend(block.files.iter().cloned());
+                blocks.push(block);
+            }
         }
     }
     if let Some(bounds) = world.bounds() {
@@ -246,9 +340,11 @@ pub fn generate_terrain(
         )?);
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
+    blocks.sort_by(|a, b| a.key.cmp(&b.key));
     Ok(Report {
         world: world.name().to_owned(),
         files,
+        blocks,
     })
 }
 
@@ -330,6 +426,39 @@ mod tests {
     }
 
     #[test]
+    fn block_inputs_change_only_where_the_world_changes_and_a_reused_block_is_not_built() {
+        let run = |w: &Worldspace, name: &str, reuse: bool| {
+            let keep = |_: &str, _: &str| Some(Vec::new());
+            generate_terrain(
+                w,
+                &TerrainSettings::default(),
+                &temp(name),
+                &Options {
+                    reuse: reuse.then_some(&keep as &(dyn Fn(&str, &str) -> _ + Sync)),
+                    ..Options::default()
+                },
+            )
+            .unwrap()
+        };
+        let a = run(&world(), "inputs-a", false);
+        let mut changed = world();
+        changed.set_cell_water(0, 0, true, Some(500.0));
+        let b = run(&changed, "inputs-b", false);
+        assert_eq!(a.blocks.len(), b.blocks.len());
+        // the water of cell (0, 0) is inside every level's block x0.y0, and there is only that block per level
+        assert!(
+            a.blocks
+                .iter()
+                .zip(&b.blocks)
+                .all(|(x, y)| x.key == y.key && x.inputs != y.inputs)
+        );
+        assert_eq!(run(&world(), "inputs-c", false).blocks, a.blocks);
+        let kept = run(&world(), "inputs-d", true);
+        assert!(kept.blocks.iter().all(|b| b.reused && b.files.is_empty()));
+        assert!(!temp("inputs-d").join("meshes").exists());
+    }
+
+    #[test]
     fn the_thread_count_does_not_change_a_single_byte() {
         let (one, four) = (temp("t1"), temp("t4"));
         let a = generate_terrain(
@@ -341,6 +470,7 @@ mod tests {
                 land: None,
                 progress: None,
                 water: true,
+                reuse: None,
             },
         )
         .unwrap();
@@ -353,6 +483,7 @@ mod tests {
                 land: None,
                 progress: None,
                 water: true,
+                reuse: None,
             },
         )
         .unwrap();

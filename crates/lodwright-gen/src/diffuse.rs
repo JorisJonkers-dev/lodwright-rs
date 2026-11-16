@@ -23,6 +23,12 @@ pub struct Tile {
 }
 
 impl Tile {
+    /// The pixels, row-major.
+    #[must_use]
+    pub fn pixels(&self) -> &[[u8; 3]] {
+        &self.rgb
+    }
+
     /// A tile of one colour.
     #[must_use]
     pub fn flat(rgb: [u8; 3]) -> Self {

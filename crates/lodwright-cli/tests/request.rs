@@ -117,6 +117,50 @@ fn a_changed_request_replaces_the_old_files_and_a_deleted_file_is_regenerated() 
 }
 
 #[test]
+fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
+    let d = data("reuse");
+    let out = temp("reuse-out");
+    let level = |level, quality| lodwright_contract::LevelRequest {
+        level,
+        quality,
+        max_vertices: 500,
+        diffuse_size: 64,
+        normal_size: 64,
+    };
+    let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
+    request.terrain.land_textures = false;
+    request.objects.enabled = false;
+    request.terrain.levels = vec![level(4, 10.0), level(8, 10.0)];
+    let file = write_request(&out, &request);
+    let (_, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
+    assert_eq!(doc["blocks"]["generated"], 2, "{doc}");
+    let kept = out.join("meshes/landscape/lod/island/island.level4.x0.y0.nif");
+    let stamp = std::fs::metadata(&kept).unwrap().modified().unwrap();
+    // level 8 changes and level 16 is new: level 4 is kept untouched
+    request.terrain.levels = vec![level(4, 10.0), level(8, 20.0), level(16, 10.0)];
+    let file = write_request(&out, &request);
+    let (code, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
+    assert_eq!((code, doc["code"].as_str()), (0, Some("generated")));
+    assert_eq!(doc["blocks"]["up_to_date"], 1, "{doc}");
+    assert_eq!(doc["blocks"]["generated"], 2, "{doc}");
+    assert_eq!(std::fs::metadata(&kept).unwrap().modified().unwrap(), stamp);
+    let manifest: lodwright_contract::Manifest =
+        serde_json::from_slice(&std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest.blocks.len(), 3);
+    // a kept file that was changed on disk is rebuilt, and a dropped level's files go away
+    std::fs::write(&kept, b"changed").unwrap();
+    request.terrain.levels = vec![level(4, 10.0)];
+    let file = write_request(&out, &request);
+    let (_, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
+    assert_eq!(doc["blocks"]["generated"], 1, "{doc}");
+    assert!(std::fs::read(&kept).unwrap().len() > 100);
+    assert!(
+        !out.join("meshes/landscape/lod/island/island.level16.x0.y0.nif")
+            .exists()
+    );
+}
+
+#[test]
 fn bad_requests_and_unsafe_outputs_are_refused_with_codes() {
     let d = data("bad");
     let out = temp("bad-out");

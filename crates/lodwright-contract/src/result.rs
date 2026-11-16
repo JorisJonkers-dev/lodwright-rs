@@ -71,6 +71,19 @@ pub struct ResultDoc {
     /// Relative name of the manifest, when one was written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifest: Option<String>,
+    /// Terrain blocks of a `generate` run: how many were built and how many were kept from the earlier run
+    /// because their inputs did not change; omitted when no terrain was generated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocks: Option<BlockCounts>,
+}
+
+/// Terrain blocks built and kept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct BlockCounts {
+    /// Blocks built in this run.
+    pub generated: u64,
+    /// Blocks whose files were kept from the earlier run.
+    pub up_to_date: u64,
 }
 
 impl ResultDoc {
@@ -91,6 +104,7 @@ impl ResultDoc {
             written: Vec::new(),
             warnings: Vec::new(),
             manifest: None,
+            blocks: None,
         }
     }
 

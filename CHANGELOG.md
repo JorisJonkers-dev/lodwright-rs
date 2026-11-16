@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.2.0...v0.3.0) (2026-11-16)
+
+
+### Features
+
+* generate terrain LOD for a world with adaptive meshes ([#67](https://github.com/JorisJonkers-dev/lodwright-rs/issues/67)) ([1406d43](https://github.com/JorisJonkers-dev/lodwright-rs/commit/1406d4348069d19243ed74cd08b2ea50417455d6))
+* **generate:** keep unchanged terrain blocks across runs ([#84](https://github.com/JorisJonkers-dev/lodwright-rs/issues/84)) ([b66a5aa](https://github.com/JorisJonkers-dev/lodwright-rs/commit/b66a5aa9471a5025e417033179ca0b67c038cef0))
+* land texture layers in terrain diffuse maps ([#72](https://github.com/JorisJonkers-dev/lodwright-rs/issues/72)) ([0d670cb](https://github.com/JorisJonkers-dev/lodwright-rs/commit/0d670cb32307d4fbc30c19ed847cc34123314c29))
+* match the game's LOD tree, settings file codec and terrain block NIF writer ([#66](https://github.com/JorisJonkers-dev/lodwright-rs/issues/66)) ([aa40793](https://github.com/JorisJonkers-dev/lodwright-rs/commit/aa40793d0a6d7cdda1111f431456b5b315189a8b))
+* object LOD generation ([#70](https://github.com/JorisJonkers-dev/lodwright-rs/issues/70)) ([fc6b341](https://github.com/JorisJonkers-dev/lodwright-rs/commit/fc6b3410524c19c6e031cbca84615e4847c6a067))
+* progress events, README and gap list ([#74](https://github.com/JorisJonkers-dev/lodwright-rs/issues/74)) ([dabd010](https://github.com/JorisJonkers-dev/lodwright-rs/commit/dabd010e54035b4617ede9b82d88544b8a33c2e0))
+* request document, inclusion rules and manifest for generate ([#73](https://github.com/JorisJonkers-dev/lodwright-rs/issues/73)) ([9d87bb5](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9d87bb5f7f17adf8840bb3e7cc1ec410cfcc8b03))
+* **terrain:** water planes in terrain blocks ([#83](https://github.com/JorisJonkers-dev/lodwright-rs/issues/83)) ([e2cf3fd](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e2cf3fd240a2966e82007723cb417f77bf47179f))
+* **trees:** tree LOD lists, block files and billboard atlas ([#79](https://github.com/JorisJonkers-dev/lodwright-rs/issues/79)) ([2edd83f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/2edd83fe29e660e5c88a0672e1b28243818d3f41))
+* use esplugin for plugin headers in a GPL-3.0 crate and add a licence map ([#64](https://github.com/JorisJonkers-dev/lodwright-rs/issues/64)) ([0001fb4](https://github.com/JorisJonkers-dev/lodwright-rs/commit/0001fb49add11e118b35ef81803ec728c9590492))
+* verify command for generated LOD folders ([#71](https://github.com/JorisJonkers-dev/lodwright-rs/issues/71)) ([2dbabe8](https://github.com/JorisJonkers-dev/lodwright-rs/commit/2dbabe890d275009b3eae156f8d2a3c4269dc781))
+
+
+### Bug Fixes
+
+* **licence:** mark the crate linking esplugin as GPL-3.0-only ([#69](https://github.com/JorisJonkers-dev/lodwright-rs/issues/69)) ([9819e33](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9819e33285b459fecf4eed2a338183a063f0cbfe))
+* **objects:** keep model translations out of the reference scale and ignore node rotations ([#80](https://github.com/JorisJonkers-dev/lodwright-rs/issues/80)) ([a51835e](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a51835ef9a1674796e0b07336c35898feca1fdfd))
+* **objects:** place temporary references in the block of their cell ([#81](https://github.com/JorisJonkers-dev/lodwright-rs/issues/81)) ([3816fc2](https://github.com/JorisJonkers-dev/lodwright-rs/commit/3816fc2d56957979cb18d1ff7ee573be46aab038))
+
 ## [0.2.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.1.0...v0.2.0) (2026-11-14)
 
 

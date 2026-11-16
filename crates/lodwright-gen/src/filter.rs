@@ -103,6 +103,7 @@ mod tests {
             reference_plugin: ref_plugin,
             base_plugin,
             part: false,
+            cell: None,
         }
     }
 

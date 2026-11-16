@@ -987,7 +987,18 @@ date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Found by fitting the per-model offset between generated and shipped vertices: over the 295 blocks of the main world the median share of vertices within 0.05 units rose from 0.881 to 0.940 with the unscaled translation and to 0.942 with node rotations ignored (lowest block from 0.108 to 0.814). The scale of a shape's own transform is still applied with s; only seven models carry one."
+note = "Found by fitting the per-model offset between generated and shipped vertices: over the 295 blocks of the main world the median share of vertices within 0.05 units rose from 0.881 to 0.940 with the unscaled translation and to 0.942 with node rotations ignored (lowest block from 0.108 to 0.814). The scale of a shape's own transform is still applied with s; only seven models carry one. These shares came from matching vertices rounded to a 0.05 grid, which misses pairs that straddle a grid line; matched one to one within 0.05 units the same output covers 99.98 percent of the vertices (see game-object-block-cell)."
+
+[[source]]
+id = "game-object-block-cell"
+fact = "The game's own object LOD blocks place a temporary reference (one in a cell's temporary children group) in the block of that cell's XCLC grid and a persistent reference in the block of the cell under its position. With this rule all 295 blocks of the main worldspace have the same vertex and triangle counts as the game's own, and 2,305,461 of 2,305,868 vertices (99.98 percent) have a generated vertex within 0.05 units (one to one); 291 blocks match in every vertex."
+url = "oracle:game-lod-files"
+licence = "Counts and positions compared between records and files of the owner's own game; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Only one LOD reference of the base game separates the two rules for temporary references: it lies a fraction of a unit south of its cell's edge and the game's block follows the cell. 93 persistent LOD references lie outside the persistent cell's grid and the game's blocks follow their positions. The four blocks that still differ each hold one object whose vertices are shifted or turned as a whole (407 vertices in all), which points at placements changed after the game's blocks were built."
 
 [[source]]
 id = "game-lod-water-shape"

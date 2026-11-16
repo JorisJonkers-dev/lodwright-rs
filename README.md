@@ -25,11 +25,18 @@ the game's own tree in file names, counts and structure; against the game's own 
 object blocks have the same vertex and triangle counts (99.98 percent of vertices in place) and the water planes
 cover the same ground to 0.91 to 0.99 (see `docs/gap-list.md` for the measurements). A second run keeps the terrain
 blocks whose inputs did not change. `lodwright verify` checks a folder against the formats and can compare it with
-another tree. A request document (`lodwright schema request`) and the `lodwright-gen` library are the integration
-points for a mod manager.
+another tree. A request document (`lodwright schema request`) is how a caller drives a run.
 
 Not done: loading in the game (owner only, docs/owner-runbook.md section 6), the game's own water outline (ours is
 our own design), and reuse of unchanged object and tree blocks. The gap list has each item with its state.
+
+## Place in the stack
+
+lodwright-rs is a Component of [Raul's Trusty Toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox).
+The Toolbox (`raul`) pins, fetches and verifies the lodwright release, writes the request document and runs
+`lodwright` as a process (ADR-0007 there). lodwright owns its Contracts (plan, request, result, manifest, verify and
+events, see [docs/contracts.md](docs/contracts.md)); the Toolbox keeps the registry of which versions each Known-good
+set speaks (ADR-0009 there). The CLI works alone and never fetches or starts another tool.
 
 ## Scope
 

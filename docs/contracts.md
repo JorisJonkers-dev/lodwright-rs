@@ -1,7 +1,14 @@
 # Contracts
 
-lodwright emits JSON documents that other tools read. Each document is a contract (ADR-0006 in the nv-linux umbrella
-repository) and says so:
+lodwright emits JSON documents that other tools read. Each document is a contract and says so. lodwright owns these
+Contracts: plan, request, result, manifest, verify and the progress events. Their published schemas are authoritative;
+verify, manifest and events get their schema files and handshake entries in issue #87.
+Raul's Trusty Toolbox keeps the registry: which Contracts exist, which versions each Known-good set speaks, and a
+snapshot of each such version (ADR-0009 in
+[rauls-trusty-toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox/tree/main/docs/adr)). The Toolbox
+(`raul`), not a mod manager, drives lodwright through them (ADR-0007 there).
+
+Each document carries:
 
 * `schema_version`: an integer. It rises when a key is removed, renamed or retyped, or when a value is added to an enum
   that is not open. A new optional key does not raise it, so a reader ignores keys it does not know.

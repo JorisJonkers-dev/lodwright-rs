@@ -35,7 +35,7 @@ when they drift, and the release build fails when the binary prints a different 
 | first release with the contract (after 0.1.0) | 1 | 1 |
 
 A change to a document that adds an optional field is not a version bump; readers ignore unknown fields. A breaking
-change adds a `v2` schema beside `v1`, keeps printing `v1` on `--schema-version 1` for at least one nvmod release, and
+change adds a `v2` schema beside `v1`, keeps printing `v1` on `--schema-version 1` for at least one Known-good set of Raul's Trusty Toolbox, and
 gets a row here. The release procedure above is unchanged: the asset names carry the document version, never the tool
 version.
 

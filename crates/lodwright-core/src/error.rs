@@ -22,6 +22,8 @@ pub enum Error {
     },
     /// The input is not shaped like a plugin (bad signature, impossible size, nesting too deep).
     Malformed(&'static str),
+    /// A `.dlodsettings` file has the wrong size.
+    BadSettings(&'static str),
     /// A compressed record did not inflate, or claimed more than the allowed size.
     Decompress,
     /// A plugin names a master that is not in the load order.
@@ -62,6 +64,7 @@ impl fmt::Display for Error {
             Self::VhgtOffset => f.write_str("the VHGT offset is not a usable number"),
             Self::Truncated { what } => write!(f, "the plugin ends inside {what}"),
             Self::Malformed(why) => write!(f, "not a readable plugin: {why}"),
+            Self::BadSettings(why) => write!(f, "not a LOD settings file: {why}"),
             Self::Decompress => f.write_str("a compressed record could not be inflated"),
             Self::MissingMaster(name) => {
                 write!(f, "master {name} is not in the load order")

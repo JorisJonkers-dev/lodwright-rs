@@ -8,7 +8,7 @@
 //! quality, not a copy of another tool's: the `quality` number is converted to a tolerance in world units
 //! ([`UNITS_PER_QUALITY`]), so quality numbers of other tools do not map onto it.
 //!
-//! No `.btr` is written: its layout is not specified yet (`docs/design.md`, open questions).
+//! No file is written here: the block NIF writer lives in `lodwright-nif` and the generator in the CLI.
 //!
 //! Derived from: `provenance/sources.toml` rows `cell-size-units` and the layout rows used by [`crate::layout`].
 
@@ -531,7 +531,7 @@ mod tests {
     fn a_plan_lists_each_block_with_data_with_paths_and_texture_sizes() {
         let world = flat_world("Mojave", &[(0, 0), (1, 1), (5, 0)]);
         let plan = plan_world(&world, &TerrainSettings::default()).unwrap();
-        assert_eq!(plan.settings_path, "lodsettings/Mojave.lod");
+        assert_eq!(plan.settings_path, "lodsettings/mojave.dlodsettings");
         // level 4: blocks (0,0) and (4,0); levels 8, 16, 32: one block each
         let per_level: Vec<usize> = LEVELS
             .iter()
@@ -542,7 +542,7 @@ mod tests {
         assert_eq!((first.id.level, first.id.x, first.id.y), (4, 0, 0));
         assert_eq!(
             first.mesh_path,
-            "meshes/landscape/lod/Mojave/blocks/Mojave.4.0.0.btr"
+            "meshes/landscape/lod/mojave/mojave.level4.x0.y0.nif"
         );
         assert_eq!(
             (first.diffuse_size, first.normal_size, first.mip_levels),

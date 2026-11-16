@@ -6,11 +6,12 @@ each source file say which one applies; this page is the map.
 | Part | Licence | Why |
 | --- | --- | --- |
 | `lodwright-core`, `lodwright-nif`, `lodwright-dds`, `lodwright-assets`, `lodwright-contract`, `lodwright-testkit` | MPL-2.0 | Written here, some of it translated from MPL-2.0 xEdit definitions, which must stay MPL-2.0 |
-| `lodwright-plugin-meta` | GPL-3.0-or-later | Wraps the GPL-3.0 `esplugin` crate for plugin header reading |
+| `lodwright-plugin-meta` | GPL-3.0-only | Wraps the GPL-3.0 `esplugin` crate for plugin header reading |
 | `lodwright-cli` (the `lodwright` binary) | MPL-2.0 for its own files; the built binary is GPL-3.0 | It links `lodwright-plugin-meta` |
 
 Rules:
 
+- esplugin declares plain `GPL-3.0` (GPL-3.0-only); a crate linking it cannot claim "or later", so ours say GPL-3.0-only.
 - A binary that links GPL-3.0 code is distributed under GPL-3.0 terms. MPL-2.0 files stay MPL-2.0 and remain usable
   by anyone from the library crates that do not link GPL code.
 - Code translated from xEdit's MPL-2.0 sources keeps MPL-2.0 and names the file and revision in its header. It is

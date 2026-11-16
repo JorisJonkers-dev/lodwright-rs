@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 //! Plugin header facts read with the `esplugin` crate (GPL-3.0): masters and the master flag. Kept in its own
 //! crate so the MPL-2.0 crates keep a permissive dependency tree; see `docs/LICENSING.md`.
 

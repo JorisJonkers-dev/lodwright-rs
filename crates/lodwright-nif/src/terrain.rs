@@ -210,7 +210,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         },
         num_triangles: triangles,
         num_triangle_points: u32::from(triangles) * 3,
-        triangles: Some(block.indices.as_chunks::<3>().0.iter().copied().collect()),
+        triangles: Some(block.indices.as_chunks::<3>().0.to_vec()),
         match_groups: Vec::new(),
     };
     let shape = tri_shape();

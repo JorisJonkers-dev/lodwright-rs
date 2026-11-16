@@ -977,3 +977,14 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Open: which objects make up the remaining difference in the eight blocks that still differ; some of the difference may come from DLC plugins the game's blocks were built with."
+
+[[source]]
+id = "game-lod-water-shape"
+fact = "In 164 of the 1360 terrain block NIFs of the main worldspace (86 with ten blocks, 78 with twelve) the root node has one or two further children after the terrain shape: a NiTriShape without properties whose data block has no UVs and a handful of vertices (4 vertices and 3 triangles in the block measured) at one constant height, with the shape's translation equal to the block origin."
+url = "oracle:game-lod-files"
+licence = "Structure and counts of the owner's own game files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "These are the water planes of the block. Their derivation (which cells, the polygon outline, the height) is not established, so generate does not write them yet; verify reports the missing blocks as structure differences from the game's own tree."

@@ -348,3 +348,9 @@ segment table, the shader flag words, and the in-game behaviour of tiling textur
 `game-object-block-rules`: the remaining rules (disabled references, high priority in both files, collections drawn
 with their own model) were found by comparing block by block, which raised the blocks with equal counts from 196 to
 287 of 295.
+
+## 2026-11-16: water shapes in terrain blocks
+
+`game-lod-water-shape`: found by running `lodwright verify --reference` on the game's own tree against the generated
+one: file names and counts are identical, and 122 terrain blocks differ in block types because the game's blocks carry
+a water plane. Open: how the outline and height of the plane are derived.

@@ -326,3 +326,44 @@ fn the_contract_the_plan_names_is_one_the_handshake_lists() {
     assert!(plan.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\","));
     assert!(handshake.contains("{\"name\":\"lodwright-plan\",\"versions\":[1]}"));
 }
+
+#[test]
+fn verify_passes_a_generated_folder_and_fails_a_damaged_one() {
+    let data = std::env::temp_dir().join(format!("lodwright-verify-cli-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&data);
+    std::fs::create_dir_all(&data).unwrap();
+    let world = SyntheticWorld::new(0xB00, "Island").cell(2, 2, Heights::flat(16.0));
+    std::fs::write(data.join("Island.esm"), world_plugin(&[], &world, false)).unwrap();
+    let out_dir =
+        std::env::temp_dir().join(format!("lodwright-verify-cli-out-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out_dir);
+    let run = |args: &[&str]| {
+        let args: Vec<String> = args.iter().map(|a| (*a).to_owned()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = lodwright_cli::run(&args, &mut out, &mut err);
+        (code, String::from_utf8(out).unwrap())
+    };
+    let (code, _) = run(&[
+        "generate",
+        "--data",
+        data.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--out",
+        out_dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0);
+    let (code, text) = run(&["verify", out_dir.to_str().unwrap()]);
+    assert_eq!(code, 0, "{text}");
+    assert!(text.contains("0 errors"), "{text}");
+    std::fs::remove_file(out_dir.join("lodsettings/island.dlodsettings")).unwrap();
+    std::fs::write(out_dir.join("lodsettings/island.dlodsettings"), b"short").unwrap();
+    let (code, text) = run(&["verify", out_dir.to_str().unwrap(), "--json"]);
+    assert_eq!(code, 1);
+    assert!(
+        text.contains("\"ok\":false") && text.contains("24 bytes"),
+        "{text}"
+    );
+    assert_eq!(run(&["verify"]).0, 2);
+}

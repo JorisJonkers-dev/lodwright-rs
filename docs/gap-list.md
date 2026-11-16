@@ -18,7 +18,8 @@ pipeline the community generators provide for this game. Each row is one work it
 | 11 | Inclusion rules | Not built | Per plugin and per record include and exclude lists, reading them from a request file |
 | 12 | Determinism, incremental runs | Terrain ready to build on | Stable ordering everywhere, content hashes per block, a manifest and reuse of unchanged blocks |
 | 13 | Performance | Parallel terrain blocks, bounded worker count; the main worldspace takes about 9 seconds and 0.5 GiB with four workers | Memory cap option, streaming of large plugins |
-| 14 | CLI | `plan`, `heightmap`, `probe`, `generate` (terrain) | `verify`, a request document |
+| 14 | CLI | `plan`, `heightmap`, `probe`, `generate`, `verify` | A request document |
+| 17 | Water planes in terrain blocks | Structure measured (`game-lod-water-shape`): 164 of 1360 blocks carry one or two extra shapes | Outline and height rules; not written yet |
 | 15 | Integration for the mod manager | Contracts exist (plan, result) | A request document, progress events, stable exit codes, a library entry point that does not print |
 | 16 | In-game acceptance | Owner only | Loading generated blocks in the game |
 

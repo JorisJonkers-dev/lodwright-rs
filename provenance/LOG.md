@@ -312,3 +312,10 @@ They supersede `lod-block-naming`, `lod-terrain-paths` and `lod-settings-path` a
 part of M8 (the 24-byte settings layout). Open: the contents of the additional-data block beyond its per-vertex float
 channel, the sentinel low heights in some blocks, the object block structure (M4, M6) and the tree files (M7). A second
 reader has not verified these rows.
+
+## 2026-11-16: checksum of compressed records in the game's own master
+
+`game-plugin-zlib-checksum`: reading the owner's master plugin read-only showed LAND records whose zlib checksum does
+not match; the reader now falls back to raw inflate for that failure only and still checks the stated size. Found by
+running `lodwright plan` on the real file (numbers only: the reader failed before the fix, then read 16 386 cells of
+the main worldspace).

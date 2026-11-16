@@ -891,3 +891,14 @@ date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
+
+[[source]]
+id = "game-plugin-zlib-checksum"
+fact = "Some compressed records in the game's own master plugin (LAND records among them) hold a deflate stream whose zlib checksum does not match the inflated bytes; the inflated length equals the size the record states."
+url = "oracle:game-lod-files"
+licence = "Observation about the owner's own game plugin; no content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "The reader inflates without the checksum when only the checksum fails and keeps the stated size as the check."

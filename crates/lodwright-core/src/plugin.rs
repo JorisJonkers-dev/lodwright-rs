@@ -170,6 +170,7 @@ impl RawRecord<'_> {
         if claimed > MAX_RECORD_BYTES {
             return Err(Error::Decompress);
         }
+        // source: game-plugin-zlib-checksum
         let stream = &self.data[4..];
         // Some of the game's own records carry a zlib checksum that does not match their contents; the
         // deflate data inside is still sound, so a checksum mismatch falls back to inflating without the

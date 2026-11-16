@@ -173,6 +173,7 @@ version = "0.2.0"
 dependencies = [
  "lodwright-contract",
  "lodwright-core",
+ "lodwright-gen",
  "lodwright-plugin-meta",
  "lodwright-testkit",
  "serde",
@@ -205,6 +206,17 @@ dependencies = [
  "ddsfile",
  "lodwright-testkit",
  "texpresso",
+]
+
+[[package]]
+name = "lodwright-gen"
+version = "0.2.0"
+dependencies = [
+ "lodwright-contract",
+ "lodwright-core",
+ "lodwright-dds",
+ "lodwright-nif",
+ "lodwright-testkit",
 ]
 
 [[package]]

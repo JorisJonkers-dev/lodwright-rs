@@ -19,6 +19,7 @@ pub mod lod;
 pub mod plugin;
 pub mod probe;
 pub mod raster;
+pub mod rtin;
 pub mod terrain;
 pub mod texture;
 pub mod worldspace;

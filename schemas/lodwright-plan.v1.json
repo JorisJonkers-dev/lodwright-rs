@@ -91,7 +91,7 @@
       ]
     },
     "Capabilities": {
-      "description": "What `generate` can do today. All false until a writer exists.",
+      "description": "What `generate` can do today.",
       "type": "object",
       "properties": {
         "object_lod": {

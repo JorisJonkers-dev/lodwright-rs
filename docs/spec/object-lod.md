@@ -19,6 +19,10 @@ reference select what appears (reported by modders in the forum thread of `fnv-l
 references are selected, how scale and rotation are baked, how SCOL (static collection) records are expanded, how
 textures are collected into the atlas: no public document. M6 gives the protocol.
 
+Measured on the game's own blocks: a reference turns its model by `game-object-rotation`; a vertex lands at
+`pos + R * (s * v + T)`, where the model's translations `T` are not scaled by the reference scale `s` and the rotations
+of the model's nodes are ignored (`game-object-shape-offset`).
+
 ## 3. Tree LOD
 
 Settled from the xEdit source (`xedit-tree-lod-files`, `xedit-tree-lod-selection`, `xedit-tree-lod-atlas`) and measured on

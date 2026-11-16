@@ -349,6 +349,13 @@ segment table, the shader flag words, and the in-game behaviour of tiling textur
 with their own model) were found by comparing block by block, which raised the blocks with equal counts from 196 to
 287 of 295.
 
+## 2026-11-16: object shape offsets
+
+`game-object-shape-offset`: found by fitting, model by model, the offset between generated vertices and the vertices of
+the game's own object blocks (read-only, numbers only). The translation of a model's shapes is added after the
+reference scale, and the rotation of the model's nodes is ignored. The median share of matching vertices per block
+went from 0.881 to 0.942 and the lowest block from 0.108 to 0.814. Open: the remaining 6 percent of vertices per block.
+
 ## 2026-11-16: water shapes in terrain blocks
 
 `game-lod-water-shape`: found by running `lodwright verify --reference` on the game's own tree against the generated

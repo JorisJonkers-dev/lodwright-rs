@@ -116,6 +116,51 @@ fn additional_data(heights: &[f32]) -> Result<Vec<u8>> {
     Ok(b)
 }
 
+fn tri_shape() -> NiTriShape {
+    NiTriShape {
+        av: AvObject {
+            net: ObjectNet {
+                name: -1,
+                extra_data: Vec::new(),
+                controller: -1,
+            },
+            flags: SHAPE_FLAGS,
+            translation: [0.0; 3],
+            rotation: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            scale: 1.0,
+            properties: vec![2],
+            collision_object: -1,
+        },
+        data: 4,
+        skin_instance: -1,
+        material_names: Vec::new(),
+        material_extra_data: Vec::new(),
+        active_material: 0,
+        material_needs_update: 0,
+        shader_property: -1,
+        alpha_property: -1,
+    }
+}
+
+fn file_header() -> Header {
+    Header {
+        user_version: 11,
+        bethesda: Some((
+            34,
+            ExportInfo {
+                author: vec![0],
+                unknown_int: 0,
+                process_script: vec![0],
+                export_script: vec![0],
+                max_filepath: Vec::new(),
+            },
+        )),
+        block_types: TYPES.iter().map(|t| t.to_vec()).collect(),
+        strings: Vec::new(),
+        groups: Vec::new(),
+    }
+}
+
 /// Build the NIF of one terrain block.
 ///
 /// # Errors
@@ -123,7 +168,7 @@ fn additional_data(heights: &[f32]) -> Result<Vec<u8>> {
 /// of range, or an index count that is not a multiple of three.
 pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
     let verts = block.vertices;
-    if verts.is_empty() || block.indices.is_empty() || block.indices.len() % 3 != 0 {
+    if verts.is_empty() || block.indices.is_empty() || !block.indices.len().is_multiple_of(3) {
         return Err(NifError::Inconsistent("a terrain block needs triangles"));
     }
     if block.indices.iter().any(|i| usize::from(*i) >= verts.len()) {
@@ -137,7 +182,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         high = high.max(v[2]);
     }
     let half = block.size / 2.0;
-    let mid = (low + high) / 2.0;
+    let mid = f32::midpoint(low, high);
     let radius = (half * half * 2.0 + (high - mid) * (high - mid)).sqrt();
     // source: game-lod-terrain-block-nif (u mirrored: u = 1 - x / size, v = y / size)
     let uv: Vec<[f32; 2]> = verts
@@ -165,38 +210,10 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         },
         num_triangles: triangles,
         num_triangle_points: u32::from(triangles) * 3,
-        triangles: Some(
-            block
-                .indices
-                .chunks_exact(3)
-                .map(|t| [t[0], t[1], t[2]])
-                .collect(),
-        ),
+        triangles: Some(block.indices.as_chunks::<3>().0.iter().copied().collect()),
         match_groups: Vec::new(),
     };
-    let shape = NiTriShape {
-        av: AvObject {
-            net: ObjectNet {
-                name: -1,
-                extra_data: Vec::new(),
-                controller: -1,
-            },
-            flags: SHAPE_FLAGS,
-            translation: [0.0; 3],
-            rotation: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-            scale: 1.0,
-            properties: vec![2],
-            collision_object: -1,
-        },
-        data: 4,
-        skin_instance: -1,
-        material_names: Vec::new(),
-        material_extra_data: Vec::new(),
-        active_material: 0,
-        material_needs_update: 0,
-        shader_property: -1,
-        alpha_property: -1,
-    };
+    let shape = tri_shape();
     let mut lighting = Vec::with_capacity(54);
     put_u32(&mut lighting, u32::MAX);
     put_u32(&mut lighting, 0);
@@ -225,22 +242,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         (7, Body::Opaque(aabb)),
     ];
     Ok(NifFile {
-        header: Header {
-            user_version: 11,
-            bethesda: Some((
-                34,
-                ExportInfo {
-                    author: vec![0],
-                    unknown_int: 0,
-                    process_script: vec![0],
-                    export_script: vec![0],
-                    max_filepath: Vec::new(),
-                },
-            )),
-            block_types: TYPES.iter().map(|t| t.to_vec()).collect(),
-            strings: Vec::new(),
-            groups: Vec::new(),
-        },
+        header: file_header(),
         blocks: blocks
             .into_iter()
             .map(|(type_index, body)| Block { type_index, body })

@@ -27,7 +27,7 @@ pub const EXIT_USAGE: u8 = 2;
 /// Exit code: a capability is not built yet (`generate`).
 pub const EXIT_UNSUPPORTED: u8 = 3;
 
-const HELP: &str = "lodwright: clean-room terrain and object LOD generator (terrain planning so far)
+const HELP: &str = "lodwright: clean-room terrain, object and tree LOD generator
 
 Usage: lodwright [--help | --version [--json]]
        lodwright doctor <data-folder>

@@ -84,7 +84,27 @@ These need real files and are what the next implementation steps wait for. Each 
 Public-source specs and the measurement protocol for these items are in [spec/](spec/README.md) (M1 to M9). Note
 the finding there: the block meshes are `.nif`, not `.btr`, and the settings file is `.dlodsettings`.
 
+Items 1 to 4 are settled now: the measurements and the rules found are in [gap-list.md](gap-list.md) and the
+provenance rows it names.
+
 ## 5. Not done and not planned without your decision
 
 Publishing the repository, and contacting the author of the tool whose behaviour is being reimplemented, are your
 decisions (see the last section of [clean-room.md](clean-room.md)).
+
+## 6. In-game load test (issue 78)
+
+Only the game shows whether a generated folder loads and looks right. Generate into an empty folder outside the data
+folder and outside any git tree, check it, then install it as a mod of its own (above every other LOD) in a test
+profile:
+
+```text
+lodwright generate --data "<data folder>" --load-order plugins.txt --out ~/lod-test --json
+lodwright verify ~/lod-test
+```
+
+Look from a high place over open ground, over a lake and over a town, at a distance where LOD shows. Report per world,
+with the `lodwright --version` line: loads or crashes; terrain seams or holes; whether distant lakes show water at the
+right height (water planes are new and our own design); whether distant buildings stand in place and are textured;
+whether trees show (only with billboard textures from mods). Use `--no-water` for a second run if the water looks
+wrong, to tell it apart from the terrain. Numbers and a description only, no screenshots of game content in issues.

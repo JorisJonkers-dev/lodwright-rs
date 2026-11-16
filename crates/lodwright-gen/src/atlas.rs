@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Packing the textures of object LOD into one atlas.
 //!
 //! The game's own atlas holds every texture its models use at their native size (the measured textures add up to

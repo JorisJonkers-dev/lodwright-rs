@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the tree LOD readers. The only property: arbitrary bytes never panic, and what parses writes
 //! back to the same bytes.
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Inclusion rules for object LOD: which of the game's visible objects the caller wants left out or kept.
 
 use lodwright_contract::Inclusion;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Round trips: `read(write(x)) == x` over generated shape sets, and byte-exact carriage of unknown blocks.
 
 mod common;

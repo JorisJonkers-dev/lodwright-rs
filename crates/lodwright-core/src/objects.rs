@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Which objects stand in a world and can be seen from afar, after load-order overrides.
 //!
 //! A later plugin's record replaces an earlier one with the same absolute `FormID` as a whole. Base objects are

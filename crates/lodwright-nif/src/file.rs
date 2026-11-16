@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The NIF container: header, block table, blocks and footer.
 //!
 //! Derived from: `Core/wbDataFormatNif.pas` and `Core/wbDataFormatNifTypes.pas` in TES5Edit/TES5Edit at revision

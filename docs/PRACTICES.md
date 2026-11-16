@@ -24,4 +24,4 @@ Security on a private repository; revisit if the repository goes public), Window
 Windows-only), nv-rs's sync and fork machinery (this is not a fork).
 
 Provenance of the scripts: `scripts/setup-repo.sh` and `scripts/apply-ruleset.sh` are adapted from the owner's own
-scripts in nv-rs, a GPL-3.0-only repository; the owner decides whether MPL-2.0 headers on them are right.
+scripts in nv-rs, a GPL-3.0-only repository; they carry GPL-3.0-only like the rest of the repository.

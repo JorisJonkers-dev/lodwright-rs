@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! `lodwright probe` against files built by the testkit in a temporary folder.
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The per-world LOD settings file (`lodsettings/<world>.dlodsettings`): 24 bytes, little endian.
 //!
 //! Layout from the row `game-dlodsettings-layout` (measured on two files of the owner's install).

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Terrain LOD planning: which blocks exist at each level, how coarse each block's mesh can be, and what files
 //! and texture sizes the block needs.
 //!

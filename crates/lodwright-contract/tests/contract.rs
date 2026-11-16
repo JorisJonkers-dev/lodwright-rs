@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Golden documents, schema drift and the compatibility rules of the contract.
 
 use std::path::{Path, PathBuf};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Reading game assets by path: loose files over archives, as the game finds them.
 
 use std::collections::HashMap;

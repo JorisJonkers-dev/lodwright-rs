@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! DDS contract. Not implemented.
 //!
 //! Will read and write the DDS container and compress BC1, BC3 and BC5 through a permissively licensed crate.

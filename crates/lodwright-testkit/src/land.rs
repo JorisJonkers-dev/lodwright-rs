@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic LAND heights: encoding a 33x33 vertex grid as VHGT bytes and decoding it again.
 //!
 //! Layout used: a little-endian `f32` offset, then 33 x 33 signed byte deltas, then three padding bytes. Row

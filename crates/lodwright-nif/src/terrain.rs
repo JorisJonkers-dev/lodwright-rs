@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The terrain LOD block NIF: the eight-block structure the game's own terrain blocks have.
 //!
 //! Layout from the row `game-lod-terrain-block-nif` in `provenance/sources.toml`. Blocks whose bytes are

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Game assets for lodwright: a reader for BSA v104 archives and the resolver that finds a path the way the game
 //! does (loose files first, then archives).
 //!

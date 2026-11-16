@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Path normalisation shared by the archive index and the resolver.
 
 /// The lookup key of a path: ASCII lower case, backslash separators, no leading or trailing separator.

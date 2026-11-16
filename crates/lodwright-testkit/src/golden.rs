@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Golden-file helper: expectations are text files next to the tests, never binary.
 //!
 //! `UPDATE_GOLDEN=1 cargo test` rewrites them; the diff is then reviewed like any other change.

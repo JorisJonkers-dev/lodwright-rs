@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The `plan` and `heightmap` commands.
 
 use std::fmt::Write as _;

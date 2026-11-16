@@ -4,8 +4,8 @@ A Linux-native, clean-room generator of terrain and object LOD (level of detail)
 Tale of Two Wastelands, written in Rust. The existing generators are Windows-only; this one is built from public
 file-format documentation, our own measurements and synthetic tests.
 
-**Licence: MPL-2.0.** How the clean-room rule and the licence follow from the licences of the existing tools is in
-[docs/clean-room.md](docs/clean-room.md).
+**Licence: GPL-3.0-only**, with two files translated from xEdit kept under MPL-2.0 ([docs/LICENSING.md](docs/LICENSING.md)).
+The clean-room rule is in [docs/clean-room.md](docs/clean-room.md).
 
 ## Clean-room rule
 

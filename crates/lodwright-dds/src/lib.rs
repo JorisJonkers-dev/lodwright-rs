@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! DDS output for the LOD pipeline: an image buffer, box and Lanczos resampling, mip chains, BC1, BC3 and BC5
 //! encoding through the permissively licensed `texpresso` crate, and the `ddsfile` crate for the container.
 //!

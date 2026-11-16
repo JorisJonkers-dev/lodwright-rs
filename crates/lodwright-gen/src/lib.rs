@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Library entry point of lodwright: turns a worldspace into LOD files in an output folder.
 //!
 //! This is what a mod manager links against; the command line is a thin shell over it. Nothing here prints.

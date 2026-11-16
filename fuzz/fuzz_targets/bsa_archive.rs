@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the BSA v104 reader. The only property: arbitrary bytes never panic, and an extracted entry
 //! never exceeds the cap.
 

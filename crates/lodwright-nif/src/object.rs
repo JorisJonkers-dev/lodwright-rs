@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The object LOD block NIF: the seven-block structure the game's own object blocks have.
 //!
 //! Layout from the row `game-lod-object-block-nif` in `provenance/sources.toml`. The segment table has eight

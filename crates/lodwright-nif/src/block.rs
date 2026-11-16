@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Typed blocks: `NiNode`, `NiTriShape`, `NiTriShapeData` and the common property blocks, plus the opaque
 //! carrier for every other block type.
 //!

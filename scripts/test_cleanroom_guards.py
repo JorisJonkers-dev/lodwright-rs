@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests of the clean-room guards, in throwaway git repositories (positive and negative cases)."""
 
 import os
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import cleanroom_guards as g
 
-SPDX = "// SPDX-License-Identifier: MPL-2.0\n"
+SPDX = "// SPDX-License-Identifier: GPL-3.0-only\n"
 ROW = "\n".join(
     [
         "[[source]]",
@@ -92,7 +92,7 @@ class SpdxTests(unittest.TestCase):
         repo = Repo(self)
         repo.write("a.py", "print(1)\n")
         repo.write("b.sh", "#!/usr/bin/env bash\necho hi\n")
-        repo.write("c.sh", "#!/usr/bin/env bash\n# SPDX-License-Identifier: MPL-2.0\n")
+        repo.write("c.sh", "#!/usr/bin/env bash\n# SPDX-License-Identifier: GPL-3.0-only\n")
         repo.commit()
         failed = " ".join(repo.check("spdx", "base"))
         self.assertIn("a.py", failed)
@@ -102,7 +102,7 @@ class SpdxTests(unittest.TestCase):
     def test_another_licence_is_not_accepted(self) -> None:
         repo = Repo(self)
         repo.write("mit.rs", "// SPDX-License-Identifier: MIT\n")
-        repo.write("lookalike.rs", "// SPDX-License-Identifier: MPL-2.0-only-not\n")
+        repo.write("lookalike.rs", "// SPDX-License-Identifier: GPL-3.0-only-only-not\n")
         repo.commit()
         self.assertEqual(len(repo.check("spdx", "base")), 2)
 
@@ -154,7 +154,7 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_python_and_toml_comments_count(self) -> None:
         repo = Repo(self)
-        repo.write("a.py", "# SPDX-License-Identifier: MPL-2.0\n# " + "source: missing-row\n")
+        repo.write("a.py", "# SPDX-License-Identifier: GPL-3.0-only\n# " + "source: missing-row\n")
         repo.write("b.toml", "# " + "source: missing-too\n")
         repo.commit()
         self.assertEqual(len(repo.check("provenance", "base")), 2)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 # Build the release assets of the Linux x86_64 binary into one directory:
 #   lodwright-x86_64-unknown-linux-gnu   the binary
 #   lodwright-<document>.v<N>.json       the contract schemas (copied from schemas/, checked against the binary)

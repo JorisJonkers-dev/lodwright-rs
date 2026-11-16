@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Per-block terrain images: normal maps from heights and diffuse maps from vertex colours.
 //!
 //! Orientation follows the block mesh's UVs (row `game-lod-terrain-block-nif`): image column `c` of `n` is at

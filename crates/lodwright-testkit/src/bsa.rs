@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic BSA v104 archives, built in memory.
 //!
 //! Layout used: the 36-byte header, 16-byte folder records, one block per folder (length-prefixed folder name, then

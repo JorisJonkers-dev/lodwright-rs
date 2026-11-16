@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Adaptive terrain meshes on a right-triangle binary tree (RTIN).
 //!
 //! The block's `(2^k + 1)` square of samples is covered by two right triangles; a triangle is split at the middle

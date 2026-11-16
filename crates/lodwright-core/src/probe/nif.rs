@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! NIF probe: the header, the block table with type counts, and per-shape counts, for version 20.2.0.7.
 //!
 //! The layouts come from the provenance rows named in the `source:` comments. A block whose fields do not add up

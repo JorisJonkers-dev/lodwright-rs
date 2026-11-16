@@ -1,6 +1,6 @@
 # Clean-room process
 
-lodwright-rs is licensed MPL-2.0 and reimplements parts of xLODGen whose source is closed or unlicensed. This
+lodwright-rs is licensed GPL-3.0-only (docs/LICENSING.md) and reimplements parts of xLODGen whose source is closed or unlicensed. This
 document is the rule for everyone who writes code or docs here. The study behind it is
 `docs/research/porting/xlodgen-licence-and-design.md` in the NV-Linux-Modding repository.
 
@@ -63,13 +63,14 @@ the format becomes someone else's to implement. Nobody is penalised for disclosi
 - Open format questions are listed in `docs/design.md`; a question is closed by a row, never by a guess.
 - Code translated from MPL xEdit source names the file and revision in its header and stays MPL-2.0. Code taken from
   an MIT or Apache-2.0 tool of the owner (`lodcheck`, `ddsaudit`, `fnvorder`) is allowed with its notice kept
-  (MPL-2.0 can include permissive code); add the notice, the origin and a licence check to the pull request.
+  (GPL-3.0 can include permissive code); add the notice, the origin and a licence check to the pull request.
 
 ## What CI enforces
 
 `task guards` (`scripts/cleanroom_guards.py`, tested by `scripts/test_cleanroom_guards.py`) fails the pipeline when:
 
-- a `.rs`, `.py` or `.sh` file lacks `SPDX-License-Identifier: MPL-2.0` in its first five lines;
+- a `.rs`, `.py` or `.sh` file lacks `SPDX-License-Identifier: GPL-3.0-only` (or `MPL-2.0` for a file translated from
+  MPL-2.0 sources) in its first five lines;
 - a `source:` comment names an id that has no row, or a row lacks a field, states no licence, uses a URL that is not
   `https://` or `oracle:`, names a forbidden input (the unlicensed repository, decompiled or leaked code), or is
   missing from `LOG.md`;

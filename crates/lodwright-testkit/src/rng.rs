@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! A tiny seeded generator for property-style tests: deterministic, no dependency, not for anything else.
 
 /// A xorshift64* generator.

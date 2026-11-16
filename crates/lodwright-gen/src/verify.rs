@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Structural validation of a generated LOD folder against the game's formats.
 //!
 //! Nothing here needs the game: it re-reads every file with the generic readers and checks the properties the

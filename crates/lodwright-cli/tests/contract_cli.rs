@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The JSON contract as a caller sees it: documents, exit codes, versions and what never appears.
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_UNSUPPORTED, EXIT_USAGE, run};

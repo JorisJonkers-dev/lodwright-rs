@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Clean-room core of lodwright.
 //!
 //! Format readers and the height-and-tile math of the terrain pipeline. Nothing here may be implemented from the

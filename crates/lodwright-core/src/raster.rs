@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Block-aligned raster: the grid that LOD output is cut into (first slice).
 //!
 //! A raster over a worldspace is addressed in cell coordinates (signed, the origin is the worldspace origin).

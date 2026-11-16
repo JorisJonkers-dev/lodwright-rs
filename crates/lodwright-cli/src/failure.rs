@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! A failed command: a stable machine-readable code and a reason for people.
 
 use std::fmt;

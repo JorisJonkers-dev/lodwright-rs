@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! LAND layers: vertex normals (VNML), vertex colours (VCLR), base textures (BTXT) and additional texture layers
 //! (ATXT with its VTXT opacity points).
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Worldspaces assembled across a load order: `FormID`s resolved through master lists, later plugins overriding
 //! the cells of earlier ones.
 //!

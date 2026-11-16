@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Digests that tie a document to what produced it. A digest is a hash, never content.
 
 use sha2::{Digest, Sha256};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The documents `lodwright` prints for its callers, as types with serde and JSON Schema.
 //!
 //! The contract is ours (no format facts): plan v1 and result v1, the progress event lines, the answer to

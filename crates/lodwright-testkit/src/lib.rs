@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic fixture builders: the only test data this repository allows.
 //!
 //! Everything is built in memory by code. No game file, no extract of one and no committed binary is ever used

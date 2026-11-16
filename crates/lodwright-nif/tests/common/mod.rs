@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Shared builders: turn testkit shape specs into NIF files.
 
 use lodwright_nif::{

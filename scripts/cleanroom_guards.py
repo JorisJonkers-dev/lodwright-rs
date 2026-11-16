@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 """Clean-room guards: SPDX headers, provenance references, and the game-data guard.
 
     cleanroom_guards.py [--root DIR] [--base REF] {spdx,provenance,data,gitignore,all}
@@ -9,7 +9,7 @@ Without --base every tracked file is checked. With --base REF only what the curr
 references. Exit status 0 when clean, 1 when a rule is broken (one line per violation), 2 on misuse.
 
 Rules (docs/clean-room.md explains why):
-  spdx        every .rs, .py and .sh file has `SPDX-License-Identifier: MPL-2.0` in its first five lines.
+  spdx        every .rs, .py and .sh file has `SPDX-License-Identifier: GPL-3.0-only` in its first five lines.
   provenance  every `// source: <id>[, <id>]` (`# source:` in Python, shell, TOML and YAML) names a row of
               provenance/sources.toml; the rows are well formed (fields, unique ids, licence stated, no forbidden
               source) and each id appears in provenance/LOG.md.
@@ -135,7 +135,7 @@ def check_spdx(root: Path, files: list[str], v: Violations) -> None:
             continue
         head = "\n".join(text.splitlines()[:SPDX_LINES])
         if not SPDX_RE.search(head):
-            v.add(rel, f"no `SPDX-License-Identifier: MPL-2.0` (or GPL-3.0-only, see docs/LICENSING.md) in the first {SPDX_LINES} lines")
+            v.add(rel, f"no `SPDX-License-Identifier: GPL-3.0-only` (or GPL-3.0-only, see docs/LICENSING.md) in the first {SPDX_LINES} lines")
 
 
 # --- provenance ---------------------------------------------------------------------------------------------------

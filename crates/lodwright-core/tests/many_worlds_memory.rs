@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! A load order with 60 synthetic worlds can be walked one world at a time within a stated memory cap.
 //!
 //! Peak resident memory comes from the kernel's high-water mark (`VmHWM` in `/proc/self/status`, reset through

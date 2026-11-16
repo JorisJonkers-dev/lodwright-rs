@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Land texture colours for the terrain diffuse maps.
 //!
 //! Every land texture is reduced to a small tile once; the diffuse of a block samples the tile of the base texture

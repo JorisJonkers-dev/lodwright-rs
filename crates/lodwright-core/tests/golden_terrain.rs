@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Golden test: the terrain plan of a synthetic two-hill world, from plugin bytes to planned blocks.
 
 use lodwright_core::plugin::read;

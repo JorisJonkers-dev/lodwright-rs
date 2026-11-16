@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The `probe` command: numbers and structure of one file, never its content.
 
 use std::io::{Read, Write};

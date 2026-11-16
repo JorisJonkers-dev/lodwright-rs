@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Finding and reading the plugins of a load order in a data folder.
 
 use std::path::{Path, PathBuf};

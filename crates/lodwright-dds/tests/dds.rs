@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Header goldens, quality floors, mip sizes, the DX10 ban and hostile input for the DDS writer and reader.
 
 use lodwright_dds::{

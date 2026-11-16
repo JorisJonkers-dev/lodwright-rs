@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 # Audits the GitHub repository settings that cannot live in a file and applies the ones that are missing. Needs
 # admin rights to apply; the audit alone needs only read access. Adapted from nv-rs scripts/fork/setup-repo.sh.
 #

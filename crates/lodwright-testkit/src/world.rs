@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic worldspaces: a `WRLD` record and exterior cells with `LAND` heights, nested in groups the way a
 //! real plugin nests them (top group, world children, exterior block, sub-block, cell children, temporary).
 

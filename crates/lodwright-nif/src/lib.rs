@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! A clean-room generic reader and writer for the NIF container, version 20.2.0.7 (the version Fallout 3 and
 //! New Vegas meshes use).
 //!

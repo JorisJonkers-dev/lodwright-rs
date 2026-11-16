@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Object LOD generation from synthetic models, textures and references.
 
 use std::collections::HashMap;

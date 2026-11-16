@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! DDS files: legacy-header writing, strict header reading, and decoding for tests.
 //!
 //! Only DXT1 (BC1), DXT5 (BC3) and ATI2 (BC5) with the 128-byte legacy header are handled. A DX10 extension

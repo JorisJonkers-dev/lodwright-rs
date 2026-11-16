@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! A bounds-checked little-endian cursor. Every read returns `None` past the end; nothing indexes the slice.
 
 /// A cursor over a byte slice.

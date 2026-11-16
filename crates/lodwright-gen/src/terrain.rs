@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Terrain LOD generation for one worldspace: block NIFs, normal maps, diffuse maps and the settings file.
 //!
 //! Every block is independent, so blocks run on a bounded number of threads; the output does not depend on the

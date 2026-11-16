@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The loose-over-archive resolver: given a listing of what is on disk, which source supplies a path.
 //!
 //! The resolver is a pure function of its inputs (no file system access), so its rules are testable with plain

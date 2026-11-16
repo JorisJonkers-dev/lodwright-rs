@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Golden hex dump of the writer output for one fixed synthetic input.
 
 mod common;

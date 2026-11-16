@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the `.lod` settings reader.
 //!
 //! The reader does not exist in `lodwright-core` yet, so this runs the testkit's own reference reader (or nothing

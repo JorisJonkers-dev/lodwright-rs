@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! `generate --request`: the document, the manifest, the up-to-date run and the refusals.
 
 use lodwright_cli::run;

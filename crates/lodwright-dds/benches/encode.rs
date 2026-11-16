@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Hand-run encoder benchmark: `cargo bench -p lodwright-dds --bench encode`.
 //!
 //! Synthetic 2048 by 2048 inputs from the testkit, one timing per format, quality and picture kind, with the

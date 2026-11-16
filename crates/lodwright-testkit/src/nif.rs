@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic shape sets for NIF tests: plain data (no NIF types), built from a seed.
 //!
 //! The NIF crate turns these into files; the testkit stays free of format code so that the crate under test

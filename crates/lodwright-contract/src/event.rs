@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Progress events: newline-delimited JSON on stderr or in the file named by `--events`.
 
 use schemars::JsonSchema;

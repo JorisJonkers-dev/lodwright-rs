@@ -23,7 +23,7 @@ game data in the repository, a pull request or an issue.
 
 - Small pull requests with Conventional Commit titles (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`); the title becomes the
   squash commit and release-please reads it. Do not hand-edit `CHANGELOG.md`.
-- Every source file starts with `SPDX-License-Identifier: MPL-2.0`.
+- Every source file starts with `SPDX-License-Identifier: GPL-3.0-only`.
 - Every format fact the code relies on is a row in `provenance/sources.toml`, mentioned in `provenance/LOG.md`, and
   referenced from code with `// source: <id>`.
 - Tests use synthetic fixtures from `lodwright-testkit`; nothing binary is committed (`docs/TESTING.md`).

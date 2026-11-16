@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! `generate`: from a request (a file, or the command line turned into one) to files, a manifest and a result.
 
 use std::io::Write;

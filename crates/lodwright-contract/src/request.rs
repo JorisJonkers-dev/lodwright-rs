@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Request v1: what a caller asks `generate --request` to do, as one document.
 //!
 //! The request carries everything that decides the output, so its digest (`request_digest`) says whether an

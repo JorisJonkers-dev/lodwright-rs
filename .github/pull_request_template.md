@@ -13,7 +13,7 @@ What this pull request changes and why.
       binaries, or leaked source for this change, and I worked from the recorded sources only. If I was the
       specifier for the formats this change implements, I did not implement them (or a second reviewer
       re-derived the facts), as `docs/clean-room.md` requires.
-- [ ] New source files carry `SPDX-License-Identifier: MPL-2.0` in their first five lines.
+- [ ] New source files carry `SPDX-License-Identifier: GPL-3.0-only` in their first five lines.
 - [ ] Checks: `task check` passes locally.
 
 ## Verification

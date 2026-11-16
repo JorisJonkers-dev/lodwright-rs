@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the plugin reader: arbitrary bytes never panic, and what is read has sane heights.
 
 #![no_main]

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Probe for settings and `.dtl` files: the size and the leading bytes as little-endian integers.
 //!
 //! No format fact is used: the file is treated as a row of 32-bit little-endian integers, which is how the owner

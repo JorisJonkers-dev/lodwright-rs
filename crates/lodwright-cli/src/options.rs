@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Option parsing shared by `plan` and `heightmap`.
 
 use std::path::PathBuf;

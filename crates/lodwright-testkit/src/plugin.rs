@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic plugin bytes: a TES4 header record and flat records, built and parsed back.
 //!
 //! Record layout used: 4-byte signature, `u32` data size, `u32` flags, `u32` `FormID`, 8 bytes of version

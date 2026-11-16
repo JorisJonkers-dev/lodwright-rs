@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Little-endian cursor reader and byte writer with bounds-checked counts.
 
 use crate::error::{NifError, Result};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! `lodwright probe`: small readers that turn a NIF, DDS, settings or `.dtl` file into numbers and structure, so
 //! the owner can take measurements without copying content.
 //!

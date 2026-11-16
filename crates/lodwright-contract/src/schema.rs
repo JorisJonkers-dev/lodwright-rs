@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! JSON Schemas of the documents, and the check that refuses a document of a version we do not speak.
 
 use std::fmt;

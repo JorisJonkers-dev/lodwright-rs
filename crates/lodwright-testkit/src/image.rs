@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic RGBA8 pixel buffers for texture tests and benchmarks: gradients and noise, built from a seed.
 
 use crate::rng::Rng;

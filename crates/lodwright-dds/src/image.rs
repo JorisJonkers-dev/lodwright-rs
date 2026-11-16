@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The image buffer type, and the pure colour adjustments on it.
 
 use crate::error::{DdsError, Result};

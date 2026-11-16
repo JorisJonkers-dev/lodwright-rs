@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! BSA version 104 reader: header, folder and file records, names and optional zlib compression.
 //!
 //! Opening an archive reads only the index (header, records, names), never the file data, so a multi-gigabyte

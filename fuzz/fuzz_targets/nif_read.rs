@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the NIF reader: arbitrary bytes never panic it, and whatever it accepts and can write again
 //! reaches a fixed point (the second read-write gives the first write's bytes).
 

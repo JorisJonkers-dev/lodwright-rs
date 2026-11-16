@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Object LOD generation: the small LOD models of every visible object, merged per block of 4 by 4 cells, with
 //! their textures packed into one atlas per world.
 //!

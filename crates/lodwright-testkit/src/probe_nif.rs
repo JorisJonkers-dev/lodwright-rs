@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic NIF files for `lodwright probe`, in the layout of version 20.2.0.7 (Fallout 3 and New Vegas): the header with its block table
 //! and a few block types. Block contents are zeros or counters; nothing here is, or is derived from, a game file.
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Plan v1: what `lodwright plan --json` prints.
 
 use schemars::JsonSchema;

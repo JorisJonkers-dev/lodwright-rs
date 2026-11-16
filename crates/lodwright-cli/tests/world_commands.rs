@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! `plan` and `heightmap` against plugins built by the testkit in a temporary data folder.
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};

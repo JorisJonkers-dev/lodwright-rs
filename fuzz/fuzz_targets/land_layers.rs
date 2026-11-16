@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the LAND layer decoders (VNML, VCLR, BTXT, ATXT, VTXT) and the plugin reader with layers on.
 //! The only property: arbitrary bytes never panic, and decoded opacities are finite.
 

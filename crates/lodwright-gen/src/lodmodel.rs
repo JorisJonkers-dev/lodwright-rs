@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Reading the small LOD models that sit beside the full models: geometry with the shape rotations and the scales
 //! applied, the translations kept apart as an offset the placement scale does not touch, node rotations ignored
 //! (`game-object-shape-offset`), plus the texture paths and whether the shape is alpha tested.

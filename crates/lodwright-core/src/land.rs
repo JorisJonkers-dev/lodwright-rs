@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! LAND heightfield: decoding the VHGT subrecord of a LAND record into heights.
 //!
 //! A cell has a 33 x 33 vertex grid, stored as an `f32` offset and signed byte deltas. Adjacent cells share their

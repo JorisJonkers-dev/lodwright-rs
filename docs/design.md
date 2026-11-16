@@ -49,7 +49,7 @@ water handling are not designed yet.
 - DDS: `texpresso` (MIT) or `intel_tex_2` (MIT/Apache-2.0) for BC1/BC3/BC5, `ddsfile` (MIT) for containers,
   `image_dds` (MIT) as a convenience layer. `binrw` (MIT) for layouts. `esplugin` (GPL-3.0) is used for plugin
   headers in the `lodwright-plugin-meta` crate (see LICENSING.md).
-- Every new dependency must pass `cargo deny` (permissive or MPL-2.0 licences only) and be at least seven days old
+- Every new dependency must pass `cargo deny` (permissive, MPL-2.0 or GPL-3.0 licences) and be at least seven days old
   on the registry.
 
 ## Estimate

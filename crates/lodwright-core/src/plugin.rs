@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Plugin (`.esm`/`.esp`) reader: the TES4 header and master list, the group tree, zlib-compressed records, and
 //! the three record types the terrain pipeline needs (`WRLD`, `CELL`, `LAND`). Everything else is skipped
 //! unread.

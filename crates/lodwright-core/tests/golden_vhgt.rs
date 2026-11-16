@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Golden test: a fixed synthetic hill decoded from VHGT bytes equals the stored text rendering.
 
 use lodwright_core::land::{SIDE, decode_vhgt};

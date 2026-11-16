@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for `lodwright probe dds`. The only property: arbitrary bytes never panic, and a report never holds
 //! a byte of the input beyond the documented numbers (the report type cannot carry free text).
 

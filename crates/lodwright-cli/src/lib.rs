@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Command line of lodwright. The logic is here so tests can drive it without a process.
 //!
 //! Exit codes: 0 success, 1 failed (a result document is still printed with `--json`), 2 usage error or an

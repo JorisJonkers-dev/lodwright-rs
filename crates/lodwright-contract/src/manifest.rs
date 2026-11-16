@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The manifest `generate` leaves in its output folder: what was written, from which request and inputs.
 //!
 //! A later run over the same request and the same plugin contents finds the manifest and the files it lists

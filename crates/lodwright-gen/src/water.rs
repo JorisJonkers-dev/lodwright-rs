@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Water planes for terrain blocks: flat rectangles at each cell's water height over the ground that lies below it.
 //!
 //! The game's own blocks carry a water shape (`game-lod-water-shape`) whose outline and slopes come from a rule

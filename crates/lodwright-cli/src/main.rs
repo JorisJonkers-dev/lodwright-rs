@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The `lodwright` binary: a thin wrapper over [`lodwright_cli::run`].
 
 use std::process::ExitCode;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Landscape textures: `LTEX` records and the `TXST` texture sets they point to, with load-order overrides, and a
 //! resolver from an `LTEX` `FormID` to a texture path.
 //!

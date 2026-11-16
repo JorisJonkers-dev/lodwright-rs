@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Where the game expects LOD output: folder and file names, relative to the data folder, with forward slashes.
 //!
 //! Names are lower case throughout, as in the game's own archives, so a case-sensitive file system needs no

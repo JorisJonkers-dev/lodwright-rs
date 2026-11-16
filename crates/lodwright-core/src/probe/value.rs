@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! The report tree and its two renderings (JSON and text).
 
 use std::fmt::{self, Write as _};

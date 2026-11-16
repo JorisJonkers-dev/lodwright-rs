@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Resampling and mip chains, in plain `f32` on the 8-bit channel values.
 //!
 //! The filters are the textbook area-average (box) filter and the Lanczos filter with three lobes, applied

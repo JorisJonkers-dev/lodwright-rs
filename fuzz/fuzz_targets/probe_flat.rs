@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for `lodwright probe settings` and `lodwright probe dtl`, which share one reader. The only property:
 //! arbitrary bytes and sizes never panic.
 

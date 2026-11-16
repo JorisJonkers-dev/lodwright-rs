@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! DDS probe: the header fields, and per-channel statistics of mip level 0 for uncompressed pixels and for
 //! BC1 and BC3 (decoded). Pixel values enter the report only as the mean, minimum and maximum of each channel.
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Synthetic DDS headers: building the 128 bytes (magic and header) and reading the fields back.
 
 /// Bytes of the magic plus the header.

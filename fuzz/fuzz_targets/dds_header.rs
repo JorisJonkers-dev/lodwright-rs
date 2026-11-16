@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 //! Fuzz harness for the DDS header reader and decoder: arbitrary bytes never panic either, a header the reader
 //! accepts always describes a data run that fits in the input, and decoding does no more work than that.
 

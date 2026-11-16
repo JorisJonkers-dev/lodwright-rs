@@ -354,3 +354,7 @@ with their own model) were found by comparing block by block, which raised the b
 `game-lod-water-shape`: found by running `lodwright verify --reference` on the game's own tree against the generated
 one: file names and counts are identical, and 122 terrain blocks differ in block types because the game's blocks carry
 a water plane. Open: how the outline and height of the plane are derived.
+
+## 2026-11-16: land texture diffuse
+
+The diffuse blend is our own design (base texture per quadrant, layers by opacity point, times vertex colour, textures reduced to 32 by 32 tiles). No new format facts; checked against the game's own diffuse maps for three blocks: channel correlation 0.85 to 0.95 and means within 3 of 255.

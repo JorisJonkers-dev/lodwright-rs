@@ -10,7 +10,7 @@ pipeline the community generators provide for this game. Each row is one work it
 | 3 | Worldspace assembly, height raster | Done | Parent-world inheritance is decoded; its use in LOD is untested on real data |
 | 4 | Terrain mesh planning | Done: adaptive (RTIN) meshes, fixed edge vertices, vertex cap, no triangles over missing ground | Hiding unseen faces, water offset, per-block quality tuning against the game's own blocks |
 | 5 | Terrain block NIF | Done (`lodwright-nif`), structure matches the game's blocks | In-game load check (owner) |
-| 6 | Terrain textures | Normal maps done (correlate 0.95 with the game's own); diffuse is vertex colours only | Layer blending of land textures into the diffuse |
+| 6 | Terrain textures | Done: normal maps correlate 0.95 to 0.97 with the game's own, diffuse (land texture layers, opacity points, vertex colour) correlates 0.85 to 0.95 | Per-texture tiling scale, specular alpha option |
 | 7 | Settings file | Done; byte-identical to the game's own file for the main world | Check against the game's loading |
 | 8 | Output layout | Done, matches the game's own tree; files appear atomically | Manifest, resume |
 | 9 | Object LOD | Done: selection, merge, atlas and block NIFs (`lodwright-gen`); 287 of the game's 295 blocks have the same vertex and triangle counts and 82 percent of vertices coincide in position | The remaining eight blocks, the segment table meaning, in-game check (owner) |

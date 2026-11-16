@@ -38,6 +38,8 @@ pub struct Options {
     pub allow_in_repo: bool,
     /// `generate`: write only terrain LOD, no object LOD.
     pub terrain_only: bool,
+    /// `generate`: leave land textures out of the diffuse maps (vertex colours only; less memory and time).
+    pub no_land_textures: bool,
     /// `generate`: worker threads; 0 chooses from the machine (at most 4).
     pub threads: usize,
 }
@@ -59,6 +61,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         allow_in_repo: false,
         threads: 0,
         terrain_only: false,
+        no_land_textures: false,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -113,6 +116,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
             "--out" => options.out = Some(PathBuf::from(value("--out")?)),
             "--blocks" => options.blocks = true,
             "--terrain-only" => options.terrain_only = true,
+            "--no-land-textures" => options.no_land_textures = true,
             "--allow-in-repo" => options.allow_in_repo = true,
             other => return Err(format!("unknown option {other}")),
         }

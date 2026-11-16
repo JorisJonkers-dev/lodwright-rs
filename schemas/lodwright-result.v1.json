@@ -69,6 +69,13 @@
       "description": "The tool that printed this document.",
       "$ref": "#/$defs/ToolInfo"
     },
+    "warnings": {
+      "description": "Things that did not go in and why, at most twenty lines (a missing texture, a model without LOD).",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "written": {
       "description": "What was written.",
       "type": "array",

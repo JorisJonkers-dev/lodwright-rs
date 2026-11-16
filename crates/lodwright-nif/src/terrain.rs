@@ -184,7 +184,8 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
     let half = block.size / 2.0;
     let mid = f32::midpoint(low, high);
     let radius = (half * half * 2.0 + (high - mid) * (high - mid)).sqrt();
-    // source: game-lod-terrain-block-nif (u mirrored: u = 1 - x / size, v = y / size)
+    // The UVs are mirrored in u: u = 1 - x / size, v = y / size.
+    // source: game-lod-terrain-block-nif
     let uv: Vec<[f32; 2]> = verts
         .iter()
         .map(|v| [1.0 - v[0] / block.size, v[1] / block.size])

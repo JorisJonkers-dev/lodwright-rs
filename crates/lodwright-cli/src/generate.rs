@@ -5,8 +5,8 @@ use std::io::Write;
 use std::path::Path;
 
 use lodwright_contract::{
-    Capabilities, MANIFEST_FILE, Manifest, ManifestFile, Request, ResultDoc, Status, Written,
-    peak_memory_mib,
+    BlockCounts, Capabilities, MANIFEST_FILE, Manifest, ManifestBlock, ManifestFile, Request,
+    ResultDoc, Status, Written, peak_memory_mib,
 };
 use lodwright_core::terrain::{LevelSettings, TerrainSettings};
 use lodwright_core::worldspace::Worldspace;
@@ -152,6 +152,35 @@ fn up_to_date(out: &Path, manifest: &Manifest) -> bool {
         .all(|f| std::fs::metadata(out.join(&f.path)).is_ok_and(|m| m.len() == f.bytes))
 }
 
+/// The files of `old`'s block `key` when its inputs were `inputs` too and every file is still there unchanged
+/// (same digest); the block can then be kept.
+fn reusable(out: &Path, old: &Manifest, key: &str, inputs: &str) -> Option<Vec<FileRecord>> {
+    let block = old
+        .blocks
+        .binary_search_by(|b| b.key.as_str().cmp(key))
+        .ok()
+        .map(|i| &old.blocks[i])
+        .filter(|b| b.inputs == inputs)?;
+    block
+        .files
+        .iter()
+        .map(|path| {
+            let f = old
+                .files
+                .binary_search_by(|f| f.path.as_str().cmp(path))
+                .ok()
+                .map(|i| &old.files[i])?;
+            let bytes = std::fs::read(out.join(&f.path)).ok()?;
+            (bytes.len() as u64 == f.bytes && lodwright_contract::sha256_digest(&bytes) == f.digest)
+                .then(|| FileRecord {
+                    path: f.path.clone(),
+                    bytes: f.bytes,
+                    digest: f.digest.clone(),
+                })
+        })
+        .collect()
+}
+
 fn non_empty(out: &Path) -> bool {
     std::fs::read_dir(out).is_ok_and(|mut d| d.next().is_some())
 }
@@ -228,11 +257,9 @@ fn run_request(
             "the output folder is not empty and has no manifest: use an empty folder or pass --overwrite",
         ));
     }
-    if let Some(old) = &old {
-        // a changed request or input replaces what the old manifest lists
-        for f in &old.files {
-            let _ = std::fs::remove_file(out.join(&f.path));
-        }
+    if old.is_some() {
+        // the old manifest goes first, so an interrupted run leaves no manifest that claims changed files; its
+        // blocks are kept where their inputs did not change and its other files are removed at the end
         let _ = std::fs::remove_file(out.join(MANIFEST_FILE));
     }
     let worlds = Worldspace::from_load_order(&loaded.plugins)
@@ -269,7 +296,7 @@ fn run_request(
     let settings = terrain_settings(request);
     std::fs::create_dir_all(out).map_err(|e| io_failure("cannot create the output folder", &e))?;
     let sink = events_sink(events)?;
-    let progress = |world: &str, level: u32, done: u64, of: u64| {
+    let progress = |world: &str, level: u32, done: u64, of: u64, up_to_date: bool| {
         if let Some(sink) = &sink
             && let Ok(mut w) = sink.lock()
         {
@@ -278,12 +305,16 @@ fn run_request(
                 level,
                 done,
                 of,
+                up_to_date,
             }
             .to_line();
             let _ = writeln!(w, "{line}");
         }
     };
+    let reuse = |key: &str, inputs: &str| reusable(out, old.as_ref()?, key, inputs);
     let mut all: Vec<ManifestFile> = Vec::new();
+    let mut blocks: Vec<ManifestBlock> = Vec::new();
+    let mut counts: Option<BlockCounts> = None;
     for world in chosen {
         let mut files: Vec<ManifestFile> = Vec::new();
         if request.terrain.enabled {
@@ -304,10 +335,24 @@ fn run_request(
                     land: Some(&tiles),
                     progress: Some(&progress),
                     water: request.terrain.water,
+                    reuse: Some(&reuse),
                 },
             )
             .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
             files.extend(report.files.iter().map(to_manifest_file));
+            let c = counts.get_or_insert_with(BlockCounts::default);
+            for b in &report.blocks {
+                if b.reused {
+                    c.up_to_date += 1;
+                } else {
+                    c.generated += 1;
+                }
+            }
+            blocks.extend(report.blocks.into_iter().map(|b| ManifestBlock {
+                key: b.key,
+                inputs: b.inputs,
+                files: b.files.into_iter().map(|f| f.path).collect(),
+            }));
         }
         if let (Some(assets), true) = (&assets, request.objects.enabled) {
             let instances =
@@ -344,7 +389,15 @@ fn run_request(
         written_of(world.name(), &files, &mut doc);
         all.extend(files);
     }
-    let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all);
+    if let Some(old) = &old {
+        // files of the old run that this run did not write or keep
+        let kept: std::collections::BTreeSet<&str> = all.iter().map(|f| f.path.as_str()).collect();
+        for f in old.files.iter().filter(|f| !kept.contains(f.path.as_str())) {
+            let _ = std::fs::remove_file(out.join(&f.path));
+        }
+    }
+    doc.blocks = counts;
+    let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
     let text = serde_json::to_string_pretty(&manifest)
         .map_err(|e| Failure::new("output_failed", e.to_string()))?
         + "\n";

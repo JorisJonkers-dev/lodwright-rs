@@ -11,6 +11,17 @@
         "null"
       ]
     },
+    "blocks": {
+      "description": "Terrain blocks of a `generate` run: how many were built and how many were kept from the earlier run\nbecause their inputs did not change; omitted when no terrain was generated.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BlockCounts"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "code": {
       "description": "A stable machine-readable string that callers match on.",
       "type": "string"
@@ -94,6 +105,28 @@
     "reason"
   ],
   "$defs": {
+    "BlockCounts": {
+      "description": "Terrain blocks built and kept.",
+      "type": "object",
+      "properties": {
+        "generated": {
+          "description": "Blocks built in this run.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "up_to_date": {
+          "description": "Blocks whose files were kept from the earlier run.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "generated",
+        "up_to_date"
+      ]
+    },
     "Status": {
       "description": "How a run ended.",
       "oneOf": [

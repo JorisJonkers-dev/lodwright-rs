@@ -20,6 +20,17 @@ pub struct ManifestFile {
     pub digest: String,
 }
 
+/// One terrain block of the output: what its files were built from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ManifestBlock {
+    /// `terrain:<world>:<level>:<x>:<y>`, the world in lower case.
+    pub key: String,
+    /// `sha256:` over everything the block's files depend on.
+    pub inputs: String,
+    /// The block's files (paths in [`Manifest::files`]).
+    pub files: Vec<String>,
+}
+
 /// The manifest, `manifest.json` in the output folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Manifest {
@@ -37,6 +48,10 @@ pub struct Manifest {
     pub inputs_digest: String,
     /// Files, sorted by path.
     pub files: Vec<ManifestFile>,
+    /// Terrain blocks, sorted by key; a later run keeps a block whose inputs did not change. Empty in manifests
+    /// of earlier versions, which then rebuild every block.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocks: Vec<ManifestBlock>,
 }
 
 /// The contract name of the manifest.
@@ -61,7 +76,16 @@ impl Manifest {
             request_digest: request_digest.to_owned(),
             inputs_digest: inputs_digest.to_owned(),
             files,
+            blocks: Vec::new(),
         }
+    }
+
+    /// The same manifest with `blocks` (sorted here).
+    #[must_use]
+    pub fn with_blocks(mut self, mut blocks: Vec<ManifestBlock>) -> Self {
+        blocks.sort_by(|a, b| a.key.cmp(&b.key));
+        self.blocks = blocks;
+        self
     }
 }
 

@@ -36,6 +36,11 @@ digest (`arguments_digest` in the result) covers every field. The library entry 
 
 The run leaves `manifest.json` (`lodwright-manifest`: request digest, inputs digest, every file with size and digest) in
 the output folder. A later run with the same request over the same plugin contents finds it and the files it lists and
-answers `up_to_date` without writing; a different request or input replaces exactly the files the old manifest lists. An
-output folder that is not empty and has no manifest is refused (`output_not_empty`) unless `--overwrite` is given.
-Incremental regeneration is per run, not per block.
+answers `up_to_date` without writing. The manifest also lists every terrain block with a digest of what its files
+depend on (the generator version, the level settings, the water and land texture switches, the block's heights and,
+per cell, the water height, the land layers and the pixels of the land textures they name). A run with a different
+request or input keeps a block whose digest is unchanged and whose files still have the recorded digests, builds the
+others, and removes the old manifest's files it neither kept nor wrote. The result's `blocks` counts the blocks built
+(`generated`) and kept (`up_to_date`); each block event carries `up_to_date`. Object and tree LOD are rebuilt in full
+whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
+(`output_not_empty`) unless `--overwrite` is given.

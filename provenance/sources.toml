@@ -902,3 +902,14 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "The reader inflates without the checksum when only the checksum fails and keeps the stated size as the check."
+
+[[source]]
+id = "game-lod-object-block-nif"
+fact = "An object LOD block NIF is version 20.2.0.7, user version 11, user version 2 34, with seven blocks: BSMultiBoundNode (root, translation = the block's south-west corner in world units), BSSegmentedTriShape (four segments in the measured block), BSShaderPPLightingProperty, BSShaderTextureSet (two paths: the shared object atlas and its normal atlas, under textures/landscape/lod/<world>/blocks), NiTriShapeData, BSMultiBound, BSMultiBoundAABB. The data block has block-local positions, normals, tangents, one UV set that addresses a sub-rectangle of the atlas, 16-bit triangle lists and keep flags 51. The measured block has 1715 vertices and 2071 triangles, with positions spanning about 6760 by 17300 world units around the block origin."
+url = "oracle:game-lod-files"
+licence = "Structure and counts of one of the owner's own game files; no file content is recorded"
+date = 2026-11-16
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "One block measured. The meaning of the segment table is not established (a segment count of four with one triangle range each is what the bytes show). The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells."

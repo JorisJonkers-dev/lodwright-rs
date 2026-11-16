@@ -161,7 +161,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "lodwright-assets"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-testkit",
  "miniz_oxide",
@@ -169,7 +169,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-contract",
  "lodwright-core",
@@ -182,7 +182,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-contract"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-testkit",
  "schemars",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-testkit",
  "miniz_oxide",
@@ -201,7 +201,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-dds"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ddsfile",
  "lodwright-testkit",
@@ -210,7 +210,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-gen"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-assets",
  "lodwright-contract",
@@ -222,14 +222,14 @@ dependencies = [
 
 [[package]]
 name = "lodwright-nif"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lodwright-testkit",
 ]
 
 [[package]]
 name = "lodwright-plugin-meta"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "esplugin",
  "lodwright-testkit",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-testkit"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "miniz_oxide",
 ]

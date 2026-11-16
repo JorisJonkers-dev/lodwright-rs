@@ -24,12 +24,15 @@ use crate::images::{diffuse_image, normal_image};
 const CELL_UNITS: f32 = 4096.0;
 
 /// How to run.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Options<'a> {
     /// Worker threads (at least 1).
     pub threads: usize,
     /// Land textures for the diffuse maps; `None` leaves the ground to vertex colours.
     pub land: Option<&'a LandTiles>,
+    /// Called after each block with the world, the level, the blocks finished at this level and the blocks of
+    /// the level; from worker threads, in no fixed order.
+    pub progress: Option<&'a (dyn Fn(&str, u32, u64, u64) + Sync)>,
 }
 
 impl Default for Options<'_> {
@@ -37,6 +40,7 @@ impl Default for Options<'_> {
         Self {
             threads: 1,
             land: None,
+            progress: None,
         }
     }
 }
@@ -185,6 +189,7 @@ pub fn generate_terrain(
         highest = highest.max(level.level);
         let jobs = jobs_of(&raster, level);
         let next = AtomicUsize::new(0);
+        let finished = AtomicUsize::new(0);
         let done: Mutex<Vec<Result<Vec<FileRecord>, GenError>>> = Mutex::new(Vec::new());
         std::thread::scope(|scope| {
             for _ in 0..options.threads.max(1) {
@@ -193,6 +198,10 @@ pub fn generate_terrain(
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         let Some(job) = jobs.get(i) else { break };
                         let result = run_job(world, &raster, job, out, tiles);
+                        if let Some(report) = options.progress {
+                            let n = finished.fetch_add(1, Ordering::Relaxed) + 1;
+                            report(world.name(), level.level, n as u64, jobs.len() as u64);
+                        }
                         let failed = result.is_err();
                         if let Ok(mut done) = done.lock() {
                             done.push(result);
@@ -290,6 +299,7 @@ mod tests {
             &Options {
                 threads: 1,
                 land: None,
+                progress: None,
             },
         )
         .unwrap();
@@ -300,6 +310,7 @@ mod tests {
             &Options {
                 threads: 4,
                 land: None,
+                progress: None,
             },
         )
         .unwrap();

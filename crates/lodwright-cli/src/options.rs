@@ -38,6 +38,8 @@ pub struct Options {
     pub allow_in_repo: bool,
     /// `generate --request FILE`: the request document.
     pub request: Option<PathBuf>,
+    /// `generate --events FILE`: write progress events (one JSON line per block) to FILE, or to stderr for `-`.
+    pub events: Option<String>,
     /// `generate`: write into a non-empty output folder that has no manifest.
     pub overwrite: bool,
     /// `generate`: write only terrain LOD, no object LOD.
@@ -65,6 +67,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
         allow_in_repo: false,
         threads: 0,
         request: None,
+        events: None,
         overwrite: false,
         terrain_only: false,
         no_land_textures: false,
@@ -123,6 +126,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
             "--blocks" => options.blocks = true,
             "--request" => options.request = Some(PathBuf::from(value("--request")?)),
             "--overwrite" => options.overwrite = true,
+            "--events" => options.events = Some(value("--events")?),
             "--terrain-only" => options.terrain_only = true,
             "--no-land-textures" => options.no_land_textures = true,
             "--allow-in-repo" => options.allow_in_repo = true,

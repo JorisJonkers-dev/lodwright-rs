@@ -14,13 +14,13 @@ pipeline the community generators provide for this game. Each row is one work it
 | 7 | Settings file | Done; byte-identical to the game's own file for the main world | Check against the game's loading |
 | 8 | Output layout | Done, matches the game's own tree; files appear atomically | Manifest, resume |
 | 9 | Object LOD | Done: selection, merge, atlas and block NIFs (`lodwright-gen`); 287 of the game's 295 blocks have the same vertex and triangle counts and 82 percent of vertices coincide in position | The remaining eight blocks, the segment table meaning, in-game check (owner) |
-| 10 | Tree and billboard LOD | Not measured | `.dtl` and `treetypes.lst` layouts, tree record decoding, the fixed atlas |
+| 10 | Tree and billboard LOD | One sample pair exists outside the repository (a `.dtl` of 1361 records of 32 bytes after a 12 byte header, and a `treetypes.lst` of four 32 byte entries after a 4 byte count); the field meanings and the file naming are not established | More samples with their inputs (the references and tree records they came from), then the writer |
 | 11 | Inclusion rules | Done for object LOD: exclude or keep by plugin, exclude by record or model glob, from the request document | Per plugin rules for terrain cells |
 | 12 | Determinism, incremental runs | Deterministic output for any thread count; manifest with digests; an unchanged request and input is detected and skipped, a changed one replaces exactly the old manifest's files | Reuse of unchanged blocks inside a run |
 | 13 | Performance | Parallel terrain blocks, bounded worker count; the main worldspace takes about 9 seconds and 0.5 GiB with four workers | Memory cap option, streaming of large plugins |
 | 14 | CLI | `plan`, `heightmap`, `probe`, `generate`, `verify` | A request document |
 | 17 | Water planes in terrain blocks | Structure measured (`game-lod-water-shape`): 164 of 1360 blocks carry one or two extra shapes | Outline and height rules; not written yet |
-| 15 | Integration for the mod manager | Plan, result, request and manifest contracts; `lodwright-gen` library; stable exit codes | Progress events (NDJSON) |
+| 15 | Integration for the mod manager | Plan, result, request and manifest contracts; `lodwright-gen` library; stable exit codes; progress events (`--events FILE|-`, one line per terrain block) | Events for object LOD |
 | 16 | In-game acceptance | Owner only | Loading generated blocks in the game |
 
 What verification means here: tests build synthetic plugins and archives; real-data checks read the owner's install

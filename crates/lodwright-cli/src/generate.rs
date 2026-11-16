@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! `generate`: from a request (a file, or the command line turned into one) to files, a manifest and a result.
 
+use std::io::Write;
 use std::path::Path;
 
 use lodwright_contract::{
@@ -163,6 +164,7 @@ fn run_request(
     request: &Request,
     allow_in_repo: bool,
     overwrite: bool,
+    events: Option<&str>,
 ) -> Result<ResultDoc, Failure> {
     let version = env!("CARGO_PKG_VERSION");
     request
@@ -255,6 +257,21 @@ fn run_request(
         .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
     let settings = terrain_settings(request);
     std::fs::create_dir_all(out).map_err(|e| io_failure("cannot create the output folder", &e))?;
+    let sink = events_sink(events)?;
+    let progress = |world: &str, level: u32, done: u64, of: u64| {
+        if let Some(sink) = &sink
+            && let Ok(mut w) = sink.lock()
+        {
+            let line = lodwright_contract::Event::Block {
+                world: world.to_owned(),
+                level,
+                done,
+                of,
+            }
+            .to_line();
+            let _ = writeln!(w, "{line}");
+        }
+    };
     let mut all: Vec<ManifestFile> = Vec::new();
     for world in chosen {
         let mut files: Vec<ManifestFile> = Vec::new();
@@ -274,6 +291,7 @@ fn run_request(
                 &lodwright_gen::Options {
                     threads,
                     land: Some(&tiles),
+                    progress: Some(&progress),
                 },
             )
             .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
@@ -304,6 +322,19 @@ fn run_request(
         .map_err(|e| io_failure("cannot write the manifest", &e))?;
     doc.manifest = Some(MANIFEST_FILE.to_owned());
     Ok(doc)
+}
+
+type Sink = std::sync::Mutex<Box<dyn Write + Send>>;
+
+fn events_sink(target: Option<&str>) -> Result<Option<Sink>, Failure> {
+    Ok(match target {
+        None => None,
+        Some("-") => Some(std::sync::Mutex::new(Box::new(std::io::stderr()))),
+        Some(file) => Some(std::sync::Mutex::new(Box::new(
+            std::fs::File::create(file)
+                .map_err(|e| io_failure("cannot open the events file", &e))?,
+        ))),
+    })
 }
 
 fn unsupported(version: &str) -> ResultDoc {
@@ -348,8 +379,13 @@ pub fn generate(options: &Options) -> ResultDoc {
         None
     };
     let mut doc = match request {
-        Some(Ok(request)) => run_request(&request, options.allow_in_repo, options.overwrite)
-            .unwrap_or_else(|f| failed_document(options, &f)),
+        Some(Ok(request)) => run_request(
+            &request,
+            options.allow_in_repo,
+            options.overwrite,
+            options.events.as_deref(),
+        )
+        .unwrap_or_else(|f| failed_document(options, &f)),
         Some(Err(f)) => failed_document(options, &f),
         None => {
             let mut doc = unsupported(version);

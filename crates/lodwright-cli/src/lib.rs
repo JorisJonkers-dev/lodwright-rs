@@ -34,7 +34,7 @@ Usage: lodwright [--help | --version [--json]]
        lodwright plan --data <data-folder> (--plugin NAME ... | --load-order FILE) [--world NAME]
                       [--format text|json | --json] [--schema-version N] [--blocks]
        lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
-                      [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--overwrite]
+                      [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--json]
        lodwright verify <folder> [--reference <folder>] [--json]

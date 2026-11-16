@@ -184,3 +184,35 @@ fn the_request_schema_is_printed_and_names_its_contract() {
     let text = String::from_utf8(out).unwrap();
     assert!(text.contains("lodwright-request") && text.contains("exclude_plugins"));
 }
+
+#[test]
+fn progress_events_are_one_json_line_per_block_in_the_events_file() {
+    let d = data("events");
+    let out = temp("events-out");
+    let events = temp("events.ndjson");
+    let (code, _) = go(&[
+        "generate",
+        "--data",
+        d.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--out",
+        out.to_str().unwrap(),
+        "--events",
+        events.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0);
+    let text = std::fs::read_to_string(&events).unwrap();
+    let parsed: Vec<lodwright_contract::Event> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    // one cell pair: a block at each of the four levels
+    assert_eq!(parsed.len(), 4);
+    assert!(
+        parsed
+            .iter()
+            .all(|e| matches!(e, lodwright_contract::Event::Block { done: 1, of: 1, .. }))
+    );
+}

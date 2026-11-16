@@ -7,17 +7,17 @@ use std::path::Path;
 
 use lodwright_contract::{
     Bounds, Capabilities, LevelPlan, PLAN_CONTRACT, Plan, PlannedBlock, ResultDoc, Status,
-    ToolInfo, WorldPlan, Written, arguments_digest, peak_memory_mib, round_error,
+    ToolInfo, WorldPlan, arguments_digest, peak_memory_mib, round_error,
 };
 use lodwright_core::raster::{BlockGrid, HeightRaster};
 use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
 use lodwright_core::worldspace::{Inheritance, WorldIndex, Worldspace};
 
 use crate::failure::Failure;
-use crate::load::{load_plugins, load_plugins_with, load_worlds};
+use crate::load::{load_plugins, load_worlds};
 use crate::options::{Format, Options};
 
-fn select<'a>(
+pub(crate) fn select<'a>(
     worlds: &'a [Worldspace],
     wanted: Option<&str>,
 ) -> Result<Vec<&'a Worldspace>, Failure> {
@@ -185,7 +185,7 @@ pub fn arguments_digest_of(options: &Options) -> String {
     arguments_digest(&argument_lines(options, 1))
 }
 
-fn count(n: usize) -> u64 {
+pub(crate) fn count(n: usize) -> u64 {
     u64::try_from(n).unwrap_or(u64::MAX)
 }
 
@@ -278,180 +278,6 @@ pub fn plan(options: &Options, out: &mut dyn Write) -> Result<(), Failure> {
     print(out, &text)
 }
 
-/// `generate`: with `--data`, plugins and `--out`, writes the terrain LOD of the chosen worlds (all worlds when
-/// `--world` is absent) and answers with a result document; with nothing to read it answers `unsupported`.
-pub fn generate(options: &Options) -> ResultDoc {
-    let version = env!("CARGO_PKG_VERSION");
-    let has_data = !options.data.as_os_str().is_empty();
-    let mut doc = unsupported(version);
-    if has_data && !options.plugins.is_empty() {
-        doc = match options.out.as_deref() {
-            Some(out) => match write_terrain(options, out, version) {
-                Ok(doc) => doc,
-                Err(failure) => failed_document(options, &failure),
-            },
-            None => match load_plugins(&options.data, &options.plugins) {
-                Ok(loaded) => {
-                    let mut doc = doc;
-                    doc.inputs_digest = Some(loaded.inputs_digest);
-                    doc
-                }
-                Err(failure) => {
-                    ResultDoc::new(version, Status::Failed, failure.code, &failure.reason)
-                }
-            },
-        };
-    }
-    if has_data || !options.plugins.is_empty() {
-        doc.arguments_digest = Some(arguments_digest_of(options));
-    }
-    doc.peak_memory_mib = peak_memory_mib();
-    doc
-}
-
-fn refuse_output(options: &Options, out: &Path) -> Result<(), Failure> {
-    if !options.allow_in_repo && inside_git_tree(out) {
-        return Err(Failure::new(
-            "output_in_repo",
-            "refusing to write inside a git working tree; pass --allow-in-repo to override",
-        ));
-    }
-    let resolve = |p: &Path| {
-        // the nearest existing ancestor, resolved, then the rest appended: a not yet created output folder
-        // inside the data folder is still caught
-        let mut rest = Vec::new();
-        let mut cur = p.to_path_buf();
-        loop {
-            if let Ok(real) = cur.canonicalize() {
-                return rest.iter().rev().fold(real, |acc, c| acc.join(c));
-            }
-            let Some(name) = cur.file_name().map(std::ffi::OsStr::to_os_string) else {
-                return p.to_path_buf();
-            };
-            rest.push(name);
-            if !cur.pop() {
-                return p.to_path_buf();
-            }
-        }
-    };
-    if resolve(out).starts_with(resolve(&options.data)) {
-        return Err(Failure::new(
-            "output_in_data",
-            "refusing to write inside the data folder: generate into a separate folder and install it from there",
-        ));
-    }
-    Ok(())
-}
-
-/// Add warnings to the document, keeping at most twenty lines in all.
-fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
-    for w in warnings {
-        if doc.warnings.len() < 20 {
-            doc.warnings.push(w);
-        } else if doc.warnings.len() == 20 {
-            doc.warnings.push("more warnings were left out".to_owned());
-        }
-    }
-}
-
-fn write_terrain(options: &Options, out: &Path, version: &str) -> Result<ResultDoc, Failure> {
-    refuse_output(options, out)?;
-    let read = lodwright_core::plugin::ReadOptions {
-        objects: !options.terrain_only,
-        land_layers: !options.no_land_textures,
-    };
-    let loaded = load_plugins_with(&options.data, &options.plugins, read)?;
-    let worlds = Worldspace::from_load_order(&loaded.plugins)
-        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
-    let chosen = select(&worlds, options.world.as_deref())?;
-    let threads = if options.threads > 0 {
-        options.threads
-    } else {
-        std::thread::available_parallelism().map_or(1, |n| n.get().min(4))
-    };
-    let mut doc = ResultDoc::new(version, Status::Ok, "generated", "terrain LOD written");
-    doc.inputs_digest = Some(loaded.inputs_digest);
-    let assets = if options.terrain_only && options.no_land_textures {
-        None
-    } else {
-        Some(
-            lodwright_gen::FolderAssets::open(&options.data, &options.plugins)
-                .map_err(|e| Failure::new("assets_unreadable", e))?,
-        )
-    };
-    let resolver = lodwright_core::texture::TextureResolver::from_load_order(&loaded.plugins)
-        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
-    for world in chosen {
-        let mut warnings = Vec::new();
-        let tiles = match (&assets, options.no_land_textures) {
-            (Some(assets), false) => {
-                lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
-            }
-            _ => lodwright_gen::LandTiles::empty(),
-        };
-        add_warnings(&mut doc, warnings);
-        let report = lodwright_gen::generate_terrain(
-            world,
-            &TerrainSettings::default(),
-            out,
-            &lodwright_gen::Options {
-                threads,
-                land: Some(&tiles),
-            },
-        )
-        .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
-        for (kind, suffix) in [
-            ("terrain_mesh", ".nif"),
-            ("terrain_texture", ".dds"),
-            ("settings", ".dlodsettings"),
-        ] {
-            let files: Vec<_> = report
-                .files
-                .iter()
-                .filter(|f| f.path.ends_with(suffix))
-                .collect();
-            doc.written.push(Written {
-                world: report.world.clone(),
-                kind: kind.to_owned(),
-                files: count(files.len()),
-                bytes: files.iter().map(|f| f.bytes).sum(),
-            });
-        }
-        if let (Some(assets), false) = (&assets, options.terrain_only) {
-            let instances =
-                lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
-                    .map_err(|e| Failure::new("load_order_invalid", e.to_string()))?;
-            let objects = lodwright_gen::generate_objects(world.name(), &instances, assets, out)
-                .map_err(|e| Failure::new("generate_failed", e.to_string()))?;
-            add_warnings(&mut doc, objects.warnings.clone());
-            if !objects.files.is_empty() {
-                doc.written.push(Written {
-                    world: world.name().to_owned(),
-                    kind: "object_lod".to_owned(),
-                    files: count(objects.files.len()),
-                    bytes: objects.files.iter().map(|f| f.bytes).sum(),
-                });
-            }
-        }
-    }
-    Ok(doc)
-}
-
-fn unsupported(version: &str) -> ResultDoc {
-    let missing = Capabilities::default().missing();
-    let mut doc = ResultDoc::new(
-        version,
-        Status::Unsupported,
-        "capability_missing",
-        &format!(
-            "generate cannot write {} yet, and takes no request document yet",
-            missing.join(", ")
-        ),
-    );
-    doc.missing_capabilities = missing;
-    doc
-}
-
 /// The failure document of a command that failed with `failure` (for `--json`).
 pub fn failed_document(options: &Options, failure: &Failure) -> ResultDoc {
     let mut doc = ResultDoc::new(
@@ -468,7 +294,7 @@ pub fn failed_document(options: &Options, failure: &Failure) -> ResultDoc {
 }
 
 /// Whether `path` (a file to be written) lies inside a git working tree.
-fn inside_git_tree(path: &Path) -> bool {
+pub(crate) fn inside_git_tree(path: &Path) -> bool {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     absolute
         .parent()

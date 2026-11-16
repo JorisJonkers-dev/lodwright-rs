@@ -135,6 +135,10 @@ impl Handshake {
                     name: crate::RESULT_CONTRACT.to_owned(),
                     versions: crate::RESULT_VERSIONS.to_vec(),
                 },
+                ContractInfo {
+                    name: crate::REQUEST_CONTRACT.to_owned(),
+                    versions: crate::REQUEST_VERSIONS.to_vec(),
+                },
             ],
         }
     }
@@ -218,7 +222,7 @@ mod tests {
         assert_eq!(info.contracts, Handshake::current().contracts);
         assert_eq!(
             serde_json::to_string(&Handshake::current()).unwrap(),
-            r#"{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]}]}"#
+            r#"{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]}]}"#
         );
     }
 }

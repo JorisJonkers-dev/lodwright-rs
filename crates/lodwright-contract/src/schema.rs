@@ -6,7 +6,7 @@ use std::fmt;
 use schemars::schema_for;
 use serde_json::Value;
 
-use crate::{PLAN_VERSIONS, Plan, RESULT_VERSIONS, ResultDoc};
+use crate::{PLAN_VERSIONS, Plan, REQUEST_VERSIONS, RESULT_VERSIONS, Request, ResultDoc};
 
 /// Which document a schema or check is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,6 +15,8 @@ pub enum DocumentKind {
     Plan,
     /// The result document.
     Result,
+    /// The request document.
+    Request,
 }
 
 impl DocumentKind {
@@ -24,6 +26,7 @@ impl DocumentKind {
         match self {
             Self::Plan => "plan",
             Self::Result => "result",
+            Self::Request => "request",
         }
     }
 
@@ -33,6 +36,7 @@ impl DocumentKind {
         match text {
             "plan" => Some(Self::Plan),
             "result" => Some(Self::Result),
+            "request" => Some(Self::Request),
             _ => None,
         }
     }
@@ -43,6 +47,7 @@ impl DocumentKind {
         match self {
             Self::Plan => PLAN_VERSIONS,
             Self::Result => RESULT_VERSIONS,
+            Self::Request => REQUEST_VERSIONS,
         }
     }
 }
@@ -100,6 +105,7 @@ pub fn schema_json(kind: DocumentKind, version: u32) -> Result<String, SchemaErr
     let schema = match kind {
         DocumentKind::Plan => schema_for!(Plan),
         DocumentKind::Result => schema_for!(ResultDoc),
+        DocumentKind::Request => schema_for!(Request),
     };
     let mut text = serde_json::to_string_pretty(&schema).expect("a schema serialises");
     text.push('\n');
@@ -125,6 +131,7 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
     let wanted = match kind {
         DocumentKind::Plan => crate::PLAN_CONTRACT,
         DocumentKind::Result => crate::RESULT_CONTRACT,
+        DocumentKind::Request => crate::REQUEST_CONTRACT,
     };
     match value.get("contract").and_then(Value::as_str) {
         Some(name) if name == wanted => {}
@@ -138,6 +145,7 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
     let outcome = match kind {
         DocumentKind::Plan => serde_json::from_value::<Plan>(value.clone()).map(drop),
         DocumentKind::Result => serde_json::from_value::<ResultDoc>(value.clone()).map(drop),
+        DocumentKind::Request => serde_json::from_value::<Request>(value.clone()).map(drop),
     };
     outcome.map_err(|e| SchemaError::Invalid(e.to_string()))
 }
@@ -148,6 +156,14 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
 /// [`SchemaError`] when the document is refused.
 pub fn check_plan(value: &Value) -> Result<(), SchemaError> {
     check(DocumentKind::Plan, value)
+}
+
+/// Check a request document, as [`check_plan`] does for a plan.
+///
+/// # Errors
+/// [`SchemaError`] when the document is refused.
+pub fn check_request(value: &Value) -> Result<(), SchemaError> {
+    check(DocumentKind::Request, value)
 }
 
 /// Check a result document, as [`check_plan`] does for a plan.

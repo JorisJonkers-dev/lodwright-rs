@@ -174,6 +174,8 @@ fn instance(model: &str, x: f32, y: f32, rot_z: f32, reference: u32, high: bool)
         high_priority: high,
         has_tree_lod: false,
         reference,
+        reference_plugin: 0,
+        base_plugin: 0,
         part: false,
     }
 }

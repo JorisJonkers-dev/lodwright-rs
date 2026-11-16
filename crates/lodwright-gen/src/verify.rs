@@ -5,6 +5,11 @@
 //! engine relies on (block structure, 16-bit index range, bounds, UVs, texture formats, names and paths). With a
 //! reference folder (for example the game's own tree extracted somewhere) it also compares counts and structure.
 
+#![allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "the names are lower-cased before the comparison"
+)]
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -181,7 +186,7 @@ impl Ctx {
                         ),
                     );
                 }
-                let full = u32::BITS - h.width.max(h.height).leading_zeros();
+                let full = h.width.max(h.height).max(1).ilog2() + 1;
                 if h.mip_count != full {
                     self.err(
                         path,

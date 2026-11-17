@@ -30,6 +30,19 @@ another tree. A request document (`lodwright schema request`) is how a caller dr
 Not done: loading in the game (owner only, docs/owner-runbook.md section 6), the game's own water outline (ours is
 our own design), and reuse of unchanged object and tree blocks. The gap list has each item with its state.
 
+## Packages
+
+The `lodwright` program is published on each release as an OCI package on ghcr.io:
+
+`ghcr.io/jorisjonkers-dev/lodwright-rs-lodwright:<version>-x86_64-unknown-linux-gnu`
+
+where `<version>` is the release tag without the leading `v`. The package is a `tar.gz` archive with the binary and
+`LICENSE`. Verify it with:
+
+```sh
+gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs-lodwright:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
+```
+
 ## Place in the stack
 
 lodwright-rs is a Component of [Raul's Trusty Toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox).

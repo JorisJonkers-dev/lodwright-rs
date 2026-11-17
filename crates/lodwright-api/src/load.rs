@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Finding and reading the plugins of a load order in a data folder.
+//! Finding and reading the plugins of a load order in a data folder, and choosing worlds.
 
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,7 @@ use lodwright_contract::Sha256Stream;
 use lodwright_core::plugin;
 use lodwright_core::worldspace::Worldspace;
 
-use crate::failure::Failure;
+use crate::Error;
 
 /// The plugins of a load order, parsed, and the digest of the files they came from.
 #[derive(Debug)]
@@ -31,18 +31,18 @@ pub fn parse_load_order(text: &str) -> Vec<String> {
 
 /// The file of plugin `name` in `data`, matched without regard to case (a Windows game folder on Linux often
 /// differs in case from the names in a load order).
-pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Failure> {
+///
+/// # Errors
+/// `plugin_name_invalid` for a name that is not a file name, `data_unreadable`, or `plugin_not_found`.
+pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Error> {
     if name.contains(['/', '\\']) || name == ".." || name == "." {
-        return Err(Failure::new(
+        return Err(Error::new(
             "plugin_name_invalid",
             format!("plugin name {name:?} must be a file name"),
         ));
     }
     let entries = std::fs::read_dir(data).map_err(|e| {
-        Failure::new(
-            "data_unreadable",
-            format!("cannot read the data folder: {e}"),
-        )
+        Error::new("data_unreadable", "cannot read the data folder").with_detail(e.to_string())
     })?;
     let mut found = None;
     for entry in entries.flatten() {
@@ -59,7 +59,7 @@ pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Failure> {
         }
     }
     found.ok_or_else(|| {
-        Failure::new(
+        Error::new(
             "plugin_not_found",
             format!("plugin {name} not found in the data folder"),
         )
@@ -67,21 +67,25 @@ pub fn find_plugin(data: &Path, name: &str) -> Result<PathBuf, Failure> {
 }
 
 /// Read every plugin of the load order, in order.
-pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Failure> {
+///
+/// # Errors
+/// As [`load_plugins_with`].
+pub fn load_plugins(data: &Path, names: &[String]) -> Result<LoadedPlugins, Error> {
     load_plugins_with(data, names, plugin::ReadOptions::default())
 }
 
 /// Read every plugin of the load order, keeping what `options` asks for.
+///
+/// # Errors
+/// `no_plugins`, the errors of [`find_plugin`], `plugin_unreadable`, `plugin_invalid`, or `master_order` when a
+/// master comes after a plugin that needs it or is missing.
 pub fn load_plugins_with(
     data: &Path,
     names: &[String],
     options: plugin::ReadOptions,
-) -> Result<LoadedPlugins, Failure> {
+) -> Result<LoadedPlugins, Error> {
     if names.is_empty() {
-        return Err(Failure::new(
-            "no_plugins",
-            "no plugins given: use --plugin NAME (repeatable) or --load-order FILE",
-        ));
+        return Err(Error::new("no_plugins", "no plugins given"));
     }
     let mut plugins = Vec::with_capacity(names.len());
     let mut digest = Sha256Stream::new();
@@ -89,35 +93,76 @@ pub fn load_plugins_with(
     for name in names {
         let path = find_plugin(data, name)?;
         let bytes = std::fs::read(&path).map_err(|e| {
-            Failure::new(
-                "plugin_unreadable",
-                format!("cannot read plugin {name}: {e}"),
-            )
+            Error::new("plugin_unreadable", format!("cannot read plugin {name}"))
+                .with_detail(e.to_string())
         })?;
         digest.update(name.to_ascii_lowercase().as_bytes());
         digest.update(&(bytes.len() as u64).to_le_bytes());
         digest.update(&bytes);
         // The header read by esplugin (GPL-3.0 crate) is used to check the order of masters.
         let header = lodwright_plugin_meta::read_header(name, &bytes)
-            .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
+            .map_err(|e| Error::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         headers.push((name.clone(), header));
         let parsed = plugin::read_with(&bytes, options)
-            .map_err(|e| Failure::new("plugin_invalid", format!("plugin {name}: {e}")))?;
+            .map_err(|e| Error::new("plugin_invalid", format!("plugin {name}: {e}")))?;
         plugins.push((name.clone(), parsed));
     }
     lodwright_plugin_meta::check_master_order(&headers)
-        .map_err(|reason| Failure::new("master_order", reason))?;
+        .map_err(|reason| Error::new("master_order", reason))?;
     Ok(LoadedPlugins {
         plugins,
         inputs_digest: digest.finish(),
     })
 }
 
+/// The worlds of `worlds` that `wanted` names, matched without regard to case; every world when `wanted` is
+/// `None`.
+///
+/// # Errors
+/// `world_not_found` when no world has that name (the error lists the names there are), `no_worlds` when
+/// `wanted` is `None` and there are none.
+pub fn select_worlds<'a>(
+    worlds: &'a [Worldspace],
+    wanted: Option<&str>,
+) -> Result<Vec<&'a Worldspace>, Error> {
+    let names = || {
+        worlds
+            .iter()
+            .map(Worldspace::name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match wanted {
+        Some(name) => {
+            let found: Vec<&Worldspace> = worlds
+                .iter()
+                .filter(|w| w.name().eq_ignore_ascii_case(name))
+                .collect();
+            if found.is_empty() {
+                Err(Error::new(
+                    "world_not_found",
+                    format!("no worldspace named {name}; found: {}", names()),
+                ))
+            } else {
+                Ok(found)
+            }
+        }
+        None if worlds.is_empty() => Err(Error::new(
+            "no_worlds",
+            "the plugins define no worldspace with terrain",
+        )),
+        None => Ok(worlds.iter().collect()),
+    }
+}
+
 /// Read every plugin of the load order (in order) and assemble all the worldspaces at once.
-pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, Failure> {
+///
+/// # Errors
+/// As [`load_plugins`], and `load_order_invalid` when the worldspaces cannot be assembled.
+pub fn load_worlds(data: &Path, names: &[String]) -> Result<Vec<Worldspace>, Error> {
     let loaded = load_plugins(data, names)?;
     Worldspace::from_load_order(&loaded.plugins)
-        .map_err(|e| Failure::new("load_order_invalid", e.to_string()))
+        .map_err(|e| Error::new("load_order_invalid", e.to_string()))
 }
 
 #[cfg(test)]
@@ -166,7 +211,7 @@ mod tests {
         let dir = temp("missing");
         let err = find_plugin(&dir, "Nope.esm").unwrap_err();
         assert_eq!(err.code, "plugin_not_found");
-        assert_eq!(err.reason, "plugin Nope.esm not found in the data folder");
+        assert_eq!(err.summary, "plugin Nope.esm not found in the data folder");
     }
 
     #[test]
@@ -180,7 +225,14 @@ mod tests {
     #[test]
     fn an_unreadable_data_folder_is_an_error() {
         let err = find_plugin(std::path::Path::new("/definitely/not/here"), "a.esm").unwrap_err();
-        assert!(err.reason.starts_with("cannot read the data folder"));
+        assert_eq!(err.code, "data_unreadable");
+        assert!(err.summary.starts_with("cannot read the data folder"));
+        assert!(
+            !err.summary.contains(['/', '\\']),
+            "the summary is plain prose: {}",
+            err.summary
+        );
+        assert!(err.detail.is_some(), "the OS error text is in the detail");
     }
 
     #[test]
@@ -220,9 +272,9 @@ mod tests {
         std::fs::write(dir.join("Bad.esp"), b"not a plugin at all, just text").unwrap();
         let err = load_worlds(&dir, &["Bad.esp".into()]).unwrap_err();
         assert_eq!(err.code, "plugin_invalid");
-        assert!(err.reason.starts_with("plugin Bad.esp: "), "{err}");
+        assert!(err.summary.starts_with("plugin Bad.esp: "), "{err}");
         let err = load_worlds(&dir, &[]).unwrap_err();
-        assert!(err.reason.contains("no plugins given"));
+        assert!(err.summary.contains("no plugins given"));
         let world = SyntheticWorld::new(1, "W").cell(0, 0, Heights::flat(8.0));
         std::fs::write(
             dir.join("Orphan.esp"),
@@ -230,6 +282,6 @@ mod tests {
         )
         .unwrap();
         let err = load_worlds(&dir, &["Orphan.esp".into()]).unwrap_err();
-        assert_eq!(err.reason, "master Gone.esm is not in the load order");
+        assert_eq!(err.summary, "master Gone.esm is not in the load order");
     }
 }

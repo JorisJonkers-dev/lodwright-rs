@@ -20,6 +20,7 @@ at run time, and CI never has it.
 | Round trip | Every writer is read back by its reader, every reader by its writer, over generated inputs | each format module |
 | Golden file | A writer's output for a fixed synthetic input equals a stored expectation | `crates/*/tests/golden/` as text (hex dumps or JSON, never raw binary), updated with `UPDATE_GOLDEN=1` and reviewed in the diff |
 | Property | Invariants of the height and tile math, over random inputs | see below |
+| Library API | Each call in process: result, progress, cancel and resume, error codes | `crates/lodwright-api/tests/` |
 | CLI | Exit codes and output of the binary | `crates/lodwright-cli/tests/` |
 | Fuzz | Arbitrary bytes never panic a parser | `fuzz/`, weekly in CI; one target per parser |
 | Oracle comparison | Generated output against the owner's existing reference-generator output | owner's machine only, see below |

@@ -92,7 +92,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
                 let file = value("--load-order")?;
                 let text = std::fs::read_to_string(&file)
                     .map_err(|e| format!("cannot read the load-order file: {e}"))?;
-                plugins.extend(crate::load::parse_load_order(&text));
+                plugins.extend(lodwright_api::load::parse_load_order(&text));
             }
             "--world" => options.world = Some(value("--world")?),
             "--format" => {

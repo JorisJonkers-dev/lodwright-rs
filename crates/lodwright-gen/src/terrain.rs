@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use lodwright_contract::{Sha256Stream, sha256_digest};
 use lodwright_core::layout::{self, BlockId};
@@ -39,6 +39,9 @@ pub struct Options<'a> {
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
+    /// Asked before each block is built: `true` stops the run at that point. The blocks finished so far are kept and
+    /// reported, the settings file is not written, and [`Report::cancelled`] is set.
+    pub cancel: Option<&'a (dyn Fn() -> bool + Sync)>,
 }
 
 impl Default for Options<'_> {
@@ -49,6 +52,7 @@ impl Default for Options<'_> {
             progress: None,
             water: true,
             reuse: None,
+            cancel: None,
         }
     }
 }
@@ -86,6 +90,9 @@ pub struct Report {
     pub files: Vec<FileRecord>,
     /// Terrain blocks with files, sorted by key.
     pub blocks: Vec<BlockRecord>,
+    /// [`Options::cancel`] stopped the run: `files` and `blocks` hold only the blocks that finished, and the
+    /// settings file was not written.
+    pub cancelled: bool,
 }
 
 pub(crate) fn write_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
@@ -280,7 +287,12 @@ pub fn generate_terrain(
     let mut files = Vec::new();
     let mut blocks = Vec::new();
     let mut highest = 0;
+    let stop = || options.cancel.is_some_and(|cancel| cancel());
+    let cancelled = AtomicBool::new(false);
     for level in &settings.levels {
+        if cancelled.load(Ordering::Relaxed) {
+            break;
+        }
         let grid = BlockGrid::new(level.level).map_err(|_| lodwright_core::Error::ZeroLevel)?;
         let Some(raster) = HeightRaster::build(world, grid)? else {
             continue;
@@ -296,6 +308,11 @@ pub fn generate_terrain(
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         let Some(job) = jobs.get(i) else { break };
+                        if stop() {
+                            cancelled.store(true, Ordering::Relaxed);
+                            next.store(jobs.len(), Ordering::Relaxed);
+                            break;
+                        }
                         let result = run_job(world, &raster, job, out, tiles, options);
                         if let Some(report) = options.progress {
                             let n = finished.fetch_add(1, Ordering::Relaxed) + 1;
@@ -326,7 +343,8 @@ pub fn generate_terrain(
             }
         }
     }
-    if let Some(bounds) = world.bounds() {
+    let cancelled = cancelled.into_inner();
+    if let Some(bounds) = world.bounds().filter(|_| !cancelled) {
         let clamp = |v: i32| i16::try_from(v).unwrap_or(if v < 0 { i16::MIN } else { i16::MAX });
         let settings_file = LodSettings::for_bounds(
             (clamp(bounds.min_x), clamp(bounds.min_y)),
@@ -345,6 +363,7 @@ pub fn generate_terrain(
         world: world.name().to_owned(),
         files,
         blocks,
+        cancelled,
     })
 }
 
@@ -459,6 +478,44 @@ mod tests {
     }
 
     #[test]
+    fn a_cancel_after_the_first_block_keeps_that_block_and_writes_no_settings_file() {
+        let out = temp("cancel");
+        let asked = std::sync::atomic::AtomicUsize::new(0);
+        let cancel = || asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 1;
+        let report = generate_terrain(
+            &world(),
+            &TerrainSettings::default(),
+            &out,
+            &Options {
+                cancel: Some(&cancel),
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert!(report.cancelled);
+        assert_eq!(report.blocks.len(), 1);
+        assert!(
+            report
+                .files
+                .iter()
+                .all(|f| !f.path.ends_with(".dlodsettings"))
+        );
+        assert!(!out.join("lodsettings").exists());
+    }
+
+    #[test]
+    fn a_run_without_a_cancel_is_not_cancelled() {
+        let report = generate_terrain(
+            &world(),
+            &TerrainSettings::default(),
+            &temp("not-cancelled"),
+            &Options::default(),
+        )
+        .unwrap();
+        assert!(!report.cancelled);
+    }
+
+    #[test]
     fn the_thread_count_does_not_change_a_single_byte() {
         let (one, four) = (temp("t1"), temp("t4"));
         let a = generate_terrain(
@@ -471,6 +528,7 @@ mod tests {
                 progress: None,
                 water: true,
                 reuse: None,
+                cancel: None,
             },
         )
         .unwrap();
@@ -484,6 +542,7 @@ mod tests {
                 progress: None,
                 water: true,
                 reuse: None,
+                cancel: None,
             },
         )
         .unwrap();

@@ -328,6 +328,14 @@ fn an_output_folder_inside_the_data_folder_is_refused() {
 }
 
 #[test]
+fn an_output_folder_that_is_a_working_tree_root_is_refused() {
+    let (job, out) = job("git-root");
+    std::fs::create_dir_all(out.join(".git")).unwrap();
+    let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
+    assert_eq!(err.code, "output_in_repo");
+}
+
+#[test]
 fn a_full_output_folder_without_a_manifest_is_refused_unless_overwrite_is_set() {
     let (mut job, out) = job("full");
     std::fs::create_dir_all(&out).unwrap();

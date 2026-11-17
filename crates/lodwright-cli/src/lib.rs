@@ -14,7 +14,6 @@ use lodwright_contract::{DocumentKind, Handshake, VersionInfo, schema_json};
 mod commands;
 mod failure;
 mod generate;
-mod load;
 mod options;
 mod probe;
 
@@ -159,7 +158,7 @@ fn fail(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
-    let _ = writeln!(err, "lodwright: {failure}");
+    let _ = writeln!(err, "lodwright: {}", failure::reason(failure));
     if options.json {
         let doc = commands::failed_document(options, failure);
         let _ = writeln!(out, "{}", to_json(&doc));

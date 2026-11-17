@@ -22,8 +22,12 @@ Each document carries:
 `lodwright contracts --json` prints every contract this build emits and the schema versions it can emit, and exits 0:
 
 ```json
-{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]}]}
+{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
 ```
+
+`lodwright-api` is not a document: it is the version of the in-process library API (`crates/lodwright-api`,
+`lodwright_api::API_VERSION`). It rises when a call, a type or an error code of that API changes in a way an existing
+caller would notice.
 
 A consumer picks the highest version both sides list that is not above the version it was tested with, and refuses a
 tool whose list lacks that version. This build emits only the newest version of each contract.
@@ -38,8 +42,8 @@ as "other". An enum without the mark is closed: adding a value to it is a versio
 `lodwright generate --request FILE` reads a `lodwright-request` document (schema: `lodwright schema request`): data
 folder, plugins in load order, worlds (empty: all), output folder, terrain levels, object LOD on or off, inclusion rules
 (exclude or keep by plugin, exclude by record or by model glob) and limits (threads, a memory budget). The request
-digest (`arguments_digest` in the result) covers every field. The library entry point for the same work is the
-`lodwright-gen` crate (`generate_terrain`, `generate_objects`, `verify_folder`).
+digest (`arguments_digest` in the result) covers every field. The library entry point for the same work is
+`lodwright_api::generate`, which takes the same request; the command is a wrapper over it.
 
 The run leaves `manifest.json` (`lodwright-manifest`: request digest, inputs digest, every file with size and digest) in
 the output folder. A later run with the same request over the same plugin contents finds it and the files it lists and

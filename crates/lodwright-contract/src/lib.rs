@@ -43,5 +43,10 @@ pub const REQUEST_CONTRACT: &str = "lodwright-request";
 pub const PLAN_CONTRACT: &str = "lodwright-plan";
 /// The contract name of the result document (its `contract` field).
 pub const RESULT_CONTRACT: &str = "lodwright-result";
+/// The contract name of the in-process library API (`lodwright-api`), listed by `contracts --json`.
+pub const API_CONTRACT: &str = "lodwright-api";
+/// The version of the in-process library API. It changes when a call, a type or an error code of that API
+/// changes in a way an existing caller would notice.
+pub const API_VERSION: u32 = 1;
 /// The name every document gives as its tool.
 pub const TOOL_NAME: &str = "lodwright";

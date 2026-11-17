@@ -8,6 +8,7 @@ members = [
     "crates/lodwright-nif",
     "crates/lodwright-plugin-meta",
     "crates/lodwright-contract",
+    "crates/lodwright-api",
     "crates/lodwright-cli",
     "crates/lodwright-testkit",
 ]
@@ -36,6 +37,7 @@ lodwright-core = { path = "crates/lodwright-core" }
 lodwright-dds = { path = "crates/lodwright-dds" }
 lodwright-gen = { path = "crates/lodwright-gen" }
 lodwright-contract = { path = "crates/lodwright-contract" }
+lodwright-api = { path = "crates/lodwright-api" }
 lodwright-nif = { path = "crates/lodwright-nif" }
 lodwright-testkit = { path = "crates/lodwright-testkit" }
 lodwright-plugin-meta = { path = "crates/lodwright-plugin-meta" }

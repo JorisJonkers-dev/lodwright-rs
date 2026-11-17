@@ -56,10 +56,31 @@ impl Error {
             text.push_str(detail);
         }
         match home {
-            Some(home) => text.replace(home, "~"),
+            Some(home) => tilde(&text, home),
             None => text,
         }
     }
+}
+
+/// `text` with `home` written as `~` where it starts a path and ends at a path boundary: `/users/player` in
+/// `/users/player/out` is replaced, in `/users/player2/out` it is not.
+fn tilde(text: &str, home: &str) -> String {
+    let path_char =
+        |c: char| c.is_alphanumeric() || matches!(c, '/' | '\\' | '.' | '_' | '-' | '~');
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find(home) {
+        out.push_str(&rest[..at]);
+        rest = &rest[at + home.len()..];
+        let starts = !out.chars().next_back().is_some_and(path_char);
+        let ends = rest
+            .chars()
+            .next()
+            .is_none_or(|c| c == '/' || c == '\\' || !path_char(c));
+        out.push_str(if starts && ends { "~" } else { home });
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The home folder, when it is long enough that replacing it cannot hit unrelated text.
@@ -104,6 +125,19 @@ mod tests {
             .copy_text_at(Some(home));
         assert!(text.ends_with("detail: ~/out/x.nif"), "{text}");
         assert!(!text.contains(home));
+    }
+
+    #[test]
+    fn only_a_path_that_starts_at_the_home_folder_is_rewritten() {
+        let home = "/users/player";
+        let text = Error::new("output_failed", "cannot write /users/player2/x")
+            .with_detail(format!("{home}/out and /srv{home}/y and {home}"))
+            .copy_text_at(Some(home));
+        assert!(text.contains("cannot write /users/player2/x"), "{text}");
+        assert!(
+            text.ends_with("detail: ~/out and /srv/users/player/y and ~"),
+            "{text}"
+        );
     }
 
     #[test]

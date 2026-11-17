@@ -83,11 +83,8 @@ fn terrain_settings(request: &Request) -> TerrainSettings {
 /// Whether `path` (the output folder) lies inside a git working tree.
 fn inside_git_tree(path: &Path) -> bool {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
-    absolute
-        .parent()
-        .into_iter()
-        .flat_map(Path::ancestors)
-        .any(|dir| dir.join(".git").exists())
+    // the folder itself counts too: an output folder that is a working tree's root is inside it
+    absolute.ancestors().any(|dir| dir.join(".git").exists())
 }
 
 fn refuse_output(request: &Request, allow_in_repo: bool) -> Result<(), Error> {

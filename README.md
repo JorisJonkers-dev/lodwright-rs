@@ -48,6 +48,7 @@ repository.
 
 - [docs/owner-runbook.md](docs/owner-runbook.md): what the owner runs on real data, and what to report back.
 - [docs/gap-list.md](docs/gap-list.md): what full generation needs and what exists.
+- [docs/RELEASE-TEST.md](docs/RELEASE-TEST.md): the checklist a release passes on real data before it is cut.
 - [docs/LICENSING.md](docs/LICENSING.md): which crate carries which licence.
 - [docs/design.md](docs/design.md): pipeline, crates, first-slice interfaces, open questions.
 - [docs/clean-room.md](docs/clean-room.md): who may read what; provenance rules; what CI enforces.

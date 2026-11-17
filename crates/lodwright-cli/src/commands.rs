@@ -14,42 +14,8 @@ use lodwright_core::terrain::{TerrainPlan, TerrainSettings, plan_world};
 use lodwright_core::worldspace::{Inheritance, WorldIndex, Worldspace};
 
 use crate::failure::Failure;
-use crate::load::{load_plugins, load_worlds};
 use crate::options::{Format, Options};
-
-pub(crate) fn select<'a>(
-    worlds: &'a [Worldspace],
-    wanted: Option<&str>,
-) -> Result<Vec<&'a Worldspace>, Failure> {
-    let names = || {
-        worlds
-            .iter()
-            .map(Worldspace::name)
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    match wanted {
-        Some(name) => {
-            let found: Vec<&Worldspace> = worlds
-                .iter()
-                .filter(|w| w.name().eq_ignore_ascii_case(name))
-                .collect();
-            if found.is_empty() {
-                Err(Failure::new(
-                    "world_not_found",
-                    format!("no worldspace named {name}; found: {}", names()),
-                ))
-            } else {
-                Ok(found)
-            }
-        }
-        None if worlds.is_empty() => Err(Failure::new(
-            "no_worlds",
-            "the plugins define no worldspace with terrain",
-        )),
-        None => Ok(worlds.iter().collect()),
-    }
-}
+use lodwright_api::load::{load_plugins, load_worlds, select_worlds as select};
 
 /// The worlds `wanted` names (all when `None`), as `FormID`s from the index.
 fn select_ids(index: &WorldIndex, wanted: Option<&str>) -> Result<Vec<u32>, Failure> {
@@ -284,7 +250,7 @@ pub fn failed_document(options: &Options, failure: &Failure) -> ResultDoc {
         env!("CARGO_PKG_VERSION"),
         Status::Failed,
         failure.code,
-        &failure.reason,
+        &crate::failure::reason(failure),
     );
     if !options.plugins.is_empty() {
         doc.arguments_digest = Some(arguments_digest_of(options));

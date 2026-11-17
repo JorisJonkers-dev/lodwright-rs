@@ -49,7 +49,7 @@ fn contracts_json_lists_each_contract_with_its_versions() {
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "{\"contracts\":[{\"name\":\"lodwright-plan\",\"versions\":[1]},{\"name\":\"lodwright-result\",\"versions\":[1]},{\"name\":\"lodwright-request\",\"versions\":[1]}]}\n"
+        "{\"contracts\":[{\"name\":\"lodwright-plan\",\"versions\":[1]},{\"name\":\"lodwright-result\",\"versions\":[1]},{\"name\":\"lodwright-request\",\"versions\":[1]},{\"name\":\"lodwright-api\",\"versions\":[1]}]}\n"
     );
 }
 

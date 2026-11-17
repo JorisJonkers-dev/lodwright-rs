@@ -20,7 +20,8 @@ reading, clean-room process, risks). The process is [clean-room.md](clean-room.m
 | Crate | Role |
 | --- | --- |
 | `lodwright-core` | Library: one module per contract below. No I/O beyond what a module's reader or writer takes as `Read`/`Write` or bytes |
-| `lodwright-cli` | Thin binary `lodwright`: `--version`, `--help`, `doctor <data-folder>`; later `generate` and `verify` (see TESTING.md) |
+| `lodwright-api` | The library API a caller links: `generate(request, &mut dyn Progress, &CancelToken) -> Result<GenerateOutcome, Error>`, with progress events, cooperative cancel and resume, and errors with a stable code and `copy_text()`. Prints nothing and never ends the process |
+| `lodwright-cli` | Thin binary `lodwright` over `lodwright-api` and the other crates: `generate`, `plan`, `verify`, `probe`, `heightmap`, `doctor` |
 | `lodwright-testkit` | Synthetic builders and reference readers for tests and fuzz seeds; the only allowed test data |
 
 ## What exists

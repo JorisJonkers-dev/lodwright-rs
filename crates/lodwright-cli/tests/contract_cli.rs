@@ -165,7 +165,8 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
             serde_json::json!([
                 {"name": "lodwright-plan", "versions": [1]},
                 {"name": "lodwright-result", "versions": [1]},
-                {"name": "lodwright-request", "versions": [1]}
+                {"name": "lodwright-request", "versions": [1]},
+                {"name": "lodwright-api", "versions": [1]}
             ])
         );
     }

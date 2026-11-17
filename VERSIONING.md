@@ -30,9 +30,14 @@ The schemas are generated from the types of `crates/lodwright-contract` and comm
 when they drift, and the release build fails when the binary prints a different schema than the committed file.
 `lodwright --version --json` prints the contract versions a binary speaks.
 
-| Release | Plan | Result |
-| --- | --- | --- |
-| first release with the contract (after 0.1.0) | 1 | 1 |
+| Release | Plan | Result | Library API |
+| --- | --- | --- | --- |
+| first release with the contract (after 0.1.0) | 1 | 1 | |
+| first release with `crates/lodwright-api` (after 0.3.0) | 1 | 1 | 1 |
+
+The library API (`lodwright_api::API_VERSION`, listed as `lodwright-api` by `lodwright --version --json`) is versioned
+with each release in the same way: a caller links a tagged release, and a change an existing caller would notice
+raises the version and gets a row here.
 
 A change to a document that adds an optional field is not a version bump; readers ignore unknown fields. A breaking
 change adds a `v2` schema beside `v1`, keeps printing `v1` on `--schema-version 1` for at least one Known-good set of Raul's Trusty Toolbox, and

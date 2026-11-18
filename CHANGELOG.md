@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.3.0...v0.4.0) (2026-11-17)
+
+
+### Features
+
+* **api:** library API for in-process LOD generation ([#102](https://github.com/JorisJonkers-dev/lodwright-rs/issues/102)) ([a686f8b](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a686f8b809801900a1e4284fbfb1e39b517660bd))
+
 ## [0.3.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.2.0...v0.3.0) (2026-11-16)
 
 

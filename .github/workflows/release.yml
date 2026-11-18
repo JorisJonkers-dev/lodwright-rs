@@ -3,7 +3,8 @@
 # registry. Each release gets the Linux x86_64 binary, the contract schemas and a SHA-256 file as release assets,
 # with a build provenance attestation over all of them (scripts/release-assets.sh, VERSIONING.md).
 # `workflow_dispatch` is the dry run: it builds and attests the same assets from the selected ref and keeps them as a
-# workflow artifact instead of a release.
+# workflow artifact instead of a release. With `tag` and `publish` it republishes that existing tag: its assets and OCI
+# package are pushed again.
 name: Release
 
 on:
@@ -13,6 +14,16 @@ on:
     paths:
       - .github/workflows/release.yml
   workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing release tag, vX.Y.Z. Empty runs the dry run from the selected ref
+        required: false
+        type: string
+      publish:
+        description: Publish the tag's assets and package (false is a dry run)
+        required: false
+        default: false
+        type: boolean
 
 # Each job asks for what it needs; the workflow itself holds nothing.
 permissions: {}
@@ -87,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
+          ref: ${{ inputs.tag || needs.release-please.outputs.tag_name || github.ref }}
           persist-credentials: false
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
@@ -103,13 +114,13 @@ jobs:
         with:
           subject-path: dist/*
       - name: Upload to the release
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '' && inputs.publish) }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.release-please.outputs.tag_name }}
+          TAG: ${{ inputs.tag || needs.release-please.outputs.tag_name }}
         run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
       - name: Keep the assets of a dry run
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !(inputs.tag != '' && inputs.publish) }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets-dry-run
@@ -124,7 +135,7 @@ jobs:
   # first push of a new package (ghcr.io creates it private; make it public, then remove the variable).
   packages:
     needs: [release-please, assets]
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.assets.result == 'success' }}
+    if: ${{ !cancelled() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '' && inputs.publish)) && needs.assets.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -133,13 +144,13 @@ jobs:
       id-token: write
       attestations: write
     env:
-      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      TAG_NAME: ${{ inputs.tag || needs.release-please.outputs.tag_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OUT: packages
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ inputs.tag || needs.release-please.outputs.tag_name }}
           persist-credentials: false
       - name: Install oras
         # The repository allows only listed actions, so oras comes from its release, checked by SHA-256.

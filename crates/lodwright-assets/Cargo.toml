@@ -9,7 +9,7 @@ publish.workspace = true
 description = "BSA v104 archive reader and the loose-over-archive resolver of lodwright."
 
 [dependencies]
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "=0.8.9", default-features = false, features = ["with-alloc"] }
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

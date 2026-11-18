@@ -9,10 +9,10 @@ publish.workspace = true
 description = "The documents lodwright prints for its callers (plan v1, result v1, events), their JSON Schemas and digests."
 
 [dependencies]
-schemars = { version = "=1.2.3", default-features = false, features = ["derive", "std"] }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.154"
-sha2 = "=0.10.9"
+schemars = { version = "1.2.3", default-features = false, features = ["derive", "std"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.10.9"
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

@@ -9,7 +9,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "=0.4.13"
+libfuzzer-sys = "0.4.13"
 lodwright-assets = { path = "../crates/lodwright-assets" }
 lodwright-core = { path = "../crates/lodwright-core" }
 lodwright-dds = { path = "../crates/lodwright-dds" }

@@ -34,13 +34,13 @@ our own design), and reuse of unchanged object and tree blocks. The gap list has
 
 The `lodwright` program is published on each release as an OCI package on ghcr.io:
 
-`ghcr.io/jorisjonkers-dev/lodwright-rs-lodwright:<version>-x86_64-unknown-linux-gnu`
+`ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu`
 
 where `<version>` is the release tag without the leading `v`. The package is a `tar.gz` archive with the binary and
 `LICENSE`. Verify it with:
 
 ```sh
-gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs-lodwright:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
+gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
 ```
 
 ## Place in the stack

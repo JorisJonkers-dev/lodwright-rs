@@ -13,8 +13,8 @@ lodwright-core = { workspace = true }
 lodwright-gen = { workspace = true }
 lodwright-contract = { workspace = true }
 lodwright-plugin-meta = { workspace = true }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 
 [dev-dependencies]
 lodwright-nif = { workspace = true }

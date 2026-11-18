@@ -9,7 +9,7 @@ publish.workspace = true
 description = "Plugin header summaries (masters, master and light flags) read with the esplugin crate."
 
 [dependencies]
-esplugin = "=6.1.4"
+esplugin = "6.1.4"
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

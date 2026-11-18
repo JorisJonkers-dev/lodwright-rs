@@ -6,6 +6,11 @@
       "description": "Crates from crates.io wait 7 days after publication, as Cargo does (.cargo/config.toml). The organisation's own git dependencies have their own rules.",
       "matchManagers": ["cargo"],
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Cargo: keep caret requirements so the Components link together; exact versions live in Cargo.lock.",
+      "matchManagers": ["cargo"],
+      "rangeStrategy": "update-lockfile"
     }
   ]
 }

@@ -17,8 +17,8 @@ lodwright-core = { workspace = true }
 lodwright-gen = { workspace = true }
 lodwright-contract = { workspace = true }
 lodwright-api = { workspace = true }
-serde = "1.0.228"
-serde_json = "1.0.150"
+serde = "=1.0.229"
+serde_json = "=1.0.154"
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

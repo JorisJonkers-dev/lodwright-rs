@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.0...v0.4.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** pin dependencies ([#108](https://github.com/JorisJonkers-dev/lodwright-rs/issues/108)) ([4fe1142](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4fe1142625bf1ace4bd2d90aef37d6db3111d3b7))
+
 ## [0.4.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.3.0...v0.4.0) (2026-11-17)
 
 

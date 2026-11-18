@@ -43,6 +43,8 @@ where `<version>` is the release tag without the leading `v`. The package is a `
 gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
 ```
 
+To republish an existing tag, for example after the package was renamed, run the release workflow by hand on `main` with the tag and `publish` set: `gh workflow run release.yml -R JorisJonkers-dev/lodwright-rs --ref main -f tag=vX.Y.Z -f publish=true`. The run builds the assets of that tag, uploads them to its GitHub release and pushes the package again. Without `publish=true` it is a dry run that pushes nothing.
+
 ## Place in the stack
 
 lodwright-rs is a Component of [Raul's Trusty Toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox).

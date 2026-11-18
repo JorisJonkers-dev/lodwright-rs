@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.1...v0.4.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** use caret requirements so the Components link together ([#116](https://github.com/JorisJonkers-dev/lodwright-rs/issues/116)) ([3af826c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/3af826cbf5c70bbbde080f3693530ba1ff1f8932))
+
 ## [0.4.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.0...v0.4.1) (2026-11-18)
 
 

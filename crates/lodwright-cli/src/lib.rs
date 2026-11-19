@@ -339,7 +339,7 @@ fn verify_document(verification: &lodwright_gen::Verification) -> VerifyDoc {
     doc
 }
 
-/// The IoU under which a block is counted in the water summary when `--water-iou` is not given (the G5 goal).
+/// The `IoU` under which a block is counted in the water summary when `--water-iou` is not given (the G5 goal).
 const DEFAULT_WATER_IOU: f64 = 0.95;
 
 /// Three decimals, as the documents print measurements.

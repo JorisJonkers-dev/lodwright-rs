@@ -53,28 +53,28 @@ pub struct VerifyDoc {
     pub objects: Option<ObjectReport>,
 }
 
-/// The water of the terrain blocks compared with the reference: the IoU (intersection over union) of the ground the
+/// The water of the terrain blocks compared with the reference: the `IoU` (intersection over union) of the ground the
 /// two water planes cover, seen from above, sampled at the centres of a 400 by 400 grid over the bounds of both
 /// planes. Numbers are rounded to three decimals.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct WaterReport {
     /// Terrain blocks with water on either side (and present on both sides).
     pub blocks: u64,
-    /// The IoU under which a block counts in `under_threshold`: `--water-iou`, or 0.95 without it.
+    /// The `IoU` under which a block counts in `under_threshold`: `--water-iou`, or 0.95 without it.
     pub threshold: f64,
-    /// Blocks whose IoU is under `threshold`.
+    /// Blocks whose `IoU` is under `threshold`.
     pub under_threshold: u64,
-    /// The lowest IoU; omitted when no block has water.
+    /// The lowest `IoU`; omitted when no block has water.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lowest: Option<f64>,
-    /// The mean IoU; omitted when no block has water.
+    /// The mean `IoU`; omitted when no block has water.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean: Option<f64>,
     /// Every block with water, sorted by path.
     pub per_block: Vec<WaterBlock>,
 }
 
-/// The water IoU of one terrain block.
+/// The water `IoU` of one terrain block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct WaterBlock {
     /// The block mesh, relative to the folder, lower case.

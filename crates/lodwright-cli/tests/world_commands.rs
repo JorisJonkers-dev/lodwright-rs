@@ -379,7 +379,9 @@ fn generate_lake(name: &str, water: bool) -> PathBuf {
         .cell(0, 0, Heights::flat(-64.0))
         .cell_water(0, 0, true, Some(0.0));
     std::fs::write(data.join("Lake.esm"), world_plugin(&[], &world, false)).unwrap();
-    let out = data.join("out");
+    // the output must not lie inside the data folder
+    let out = data.with_extension("out");
+    let _ = std::fs::remove_dir_all(&out);
     let mut args = vec![
         "generate",
         "--data",

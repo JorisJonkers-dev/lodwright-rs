@@ -519,7 +519,7 @@ fn water_area(nif: &NifFile) -> f64 {
         .sum()
 }
 
-/// Grid cells per side of the water IoU sampling (the definition of `WaterReport` in the contract).
+/// Grid cells per side of the water `IoU` sampling (the definition of `WaterReport` in the contract).
 const IOU_GRID: usize = 400;
 
 /// Mark the grid cells whose centre lies in one of `triangles` (edges included).
@@ -564,7 +564,7 @@ fn rasterise(triangles: &[Flat], min: [f64; 2], cell: [f64; 2], grid: &mut [bool
     }
 }
 
-/// The IoU of the ground two water planes cover, seen from above: the share of the centres of a 400 by 400 grid over
+/// The `IoU` of the ground two water planes cover, seen from above: the share of the centres of a 400 by 400 grid over
 /// the bounds of both planes that lie in both, out of those in either. 0 when only one side has water or the planes
 /// cover no ground; 1 when neither has water.
 #[must_use]
@@ -642,7 +642,7 @@ fn unmatched_vertices(mine: &[[f32; 3]], theirs: &[[f32; 3]]) -> usize {
 pub struct WaterOverlap {
     /// The block mesh, relative to the folder, lower case.
     pub path: String,
-    /// The IoU of the covered ground, unrounded.
+    /// The `IoU` of the covered ground, unrounded.
     pub iou: f64,
 }
 
@@ -694,7 +694,7 @@ fn all_vertices_and_triangles(nif: &NifFile) -> (Vec<[f32; 3]>, usize) {
     (vertices, triangles)
 }
 
-/// Measure every block mesh present in both `folder` and `reference` (names compared in lower case): the water IoU
+/// Measure every block mesh present in both `folder` and `reference` (names compared in lower case): the water `IoU`
 /// of each terrain block with water on either side, and the agreement of each object block. A file that cannot be
 /// read on either side is skipped; [`verify_folder`] and [`compare_folders`] report those.
 #[must_use]
@@ -998,7 +998,8 @@ mod tests {
             [
                 (
                     "meshes/landscape/lod/w/w.level4.x0.y0.nif",
-                    "0.333".to_owned()
+                    // a third of the union, as sampled at the cell centres of the 400 by 400 grid
+                    "0.335".to_owned()
                 ),
                 (
                     "meshes/landscape/lod/w/w.level4.x12.y0.nif",

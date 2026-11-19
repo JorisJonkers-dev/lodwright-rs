@@ -474,4 +474,15 @@ fn the_water_iou_threshold_needs_a_reference_and_a_number_from_zero_to_one() {
         go(&["verify", dir, "--reference", dir, "--water-iou"]).0,
         EXIT_USAGE
     );
+    // both ends of the range are accepted: two empty folders are equal, so the run is clean
+    let empty = std::env::temp_dir().join(format!("lodwright-iou-edges-{}", std::process::id()));
+    std::fs::create_dir_all(&empty).unwrap();
+    let empty = empty.to_str().unwrap();
+    for edge in ["0", "1"] {
+        assert_eq!(
+            go(&["verify", empty, "--reference", empty, "--water-iou", edge]).0,
+            EXIT_OK,
+            "{edge}"
+        );
+    }
 }

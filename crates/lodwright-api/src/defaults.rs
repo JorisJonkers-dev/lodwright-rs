@@ -78,9 +78,21 @@ pub fn request_defaults() -> Defaults {
         since: NEXT_RELEASE.to_owned(),
         ..option(&doc, "terrain.texture_scales", OptionKind::Map)
     });
-    for key in ["objects.enabled", "trees.enabled"] {
-        options.push(option(&doc, key, OptionKind::Switch));
+    options.push(option(&doc, "objects.enabled", OptionKind::Switch));
+    // options that are off by default are not written while off: their default comes from the request type
+    let objects = Request::new("", &[], "").objects;
+    for (key, default) in [
+        ("objects.drop_under_terrain", objects.drop_under_terrain),
+        ("objects.drop_under_water", objects.drop_under_water),
+    ] {
+        options.push(OptionInfo {
+            default: Value::Bool(default),
+            tier: 3,
+            since: NEXT_RELEASE.to_owned(),
+            ..option(&doc, key, OptionKind::Switch)
+        });
     }
+    options.push(option(&doc, "trees.enabled", OptionKind::Switch));
     options.push(OptionInfo {
         minimum: Some(f64::from(QUALITY_MIN)),
         ..per_level("quality", OptionKind::Number, |l| {
@@ -192,11 +204,12 @@ mod tests {
                     assert_eq!(request.validate(), Ok(()), "{}", o.key);
                 }
             } else {
-                // an option that is empty by default is not written while empty
+                // an option that is empty or off by default is not written while so
                 let written = match at(&doc, &o.key) {
                     Value::Null if o.kind == OptionKind::Map => {
                         Value::Object(serde_json::Map::new())
                     }
+                    Value::Null if o.kind == OptionKind::Switch => Value::Bool(false),
                     v => v,
                 };
                 assert_eq!(o.default, written, "{}", o.key);
@@ -257,6 +270,8 @@ mod tests {
         );
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
+        let drop = d.option("objects.drop_under_water").unwrap();
+        assert_eq!((drop.tier, drop.default.clone()), (3, Value::Bool(false)));
         assert_eq!(d.option("limits.threads").unwrap().default, Value::Null);
         assert_eq!(
             d.option("terrain.water").unwrap().default,

@@ -38,6 +38,22 @@ pub struct ObjectReport {
     pub instances: usize,
     /// Instances left out because their model has no LOD model or it could not be read.
     pub skipped: usize,
+    /// Faces left out because they lie wholly under the ground ([`Surfaces::ground`]).
+    pub dropped_under_terrain: usize,
+    /// Faces left out because they lie wholly under a cell's water ([`Surfaces::water`]).
+    pub dropped_under_water: usize,
+}
+
+/// A height at a world position (x, y), or `None` where there is none.
+pub type HeightAt<'a> = &'a dyn Fn(f32, f32) -> Option<f32>;
+
+/// The surfaces under which object faces are left out; `None` keeps every face (the default).
+#[derive(Clone, Copy, Default)]
+pub struct Surfaces<'a> {
+    /// The ground height; a face whose three corners all lie below it is left out.
+    pub ground: Option<HeightAt<'a>>,
+    /// The water height of cells that have water; a face whose three corners all lie below it is left out.
+    pub water: Option<HeightAt<'a>>,
 }
 
 type Mat = [[f32; 3]; 3];
@@ -173,6 +189,8 @@ struct Merged {
     uv: Vec<[f32; 2]>,
     indices: Vec<u16>,
     row_triangles: [u32; 4],
+    dropped_under_terrain: usize,
+    dropped_under_water: usize,
 }
 
 // source: game-object-block-cell
@@ -205,13 +223,81 @@ fn add_instance(
     row: usize,
     atlas: &Atlas,
     key_of: &dyn Fn(&Part) -> String,
+    surfaces: Surfaces,
 ) -> bool {
     let rot = euler(placement.rot);
-    let added: usize = model.parts.iter().map(|p| p.vertices.len()).sum();
+    // per part: the corners in world units, the faces kept and the vertices those faces use
+    let mut kept: Vec<(Vec<[f32; 3]>, Vec<[u16; 3]>, Vec<Option<u16>>)> = Vec::new();
+    let (mut under_terrain, mut under_water) = (0, 0);
+    for part in &model.parts {
+        let world: Vec<[f32; 3]> = part
+            .vertices
+            .iter()
+            .map(|v| {
+                let o = part.offset;
+                // source: game-object-shape-offset
+                let p = turn(
+                    &rot,
+                    [
+                        v[0] * placement.scale + o[0],
+                        v[1] * placement.scale + o[1],
+                        v[2] * placement.scale + o[2],
+                    ],
+                );
+                [
+                    placement.pos[0] + p[0],
+                    placement.pos[1] + p[1],
+                    placement.pos[2] + p[2],
+                ]
+            })
+            .collect();
+        let below = |surface: Option<HeightAt>, t: &[u16; 3]| {
+            surface.is_some_and(|height| {
+                t.iter().all(|&i| {
+                    let c = world[usize::from(i)];
+                    height(c[0], c[1]).is_some_and(|h| c[2] < h)
+                })
+            })
+        };
+        let mut faces = Vec::with_capacity(part.triangles.len());
+        for t in &part.triangles {
+            if below(surfaces.ground, t) {
+                under_terrain += 1;
+            } else if below(surfaces.water, t) {
+                under_water += 1;
+            } else {
+                faces.push(*t);
+            }
+        }
+        // a vertex no kept face uses is left out; the others are numbered in their original order
+        let mut used = vec![false; part.vertices.len()];
+        for t in &faces {
+            for &i in t {
+                used[usize::from(i)] = true;
+            }
+        }
+        let mut next = 0_u16;
+        let remap: Vec<Option<u16>> = used
+            .iter()
+            .map(|&u| {
+                u.then(|| {
+                    next += 1;
+                    next - 1
+                })
+            })
+            .collect();
+        kept.push((world, faces, remap));
+    }
+    let added: usize = kept
+        .iter()
+        .map(|(_, _, remap)| remap.iter().flatten().count())
+        .sum();
     if m.vertices.len() + added > MAX_VERTICES {
         return false;
     }
-    for part in &model.parts {
+    m.dropped_under_terrain += under_terrain;
+    m.dropped_under_water += under_water;
+    for (part, (world, faces, remap)) in model.parts.iter().zip(kept) {
         let base = u16::try_from(m.vertices.len()).unwrap_or(u16::MAX);
         let normals = part
             .normals
@@ -227,32 +313,19 @@ fn add_instance(
             .get(&key)
             .or_else(|| atlas.rects.get(NONE))
             .copied();
-        for i in 0..part.vertices.len() {
-            let v = part.vertices[i];
-            let o = part.offset;
-            // source: game-object-shape-offset
-            let p = turn(
-                &rot,
-                [
-                    v[0] * placement.scale + o[0],
-                    v[1] * placement.scale + o[1],
-                    v[2] * placement.scale + o[2],
-                ],
-            );
-            m.vertices.push([
-                placement.pos[0] + p[0] - origin.0,
-                placement.pos[1] + p[1] - origin.1,
-                placement.pos[2] + p[2],
-            ]);
+        for i in (0..part.vertices.len()).filter(|&i| remap[i].is_some()) {
+            let w = world[i];
+            m.vertices.push([w[0] - origin.0, w[1] - origin.1, w[2]]);
             m.normals.push(unit_or_up(turn(&rot, normals[i])));
             m.tangents.push(unit_or_up(turn(&rot, tangents[i])));
             m.bitangents.push(unit_or_up(turn(&rot, bitangents[i])));
             m.uv.push(rect.map_or(part.uv[i], |r| rect_uv(&r, atlas, part.uv[i])));
         }
-        for t in &part.triangles {
-            m.indices.extend(t.map(|i| base + i));
+        for t in &faces {
+            m.indices
+                .extend(t.map(|i| base + remap[usize::from(i)].unwrap_or(0)));
         }
-        m.row_triangles[row.min(3)] += u32::try_from(part.triangles.len()).unwrap_or(0);
+        m.row_triangles[row.min(3)] += u32::try_from(faces.len()).unwrap_or(0);
     }
     true
 }
@@ -304,7 +377,14 @@ pub fn generate_objects(
     assets: &dyn Assets,
     out: &Path,
 ) -> Result<ObjectReport, GenError> {
-    generate_objects_with_progress(world, instances, assets, out, &mut |_, _| {})
+    generate_objects_with_progress(
+        world,
+        instances,
+        assets,
+        out,
+        Surfaces::default(),
+        &mut |_, _| {},
+    )
 }
 
 /// [`generate_objects`], calling `block_done(done, total)` after each block: `total` is the number of block files
@@ -318,6 +398,7 @@ pub fn generate_objects_with_progress(
     instances: &[Instance],
     assets: &dyn Assets,
     out: &Path,
+    surfaces: Surfaces,
     block_done: &mut dyn FnMut(u64, u64),
 ) -> Result<ObjectReport, GenError> {
     layout::check_world_name(world)?;
@@ -474,6 +555,7 @@ pub fn generate_objects_with_progress(
                 row,
                 &atlas,
                 &key_of,
+                surfaces,
             ) {
                 report.instances += 1;
             } else {
@@ -484,6 +566,11 @@ pub fn generate_objects_with_progress(
             report.warnings.push(format!(
                 "block x{bx} y{by}: {dropped} objects left out, the 16-bit vertex limit is reached"
             ));
+        }
+        // a high-priority instance is in its block's normal file too: count its faces once, from the normal file
+        if !high {
+            report.dropped_under_terrain += merged.dropped_under_terrain;
+            report.dropped_under_water += merged.dropped_under_water;
         }
         if merged.indices.is_empty() {
             block_done(done, total);

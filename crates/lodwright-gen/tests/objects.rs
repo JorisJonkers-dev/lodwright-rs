@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, read_header};
-use lodwright_gen::{Assets, generate_objects, generate_objects_with_progress};
+use lodwright_gen::{Assets, Surfaces, generate_objects, generate_objects_with_progress};
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriStripsData,
     NifFile, ObjectNet,
@@ -301,11 +301,17 @@ fn each_block_file_reports_once_in_order_and_the_count_reaches_the_total() {
         instance("a\\Wall.nif", 4096.0 * 9.0, 100.0, 0.0, 2, false),
     ];
     let mut seen = Vec::new();
-    let report =
-        generate_objects_with_progress("Mojave", &list, &assets(), &out, &mut |done, total| {
+    let report = generate_objects_with_progress(
+        "Mojave",
+        &list,
+        &assets(),
+        &out,
+        Surfaces::default(),
+        &mut |done, total| {
             seen.push((done, total));
-        })
-        .unwrap();
+        },
+    )
+    .unwrap();
     // block x0 has a normal and a high-priority file, block x8 a normal one
     assert_eq!(seen, [(1, 3), (2, 3), (3, 3)]);
     assert_eq!(
@@ -324,6 +330,7 @@ fn a_world_without_a_usable_model_reports_no_block() {
         &[instance("zzz.nif", 1.0, 1.0, 0.0, 1, false)],
         &assets(),
         &out,
+        Surfaces::default(),
         &mut |done, total| seen.push((done, total)),
     )
     .unwrap();
@@ -414,4 +421,102 @@ fn a_temporary_reference_goes_to_the_block_of_its_cell() {
         count("meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y-4.nif"),
         3
     );
+}
+
+/// Generate `list` with the given surfaces and return the report and the vertex count of block x0 y0, if written.
+fn with_surfaces(
+    name: &str,
+    list: &[Instance],
+    surfaces: Surfaces,
+) -> (lodwright_gen::ObjectReport, Option<usize>) {
+    let out = temp(name);
+    let report =
+        generate_objects_with_progress("Mojave", list, &assets(), &out, surfaces, &mut |_, _| {})
+            .unwrap();
+    let path = out.join("meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif");
+    let vertices = path.is_file().then(|| {
+        let block = NifFile::read(&std::fs::read(path).unwrap()).unwrap();
+        block
+            .blocks
+            .iter()
+            .find_map(|b| match &b.body {
+                Body::TriShapeData(d) => d.geometry.vertices.as_ref().map(Vec::len),
+                _ => None,
+            })
+            .unwrap_or(0)
+    });
+    (report, vertices)
+}
+
+#[test]
+fn faces_wholly_under_the_ground_are_dropped_and_faces_above_or_crossing_it_are_kept() {
+    // a flat triangle at height 10, one at height 10 turned upright (it reaches 200 units up), one at height 90
+    let mut upright = instance("a\\Wall.nif", 300.0, 100.0, 0.0, 2, false);
+    upright.placement.rot = [-std::f32::consts::FRAC_PI_2, 0.0, 0.0];
+    let mut high = instance("a\\Wall.nif", 500.0, 100.0, 0.0, 3, false);
+    high.placement.pos[2] = 90.0;
+    let list = vec![
+        instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+        upright,
+        high,
+    ];
+    let ground = |_: f32, _: f32| Some(50.0);
+    let (report, vertices) = with_surfaces(
+        "under-ground",
+        &list,
+        Surfaces {
+            ground: Some(&ground),
+            water: None,
+        },
+    );
+    assert_eq!(
+        (report.dropped_under_terrain, report.dropped_under_water),
+        (1, 0)
+    );
+    assert_eq!(
+        vertices,
+        Some(6),
+        "the dropped face's three vertices are gone"
+    );
+    let (all, kept) = with_surfaces("no-surfaces", &list, Surfaces::default());
+    assert_eq!((all.dropped_under_terrain, kept), (0, Some(9)));
+}
+
+#[test]
+fn faces_under_water_are_dropped_only_in_cells_that_have_water() {
+    // the same low triangle in a cell with water at 50 and in a cell without water
+    let list = vec![
+        instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+        instance("a\\Wall.nif", 4096.0 + 100.0, 100.0, 0.0, 2, false),
+    ];
+    let water = |x: f32, _: f32| (x < 4096.0).then_some(50.0);
+    let (report, vertices) = with_surfaces(
+        "under-water",
+        &list,
+        Surfaces {
+            ground: None,
+            water: Some(&water),
+        },
+    );
+    assert_eq!(
+        (report.dropped_under_terrain, report.dropped_under_water),
+        (0, 1)
+    );
+    assert_eq!(vertices, Some(3));
+}
+
+#[test]
+fn a_model_with_every_face_dropped_writes_no_block_and_counts_its_faces() {
+    let list = vec![instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)];
+    let ground = |_: f32, _: f32| Some(1000.0);
+    let (report, vertices) = with_surfaces(
+        "all-dropped",
+        &list,
+        Surfaces {
+            ground: Some(&ground),
+            water: None,
+        },
+    );
+    assert_eq!(report.dropped_under_terrain, 1);
+    assert_eq!(vertices, None);
 }

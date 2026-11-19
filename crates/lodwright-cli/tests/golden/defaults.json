@@ -52,6 +52,20 @@
       "tier": 1
     },
     {
+      "default": false,
+      "key": "objects.drop_under_terrain",
+      "kind": "switch",
+      "since": "0.6.0",
+      "tier": 3
+    },
+    {
+      "default": false,
+      "key": "objects.drop_under_water",
+      "kind": "switch",
+      "since": "0.6.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "trees.enabled",
       "kind": "switch",

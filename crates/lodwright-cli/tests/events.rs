@@ -314,3 +314,26 @@ fn the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lin
     let _ = std::fs::remove_dir_all(&out);
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn a_request_that_drops_faces_under_the_ground_counts_them_in_the_result() {
+    // the wall in cell (2, 2) stands at height 0 on ground at 16, the one in cell (9, 2) has no land under it
+    let d = data("drop");
+    let out = temp("drop-out");
+    let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
+    request.objects.drop_under_terrain = true;
+    let file = temp("drop.json");
+    std::fs::write(&file, serde_json::to_string(&request).unwrap()).unwrap();
+    let args: Vec<String> = ["generate", "--request", file.to_str().unwrap(), "--json"]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+    assert_eq!(run(&args, &mut stdout, &mut stderr), 0);
+    let text = String::from_utf8(stdout).unwrap();
+    let doc: serde_json::Value = serde_json::from_str(text.lines().last().unwrap()).unwrap();
+    assert_eq!(doc["dropped_faces"]["under_terrain"], 1, "{doc}");
+    assert_eq!(doc["dropped_faces"]["under_water"], 0, "{doc}");
+    let _ = std::fs::remove_dir_all(&out);
+    let _ = std::fs::remove_dir_all(&d);
+}

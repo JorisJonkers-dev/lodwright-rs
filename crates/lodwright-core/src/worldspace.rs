@@ -146,6 +146,31 @@ impl Worldspace {
         })
     }
 
+    /// The ground height at world position (`x`, `y`) in world units, interpolated between the four height samples
+    /// around it; `None` outside the cells that have LAND.
+    #[must_use]
+    pub fn ground_height(&self, x: f32, y: f32) -> Option<f32> {
+        // source: cell-size-units
+        const CELL_UNITS: f32 = 4096.0;
+        // source: land-vhgt-layout
+        const INTERVALS: f32 = 32.0;
+        let (cell_x, cell_y) = ((x / CELL_UNITS).floor(), (y / CELL_UNITS).floor());
+        #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+        let cell = self.cell(cell_x as i32, cell_y as i32)?;
+        let east = ((x - cell_x * CELL_UNITS) / CELL_UNITS * INTERVALS).clamp(0.0, INTERVALS);
+        let north = ((y - cell_y * CELL_UNITS) / CELL_UNITS * INTERVALS).clamp(0.0, INTERVALS);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamped to 0..=32
+        let (col, row) = (
+            (east.floor() as usize).min(SIDE - 2),
+            (north.floor() as usize).min(SIDE - 2),
+        );
+        #[allow(clippy::cast_precision_loss)] // below 33
+        let (along, across) = (east - col as f32, north - row as f32);
+        let south = cell.get(col, row) * (1.0 - along) + cell.get(col + 1, row) * along;
+        let northern = cell.get(col, row + 1) * (1.0 - along) + cell.get(col + 1, row + 1) * along;
+        Some(south * (1.0 - across) + northern * across)
+    }
+
     /// Normals, colours and texture layers of cell (`x`, `y`), with absolute texture `FormID`s. Present only when
     /// the plugins were read with [`crate::plugin::ReadOptions::land_layers`] and the winning LAND record has them.
     #[must_use]
@@ -449,6 +474,19 @@ pub(crate) fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_ground_height_is_read_inside_a_cell_and_absent_outside_the_land() {
+        let world = Worldspace::from_cells(
+            0x100,
+            "W",
+            vec![((1, 0), crate::land::CellHeights::flat(96.0))],
+        );
+        assert_eq!(world.ground_height(4096.0 + 300.0, 64.0), Some(96.0));
+        assert_eq!(world.ground_height(8191.0, 4095.0), Some(96.0));
+        assert_eq!(world.ground_height(-1.0, 64.0), None);
+        assert_eq!(world.ground_height(8192.0 + 1.0, 64.0), None);
+    }
+
     #[test]
     fn a_stray_cell_beside_a_large_world_is_trimmed_and_small_worlds_are_kept() {
         let big = Worldspace::from_cells(

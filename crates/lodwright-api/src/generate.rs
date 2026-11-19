@@ -583,11 +583,29 @@ pub fn generate(
                         )
                         .with_detail(e)
                     })?;
+            let ground = |x: f32, y: f32| world.ground_height(x, y);
+            let water = |x: f32, y: f32| {
+                // source: cell-size-units
+                #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+                let cell = ((x / 4096.0).floor() as i32, (y / 4096.0).floor() as i32);
+                world.water_height(cell.0, cell.1)
+            };
+            let surfaces = lodwright_gen::Surfaces {
+                ground: request
+                    .objects
+                    .drop_under_terrain
+                    .then_some(&ground as lodwright_gen::HeightAt),
+                water: request
+                    .objects
+                    .drop_under_water
+                    .then_some(&water as lodwright_gen::HeightAt),
+            };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),
                 &instances,
                 assets,
                 out,
+                surfaces,
                 &mut |done, total| {
                     progress.report(&block_event(
                         Step::Objects,
@@ -600,6 +618,11 @@ pub fn generate(
             )
             .map_err(|e| gen_error(&e))?;
             add_warnings(&mut doc, objects.warnings.clone());
+            if request.objects.drop_under_terrain || request.objects.drop_under_water {
+                let d = doc.dropped_faces.get_or_insert_with(Default::default);
+                d.under_terrain += objects.dropped_under_terrain as u64;
+                d.under_water += objects.dropped_under_water as u64;
+            }
             files.extend(objects.files.iter().map(to_manifest_file));
         }
         if let (Some(assets), true) = (&assets, request.trees.enabled) {

@@ -75,6 +75,19 @@ pub struct ResultDoc {
     /// because their inputs did not change; omitted when no terrain was generated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocks: Option<BlockCounts>,
+    /// Object faces left out by `objects.drop_under_terrain` and `objects.drop_under_water`; omitted when neither
+    /// option is on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dropped_faces: Option<DroppedFaces>,
+}
+
+/// Object faces left out, per kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct DroppedFaces {
+    /// Faces wholly under the ground.
+    pub under_terrain: u64,
+    /// Faces wholly under a cell's water (and not under the ground).
+    pub under_water: u64,
 }
 
 /// Terrain blocks built and kept.
@@ -105,6 +118,7 @@ impl ResultDoc {
             warnings: Vec::new(),
             manifest: None,
             blocks: None,
+            dropped_faces: None,
         }
     }
 

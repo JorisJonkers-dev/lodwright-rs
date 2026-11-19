@@ -35,7 +35,9 @@ pub use error::GenError;
 pub use filter::{filter_instances, glob};
 pub use images::{diffuse_image, normal_image};
 pub use lodmodel::{Part, parse_lod_model};
-pub use objects::{BLOCK_CELLS, ObjectReport, generate_objects, generate_objects_with_progress};
+pub use objects::{
+    BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects, generate_objects_with_progress,
+};
 pub use output::{is_plain_relative, linked_folder, write_output_file};
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees, generate_trees_with_progress};

@@ -70,6 +70,19 @@ wrong with the folder) and `differences` (how it differs from `--reference`, emp
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
 
+With `--reference`, the report also carries two optional keys, measured per block mesh present on both sides (names
+compared in lower case):
+
+* `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
+  two water planes cover seen from above. It is sampled at the centres of a 400 by 400 grid over the bounds of both
+  planes, the same definition the 0.3.0 Release test used, so numbers stay comparable; 0 when only one side has water.
+  The summary gives the blocks, the `threshold`, how many are `under_threshold`, the `lowest` and the `mean`; every
+  number is rounded to three decimals. `threshold` is `--water-iou` when given, otherwise 0.95 (the G5 goal), and only
+  `--water-iou` turns a block under it into a difference (and so exit 1).
+* `objects`: for every object block, the vertex and triangle counts on both sides and the number of vertices with no
+  vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
+  0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
+
 Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 
 | Code | Meaning |

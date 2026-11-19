@@ -482,9 +482,11 @@ pub fn compare_folders(folder: &Path, reference: &Path) -> Vec<Finding> {
     out
 }
 
-/// The ground area a terrain block's water plane covers: the summed area of the triangles of every data block
-/// after the terrain's, seen from above.
-fn water_area(nif: &NifFile) -> f64 {
+/// A triangle seen from above: three corners, x and y.
+type Flat = [[f64; 2]; 3];
+
+/// The triangles of a terrain block's water plane, seen from above: those of every data block after the terrain's.
+fn water_triangles(nif: &NifFile) -> Vec<Flat> {
     nif.blocks
         .iter()
         .filter_map(|b| match &b.body {
@@ -492,22 +494,250 @@ fn water_area(nif: &NifFile) -> f64 {
             _ => None,
         })
         .skip(1)
-        .map(|d| {
+        .flat_map(|d| {
             let v = d.geometry.vertices.as_deref().unwrap_or(&[]);
             d.triangles
                 .as_deref()
                 .unwrap_or(&[])
                 .iter()
-                .filter_map(|t| {
+                .filter_map(move |t| {
                     let [a, b, c] = t.map(|i| v.get(usize::from(i)).copied());
-                    let (a, b, c) = (a?, b?, c?);
-                    let cross = f64::from(b[0] - a[0]) * f64::from(c[1] - a[1])
-                        - f64::from(b[1] - a[1]) * f64::from(c[0] - a[0]);
-                    Some(cross.abs() / 2.0)
+                    let flat = |p: [f32; 3]| [f64::from(p[0]), f64::from(p[1])];
+                    Some([flat(a?), flat(b?), flat(c?)])
                 })
-                .sum::<f64>()
+        })
+        .collect()
+}
+
+/// The ground area a terrain block's water plane covers: the summed area of its triangles, seen from above.
+fn water_area(nif: &NifFile) -> f64 {
+    water_triangles(nif)
+        .iter()
+        .map(|[a, b, c]| {
+            ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])).abs() / 2.0
         })
         .sum()
+}
+
+/// Grid cells per side of the water IoU sampling (the definition of `WaterReport` in the contract).
+const IOU_GRID: usize = 400;
+
+/// Mark the grid cells whose centre lies in one of `triangles` (edges included).
+fn rasterise(triangles: &[Flat], min: [f64; 2], cell: [f64; 2], grid: &mut [bool]) {
+    let n = IOU_GRID;
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss,
+        reason = "grid indices are clamped to 0..400"
+    )]
+    let index = |value: f64, axis: usize| -> usize {
+        (((value - min[axis]) / cell[axis]).floor().max(0.0) as usize).min(n - 1)
+    };
+    for t in triangles {
+        let side = |p: [f64; 2], a: [f64; 2], b: [f64; 2]| {
+            (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+        };
+        let xs = t.map(|p| p[0]);
+        let ys = t.map(|p| p[1]);
+        let lo = |v: [f64; 3]| v.into_iter().fold(f64::INFINITY, f64::min);
+        let hi = |v: [f64; 3]| v.into_iter().fold(f64::NEG_INFINITY, f64::max);
+        for row in index(lo(ys), 1)..=index(hi(ys), 1) {
+            for col in index(lo(xs), 0)..=index(hi(xs), 0) {
+                #[allow(clippy::cast_precision_loss, reason = "at most 400")]
+                let p = [
+                    min[0] + (col as f64 + 0.5) * cell[0],
+                    min[1] + (row as f64 + 0.5) * cell[1],
+                ];
+                let d = [
+                    side(p, t[0], t[1]),
+                    side(p, t[1], t[2]),
+                    side(p, t[2], t[0]),
+                ];
+                let inside = d.iter().all(|v| *v >= 0.0) || d.iter().all(|v| *v <= 0.0);
+                let degenerate = d.iter().all(|v| *v == 0.0);
+                if inside && !degenerate {
+                    grid[row * n + col] = true;
+                }
+            }
+        }
+    }
+}
+
+/// The IoU of the ground two water planes cover, seen from above: the share of the centres of a 400 by 400 grid over
+/// the bounds of both planes that lie in both, out of those in either. 0 when only one side has water or the planes
+/// cover no ground; 1 when neither has water.
+#[must_use]
+fn water_iou(mine: &[Flat], theirs: &[Flat]) -> f64 {
+    match (mine.is_empty(), theirs.is_empty()) {
+        (true, true) => return 1.0,
+        (true, false) | (false, true) => return 0.0,
+        (false, false) => {}
+    }
+    let mut min = [f64::INFINITY; 2];
+    let mut max = [f64::NEG_INFINITY; 2];
+    for p in mine.iter().chain(theirs).flatten() {
+        for axis in 0..2 {
+            min[axis] = min[axis].min(p[axis]);
+            max[axis] = max[axis].max(p[axis]);
+        }
+    }
+    #[allow(clippy::cast_precision_loss, reason = "400")]
+    let cell =
+        [0, 1].map(|axis| ((max[axis] - min[axis]) / IOU_GRID as f64).max(f64::MIN_POSITIVE));
+    let mut a = vec![false; IOU_GRID * IOU_GRID];
+    let mut b = vec![false; IOU_GRID * IOU_GRID];
+    rasterise(mine, min, cell, &mut a);
+    rasterise(theirs, min, cell, &mut b);
+    let both = a.iter().zip(&b).filter(|(x, y)| **x && **y).count();
+    let either = a.iter().zip(&b).filter(|(x, y)| **x || **y).count();
+    if either == 0 {
+        return 0.0;
+    }
+    #[allow(clippy::cast_precision_loss, reason = "at most 160000")]
+    let iou = both as f64 / either as f64;
+    iou
+}
+
+/// How far a vertex may lie from the reference's nearest one and still count as matched.
+pub const OBJECT_TOLERANCE: f32 = 0.05;
+
+/// The vertices of `mine` with no vertex of `theirs` within [`OBJECT_TOLERANCE`], in any order.
+fn unmatched_vertices(mine: &[[f32; 3]], theirs: &[[f32; 3]]) -> usize {
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "block-local coordinates divided by 0.05 fit in i64"
+    )]
+    let key = |v: [f32; 3]| v.map(|c| (f64::from(c) / f64::from(OBJECT_TOLERANCE)).floor() as i64);
+    let mut cells: std::collections::HashMap<[i64; 3], Vec<[f32; 3]>> =
+        std::collections::HashMap::new();
+    for v in theirs {
+        cells.entry(key(*v)).or_default().push(*v);
+    }
+    let near = |a: [f32; 3], b: [f32; 3]| {
+        let d: f64 = (0..3)
+            .map(|i| (f64::from(a[i]) - f64::from(b[i])).powi(2))
+            .sum();
+        d.sqrt() <= f64::from(OBJECT_TOLERANCE)
+    };
+    mine.iter()
+        .filter(|v| {
+            let k = key(**v);
+            let found = (-1..=1).any(|dx| {
+                (-1..=1).any(|dy| {
+                    (-1..=1).any(|dz| {
+                        cells
+                            .get(&[k[0] + dx, k[1] + dy, k[2] + dz])
+                            .is_some_and(|list| list.iter().any(|w| near(**v, *w)))
+                    })
+                })
+            });
+            !found
+        })
+        .count()
+}
+
+/// The water of one terrain block compared with the reference's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaterOverlap {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// The IoU of the covered ground, unrounded.
+    pub iou: f64,
+}
+
+/// One object block compared with the reference's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjectAgreement {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// Vertices of the block (all shapes).
+    pub vertices: usize,
+    /// Vertices of the reference's block.
+    pub reference_vertices: usize,
+    /// Triangles of the block.
+    pub triangles: usize,
+    /// Triangles of the reference's block.
+    pub reference_triangles: usize,
+    /// Vertices with no reference vertex within [`OBJECT_TOLERANCE`].
+    pub unmatched_vertices: usize,
+}
+
+impl ObjectAgreement {
+    /// Equal counts and every vertex matched.
+    #[must_use]
+    pub fn exact(&self) -> bool {
+        self.vertices == self.reference_vertices
+            && self.triangles == self.reference_triangles
+            && self.unmatched_vertices == 0
+    }
+}
+
+/// Per-block measurements of a folder against a reference.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct BlockComparison {
+    /// Terrain blocks present on both sides with water on either, sorted by path.
+    pub water: Vec<WaterOverlap>,
+    /// Object blocks present on both sides, sorted by path.
+    pub objects: Vec<ObjectAgreement>,
+}
+
+fn all_vertices_and_triangles(nif: &NifFile) -> (Vec<[f32; 3]>, usize) {
+    let mut vertices = Vec::new();
+    let mut triangles = 0;
+    for b in &nif.blocks {
+        if let Body::TriShapeData(d) = &b.body {
+            vertices.extend_from_slice(d.geometry.vertices.as_deref().unwrap_or(&[]));
+            triangles += d.triangles.as_deref().map_or(0, <[_]>::len);
+        }
+    }
+    (vertices, triangles)
+}
+
+/// Measure every block mesh present in both `folder` and `reference` (names compared in lower case): the water IoU
+/// of each terrain block with water on either side, and the agreement of each object block. A file that cannot be
+/// read on either side is skipped; [`verify_folder`] and [`compare_folders`] report those.
+#[must_use]
+pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
+    let lower = |root: &Path| -> BTreeMap<String, PathBuf> {
+        files_below(root)
+            .into_iter()
+            .map(|(n, p)| (n.to_ascii_lowercase(), p))
+            .filter(|(n, _)| n.starts_with("meshes/landscape/lod/") && n.ends_with(".nif"))
+            .collect()
+    };
+    let (mine, theirs) = (lower(folder), lower(reference));
+    let mut out = BlockComparison::default();
+    for (name, path) in &mine {
+        let Some(other) = theirs.get(name) else {
+            continue;
+        };
+        let read = |p: &PathBuf| std::fs::read(p).ok().and_then(|b| NifFile::read(&b).ok());
+        let (Some(a), Some(b)) = (read(path), read(other)) else {
+            continue;
+        };
+        if name.contains("/blocks/") {
+            let (va, ta) = all_vertices_and_triangles(&a);
+            let (vb, tb) = all_vertices_and_triangles(&b);
+            out.objects.push(ObjectAgreement {
+                path: name.clone(),
+                vertices: va.len(),
+                reference_vertices: vb.len(),
+                triangles: ta,
+                reference_triangles: tb,
+                unmatched_vertices: unmatched_vertices(&va, &vb),
+            });
+        } else {
+            let (wa, wb) = (water_triangles(&a), water_triangles(&b));
+            if !wa.is_empty() || !wb.is_empty() {
+                out.water.push(WaterOverlap {
+                    path: name.clone(),
+                    iou: water_iou(&wa, &wb),
+                });
+            }
+        }
+    }
+    out
 }
 
 /// The band within which a generated water plane counts as equal to the reference's: half to twice its area.
@@ -531,7 +761,10 @@ fn water_difference(mine: f64, theirs: f64) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_block, verify_folder, water_difference};
+    use super::{
+        Flat, compare_blocks, parse_block, unmatched_vertices, verify_folder, water_difference,
+        water_iou,
+    };
     use crate::{Options, generate_terrain};
     use lodwright_core::land::CellHeights;
     use lodwright_core::terrain::TerrainSettings;
@@ -614,5 +847,168 @@ mod tests {
                 .unwrap()
                 .contains("300 percent")
         );
+    }
+
+    fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Flat> {
+        vec![
+            [[x0, y0], [x1, y0], [x1, y1]],
+            [[x0, y0], [x1, y1], [x0, y1]],
+        ]
+    }
+
+    #[test]
+    fn equal_water_planes_have_an_iou_of_one() {
+        let a = rect(0.0, 0.0, 4096.0, 4096.0);
+        assert!((water_iou(&a, &a) - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn disjoint_water_planes_have_an_iou_of_zero() {
+        let a = rect(0.0, 0.0, 100.0, 100.0);
+        let b = rect(200.0, 0.0, 300.0, 100.0);
+        assert!(water_iou(&a, &b).abs() < 1e-12);
+    }
+
+    #[test]
+    fn planes_overlapping_by_half_have_an_iou_of_about_a_third() {
+        let a = rect(0.0, 0.0, 2.0, 1.0);
+        let b = rect(1.0, 0.0, 3.0, 1.0);
+        let iou = water_iou(&a, &b);
+        assert!((iou - 1.0 / 3.0).abs() < 0.005, "{iou}");
+    }
+
+    #[test]
+    fn water_on_one_side_only_has_an_iou_of_zero() {
+        assert!(water_iou(&rect(0.0, 0.0, 1.0, 1.0), &[]).abs() < 1e-12);
+        assert!(water_iou(&[], &rect(0.0, 0.0, 1.0, 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_iou_does_not_depend_on_the_triangle_order_or_winding() {
+        let a = rect(0.0, 0.0, 2.0, 1.0);
+        let mut b: Vec<Flat> = rect(1.0, 0.0, 3.0, 1.0)
+            .into_iter()
+            .rev()
+            .map(|[p, q, r]| [r, q, p])
+            .collect();
+        let forward = water_iou(&a, &b);
+        b.reverse();
+        assert!((forward - water_iou(&a, &b)).abs() < 1e-12);
+        assert!((forward - water_iou(&b, &a)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_same_vertices_in_another_order_all_match() {
+        let a: Vec<[f32; 3]> = (0..50)
+            .map(|i| [i as f32 * 3.0, (i % 7) as f32, -(i as f32)])
+            .collect();
+        let mut b = a.clone();
+        b.reverse();
+        b.rotate_left(13);
+        assert_eq!(unmatched_vertices(&a, &b), 0);
+    }
+
+    #[test]
+    fn a_vertex_moved_beyond_the_tolerance_is_unmatched_and_within_it_is_not() {
+        let a = vec![[10.0_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
+        let near = vec![[10.04_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
+        let far = vec![[10.06_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
+        assert_eq!(unmatched_vertices(&a, &near), 0);
+        assert_eq!(unmatched_vertices(&a, &far), 1);
+    }
+
+    fn write_terrain(root: &std::path::Path, name: &str, water: Option<(f32, f32)>) {
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [16384.0, 0.0, 0.0],
+            [16384.0, 16384.0, 0.0],
+            [0.0, 16384.0, 0.0],
+        ];
+        let indices = [0, 1, 2, 0, 2, 3];
+        let water_vertices = water.map(|(x0, x1)| {
+            [
+                [x0, 0.0, 5.0],
+                [x1, 0.0, 5.0],
+                [x1, 16384.0, 5.0],
+                [x0, 16384.0, 5.0],
+            ]
+        });
+        let nif = lodwright_nif::terrain_block(&lodwright_nif::TerrainBlock {
+            origin: (0.0, 0.0),
+            size: 16384.0,
+            vertices: &vertices,
+            indices: &indices,
+            textures: ["a.dds", "b.dds"],
+            water: water_vertices.as_ref().map(|v| lodwright_nif::WaterShape {
+                vertices: v,
+                indices: &indices,
+                segments: None,
+            }),
+        })
+        .unwrap();
+        let path = root.join("meshes/landscape/lod/w").join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    fn write_object(root: &std::path::Path, vertices: &[[f32; 3]]) {
+        let n = vertices.len();
+        let up = vec![[0.0, 0.0, 1.0]; n];
+        let along = vec![[1.0, 0.0, 0.0]; n];
+        let side = vec![[0.0, 1.0, 0.0]; n];
+        let uv = vec![[0.5, 0.5]; n];
+        let nif = lodwright_nif::object_block(&lodwright_nif::ObjectBlock {
+            origin: (0.0, 0.0),
+            vertices,
+            normals: &up,
+            tangents: &along,
+            bitangents: &side,
+            uv: &uv,
+            indices: &[0, 1, 2],
+            segment_triangles: [1, 0, 0, 0],
+            textures: ["a.dds", "b.dds"],
+        })
+        .unwrap();
+        let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x0.y0.nif");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn blocks_are_measured_against_the_reference_by_name() {
+        let (mine, theirs) = (temp("blocks-mine"), temp("blocks-theirs"));
+        write_terrain(&mine, "w.level4.x0.y0.nif", Some((0.0, 8192.0)));
+        write_terrain(&theirs, "w.level4.x0.y0.nif", Some((4096.0, 12288.0)));
+        write_terrain(&mine, "w.level4.x4.y0.nif", None);
+        write_terrain(&theirs, "w.level4.x4.y0.nif", None);
+        write_terrain(&mine, "w.level4.x8.y0.nif", Some((0.0, 16384.0)));
+        write_terrain(&mine, "w.level4.x12.y0.nif", Some((0.0, 16384.0)));
+        write_terrain(&theirs, "w.level4.x12.y0.nif", None);
+        let triangle = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        write_object(&mine, &triangle);
+        write_object(&theirs, &[triangle[2], triangle[0], [1.5, 0.0, 0.0]]);
+        let got = compare_blocks(&mine, &theirs);
+        let water: Vec<(&str, String)> = got
+            .water
+            .iter()
+            .map(|w| (w.path.as_str(), format!("{:.3}", w.iou)))
+            .collect();
+        assert_eq!(
+            water,
+            [
+                (
+                    "meshes/landscape/lod/w/w.level4.x0.y0.nif",
+                    "0.333".to_owned()
+                ),
+                (
+                    "meshes/landscape/lod/w/w.level4.x12.y0.nif",
+                    "0.000".to_owned()
+                ),
+            ],
+            "a block without water on either side and a block missing from the reference are not listed"
+        );
+        assert_eq!(got.objects.len(), 1);
+        assert_eq!(got.objects[0].unmatched_vertices, 1);
+        assert!(!got.objects[0].exact());
     }
 }

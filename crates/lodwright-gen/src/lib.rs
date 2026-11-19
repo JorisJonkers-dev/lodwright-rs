@@ -37,4 +37,7 @@ pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{BLOCK_CELLS, ObjectReport, generate_objects};
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees};
-pub use verify::{Finding, Verification, compare_folders, verify_folder};
+pub use verify::{
+    BlockComparison, Finding, OBJECT_TOLERANCE, ObjectAgreement, Verification, WaterOverlap,
+    compare_blocks, compare_folders, verify_folder,
+};

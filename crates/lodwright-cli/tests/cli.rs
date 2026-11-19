@@ -117,7 +117,13 @@ fn verify_with_a_difference_from_the_reference_exits_one() {
     let dir = scratch("differs");
     let reference = scratch("differs-reference");
     std::fs::write(reference.join("only-here.txt"), b"x").unwrap();
-    let out = lodwright(&["verify", path(&dir), "--reference", path(&reference), "--json"]);
+    let out = lodwright(&[
+        "verify",
+        path(&dir),
+        "--reference",
+        path(&reference),
+        "--json",
+    ]);
     assert_eq!(out.status.code(), Some(1));
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(report["ok"], true, "no error in the folder itself");
@@ -137,11 +143,15 @@ fn verify_without_a_folder_or_with_an_unknown_option_exits_two() {
     assert_eq!(lodwright(&["verify"]).status.code(), Some(2));
     let dir = scratch("usage");
     assert_eq!(
-        lodwright(&["verify", path(&dir), "--frobnicate"]).status.code(),
+        lodwright(&["verify", path(&dir), "--frobnicate"])
+            .status
+            .code(),
         Some(2)
     );
     assert_eq!(
-        lodwright(&["verify", path(&dir), "--reference"]).status.code(),
+        lodwright(&["verify", path(&dir), "--reference"])
+            .status
+            .code(),
         Some(2)
     );
 }

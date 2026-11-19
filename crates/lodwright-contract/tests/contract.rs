@@ -4,9 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
-    Bounds, Capabilities, DocumentKind, LevelPlan, Plan, PlannedBlock, ResultDoc, Status, ToolInfo,
-    VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_result, check_verify,
-    schema_file_name, schema_json, sha256_digest,
+    Bounds, Capabilities, DocumentKind, LevelPlan, ObjectBlock, ObjectReport, Plan, PlannedBlock,
+    ResultDoc, Status, ToolInfo, VerifyDoc, VerifyFinding, WaterBlock, WaterReport, WorldPlan,
+    Written, check_plan, check_result, check_verify, schema_file_name, schema_json, sha256_digest,
 };
 use lodwright_testkit::golden::assert_golden;
 
@@ -128,6 +128,30 @@ fn sample_verify() -> VerifyDoc {
         path: "meshes/landscape/lod/island/island.level4.x0.y0.nif".into(),
         problem: "block types differ".into(),
     }];
+    doc.water = Some(WaterReport {
+        blocks: 1,
+        threshold: 0.95,
+        under_threshold: 1,
+        lowest: Some(0.333),
+        mean: Some(0.333),
+        per_block: vec![WaterBlock {
+            path: "meshes/landscape/lod/island/island.level4.x0.y0.nif".into(),
+            iou: 0.333,
+        }],
+    });
+    doc.objects = Some(ObjectReport {
+        blocks: 1,
+        exact: 0,
+        per_block: vec![ObjectBlock {
+            path: "meshes/landscape/lod/island/blocks/island.level4.x0.y0.nif".into(),
+            vertices: 3,
+            reference_vertices: 3,
+            triangles: 1,
+            reference_triangles: 1,
+            unmatched_vertices: 1,
+            exact: false,
+        }],
+    });
     doc
 }
 

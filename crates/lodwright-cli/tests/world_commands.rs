@@ -369,3 +369,102 @@ fn verify_passes_a_generated_folder_and_fails_a_damaged_one() {
     assert_eq!(lodwright_contract::check_verify(&report), Ok(()), "{text}");
     assert_eq!(run(&["verify"]).0, 2);
 }
+
+/// Generate a one-cell island whose cell has water above the land, with or without water planes, into a fresh folder.
+fn generate_lake(name: &str, water: bool) -> PathBuf {
+    let data = std::env::temp_dir().join(format!("lodwright-lake-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&data);
+    std::fs::create_dir_all(&data).unwrap();
+    let world = SyntheticWorld::new(0xC00, "Lake")
+        .cell(0, 0, Heights::flat(-64.0))
+        .cell_water(0, 0, true, Some(0.0));
+    std::fs::write(data.join("Lake.esm"), world_plugin(&[], &world, false)).unwrap();
+    let out = data.join("out");
+    let mut args = vec![
+        "generate",
+        "--data",
+        data.to_str().unwrap(),
+        "--plugin",
+        "Lake.esm",
+        "--out",
+        out.to_str().unwrap(),
+        "--json",
+    ];
+    if !water {
+        args.push("--no-water");
+    }
+    let (code, text, _) = go(&args);
+    assert_eq!(code, EXIT_OK, "{text}");
+    out
+}
+
+#[test]
+fn verify_reports_water_iou_and_object_agreement_against_an_equal_reference() {
+    let (mine, theirs) = (
+        generate_lake("equal-a", true),
+        generate_lake("equal-b", true),
+    );
+    let (code, text, _) = go(&[
+        "verify",
+        mine.to_str().unwrap(),
+        "--reference",
+        theirs.to_str().unwrap(),
+        "--water-iou",
+        "0.95",
+        "--json",
+    ]);
+    assert_eq!(code, EXIT_OK, "{text}");
+    let report: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(lodwright_contract::check_verify(&report), Ok(()));
+    let water = &report["water"];
+    assert!(water["blocks"].as_u64().unwrap() > 0, "{text}");
+    assert_eq!(water["under_threshold"], 0);
+    assert_eq!(water["lowest"], 1.0);
+    assert_eq!(water["mean"], 1.0);
+    assert_eq!(report["objects"]["blocks"], report["objects"]["exact"]);
+}
+
+#[test]
+fn a_block_under_the_water_iou_threshold_is_a_difference_and_exits_one() {
+    let (mine, theirs) = (generate_lake("dry-a", true), generate_lake("dry-b", false));
+    let (code, text, _) = go(&[
+        "verify",
+        mine.to_str().unwrap(),
+        "--reference",
+        theirs.to_str().unwrap(),
+        "--water-iou",
+        "0.95",
+    ]);
+    assert_eq!(code, EXIT_FAILED, "{text}");
+    assert!(text.contains("water IoU 0.000 is under 0.95"), "{text}");
+    assert!(text.contains(", lowest 0.000, mean 0.000"), "{text}");
+}
+
+#[test]
+fn verify_without_a_reference_prints_no_block_reports() {
+    let mine = generate_lake("alone", true);
+    let (code, text, _) = go(&["verify", mine.to_str().unwrap(), "--json"]);
+    assert_eq!(code, EXIT_OK, "{text}");
+    assert!(
+        !text.contains("\"water\"") && !text.contains("\"objects\""),
+        "{text}"
+    );
+}
+
+#[test]
+fn the_water_iou_threshold_needs_a_reference_and_a_number_from_zero_to_one() {
+    let dir = std::env::temp_dir();
+    let dir = dir.to_str().unwrap();
+    assert_eq!(go(&["verify", dir, "--water-iou", "0.9"]).0, EXIT_USAGE);
+    for bad in ["1.5", "-0.1", "x"] {
+        assert_eq!(
+            go(&["verify", dir, "--reference", dir, "--water-iou", bad]).0,
+            EXIT_USAGE,
+            "{bad}"
+        );
+    }
+    assert_eq!(
+        go(&["verify", dir, "--reference", dir, "--water-iou"]).0,
+        EXIT_USAGE
+    );
+}

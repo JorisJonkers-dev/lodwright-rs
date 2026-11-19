@@ -43,6 +43,76 @@ pub struct VerifyDoc {
     /// Differences from the reference folder; empty when no reference was given.
     #[serde(default)]
     pub differences: Vec<VerifyFinding>,
+    /// With a reference: the water of every terrain block that has water on either side, compared with the
+    /// reference's. Omitted without a reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub water: Option<WaterReport>,
+    /// With a reference: every object block present on both sides, compared with the reference's. Omitted without
+    /// a reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objects: Option<ObjectReport>,
+}
+
+/// The water of the terrain blocks compared with the reference: the IoU (intersection over union) of the ground the
+/// two water planes cover, seen from above, sampled at the centres of a 400 by 400 grid over the bounds of both
+/// planes. Numbers are rounded to three decimals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WaterReport {
+    /// Terrain blocks with water on either side (and present on both sides).
+    pub blocks: u64,
+    /// The IoU under which a block counts in `under_threshold`: `--water-iou`, or 0.95 without it.
+    pub threshold: f64,
+    /// Blocks whose IoU is under `threshold`.
+    pub under_threshold: u64,
+    /// The lowest IoU; omitted when no block has water.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lowest: Option<f64>,
+    /// The mean IoU; omitted when no block has water.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mean: Option<f64>,
+    /// Every block with water, sorted by path.
+    pub per_block: Vec<WaterBlock>,
+}
+
+/// The water IoU of one terrain block.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WaterBlock {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// 1 for the same covered ground, 0 for none in common.
+    pub iou: f64,
+}
+
+/// The object blocks compared with the reference. A block is exact when the vertex and triangle counts are equal and
+/// every vertex lies within 0.05 units of a vertex of the reference's block, in any order. Not being exact is reported,
+/// not a finding.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ObjectReport {
+    /// Object blocks present on both sides.
+    pub blocks: u64,
+    /// Of those, the exact ones.
+    pub exact: u64,
+    /// Every block present on both sides, sorted by path.
+    pub per_block: Vec<ObjectBlock>,
+}
+
+/// One object block compared with the reference's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ObjectBlock {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// Vertices of the block (all its shapes).
+    pub vertices: u64,
+    /// Vertices of the reference's block.
+    pub reference_vertices: u64,
+    /// Triangles of the block.
+    pub triangles: u64,
+    /// Triangles of the reference's block.
+    pub reference_triangles: u64,
+    /// Vertices of the block with no vertex of the reference's block within 0.05 units.
+    pub unmatched_vertices: u64,
+    /// Equal counts and no unmatched vertex.
+    pub exact: bool,
 }
 
 impl VerifyDoc {
@@ -60,6 +130,8 @@ impl VerifyDoc {
             settings: 0,
             errors: Vec::new(),
             differences: Vec::new(),
+            water: None,
+            objects: None,
         }
     }
 }

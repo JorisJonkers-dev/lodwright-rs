@@ -439,3 +439,47 @@ footer; that the new fact claims nothing beyond it. What settles the open questi
 that both override one LAND record, the later one changing only part of the record (for example VHGT but not the
 layers); compare the game's own terrain LOD or the in-game ground built from that load order with lodwright's output
 for both readings.
+
+## 2026-11-19: `land-vnml-layout`, `land-vtxt-layout` and `wrld-child-inherits` narrowed (issue 54)
+
+Specifier entry, role held: specifier for the corrections only (not the implementer of `layers.rs` or
+`worldspace.rs`). Nothing was re-read on this date: the UESP LAND and WRLD pages answered HTTP 403 to automated reads,
+and the discrepancies are the ones the second reader recorded on 2026-11-14 (issue 54) from those pages and from xEdit
+(revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016 generator C# repository, decompiled
+binaries, GPL or leaked code. Each fact now states only what its source states; what the code does beyond it is
+labelled as the project's choice in the note, with the open question.
+
+- `land-vnml-layout`: "rows from the south" removed from the fact. The reader shares one grid accessor with VCLR, whose
+  row order is recorded; nothing that generates LOD reads VNML, so no output depends on the clause today.
+- `land-vtxt-layout`: "positions not listed have no opacity" moved from the fact to the note as the project's choice.
+  The diffuse blend relies on it, so it is a LOD question, not only a record question: if the game treats an unlisted
+  position differently, generated terrain colours differ near layer edges.
+- `wrld-child-inherits`: now only the UESP Oblivion statement (climate, water and map data). The FNV flag names are
+  `wrld-parent` (already verified). The merged sentence about what the flags make a child take is an open question;
+  the code's default (no inheritance) and the `FlaggedDefaults` option are labelled as choices. Which worlds get LOD in
+  an all-worlds run depends on this.
+
+All three stay `verified = false`. What a second reader checks: that each fact now matches the UESP page (and, for VNML
+and VTXT, xEdit `wbLandNormals` and `wbLandLayers`) with nothing added. What settles the open points (owner, numbers
+only): for VTXT, in one owner plugin count, per ATXT layer, how many of the 289 positions are listed and whether listed
+points with opacity 0.0 occur (if every layer lists all 289, the question has no effect on output); for the child
+worlds, compare the game's own terrain LOD of a child world whose PNAM has "use land data" clear with lodwright's
+output under each inheritance option; for VNML, the row order can be read from a LAND record with a known slope
+direction (normal x or y component sign by row).
+
+## 2026-11-19: odd sizes in a mip chain (issue 60)
+
+Specifier entry, role held: specifier only (not the implementer of `lodwright-dds`). Read the Microsoft Learn page
+"Introduction To Textures in Direct3D 11" in the MicrosoftDocs/win32 repository (CC-BY-4.0) at revision
+`bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583`. No generator source, decompiled output or GPL code was read.
+
+- `dds-mip-odd-size` (new): the page's one odd-size example, 5 by 1 to 2 by 1 to 1 by 1, which is rounding down. The
+  page is about Direct3D 11 resources, not the DDS file format, and its general sentence ("the next lower level is
+  always even size") does not hold for rounding down in general, so only the example is recorded.
+
+`dds-mip-chain` is unchanged and stays `verified = false`. `crates/lodwright-dds/src/resize.rs` (`mip_size`,
+`mip_count`) now says in its comments that rounding an odd size down is the project's choice and cites both rows; no
+behaviour changed. What a second reader checks: the example and its numbers on that page, that the fact claims nothing
+beyond the example, and whether a Direct3D 11 resource page may stand for the DDS files the game reads (or whether an
+`oracle:` measurement is needed). What settles it on the game's side (owner, numbers only): `lodwright probe dds` on any
+own texture with an odd dimension, reporting width, height and mip count.

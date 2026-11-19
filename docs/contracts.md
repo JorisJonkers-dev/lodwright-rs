@@ -45,6 +45,31 @@ folder, plugins in load order, worlds (empty: all), output folder, terrain level
 digest (`arguments_digest` in the result) covers every field. The library entry point for the same work is
 `lodwright_api::generate`, which takes the same request; the command is a wrapper over it.
 
+### Adding a request option
+
+The request digest is the `sha256` of the request's JSON as lodwright writes it, and the manifest keeps it to answer
+`up_to_date`. A key that is written even when it holds its default would change the digest of every existing request,
+so every output folder would be rebuilt once for no reason, and a settings round trip that writes defaults out would
+never be `up_to_date`. So a key added to the request after release 0.4.2:
+
+* is optional when read (`#[serde(default)]`), and its default keeps the output byte for byte as it was;
+* is not written while it holds its default (`skip_serializing_if`: `Option::is_none`, `Vec::is_empty`,
+  `std::ops::Not::not` for a switch that is off by default, or a comparison with the default value);
+* goes into a terrain block's digest when it changes what that block's files hold.
+
+The keys that existed at 0.4.2 are always written, as they were then; making them optional on output would change
+the digest of every request. The test `the_default_request_keeps_its_released_digest`
+(`crates/lodwright-contract/tests/contract.rs`) holds the digest of a default request at its released value and is
+not rewritten by `UPDATE_GOLDEN`; the golden `request_default.json` next to it shows the JSON that digest covers. A
+change that fails it is a change of every existing output folder's state, not a test to refresh.
+
+A new optional key does not raise `schema_version`, but it does change `schemas/lodwright-request.v1.json`: the test
+`committed_schemas_equal_the_generated_ones` fails until the schema file is regenerated (`UPDATE_GOLDEN=1`) and the
+regenerated file is part of the same pull request. The Toolbox checks every request it builds against its snapshot of
+that schema, so a new option can be used from the Toolbox only after a release and a Component bump that refreshes the
+snapshot. Options land one pull request at a time, because each one edits the request type, the schema file and this
+page.
+
 The run leaves `manifest.json` (`lodwright-manifest`: request digest, inputs digest, every file with size and digest) in
 the output folder. A later run with the same request over the same plugin contents finds it and the files it lists and
 answers `up_to_date` without writing. The manifest also lists every terrain block with a digest of what its files

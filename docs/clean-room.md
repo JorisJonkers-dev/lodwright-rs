@@ -37,6 +37,12 @@ LOG entry names who held which role. The pull request checklist asks for the sta
    diffs. Output of a tool is a fact about files, not the tool's code. Rows cite these as `oracle:<role>` (for
    example `oracle:btr-file`), by role and never by content.
 5. Permissively licensed crates (MIT, Apache-2.0, BSD) used as dependencies; `deny.toml` lists what is allowed.
+6. **The engine port's source** (nv-rs: `slaterain/nv-rs` and the fork `JorisJonkers-dev/nv-rs`), under
+   [ADR-0001](adr/0001-engine-source-as-a-format-input.md) (proposed until the owner confirms the licence reading),
+   when it is the best fit. Only code that nv-rs does not mark as translated from the decompiled game program, from
+   `fnv_decomp` or from debug symbols. Each use is a row that cites one file at a fixed commit, states that file's
+   licence (GPL-3.0-or-later, or MIT for code from before 2026-10-16) and names a `second_reader` who did not implement
+   the format. A crate dependency is preferred over copied code; copied code never goes into the two MPL-2.0 files.
 
 ## Forbidden inputs
 
@@ -48,7 +54,9 @@ LOG entry names who held which role. The pull request checklist asks for the sta
 - Anything under an unknown licence. If the licence of a source cannot be stated, it cannot be a row.
 - GPL, LGPL or AGPL *source* is not a clean-room input: reading it to learn a format taints the work. Linking a
   GPL-3.0 crate as a dependency (for example `esplugin`) is allowed under the licence map in
-  [LICENSING.md](LICENSING.md); copying its code is not.
+  [LICENSING.md](LICENSING.md); copying its code is not. The one exception is the engine port under allowed input 6.
+- Material the engine port marks as translated from the decompiled game program, from `fnv_decomp` (no licence) or
+  from debug symbols.
 
 If you have already seen forbidden material, say so in the pull request before writing anything about that area:
 the format becomes someone else's to implement. Nobody is penalised for disclosing; hiding it taints the work.
@@ -72,8 +80,10 @@ the format becomes someone else's to implement. Nobody is penalised for disclosi
 - a `.rs`, `.py` or `.sh` file lacks `SPDX-License-Identifier: GPL-3.0-only` (or `MPL-2.0` for a file translated from
   MPL-2.0 sources) in its first five lines;
 - a `source:` comment names an id that has no row, or a row lacks a field, states no licence, uses a URL that is not
-  `https://` or `oracle:`, names a forbidden input (the unlicensed repository, decompiled or leaked code), or is
-  missing from `LOG.md`;
+  `https://` or `oracle:`, names a forbidden input (the unlicensed repository, decompiled or leaked code,
+  `fnv_decomp`), or is missing from `LOG.md`;
+- a row citing the engine port does not cite one file at a 40-character commit, does not state GPL-3.0-or-later or MIT
+  as its licence, or names no `second_reader`;
 - a file has a game-data extension (`.esm .esp .esl .bsa .ba2 .nif .kf .dds .btr .bto .btt .lod .wav .ogg .mp3 .fos .ess`,
   any case, any position in the name), is over 256 KiB, or contains NUL bytes, unless it is listed in
   `provenance/fixture-allowlist.txt` (exact paths with a reason, at most ten, each at most 64 KiB; empty today);

@@ -12,7 +12,8 @@ Rules (docs/clean-room.md explains why):
   spdx        every .rs, .py and .sh file has `SPDX-License-Identifier: GPL-3.0-only` in its first five lines.
   provenance  every `// source: <id>[, <id>]` (`# source:` in Python, shell, TOML and YAML) names a row of
               provenance/sources.toml; the rows are well formed (fields, unique ids, licence stated, no forbidden
-              source) and each id appears in provenance/LOG.md.
+              source) and each id appears in provenance/LOG.md; a row citing the engine port names one file at a
+              commit, its licence and a second_reader (docs/adr/0001).
   data        no file with a game-data extension, no file over MAX_BYTES and no file with NUL bytes, except the
               paths in provenance/fixture-allowlist.txt ("<path> <reason>", at most MAX_ALLOWLIST entries).
   gitignore   .gitignore lists every game-data extension.
@@ -52,7 +53,14 @@ REQUIRED_FIELDS = ("id", "fact", "url", "licence", "date", "recorded_by", "verif
 URL_PREFIXES = ("https://", "oracle:")
 BAD_LICENCES = {"", "unknown", "none", "unlicensed", "all rights reserved", "n/a", "tbd"}
 # Inputs the clean-room rule forbids. Matched case-insensitively against the url and the fact.
-FORBIDDEN_SOURCES = ("github.com/tes5edit/xlodgen", "decompil", "disassembl", "leaked")
+FORBIDDEN_SOURCES = ("github.com/tes5edit/xlodgen", "decompil", "disassembl", "leaked", "fnv_decomp")
+# The engine port's source is an input only under docs/adr/0001-engine-source-as-a-format-input.md: a row citing it
+# names the file at a fixed commit, a licence the engine port grants, and the second reader who is not its implementer.
+ENGINE_URL_RE = re.compile(r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/", re.IGNORECASE)
+ENGINE_FILE_URL_RE = re.compile(
+    r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/blob/[0-9a-f]{40}/\S+$", re.IGNORECASE
+)
+ENGINE_LICENCES = ("gpl-3.0-or-later", "mit")
 
 # The retired project name, and the name of the tool it reimplemented, may only appear where the lineage is
 # recorded: the provenance notes, the clean-room process document, this guard and its tests, and the generated
@@ -195,6 +203,20 @@ def check_row(label: str, row: dict, v: Violations) -> None:
     for needle in FORBIDDEN_SOURCES:
         if needle in haystack:
             v.add(label, f"names a forbidden input ({needle})")
+    if ENGINE_URL_RE.match(url):
+        check_engine_row(label, row, v)
+
+
+def check_engine_row(label: str, row: dict, v: Violations) -> None:
+    """A row citing the engine port: a file at a fixed commit, its licence, and a named second reader."""
+    if not ENGINE_FILE_URL_RE.match(str(row["url"])):
+        v.add(label, "an engine-port row cites one file at a 40-character commit (.../nv-rs/blob/<commit>/<path>)")
+    licence = str(row["licence"]).lower()
+    if not any(name in licence for name in ENGINE_LICENCES):
+        v.add(label, "an engine-port row states the file's licence (GPL-3.0-or-later or MIT)")
+    reader = row.get("second_reader")
+    if not isinstance(reader, str) or not reader.strip():
+        v.add(label, "an engine-port row names its second_reader (not the implementer of the format)")
 
 
 def comment_ref_re(suffix: str) -> re.Pattern[str] | None:

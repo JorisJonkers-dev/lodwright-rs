@@ -202,6 +202,48 @@ class ProvenanceTests(unittest.TestCase):
         repo.commit()
         self.assertTrue(any("forbidden input" in line for line in repo.check("provenance")))
 
+    def engine_row(self, url: str, licence: str = "GPL-3.0-or-later", reader: str | None = "someone else") -> str:
+        row = ROW.replace(
+            "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header", url
+        ).replace("CC-BY-4.0", licence)
+        if reader is not None:
+            row += f'second_reader = "{reader}"\n'
+        return row
+
+    def test_an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes(self) -> None:
+        repo = Repo(self)
+        url = "https://github.com/JorisJonkers-dev/nv-rs/blob/" + "a" * 40 + "/crates/bsa/src/archive.rs"
+        repo.write("provenance/sources.toml", self.engine_row(url))
+        repo.commit()
+        self.assertEqual(repo.check("provenance"), [])
+
+    def test_an_engine_port_row_without_a_second_reader_fails(self) -> None:
+        repo = Repo(self)
+        url = "https://github.com/slaterain/nv-rs/blob/" + "b" * 40 + "/crates/bsa/src/archive.rs"
+        repo.write("provenance/sources.toml", self.engine_row(url, reader=None))
+        repo.commit()
+        self.assertTrue(any("second_reader" in line for line in repo.check("provenance")))
+
+    def test_an_engine_port_row_on_a_branch_instead_of_a_commit_fails(self) -> None:
+        repo = Repo(self)
+        url = "https://github.com/slaterain/nv-rs/blob/main/crates/bsa/src/archive.rs"
+        repo.write("provenance/sources.toml", self.engine_row(url))
+        repo.commit()
+        self.assertTrue(any("40-character commit" in line for line in repo.check("provenance")))
+
+    def test_an_engine_port_row_without_the_engine_licence_fails(self) -> None:
+        repo = Repo(self)
+        url = "https://github.com/slaterain/nv-rs/blob/" + "c" * 40 + "/crates/bsa/src/archive.rs"
+        repo.write("provenance/sources.toml", self.engine_row(url, licence="CC-BY-4.0"))
+        repo.commit()
+        self.assertTrue(any("licence" in line for line in repo.check("provenance")))
+
+    def test_the_unlicensed_decompilation_reconstruction_is_refused_as_a_source(self) -> None:
+        repo = Repo(self)
+        repo.write("provenance/sources.toml", ROW.replace("124 bytes", "124 bytes (fnv_decomp)"))
+        repo.commit()
+        self.assertTrue(any("forbidden input" in line for line in repo.check("provenance")))
+
     def test_the_url_must_be_https_or_an_oracle_role(self) -> None:
         repo = Repo(self)
         repo.write("provenance/sources.toml", ROW.replace("https://learn", "http://learn"))

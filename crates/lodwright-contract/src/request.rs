@@ -9,6 +9,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::sha256_digest;
 
+/// The terrain levels a request may list (cells per block edge).
+pub const TERRAIN_LEVELS: [u32; 4] = [4, 8, 16, 32];
+/// The vertex cap of a terrain block mesh: lowest and highest accepted.
+pub const MAX_VERTICES_RANGE: (u32, u32) = (3, 32767);
+/// The edge of a terrain texture in pixels: lowest and highest accepted (a power of two).
+pub const TEXTURE_SIZE_RANGE: (u32, u32) = (4, 4096);
+/// The lowest accepted terrain quality.
+pub const QUALITY_MIN: f32 = 0.0;
+/// The fewest worker threads a request may ask for.
+pub const THREADS_MIN: u32 = 1;
+
 fn yes() -> bool {
     true
 }
@@ -187,25 +198,27 @@ impl Request {
             return Err("data_folder and output_dir are required".into());
         }
         for l in &self.terrain.levels {
-            if ![4, 8, 16, 32].contains(&l.level) {
+            if !TERRAIN_LEVELS.contains(&l.level) {
                 return Err(format!("terrain level {} is not 4, 8, 16 or 32", l.level));
             }
-            if !(3..=32767).contains(&l.max_vertices) {
+            let (low, high) = MAX_VERTICES_RANGE;
+            if !(low..=high).contains(&l.max_vertices) {
                 return Err(format!(
-                    "max_vertices {} is outside 3 to 32767",
+                    "max_vertices {} is outside {low} to {high}",
                     l.max_vertices
                 ));
             }
-            if !l.quality.is_finite() || l.quality < 0.0 {
+            if !l.quality.is_finite() || l.quality < QUALITY_MIN {
                 return Err("quality must be a number of at least 0".into());
             }
             for (name, size) in [
                 ("diffuse_size", l.diffuse_size),
                 ("normal_size", l.normal_size),
             ] {
-                if !size.is_power_of_two() || !(4..=4096).contains(&size) {
+                let (low, high) = TEXTURE_SIZE_RANGE;
+                if !size.is_power_of_two() || !(low..=high).contains(&size) {
                     return Err(format!(
-                        "{name} {size} is not a power of two from 4 to 4096"
+                        "{name} {size} is not a power of two from {low} to {high}"
                     ));
                 }
             }
@@ -221,7 +234,7 @@ impl Request {
                 ));
             }
         }
-        if self.limits.threads == Some(0) {
+        if self.limits.threads.is_some_and(|t| t < THREADS_MIN) {
             return Err("threads must be at least 1".into());
         }
         Ok(())

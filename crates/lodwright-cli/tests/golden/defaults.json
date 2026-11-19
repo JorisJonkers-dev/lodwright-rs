@@ -1,0 +1,207 @@
+{
+  "contract": "lodwright-defaults",
+  "levels": [
+    4,
+    8,
+    16,
+    32
+  ],
+  "options": [
+    {
+      "default": [],
+      "key": "worlds",
+      "kind": "list",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": true,
+      "key": "terrain.enabled",
+      "kind": "switch",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": true,
+      "key": "terrain.land_textures",
+      "kind": "switch",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": true,
+      "key": "terrain.water",
+      "kind": "switch",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": true,
+      "key": "objects.enabled",
+      "kind": "switch",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": true,
+      "key": "trees.enabled",
+      "kind": "switch",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": null,
+      "key": "terrain.levels.quality",
+      "kind": "number",
+      "minimum": 0.0,
+      "per_level": [
+        {
+          "level": 4,
+          "value": 10.0
+        },
+        {
+          "level": 8,
+          "value": 15.0
+        },
+        {
+          "level": 16,
+          "value": 20.0
+        },
+        {
+          "level": 32,
+          "value": 25.0
+        }
+      ],
+      "since": "0.3.0",
+      "tier": 2
+    },
+    {
+      "default": null,
+      "key": "terrain.levels.max_vertices",
+      "kind": "integer",
+      "maximum": 32767.0,
+      "minimum": 3.0,
+      "per_level": [
+        {
+          "level": 4,
+          "value": 2000
+        },
+        {
+          "level": 8,
+          "value": 2000
+        },
+        {
+          "level": 16,
+          "value": 2000
+        },
+        {
+          "level": 32,
+          "value": 2000
+        }
+      ],
+      "since": "0.3.0",
+      "tier": 2
+    },
+    {
+      "default": null,
+      "key": "terrain.levels.diffuse_size",
+      "kind": "integer",
+      "maximum": 4096.0,
+      "minimum": 4.0,
+      "per_level": [
+        {
+          "level": 4,
+          "value": 256
+        },
+        {
+          "level": 8,
+          "value": 256
+        },
+        {
+          "level": 16,
+          "value": 256
+        },
+        {
+          "level": 32,
+          "value": 256
+        }
+      ],
+      "power_of_two": true,
+      "since": "0.3.0",
+      "tier": 2
+    },
+    {
+      "default": null,
+      "key": "terrain.levels.normal_size",
+      "kind": "integer",
+      "maximum": 4096.0,
+      "minimum": 4.0,
+      "per_level": [
+        {
+          "level": 4,
+          "value": 256
+        },
+        {
+          "level": 8,
+          "value": 256
+        },
+        {
+          "level": 16,
+          "value": 256
+        },
+        {
+          "level": 32,
+          "value": 256
+        }
+      ],
+      "power_of_two": true,
+      "since": "0.3.0",
+      "tier": 2
+    },
+    {
+      "default": [],
+      "key": "inclusion.exclude_plugins",
+      "kind": "list",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": [],
+      "key": "inclusion.only_plugins",
+      "kind": "list",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": [],
+      "key": "inclusion.exclude_records",
+      "kind": "list",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": [],
+      "key": "inclusion.exclude_models",
+      "kind": "list",
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": null,
+      "key": "limits.threads",
+      "kind": "integer",
+      "minimum": 1.0,
+      "since": "0.3.0",
+      "tier": 1
+    },
+    {
+      "default": null,
+      "key": "limits.memory_mib",
+      "kind": "integer",
+      "since": "0.3.0",
+      "tier": 1
+    }
+  ],
+  "schema_version": 1,
+  "version": "VERSION"
+}

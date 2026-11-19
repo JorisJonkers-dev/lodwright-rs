@@ -234,6 +234,7 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
                 {"name": "lodwright-manifest", "versions": [1]},
                 {"name": "lodwright-verify", "versions": [1]},
                 {"name": "lodwright-events", "versions": [1]},
+                {"name": "lodwright-defaults", "versions": [1]},
                 {"name": "lodwright-api", "versions": [1]}
             ])
         );
@@ -399,4 +400,19 @@ fn no_output_contains_a_data_path_or_plugin_content() {
     // The world name comes from the plugin by design (an editor id); the trailing marker bytes are never echoed.
     let (_, out, _) = go(&[&["generate"][..], &base, &["--json"]].concat());
     assert!(!out.contains(marker));
+}
+
+#[test]
+fn defaults_prints_every_request_option_with_its_default_and_range() {
+    let (code, out, _) = go(&["defaults", "--json"]);
+    assert_eq!(code, EXIT_OK);
+    let doc: lodwright_contract::Defaults = serde_json::from_str(&out).unwrap();
+    assert_eq!(doc, lodwright_api::request_defaults());
+    let text = serde_json::to_string_pretty(&json(&out)).unwrap() + "\n";
+    let text = text.replace(env!("CARGO_PKG_VERSION"), "VERSION");
+    lodwright_testkit::golden::assert_golden(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/defaults.json"),
+        &text,
+    );
+    assert_eq!(go(&["defaults"]).0, EXIT_USAGE);
 }

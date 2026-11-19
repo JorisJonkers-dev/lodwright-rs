@@ -15,7 +15,8 @@ Each document carries:
 * `contract`: the name of the contract, `<tool>-<noun>`. A reader refuses a document whose name is not the one it asked
   for. Today: `lodwright-plan` (`lodwright plan --json`), `lodwright-result` (`lodwright generate --json`, and the error
   document of a failed `--json` command), `lodwright-request` (read by `generate --request`), `lodwright-manifest`
-  (`manifest.json` in the output folder) and `lodwright-verify` (`lodwright verify --json`). All are typed in
+  (`manifest.json` in the output folder), `lodwright-verify` (`lodwright verify --json`) and `lodwright-defaults`
+  (`lodwright defaults --json`). All are typed in
   `crates/lodwright-contract`; their schemas are under `schemas/` and require `contract` with the constant name.
 
 The progress events (`lodwright-events`) are single JSON lines, not documents: they carry neither `schema_version` nor
@@ -26,7 +27,7 @@ The progress events (`lodwright-events`) are single JSON lines, not documents: t
 `lodwright contracts --json` prints every contract this build emits and the schema versions it can emit, and exits 0:
 
 ```json
-{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
+{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
 ```
 
 `lodwright --version --json` lists the same contracts.
@@ -66,6 +67,26 @@ and macOS the preflight estimate stands in for it, so the budget is measured on 
 and tree LOD run on one thread per world and are not scaled. The budget is a target, not a hard cap: a single worker
 that needs more than is left still runs. The Toolbox labels it advisory.
 
+### Request defaults
+
+`lodwright defaults --json` and `lodwright_api::request_defaults()` give the same `lodwright-defaults` document (schema:
+`lodwright schema defaults`): the terrain `levels` a request may list, and every option a user can set, in request
+order. Each option has its dotted `key` in the request (`terrain.water`; `terrain.levels.quality` for a per-level
+setting), its `kind` (`switch`, `integer`, `number`, `list`; an open enum), its `default` (`null` where the default is
+"the machine decides" or "no limit"), for a per-level option its `per_level` defaults, the `minimum`, `maximum` and
+`power_of_two` that `Request::validate` checks, its `tier` (1: every user; 2: per-level terrain settings; 3: an option a
+later release added, behind the advanced gate) and `since`, the release that introduced it. The defaults and ranges
+are read from the code that applies them (the request's `Default`, the terrain settings of `lodwright-core` and the
+constants `validate` uses), and a test fails when the table and that code disagree.
+
+A request lists a terrain level whole: to change one setting of a level, a caller writes that level with the other
+settings at their `per_level` defaults, and leaves `terrain.levels` empty while nothing differs from the defaults (so
+the request digest stays the default one).
+
+A consumer that links an older lodwright without this call, or reads a handshake without `lodwright-defaults`, shows
+no default label and offers no tier 2 or tier 3 row. Adding the call changed no existing call, type or error code, so
+`lodwright-api` stays at version 1.
+
 ### Adding a request option
 
 The request digest is the `sha256` of the request's JSON as lodwright writes it, and the manifest keeps it to answer
@@ -76,7 +97,9 @@ never be `up_to_date`. So a key added to the request after release 0.4.2:
 * is optional when read (`#[serde(default)]`), and its default keeps the output byte for byte as it was;
 * is not written while it holds its default (`skip_serializing_if`: `Option::is_none`, `Vec::is_empty`,
   `std::ops::Not::not` for a switch that is off by default, or a comparison with the default value);
-* goes into a terrain block's digest when it changes what that block's files hold.
+* goes into a terrain block's digest when it changes what that block's files hold;
+* gets a row in `request_defaults()` (`crates/lodwright-api/src/defaults.rs`) with its tier and the release that
+  introduced it.
 
 The keys that existed at 0.4.2 are always written, as they were then; making them optional on output would change
 the digest of every request. The test `the_default_request_keeps_its_released_digest`

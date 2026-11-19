@@ -8,8 +8,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
-    EVENTS_VERSIONS, Event, MANIFEST_VERSIONS, Manifest, PLAN_VERSIONS, Plan, REQUEST_VERSIONS,
-    RESULT_VERSIONS, Request, ResultDoc, VERIFY_VERSIONS, VerifyDoc,
+    DEFAULTS_VERSIONS, Defaults, EVENTS_VERSIONS, Event, MANIFEST_VERSIONS, Manifest,
+    PLAN_VERSIONS, Plan, REQUEST_VERSIONS, RESULT_VERSIONS, Request, ResultDoc, VERIFY_VERSIONS,
+    VerifyDoc,
 };
 
 /// Which document a schema or check is about.
@@ -27,20 +28,23 @@ pub enum DocumentKind {
     Verify,
     /// One progress event line.
     Events,
+    /// The request options with their defaults (`lodwright defaults --json`).
+    Defaults,
 }
 
 impl DocumentKind {
     /// Every kind, in the order the handshake lists them.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Plan,
         Self::Result,
         Self::Request,
         Self::Manifest,
         Self::Verify,
         Self::Events,
+        Self::Defaults,
     ];
 
-    /// `plan`, `result`, `request`, `manifest`, `verify` or `events`.
+    /// `plan`, `result`, `request`, `manifest`, `verify`, `events` or `defaults`.
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
@@ -50,6 +54,7 @@ impl DocumentKind {
             Self::Manifest => "manifest",
             Self::Verify => "verify",
             Self::Events => "events",
+            Self::Defaults => "defaults",
         }
     }
 
@@ -69,6 +74,7 @@ impl DocumentKind {
             Self::Manifest => crate::MANIFEST_CONTRACT,
             Self::Verify => crate::VERIFY_CONTRACT,
             Self::Events => crate::EVENTS_CONTRACT,
+            Self::Defaults => crate::DEFAULTS_CONTRACT,
         }
     }
 
@@ -82,6 +88,7 @@ impl DocumentKind {
             Self::Manifest => MANIFEST_VERSIONS,
             Self::Verify => VERIFY_VERSIONS,
             Self::Events => EVENTS_VERSIONS,
+            Self::Defaults => DEFAULTS_VERSIONS,
         }
     }
 }
@@ -143,6 +150,7 @@ pub fn schema_json(kind: DocumentKind, version: u32) -> Result<String, SchemaErr
         DocumentKind::Manifest => schema_for!(Manifest),
         DocumentKind::Verify => schema_for!(VerifyDoc),
         DocumentKind::Events => schema_for!(Event),
+        DocumentKind::Defaults => schema_for!(Defaults),
     };
     let mut text = serde_json::to_string_pretty(&schema).expect("a schema serialises");
     text.push('\n');

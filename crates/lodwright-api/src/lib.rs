@@ -23,11 +23,13 @@
 //! contract.
 
 mod budget;
+mod defaults;
 mod error;
 mod generate;
 pub mod load;
 mod progress;
 
+pub use defaults::request_defaults;
 pub use error::Error;
 pub use generate::{GenerateOutcome, GenerateRequest, generate};
 pub use lodwright_contract::{API_CONTRACT, API_VERSION};

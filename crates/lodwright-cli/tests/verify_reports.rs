@@ -104,14 +104,14 @@ fn verify_reports_equal_their_golden_files_for_four_folder_pairs() {
     let missing = generate("missing", 0.0);
     let gone = files(&missing)
         .into_iter()
-        .find(|f| f.ends_with(".dds"))
+        .find(|f| Path::new(f).extension().is_some_and(|e| e == "dds"))
         .unwrap();
     std::fs::remove_file(missing.join(&gone)).unwrap();
     // a copy of the base whose first terrain texture claims one mip level fewer
     let mips = generate("mips", 0.0);
     let short = files(&mips)
         .into_iter()
-        .find(|f| f.ends_with(".dds"))
+        .find(|f| Path::new(f).extension().is_some_and(|e| e == "dds"))
         .unwrap();
     let mut bytes = std::fs::read(mips.join(&short)).unwrap();
     let mut header = parse_header(&bytes).unwrap();

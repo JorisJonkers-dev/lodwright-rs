@@ -60,8 +60,21 @@ ENGINE_NAME = "nv-rs"
 ENGINE_FILE_URL_RE = re.compile(
     r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/blob/[0-9a-f]{40}/[^\s?#]*[^\s?#/]$", re.IGNORECASE
 )
-# Exactly one licence atom, never an expression: a file under "A AND B" is not covered by this rule.
-ENGINE_LICENCES = ("gpl-3.0-or-later", "mit")
+# Exactly one SPDX identifier, never an expression, from this list (all GPL-3.0 compatible). Code with no licence, or one
+# that cannot be identified (fnv_decomp), is refused. Everything except the engine's own GPL-3.0-or-later code needs
+# its notice kept in THIRD-PARTY-NOTICES.md (checked against the rows).
+ENGINE_LICENCES = (
+    "gpl-3.0-or-later",
+    "gpl-3.0-only",
+    "mit",
+    "bsd-2-clause",
+    "bsd-3-clause",
+    "apache-2.0",
+    "apache-2.0 with llvm-exception",
+    "zlib",
+)
+NOTICES_FILE = "THIRD-PARTY-NOTICES.md"
+NOTICE_HEADING_RE = re.compile(r"^## `([^`]+)`\s*$")
 
 # The retired project name, and the name of the tool it reimplemented, may only appear where the lineage is
 # recorded: the provenance notes, the clean-room process document, this guard and its tests, and the generated
@@ -210,20 +223,29 @@ def check_row(label: str, row: dict, v: Violations) -> None:
 
 def check_engine_row(label: str, row: dict, v: Violations) -> None:
     """A row naming the engine port: one file at a fixed commit on GitHub, one licence the rule covers, the second
-    reader, and a note that the engine's third-party list was checked. Any other URL form (raw, mirror, directory,
+    reader, a note on GPL compatibility and the engine's third-party list, and (unless GPL-3.0-or-later) the licence
+    notice, which THIRD-PARTY-NOTICES.md must hold. Any other URL form (raw, mirror, directory,
     branch, query, fragment) is refused, so the file read is the file the row names."""
     if not ENGINE_FILE_URL_RE.match(str(row["url"])) or ".." in str(row["url"]).split("/"):
         v.add(label, "an engine-port row cites one file at a 40-character commit (https://github.com/<owner>/nv-rs/blob/<commit>/<path>)")
     licence = str(row["licence"]).strip().lower()
     if licence not in ENGINE_LICENCES:
-        v.add(label, "an engine-port row states the file's licence as exactly GPL-3.0-or-later or MIT")
+        v.add(label, "an engine-port row states the SPDX identifier of the code it relies on, exactly one of: "
+              + ", ".join(ENGINE_LICENCES))
     for field, why in (
         ("second_reader", "the reader, who is not the implementer of the format"),
-        ("engine_notes", "what was checked in the engine's third-party notes (LEGAL.md) for this file"),
-    ) + ((("licence_notice", "where the MIT notice is kept"),) if licence == "mit" else ()):
+        ("engine_notes", "the GPL-3.0 compatibility reasoning and what was checked in the engine's LEGAL.md"),
+    ) + ((("licence_notice", "the copyright line and licence notice kept, and where"),) if needs_notice(row) else ()):
         value = row.get(field)
         if not isinstance(value, str) or not value.strip():
             v.add(label, f"an engine-port row names {field}: {why}")
+
+
+def needs_notice(row: dict) -> bool:
+    """An engine-port row whose code is not the engine's own GPL-3.0-or-later work: its notice must be kept."""
+    licence = str(row.get("licence", "")).strip().lower()
+    haystack = f"{row.get('url', '')} {row.get('fact', '')}".lower()
+    return ENGINE_NAME in haystack and licence != "gpl-3.0-or-later"
 
 
 def comment_ref_re(suffix: str) -> re.Pattern[str] | None:
@@ -262,6 +284,7 @@ def check_provenance(root: Path, files: list[str], lines: dict[str, list[str]] |
         for ident in rows:
             if f"`{ident}`" not in log:
                 v.add(LOG_FILE, f"does not mention source `{ident}` (write it as `{ident}`)")
+    check_notices(root, rows, v)
     known = set(rows)
     if lines is None:
         for rel in files:
@@ -271,6 +294,33 @@ def check_provenance(root: Path, files: list[str], lines: dict[str, list[str]] |
     else:
         for rel, added in lines.items():
             check_refs(rel, added, known, v)
+
+
+def check_notices(root: Path, rows: dict, v: Violations) -> None:
+    """THIRD-PARTY-NOTICES.md holds one `## `<row id>`` section with text for each engine-port row that needs a notice,
+    and no section for anything else."""
+    needed = {ident for ident, row in rows.items() if needs_notice(row)}
+    text = read_text(root, NOTICES_FILE)
+    if text is None:
+        for ident in sorted(needed):
+            v.add(NOTICES_FILE, f"missing: row `{ident}` relies on third-party code whose notice must be kept here")
+        return
+    sections: dict[str, int] = {}
+    current = None
+    for line in text.splitlines():
+        match = NOTICE_HEADING_RE.match(line)
+        if match:
+            current = match.group(1)
+            sections[current] = 0
+        elif current is not None and line.strip():
+            sections[current] += 1
+    for ident in sorted(needed - set(sections)):
+        v.add(NOTICES_FILE, f"has no section `## `{ident}`` for the row that relies on third-party code")
+    for ident, count in sections.items():
+        if ident not in needed:
+            v.add(NOTICES_FILE, f"section `{ident}` is not an engine-port row that needs a notice")
+        elif count == 0:
+            v.add(NOTICES_FILE, f"section `{ident}` has no notice text (copyright line and licence)")
 
 
 # --- data guard ---------------------------------------------------------------------------------------------------

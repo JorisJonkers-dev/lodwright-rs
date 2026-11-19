@@ -229,13 +229,44 @@ class ProvenanceTests(unittest.TestCase):
     def test_an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes(self) -> None:
         self.assertEqual(self.engine_check(self.engine_row(self.GOOD_URL)), [])
 
-    def test_an_engine_port_row_under_mit_with_its_notice_noted_passes(self) -> None:
-        row = self.engine_row(self.GOOD_URL, licence="MIT") + 'licence_notice = "kept in LEGAL.md"\n'
-        self.assertEqual(self.engine_check(row), [])
+    NOTICES = "# Third-party notices\n\n## `dds-header`\n\nCopyright (c) Someone\nThe MIT licence text.\n"
 
-    def test_an_engine_port_row_under_mit_without_its_notice_fails(self) -> None:
-        out = self.engine_check(self.engine_row(self.GOOD_URL, licence="MIT"))
+    def engine_check_with(self, row: str, notices: str | None) -> list[str]:
+        repo = Repo(self)
+        repo.write("provenance/sources.toml", row)
+        if notices is not None:
+            repo.write("THIRD-PARTY-NOTICES.md", notices)
+        repo.commit()
+        return repo.check("provenance")
+
+    def test_an_engine_port_row_under_a_permissive_licence_with_notice_and_notices_entry_passes(self) -> None:
+        for licence in ("MIT", "BSD-3-Clause", "BSD-2-Clause", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "Zlib",
+                        "GPL-3.0-only"):
+            row = self.engine_row(self.GOOD_URL, licence=licence) + 'licence_notice = "copyright line kept"\n'
+            self.assertEqual(self.engine_check_with(row, self.NOTICES), [], licence)
+
+    def test_an_engine_port_row_under_a_third_party_licence_without_a_notice_field_fails(self) -> None:
+        out = self.engine_check_with(self.engine_row(self.GOOD_URL, licence="MIT"), self.NOTICES)
         self.assertTrue(any("licence_notice" in line for line in out))
+
+    def test_a_third_party_row_without_a_notices_entry_fails(self) -> None:
+        row = self.engine_row(self.GOOD_URL, licence="Zlib") + 'licence_notice = "kept"\n'
+        for notices in (None, "# Third-party notices\n"):
+            out = self.engine_check_with(row, notices)
+            self.assertTrue(any("THIRD-PARTY-NOTICES.md" in line for line in out), notices)
+
+    def test_a_notices_entry_without_text_fails(self) -> None:
+        row = self.engine_row(self.GOOD_URL, licence="Zlib") + 'licence_notice = "kept"\n'
+        out = self.engine_check_with(row, "# Third-party notices\n\n## `dds-header`\n\n")
+        self.assertTrue(any("no notice text" in line for line in out))
+
+    def test_a_notices_entry_for_an_unknown_or_original_code_row_fails(self) -> None:
+        out = self.engine_check_with(self.engine_row(self.GOOD_URL), "# N\n\n## `dds-header`\n\ntext\n\n## `ghost`\n\ntext\n")
+        self.assertTrue(any("ghost" in line for line in out))
+        self.assertTrue(any("dds-header" in line for line in out))
+
+    def test_gpl_or_later_rows_need_no_notices_entry(self) -> None:
+        self.assertEqual(self.engine_check_with(self.engine_row(self.GOOD_URL), None), [])
 
     def test_an_engine_port_row_without_a_second_reader_fails(self) -> None:
         out = self.engine_check(self.engine_row(self.GOOD_URL, reader=None))
@@ -264,9 +295,10 @@ class ProvenanceTests(unittest.TestCase):
             out = self.engine_check(self.engine_row(url))
             self.assertTrue(any("40-character commit" in line for line in out), url)
 
-    def test_an_engine_port_row_must_name_exactly_one_engine_licence(self) -> None:
+    def test_an_engine_port_row_must_name_exactly_one_allowed_spdx_licence(self) -> None:
         for licence in ("CC-BY-4.0", "BSD-3-Clause AND GPL-3.0-or-later", "GPL-3.0-or-later AND BSD-3-Clause",
-                        "GPL-3.0-or-later-ish", "MIT OR Apache-2.0", "GPL-3.0-only"):
+                        "GPL-3.0-or-later-ish", "MIT OR Apache-2.0", "unknown", "GPL-2.0-only", "LGPL-3.0-only",
+                        "AGPL-3.0-only", "SSPL-1.0"):
             out = self.engine_check(self.engine_row(self.GOOD_URL, licence=licence))
             self.assertTrue(any("licence" in line for line in out), licence)
 

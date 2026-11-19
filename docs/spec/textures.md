@@ -31,7 +31,8 @@ Measured (`game-lod-terrain-textures`), on blocks at levels 4 and 32:
 | Mip levels | 9 (256 down to 1) | 9 |
 | Channel statistics | not recorded | mean red and green near 128, blue near 245 |
 
-Levels 8 and 16 were not measured; the code uses the same size and format at every level. The size is the game's
+Levels 8 and 16 were not measured. The code writes BC1 at every level (`crates/lodwright-gen/src/terrain.rs`), and its
+default level settings use 256 at every level (`crates/lodwright-core/src/terrain.rs`); the size is a request setting. The size is the game's
 shipped size. Generator guidance (`fnv-lod-texture-options`) offers 512 for level 4 and 256 for the other levels by
 default, larger for retextured terrain, with mipmaps and normal maps optional and an option that bakes the terrain's
 normal map into them: these are what a tool can write, not what the game needs.

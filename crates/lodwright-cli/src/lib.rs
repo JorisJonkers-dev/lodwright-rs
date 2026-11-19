@@ -289,12 +289,17 @@ fn bands_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 
     let text = if json {
         to_json(&doc) + "\n"
     } else {
-        let lines: String = doc
-            .bands
+        use std::fmt::Write as _;
+        doc.bands
             .iter()
-            .map(|b| format!("{} {} {} ({} runs)\n", b.statistic, b.min, b.max, b.runs))
-            .collect();
-        format!("{} runs\n{lines}", doc.runs)
+            .fold(format!("{} runs\n", doc.runs), |mut text, b| {
+                let _ = writeln!(
+                    text,
+                    "{} {} {} ({} runs)",
+                    b.statistic, b.min, b.max, b.runs
+                );
+                text
+            })
     };
     write_all(out, err, &text)
 }

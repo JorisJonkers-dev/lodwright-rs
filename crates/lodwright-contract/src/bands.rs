@@ -143,7 +143,11 @@ mod tests {
     fn identical_runs_give_zero_width_bands() {
         let b = bands(&[report(0.9), report(0.9), report(0.9)]);
         assert_eq!(b.runs, 3);
-        assert!(!b.bands.is_empty());
+        assert_eq!(
+            b.bands.len(),
+            7 + 5,
+            "seven counts and five water statistics"
+        );
         assert!(
             b.bands
                 .iter()

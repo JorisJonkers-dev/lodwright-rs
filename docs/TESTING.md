@@ -77,7 +77,8 @@ is echoed except names of files and numbers.
   error at matching positions, count of vertices with no counterpart; DDS: width, height, format, mip count equal or
   not). A final summary with the worst offenders by number.
 - Exit codes (implemented, see `docs/contracts.md`): 0 clean, 1 findings (an error in the folder, or a difference from
-  the reference), 2 usage error, 3 unreadable folder. Each has a CLI test in `crates/lodwright-cli/tests/cli.rs`.
+  the reference), 2 usage error (including a folder inside a git working tree without `--allow-in-repo`), 3 unreadable
+  folder. Each has a CLI test in `crates/lodwright-cli/tests/cli.rs`.
 - Rules: read-only; never copies or embeds data from either folder into its output beyond counts and statistics.
   It refuses a `--reference` or `--generated` path inside a git working tree unless `--allow-in-repo` is given;
   that flag exists for tests that build folders with the testkit in a temporary directory.

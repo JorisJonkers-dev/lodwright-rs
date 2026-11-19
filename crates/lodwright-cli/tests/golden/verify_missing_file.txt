@@ -1,0 +1,41 @@
+exit 1
+
+4 terrain blocks, 0 object blocks, 0 tree blocks, 7 textures, 1 settings files: 1 errors, 1 differences
+meshes/landscape/lod/island/island.level16.x0.y0.nif: missing texture textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds
+textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds: missing from the folder
+water: 0 blocks with water, 0 under 0.95, lowest -, mean -
+object blocks: 0 of 0 exact
+
+{
+  "contract": "lodwright-verify",
+  "differences": [
+    {
+      "path": "textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds",
+      "problem": "missing from the folder"
+    }
+  ],
+  "errors": [
+    {
+      "path": "meshes/landscape/lod/island/island.level16.x0.y0.nif",
+      "problem": "missing texture textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds"
+    }
+  ],
+  "object_blocks": 0,
+  "objects": {
+    "blocks": 0,
+    "exact": 0,
+    "per_block": []
+  },
+  "ok": false,
+  "schema_version": 1,
+  "settings": 1,
+  "terrain_blocks": 4,
+  "textures": 7,
+  "tree_blocks": 0,
+  "water": {
+    "blocks": 0,
+    "per_block": [],
+    "threshold": 0.95,
+    "under_threshold": 0
+  }
+}

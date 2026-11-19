@@ -120,7 +120,7 @@ Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 | --- | --- |
 | 0 | clean: no error in the folder and, with `--reference`, no difference |
 | 1 | findings: at least one error or difference; the report is still printed |
-| 2 | usage error: no folder, an unknown option, an option without its value |
+| 2 | usage error: no folder, an unknown option, an option without its value, or a folder or reference inside a git working tree without `--allow-in-repo` (nothing is read) |
 | 3 | unreadable folder: the folder or the reference is missing, not a folder, or cannot be listed; nothing is printed on stdout |
 
 `ok` in the report says only that the folder has no errors; the exit code also counts the differences.

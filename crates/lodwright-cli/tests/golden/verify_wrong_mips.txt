@@ -1,0 +1,35 @@
+exit 1
+
+4 terrain blocks, 0 object blocks, 0 tree blocks, 8 textures, 1 settings files: 1 errors, 0 differences
+textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds: 8 mips, a full chain has 9
+water: 0 blocks with water, 0 under 0.95, lowest -, mean -
+object blocks: 0 of 0 exact
+
+{
+  "contract": "lodwright-verify",
+  "differences": [],
+  "errors": [
+    {
+      "path": "textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds",
+      "problem": "8 mips, a full chain has 9"
+    }
+  ],
+  "object_blocks": 0,
+  "objects": {
+    "blocks": 0,
+    "exact": 0,
+    "per_block": []
+  },
+  "ok": false,
+  "schema_version": 1,
+  "settings": 1,
+  "terrain_blocks": 4,
+  "textures": 8,
+  "tree_blocks": 0,
+  "water": {
+    "blocks": 0,
+    "per_block": [],
+    "threshold": 0.95,
+    "under_threshold": 0
+  }
+}

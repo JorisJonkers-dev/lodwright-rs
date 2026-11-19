@@ -412,3 +412,30 @@ the unit. The row stays `verified = false` until a second reader re-reads the co
 against the same two files. What that reader checks: the `IsSF1` argument order in `wbWorldObjectBounds`; that `IsSF1`
 returns the first argument only for Starfield; that `ToValue` multiplies by the scale. An owner check (NAM0 and NAM9 of
 one plugin's worldspace against the cell range of its LAND records, numbers only) would settle the unit.
+
+## 2026-11-19: `plugin-record-override` narrowed to what its source says (issue 53)
+
+Specifier entry, role held: specifier for the correction only (not the implementer of `texture.rs` or `worldspace.rs`).
+The UESP page `Tes4Mod:FormID` answered HTTP 403 to an automated read on this date, so it was not re-read; the quoted
+sentence is the one the specifier and the second reader recorded on 2026-11-14. A search for a public source with a
+stated licence that says the game replaces an overridden record whole was not successful: xEdit (MPL-2.0, revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`) models a winning override per record in its conflict view, but that is the
+tool's model and states nothing about the game. Two public pages discuss the point but cannot be rows: the xEdit
+documentation (repository TES5Edit/TES5Edit.github.io, no licence stated) and LOOT's "introduction to load orders"
+(repository loot/loot.github.io, GPL-3.0); neither was used beyond a search-result excerpt, and the owner may decide
+whether a GPL-3.0 documentation page counts as an allowed input. Not read: the 2016 generator C# repository, decompiled
+binaries, GPL or leaked code.
+
+Change: the fact now says only what the page supports (a record with the master's FormID replaces the master's data
+object) and that the page is silent on whole versus field-level replacement. Whole-record replacement is recorded in
+the note as the project's choice. The code was checked against that choice: `TextureResolver::from_load_order`
+(`texture.rs`) inserts each later LTEX and TXST over the earlier one by FormID, and `WorldIndex` and `build`
+(`worldspace.rs`) replace a WRLD record's resolved fields and a cell's heights, layers and water from the later plugin;
+nothing merges fields from two plugins. One small exception, consistent with the choice: a later WRLD without an editor
+id keeps the earlier name, which is a display label only.
+
+The row stays `verified = false`. What a second reader checks: the quoted sentence on the UESP page and its licence
+footer; that the new fact claims nothing beyond it. What settles the open question (owner, numbers only): two plugins
+that both override one LAND record, the later one changing only part of the record (for example VHGT but not the
+layers); compare the game's own terrain LOD or the in-game ground built from that load order with lodwright's output
+for both readings.

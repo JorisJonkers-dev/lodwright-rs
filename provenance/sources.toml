@@ -472,14 +472,14 @@ note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the p
 
 [[source]]
 id = "plugin-record-override"
-fact = "A plugin overrides a record of an earlier plugin by carrying a record with the same (resolved) FormID; the record of the later plugin in load order replaces the earlier one as a whole."
+fact = "A plugin overrides a record of an earlier plugin (its master) by carrying a record with the same (resolved) FormID: that shared FormID is how the game knows the later data object replaces the master's. The page does not say whether the replacement is of the whole record or field by field."
 url = "https://en.uesp.net/wiki/Tes4Mod:FormID"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License')"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master. 'As a whole' (no field merging) is the conservative reading; Bethesda games' conflict resolution is whole-record, but no page read here states it."
+note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master (quoted by the specifier and the second reader on 2026-11-14; the page answered HTTP 403 to an automated read on 2026-11-19 and was not re-read then). Corrected 2026-11-19: the fact used to add 'replaces the earlier one as a whole', which no source read states. PROJECT CHOICE, not a recorded fact: lodwright applies whole-record replacement (the last plugin in load order that carries the FormID supplies every field of LTEX, TXST, LAND and WRLD; no field-level merging is done). OPEN: whether the game does the same; settled by a public source with a stated licence or by an owner oracle check (see LOG.md)."
 
 [[source]]
 id = "wrld-parent"

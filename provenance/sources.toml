@@ -512,7 +512,7 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Read wbWorldObjectBounds. The UESP Oblivion page calls NAM0 and NAM9 'long[2]' (cell coordinates); xEdit reads floats for FNV with a display factor of 1/100 for these games. OPEN: the unit of the stored floats (cells or world units); the reader keeps them as stored and the planner does not use them."
+note = "Read wbWorldObjectBounds. The UESP Oblivion page calls NAM0 and NAM9 'long[2]' (cell coordinates). xEdit declares each coordinate as IsSF1(wbFloat(..., 1/100), wbFloat(..., 1/4096)); TwbGameDef.IsSF1 (Core/wbInterface.pas line 7377) returns its first argument only for Starfield, so for FO3 and FNV the float's scale is 1/4096 and 1/100 is the Starfield branch (corrected 2026-11-19; the earlier note had the two the wrong way round). TwbFloatDef.ToValue multiplies the stored value by that scale and TwbFloatDef.FromValue divides an entered value by it (Core/wbInterface.pas), so xEdit shows an FNV bound as the stored f32 divided by 4096. OPEN: the unit of the stored floats. A display divided by 4096 (the cell size, cell-size-units) suggests world units shown as cells, but no source states the unit; reading NAM0 and NAM9 of an owner plugin next to the cell grid of the same world (numbers only) settles it. The reader keeps the stored values; nothing that generates LOD reads them (only the accessor Worldspace::declared_bounds and its test)."
 
 [[source]]
 id = "cell-water"

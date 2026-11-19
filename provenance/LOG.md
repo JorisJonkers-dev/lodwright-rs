@@ -394,3 +394,19 @@ types agree; the rotation is random in the original and lodwright derives it fro
 differ in placement (gaps of 12 to 16 pixels against 2 in the original code, widths rounded to 4), which does not
 change what the game reads. Open: the order of references inside a block (the sets agree with ours as sets only) and
 the in-game result (owner).
+
+## 2026-11-19: `wrld-bounds` note corrected (issue 51)
+
+Specifier entry, role held: specifier for the correction only (not the implementer of the worldspace reader). Read
+`Core/wbDefinitionsCommon.pas` (`TwbGameDefCommon.wbWorldObjectBounds`) and `Core/wbInterface.pas` (`TwbGameDef.IsSF1`,
+`TwbFloatDef.ToValue`, `TwbFloatDef.FromValue`) of TES5Edit/TES5Edit at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file headers). Not read: the 2016 generator C# repository,
+decompiled binaries, GPL or leaked code.
+
+The fact of `wrld-bounds` (NAM0 minimum and NAM9 maximum, two f32 each, x then y) is unchanged. The note had the xEdit
+display factor the wrong way round: 1/100 is the Starfield branch of `IsSF1`; FO3 and FNV use 1/4096, and xEdit shows
+the stored value multiplied by that factor. The unit of the stored floats stays open: the factor is a display choice of
+xEdit, not a statement of the unit. The row stays `verified = false` until a second reader re-reads the corrected note
+against the same two files. What that reader checks: the `IsSF1` argument order in `wbWorldObjectBounds`; that `IsSF1`
+returns the first argument only for Starfield; that `ToValue` multiplies by the scale. An owner check (NAM0 and NAM9 of
+one plugin's worldspace against the cell range of its LAND records, numbers only) would settle the unit.

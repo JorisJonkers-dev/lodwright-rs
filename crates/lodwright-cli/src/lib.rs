@@ -43,9 +43,10 @@ Usage: lodwright [--help | --version [--json]]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
        lodwright verify <folder> [--reference <folder> [--water-iou X]] [--allow-in-repo] [--json]
-       lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
+       lodwright schema <plan|result|request|manifest|verify|events|defaults|bands> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
+       lodwright bands <verify.json> ... [--json]
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
                       --out <file.pgm> [--level N] [--allow-in-repo]
@@ -67,10 +68,12 @@ Commands:
                         exact (equal counts, every vertex within 0.05 units of one of the reference's). With
                         --water-iou X a terrain block whose water IoU is under X is a difference
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify, events
-                        (one progress event line) or defaults
+                        (one progress event line), defaults or bands
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
   defaults --json       print every request option a user can set, with its default, range and tier
+  bands                 read the `verify --json` reports of several runs of the same inputs and print, per
+                        statistic, the minimum and maximum (three decimals): the tolerance bands of the A/B protocol
   probe                 print only structure and numbers of one file (NIF header and shapes, DDS header and channel
                         statistics, settings or .dtl size and leading integers); refuses a file inside a git working
                         tree unless --allow-in-repo
@@ -112,6 +115,7 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
             &(to_json(&lodwright_api::request_defaults()) + "\n"),
         ),
         ["defaults", ..] => usage(err, "defaults takes exactly one option: --json"),
+        ["bands", rest @ ..] => bands_command(rest, out, err),
         ["doctor", folder] => doctor(Path::new(folder), out, err),
         ["plan", rest @ ..] => plan_command(rest, out, err),
         ["generate", rest @ ..] => generate_command(rest, out, err),
@@ -252,6 +256,53 @@ fn write_all(out: &mut dyn Write, err: &mut dyn Write, text: &str) -> u8 {
             EXIT_FAILED
         }
     }
+}
+
+fn bands_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let json = args.contains(&"--json");
+    let files: Vec<&str> = args.iter().copied().filter(|a| *a != "--json").collect();
+    if let Some(other) = files.iter().find(|a| a.starts_with("--")) {
+        return usage(err, &format!("unknown argument: {other}"));
+    }
+    if files.is_empty() {
+        return usage(err, "bands needs the verify --json reports of the runs");
+    }
+    let mut docs = Vec::new();
+    for file in files {
+        let read = std::fs::read(file)
+            .map_err(|e| e.to_string())
+            .and_then(|b| {
+                serde_json::from_slice::<serde_json::Value>(&b).map_err(|e| e.to_string())
+            })
+            .and_then(|v| {
+                lodwright_contract::check_verify(&v).map_err(|e| e.to_string())?;
+                serde_json::from_value::<VerifyDoc>(v).map_err(|e| e.to_string())
+            });
+        match read {
+            Ok(doc) => docs.push(doc),
+            Err(e) => {
+                let _ = writeln!(err, "lodwright: bands: {file} is not a verify report: {e}");
+                return EXIT_FAILED;
+            }
+        }
+    }
+    let doc = lodwright_contract::bands(&docs);
+    let text = if json {
+        to_json(&doc) + "\n"
+    } else {
+        use std::fmt::Write as _;
+        doc.bands
+            .iter()
+            .fold(format!("{} runs\n", doc.runs), |mut text, b| {
+                let _ = writeln!(
+                    text,
+                    "{} {} {} ({} runs)",
+                    b.statistic, b.min, b.max, b.runs
+                );
+                text
+            })
+    };
+    write_all(out, err, &text)
 }
 
 fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {

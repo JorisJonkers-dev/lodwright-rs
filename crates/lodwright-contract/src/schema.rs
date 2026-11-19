@@ -8,9 +8,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
-    DEFAULTS_VERSIONS, Defaults, EVENTS_VERSIONS, Event, MANIFEST_VERSIONS, Manifest,
-    PLAN_VERSIONS, Plan, REQUEST_VERSIONS, RESULT_VERSIONS, Request, ResultDoc, VERIFY_VERSIONS,
-    VerifyDoc,
+    BANDS_VERSIONS, BandsDoc, DEFAULTS_VERSIONS, Defaults, EVENTS_VERSIONS, Event,
+    MANIFEST_VERSIONS, Manifest, PLAN_VERSIONS, Plan, REQUEST_VERSIONS, RESULT_VERSIONS, Request,
+    ResultDoc, VERIFY_VERSIONS, VerifyDoc,
 };
 
 /// Which document a schema or check is about.
@@ -30,11 +30,13 @@ pub enum DocumentKind {
     Events,
     /// The request options with their defaults (`lodwright defaults --json`).
     Defaults,
+    /// The minimum and maximum of each statistic over several verify reports (`lodwright bands --json`).
+    Bands,
 }
 
 impl DocumentKind {
     /// Every kind, in the order the handshake lists them.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Plan,
         Self::Result,
         Self::Request,
@@ -42,9 +44,10 @@ impl DocumentKind {
         Self::Verify,
         Self::Events,
         Self::Defaults,
+        Self::Bands,
     ];
 
-    /// `plan`, `result`, `request`, `manifest`, `verify`, `events` or `defaults`.
+    /// `plan`, `result`, `request`, `manifest`, `verify`, `events`, `defaults` or `bands`.
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
@@ -55,6 +58,7 @@ impl DocumentKind {
             Self::Verify => "verify",
             Self::Events => "events",
             Self::Defaults => "defaults",
+            Self::Bands => "bands",
         }
     }
 
@@ -75,6 +79,7 @@ impl DocumentKind {
             Self::Verify => crate::VERIFY_CONTRACT,
             Self::Events => crate::EVENTS_CONTRACT,
             Self::Defaults => crate::DEFAULTS_CONTRACT,
+            Self::Bands => crate::BANDS_CONTRACT,
         }
     }
 
@@ -89,6 +94,7 @@ impl DocumentKind {
             Self::Verify => VERIFY_VERSIONS,
             Self::Events => EVENTS_VERSIONS,
             Self::Defaults => DEFAULTS_VERSIONS,
+            Self::Bands => BANDS_VERSIONS,
         }
     }
 }
@@ -151,6 +157,7 @@ pub fn schema_json(kind: DocumentKind, version: u32) -> Result<String, SchemaErr
         DocumentKind::Verify => schema_for!(VerifyDoc),
         DocumentKind::Events => schema_for!(Event),
         DocumentKind::Defaults => schema_for!(Defaults),
+        DocumentKind::Bands => schema_for!(BandsDoc),
     };
     let mut text = serde_json::to_string_pretty(&schema).expect("a schema serialises");
     text.push('\n');

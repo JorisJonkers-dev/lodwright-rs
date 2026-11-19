@@ -235,6 +235,7 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
                 {"name": "lodwright-verify", "versions": [1]},
                 {"name": "lodwright-events", "versions": [1]},
                 {"name": "lodwright-defaults", "versions": [1]},
+                {"name": "lodwright-bands", "versions": [1]},
                 {"name": "lodwright-api", "versions": [1]}
             ])
         );

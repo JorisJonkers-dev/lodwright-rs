@@ -77,6 +77,11 @@
           "description": "A tree LOD block file.",
           "type": "string",
           "const": "trees"
+        },
+        {
+          "description": "A kind this build does not know, written by a later version. Never written by this build.",
+          "type": "string",
+          "const": "other"
         }
       ],
       "x-open-enum": true

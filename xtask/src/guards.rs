@@ -499,8 +499,8 @@ fn needs_notice(row: &toml::Table) -> bool {
     haystack.contains(ENGINE_NAME) && text("licence").trim().to_lowercase() != "gpl-3.0-or-later"
 }
 
-/// `THIRD-PARTY-NOTICES.md` holds one `## `<row id>`` section with text for each engine-port row that needs a notice,
-/// and no section for anything else.
+/// `THIRD-PARTY-NOTICES.md` holds one section headed with the row id in backticks, with text, for each engine-port
+/// row that needs a notice, and no section for anything else.
 fn check_notices(root: &Path, needed: &BTreeSet<String>, v: &mut Violations) {
     let Some(text) = read_text(root, NOTICES_FILE) else {
         for id in needed {
@@ -524,10 +524,12 @@ fn check_notices(root: &Path, needed: &BTreeSet<String>, v: &mut Violations) {
         if let Some(id) = heading {
             sections.insert(id.to_owned(), 0);
             current = Some(id.to_owned());
-        } else if let Some(count) = current.as_ref().and_then(|id| sections.get_mut(id)) {
-            if !line.trim().is_empty() {
-                *count += 1;
-            }
+        } else if let Some(count) = current
+            .as_ref()
+            .and_then(|id| sections.get_mut(id))
+            .filter(|_| !line.trim().is_empty())
+        {
+            *count += 1;
         }
     }
     for id in needed.iter().filter(|id| !sections.contains_key(*id)) {

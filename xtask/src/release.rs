@@ -61,7 +61,7 @@ fn root() -> PathBuf {
         .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }
 
-/// The macOS asset (arm64 and x86_64 in one file), built on macOS and passed in as a directory.
+/// The macOS asset (arm64 and `x86_64` in one file), built on macOS and passed in as a directory.
 pub const MACOS_ASSET: &str = "lodwright-universal-apple-darwin";
 
 /// Copy the macOS binary from `dir` into `out` as an executable release asset.
@@ -171,7 +171,7 @@ pub fn build(out: &Path, macos: Option<&Path>) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{schema_kind_and_version, sums};
+    use super::{MACOS_ASSET, add_macos, schema_kind_and_version, sums};
 
     #[test]
     fn schema_names_give_their_kind_and_version() {

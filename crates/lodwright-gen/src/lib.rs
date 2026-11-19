@@ -39,4 +39,7 @@ pub use objects::{BLOCK_CELLS, ObjectReport, generate_objects, generate_objects_
 pub use output::{is_plain_relative, linked_folder, write_output_file};
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees, generate_trees_with_progress};
-pub use verify::{Finding, Verification, compare_folders, verify_folder};
+pub use verify::{
+    BlockComparison, Finding, OBJECT_TOLERANCE, ObjectAgreement, Verification, WaterOverlap,
+    compare_blocks, compare_folders, verify_folder,
+};

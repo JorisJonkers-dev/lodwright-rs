@@ -110,6 +110,12 @@ others, and removes the old manifest's files it neither kept nor wrote. The resu
 whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
 
+Nothing is written, replaced or removed outside the output folder. The folder may itself be a link: it is refused
+when it points into the data folder, and when either the link or the folder it points to lies in a git working tree. Below it, a folder on a file's path that is a link is
+refused (`output_link`, nothing is written through it). A temporary file is always created new, so a link already at
+its path is removed, never followed. A manifest that lists an absolute path or one with `..` is not trusted and is
+treated as no manifest.
+
 ## Verify
 
 `lodwright verify <folder> --json` prints a `lodwright-verify` document (schema: `lodwright schema verify`): `ok` (no
@@ -117,6 +123,19 @@ errors), how many terrain blocks, object blocks, tree blocks, textures and setti
 wrong with the folder) and `differences` (how it differs from `--reference`, empty without one). Each finding is a path
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
+
+With `--reference`, the report also carries two optional keys, measured per block mesh present on both sides (names
+compared in lower case):
+
+* `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
+  two water planes cover seen from above. It is sampled at the centres of a 400 by 400 grid over the bounds of both
+  planes, the same definition the 0.3.0 Release test used, so numbers stay comparable; 0 when only one side has water.
+  The summary gives the blocks, the `threshold`, how many are `under_threshold`, the `lowest` and the `mean`; every
+  measured number is rounded to three decimals. `threshold` is `--water-iou` when given, otherwise 0.95 (the G5 goal), and only
+  `--water-iou` turns a block under it into a difference (and so exit 1).
+* `objects`: for every object block, the vertex and triangle counts on both sides and the number of vertices with no
+  vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
+  0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
 
 Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 

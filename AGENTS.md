@@ -12,4 +12,4 @@ which inputs are allowed.
 ## Build and test
 
 - Everything CI runs: `task check`
-- Apply the repository settings and ruleset: `scripts/setup-repo.sh` (owner only)
+- Apply the repository settings and ruleset: `cargo xtask setup-repo --audit`, then `cargo xtask setup-repo` (owner only)

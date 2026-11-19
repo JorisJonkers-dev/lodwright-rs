@@ -5,6 +5,7 @@ use std::fmt;
 
 /// Why generation failed.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum GenError {
     /// Planning or raster building failed.
     Core(lodwright_core::Error),
@@ -21,6 +22,12 @@ pub enum GenError {
     },
     /// A worker thread panicked.
     Worker,
+    /// A path under the output folder is not plain (absolute, or with `..`) or passes a folder that is a link;
+    /// nothing was written there. `what` names the path relative to the output folder.
+    LinkInOutput {
+        /// The relative path.
+        what: String,
+    },
 }
 
 impl fmt::Display for GenError {
@@ -31,6 +38,10 @@ impl fmt::Display for GenError {
             Self::Dds(e) => write!(f, "encoding a texture: {e}"),
             Self::Io { what, source } => write!(f, "cannot write {what}: {source}"),
             Self::Worker => f.write_str("a worker thread failed"),
+            Self::LinkInOutput { what } => write!(
+                f,
+                "refusing to write {what}: it leaves the output folder or passes a link inside it"
+            ),
         }
     }
 }

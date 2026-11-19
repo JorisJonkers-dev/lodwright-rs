@@ -11,7 +11,8 @@ use std::io::Write;
 use std::path::Path;
 
 use lodwright_contract::{
-    DocumentKind, Handshake, VerifyDoc, VerifyFinding, VersionInfo, schema_json,
+    DocumentKind, Handshake, ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, VersionInfo,
+    WaterBlock, WaterReport, schema_json,
 };
 
 mod commands;
@@ -41,8 +42,8 @@ Usage: lodwright [--help | --version [--json]]
                       [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-water] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
-       lodwright verify <folder> [--reference <folder>] [--json]
-       lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
+        lodwright verify <folder> [--reference <folder> [--water-iou X]] [--json]
+        lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
@@ -61,7 +62,10 @@ Commands:
                         writes one JSON line per finished terrain, object and tree block to FILE (- for stderr)
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
-                        --reference also compare names and block types with another folder
+                        --reference also compare names and block types with another folder, and measure per
+                        block the water IoU (overlap of the water seen from above) and whether each object block is
+                        exact (equal counts, every vertex within 0.05 units of one of the reference's). With
+                        --water-iou X a terrain block whose water IoU is under X is a difference
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify, events
                         (one progress event line) or defaults
   contracts --json      print the contracts this build speaks and their schema versions, as
@@ -251,10 +255,15 @@ fn write_all(out: &mut dyn Write, err: &mut dyn Write, text: &str) -> u8 {
 
 fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let (mut folder, mut reference, mut json) = (None, None, false);
+    let mut threshold: Option<f64> = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match *arg {
             "--json" => json = true,
+            "--water-iou" => match iter.next().map(|t| t.parse::<f64>()) {
+                Some(Ok(t)) if (0.0..=1.0).contains(&t) => threshold = Some(t),
+                _ => return usage(err, "--water-iou needs a number from 0 to 1"),
+            },
             "--reference" => match iter.next() {
                 Some(r) => reference = Some(*r),
                 None => return usage(err, "--reference needs a folder"),
@@ -266,6 +275,9 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let Some(folder) = folder else {
         return usage(err, "verify needs the folder to check");
     };
+    if threshold.is_some() && reference.is_none() {
+        return usage(err, "--water-iou needs --reference");
+    }
     for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
         let Some(dir) = dir else { continue };
         if std::fs::read_dir(dir).is_err() {
@@ -277,11 +289,19 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         }
     }
     let mut verification = lodwright_gen::verify_folder(Path::new(folder));
+    let mut blocks = None;
     if let Some(reference) = reference {
         verification.differences =
             lodwright_gen::compare_folders(Path::new(folder), Path::new(reference));
+        blocks = Some(lodwright_gen::compare_blocks(
+            Path::new(folder),
+            Path::new(reference),
+        ));
     }
-    let doc = verify_document(&verification);
+    let mut doc = verify_document(&verification);
+    if let Some(blocks) = &blocks {
+        add_block_reports(&mut doc, blocks, threshold);
+    }
     let clean = doc.ok && doc.differences.is_empty();
     if json {
         let _ = writeln!(out, "{}", to_json(&doc));
@@ -300,6 +320,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         for f in doc.errors.iter().chain(&doc.differences) {
             let _ = writeln!(out, "{}: {}", f.path, f.problem);
         }
+        print_block_reports(&doc, out);
     }
     if clean { EXIT_OK } else { EXIT_FAILED }
 }
@@ -325,6 +346,109 @@ fn verify_document(verification: &lodwright_gen::Verification) -> VerifyDoc {
     doc.errors = findings(&verification.errors);
     doc.differences = findings(&verification.differences);
     doc
+}
+
+/// The `IoU` under which a block is counted in the water summary when `--water-iou` is not given (the G5 goal).
+const DEFAULT_WATER_IOU: f64 = 0.95;
+
+/// Three decimals, as the documents print measurements.
+fn round3(value: f64) -> f64 {
+    (value * 1000.0).round() / 1000.0
+}
+
+/// Add the per-block water and object reports, and with a threshold a difference per block under it.
+fn add_block_reports(
+    doc: &mut VerifyDoc,
+    blocks: &lodwright_gen::BlockComparison,
+    threshold: Option<f64>,
+) {
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let limit = threshold.unwrap_or(DEFAULT_WATER_IOU);
+    let per_block: Vec<WaterBlock> = blocks
+        .water
+        .iter()
+        .map(|w| WaterBlock {
+            path: w.path.clone(),
+            iou: round3(w.iou),
+        })
+        .collect();
+    let under = |w: &&lodwright_gen::WaterOverlap| w.iou < limit;
+    if let Some(t) = threshold {
+        for w in blocks.water.iter().filter(under) {
+            doc.differences.push(VerifyFinding {
+                path: w.path.clone(),
+                problem: format!("water IoU {:.3} is under {t}", w.iou),
+            });
+        }
+        doc.differences
+            .sort_by(|a, b| (&a.path, &a.problem).cmp(&(&b.path, &b.problem)));
+    }
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    let mean = (!blocks.water.is_empty()).then(|| {
+        round3(blocks.water.iter().map(|w| w.iou).sum::<f64>() / blocks.water.len() as f64)
+    });
+    doc.water = Some(WaterReport {
+        blocks: count(blocks.water.len()),
+        threshold: limit,
+        under_threshold: count(blocks.water.iter().filter(under).count()),
+        lowest: blocks
+            .water
+            .iter()
+            .map(|w| w.iou)
+            .reduce(f64::min)
+            .map(round3),
+        mean,
+        per_block,
+    });
+    let per_block: Vec<ObjectBlock> = blocks
+        .objects
+        .iter()
+        .map(|o| ObjectBlock {
+            path: o.path.clone(),
+            vertices: count(o.vertices),
+            reference_vertices: count(o.reference_vertices),
+            triangles: count(o.triangles),
+            reference_triangles: count(o.reference_triangles),
+            unmatched_vertices: count(o.unmatched_vertices),
+            exact: o.exact(),
+        })
+        .collect();
+    doc.objects = Some(ObjectReport {
+        blocks: count(per_block.len()),
+        exact: count(per_block.iter().filter(|o| o.exact).count()),
+        per_block,
+    });
+}
+
+/// The summary lines of the block reports, and one line per object block that is not exact.
+fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
+    if let Some(w) = &doc.water {
+        let number = |v: Option<f64>| v.map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"));
+        let _ = writeln!(
+            out,
+            "water: {} blocks with water, {} under {}, lowest {}, mean {}",
+            w.blocks,
+            w.under_threshold,
+            w.threshold,
+            number(w.lowest),
+            number(w.mean)
+        );
+    }
+    if let Some(o) = &doc.objects {
+        let _ = writeln!(out, "object blocks: {} of {} exact", o.exact, o.blocks);
+        for b in o.per_block.iter().filter(|b| !b.exact) {
+            let _ = writeln!(
+                out,
+                "{}: not exact: {} vertices (reference {}), {} triangles (reference {}), {} vertices without a reference vertex within 0.05",
+                b.path,
+                b.vertices,
+                b.reference_vertices,
+                b.triangles,
+                b.reference_triangles,
+                b.unmatched_vertices
+            );
+        }
+    }
 }
 
 fn usage(err: &mut dyn Write, problem: &str) -> u8 {

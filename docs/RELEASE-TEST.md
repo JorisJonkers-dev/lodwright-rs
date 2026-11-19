@@ -64,11 +64,16 @@ Pass:
   of the reference's, or the block is listed in an open ticket with its reason;
 - the water IoU of every terrain block with water on either side is at least 0.95.
 
-Until `verify --reference` reports the water IoU and the object agreement itself (lodwright-rs#97), measure them
-from the two folders: the water IoU as the overlap of the water triangles seen from above, sampled on a 400 by 400
-grid over the two planes' bounds; the object agreement order independent, per block. Record: the files compared,
-the missing and extra counts, the blocks with water, how many are under 0.95, the lowest and the mean IoU, and the
-object blocks exact out of all.
+`verify --reference` measures both (`docs/contracts.md`, section Verify). Run it once more with the threshold and
+keep the JSON:
+
+```sh
+lodwright verify <scratch>/gen --reference <scratch>/reference --water-iou 0.95 --json > <scratch>/verify.json
+```
+
+Record from its summary lines (`water: ...` and `object blocks: ... exact`) or from `water` and `objects` in the JSON:
+the files compared, the missing and extra counts, the blocks with water, how many are under 0.95, the lowest and the
+mean IoU, and the object blocks exact out of all, with the path of each block that is not exact.
 
 ## 3. In-game load
 

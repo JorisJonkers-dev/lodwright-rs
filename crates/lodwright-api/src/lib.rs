@@ -22,11 +22,13 @@
 //! [`API_VERSION`] is the version of this interface; `lodwright --version --json` lists it as the `lodwright-api`
 //! contract.
 
+mod defaults;
 mod error;
 mod generate;
 pub mod load;
 mod progress;
 
+pub use defaults::request_defaults;
 pub use error::Error;
 pub use generate::{GenerateOutcome, GenerateRequest, generate};
 pub use lodwright_contract::{API_CONTRACT, API_VERSION};

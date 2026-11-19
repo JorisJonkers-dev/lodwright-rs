@@ -41,7 +41,7 @@ Usage: lodwright [--help | --version [--json]]
        lodwright generate --data <data-folder> (--plugin NAME ... | --load-order FILE) --out <folder>
                       [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-water] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
-       lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--json]
+       lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
        lodwright verify <folder> [--reference <folder> [--water-iou X]] [--json]
        lodwright schema <plan|result|request|manifest|verify|events> [--schema-version N]
        lodwright contracts --json
@@ -57,7 +57,8 @@ Commands:
                         --out, which must not be inside the data folder, plus manifest.json; prints a result
                         document. --request reads a lodwright-request document instead (see `schema request`).
                         A second run with the same request and plugins does nothing. Without data, plugins and
-                        --out, or a request, it answers `unsupported` (exit 3) and writes nothing
+                        --out, or a request, it answers `unsupported` (exit 3) and writes nothing. --events
+                        writes one JSON line per finished terrain, object and tree block to FILE (- for stderr)
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
                         --reference also compare names and block types with another folder, and measure per

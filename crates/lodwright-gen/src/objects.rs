@@ -304,6 +304,22 @@ pub fn generate_objects(
     assets: &dyn Assets,
     out: &Path,
 ) -> Result<ObjectReport, GenError> {
+    generate_objects_with_progress(world, instances, assets, out, &mut |_, _| {})
+}
+
+/// [`generate_objects`], calling `block_done(done, total)` after each block: `total` is the number of block files
+/// the world can have (a normal and a high-priority file count separately), known before the first block is built,
+/// and `done` reaches it. A world without a usable model reports no block.
+///
+/// # Errors
+/// As [`generate_objects`].
+pub fn generate_objects_with_progress(
+    world: &str,
+    instances: &[Instance],
+    assets: &dyn Assets,
+    out: &Path,
+    block_done: &mut dyn FnMut(u64, u64),
+) -> Result<ObjectReport, GenError> {
     layout::check_world_name(world)?;
     let mut report = ObjectReport::default();
     // models
@@ -433,7 +449,8 @@ pub fn generate_objects(
         }
     }
     let [diffuse_ref, normal_ref] = layout::nif_atlas_paths(world)?;
-    for ((bx, by, high), mut members) in groups {
+    let total = groups.len() as u64;
+    for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
         members.sort_by_key(|i| {
             let row = cell_of(i).1 - by;
             (row.clamp(0, 3), i.reference, i.base)
@@ -469,6 +486,7 @@ pub fn generate_objects(
             ));
         }
         if merged.indices.is_empty() {
+            block_done(done, total);
             continue;
         }
         let file = object_block(&ObjectBlock {
@@ -488,6 +506,7 @@ pub fn generate_objects(
             &layout::object_mesh_path(world, bx, by, high)?,
             &file,
         )?);
+        block_done(done, total);
     }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)

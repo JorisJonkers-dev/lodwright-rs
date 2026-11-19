@@ -12,7 +12,14 @@
     "terrain_texture": false,
     "settings": false,
     "object_lod": false,
-    "tree_lod": false
+    "tree_lod": false,
+    "all_worlds": false,
+    "thread_count_independent": false,
+    "memory_budget_preflight": false,
+    "memory_budget_held": false,
+    "peak_memory_reported": false,
+    "resume_after_cancel": false,
+    "resume_after_kill": false
   },
   "worlds": [
     {

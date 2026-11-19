@@ -337,6 +337,35 @@ pub fn generate_trees(
     assets: &dyn Assets,
     out: &Path,
 ) -> Result<TreeReport, GenError> {
+    generate_trees_with_progress(
+        world,
+        south_west,
+        bases,
+        refs,
+        plugin_names,
+        assets,
+        out,
+        &mut |_, _| {},
+    )
+}
+
+/// [`generate_trees`], calling `block_done(done, total)` after each block file is written; `total` is the number
+/// of block files, known before the first is written, and `done` reaches it. A world that writes nothing reports
+/// no block.
+///
+/// # Errors
+/// As [`generate_trees`].
+#[allow(clippy::too_many_arguments)] // generate_trees's inputs plus the callback
+pub fn generate_trees_with_progress(
+    world: &str,
+    south_west: (i32, i32),
+    bases: &[TreeBase],
+    refs: &[TreeRef],
+    plugin_names: &[String],
+    assets: &dyn Assets,
+    out: &Path,
+    block_done: &mut dyn FnMut(u64, u64),
+) -> Result<TreeReport, GenError> {
     layout::check_world_name(world)?;
     let mut report = TreeReport::default();
     let (found, missing) = load_billboards(bases, plugin_names, assets);
@@ -411,12 +440,14 @@ pub fn generate_trees(
         &layout::tree_list_path(world)?,
         &write_types(&types),
     )?);
-    for ((x, y), block) in &blocks {
+    let total = blocks.len() as u64;
+    for (done, ((x, y), block)) in (1_u64..).zip(&blocks) {
         report.files.push(write_file(
             out,
             &layout::tree_block_path(world, *x, *y)?,
             &write_block(block),
         )?);
+        block_done(done, total);
     }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)
@@ -424,7 +455,9 @@ pub fn generate_trees(
 
 #[cfg(test)]
 mod tests {
-    use super::{billboard_path, crc32, generate_trees, parse_settings};
+    use super::{
+        billboard_path, crc32, generate_trees, generate_trees_with_progress, parse_settings,
+    };
     use crate::assets::Assets;
     use lodwright_core::trees::{TreeBase, TreeRef, parse_block, parse_types};
     use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
@@ -579,6 +612,50 @@ mod tests {
                 .any(|f| f.problem.contains("not a readable tree block")),
             "trailing bytes are found"
         );
+        let _ = std::fs::remove_dir_all(&out);
+    }
+
+    #[test]
+    fn each_tree_block_reports_once_in_order_and_a_world_without_billboards_reports_none() {
+        let mut files = HashMap::new();
+        files.insert(
+            "textures/terrain/lodgen/a.esm/oak_00000100.dds".to_owned(),
+            billboard(16, 16, 1),
+        );
+        let bases = vec![base(0x100, "oak.spt")];
+        let refs = vec![
+            at(0x100, 10.0, 0x200),
+            at(0x100, 9000.0, 0x201),
+            at(0x100, 40_000.0, 0x202),
+        ];
+        let names = ["A.esm".to_owned()];
+        let out = temp("progress");
+        let mut seen = Vec::new();
+        generate_trees_with_progress(
+            "Mojave",
+            (0, 0),
+            &bases,
+            &refs,
+            &names,
+            &Memory(files),
+            &out,
+            &mut |done, total| seen.push((done, total)),
+        )
+        .unwrap();
+        assert_eq!(seen, [(1, 2), (2, 2)]);
+        seen.clear();
+        generate_trees_with_progress(
+            "Mojave",
+            (0, 0),
+            &bases,
+            &refs,
+            &names,
+            &Memory(HashMap::new()),
+            &out,
+            &mut |done, total| seen.push((done, total)),
+        )
+        .unwrap();
+        assert_eq!(seen, Vec::<(u64, u64)>::new());
         let _ = std::fs::remove_dir_all(&out);
     }
 

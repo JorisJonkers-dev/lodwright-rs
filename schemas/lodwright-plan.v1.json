@@ -91,12 +91,42 @@
       ]
     },
     "Capabilities": {
-      "description": "What `generate` can do today.",
+      "description": "What `generate` can do today: the kinds of files it writes, then how it runs (worlds, scheduling, memory and\ndeterminism). The run flags are optional keys: a document without them reads them as false.",
       "type": "object",
       "properties": {
+        "all_worlds": {
+          "description": "A request that names no world builds every world of the load order, one world at a time.",
+          "type": "boolean",
+          "default": false
+        },
+        "memory_budget_held": {
+          "description": "`limits.memory_mib` is also held while the run goes on (fewer workers or smaller batches, same bytes).",
+          "type": "boolean",
+          "default": false
+        },
+        "memory_budget_preflight": {
+          "description": "`limits.memory_mib` refuses, before anything is written, a run whose plugins suggest it needs more.",
+          "type": "boolean",
+          "default": false
+        },
         "object_lod": {
           "description": "Writes object LOD (`.nif` blocks and the atlas).",
           "type": "boolean"
+        },
+        "peak_memory_reported": {
+          "description": "The result reports the run's peak resident size (`peak_memory_mib`); measured on Linux only.",
+          "type": "boolean",
+          "default": false
+        },
+        "resume_after_cancel": {
+          "description": "A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them.",
+          "type": "boolean",
+          "default": false
+        },
+        "resume_after_kill": {
+          "description": "A killed run (no cancel, for example the process ended) resumes to the bytes of an uninterrupted run.",
+          "type": "boolean",
+          "default": false
         },
         "settings": {
           "description": "Writes the LOD settings file.",
@@ -109,6 +139,11 @@
         "terrain_texture": {
           "description": "Writes terrain textures.",
           "type": "boolean"
+        },
+        "thread_count_independent": {
+          "description": "The output bytes do not depend on the number of worker threads (`limits.threads`).",
+          "type": "boolean",
+          "default": false
         },
         "tree_lod": {
           "description": "Writes tree LOD.",

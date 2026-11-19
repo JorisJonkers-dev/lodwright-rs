@@ -43,7 +43,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
        lodwright verify <folder> [--reference <folder> [--water-iou X]] [--allow-in-repo] [--json]
-       lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
+       lodwright schema <plan|result|request|manifest|verify|events|defaults|bands> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
        lodwright bands <verify.json> ... [--json]
@@ -68,7 +68,7 @@ Commands:
                         exact (equal counts, every vertex within 0.05 units of one of the reference's). With
                         --water-iou X a terrain block whose water IoU is under X is a difference
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify, events
-                        (one progress event line) or defaults
+                        (one progress event line), defaults or bands
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
   defaults --json       print every request option a user can set, with its default, range and tier

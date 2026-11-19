@@ -4,7 +4,7 @@ Mirror of nv-rs `docs/fork/PRACTICES.md`, for a project that is a clean-room rei
 
 | Practice | Where | Notes |
 | --- | --- | --- |
-| One required check, `Pipeline Complete` | `.github/workflows/pipeline.yml`, `.github/rulesets/main.json` | One job; the checks are steps (`task check`), because a private repository bills each job rounded up to a minute. Documentation-only changes skip the Rust steps (a step decides, not a job, for the same reason). The org's reusable hygiene, PR-title and quarantine workflows cannot be steps, so they are jobs the last step gates on |
+| One required check, `Pipeline Complete` | `.github/workflows/pipeline.yml`, `.github/rulesets/main.json` | Every check is its own parallel job calling the same `task` target as `task check`; `Pipeline Complete` is a thin aggregator (no checkout; fails when a needed job failed or was cancelled; a skipped job is fine). Documentation-only changes skip the Rust jobs through the `Changed files` job. A private repository bills each job rounded up to a minute: the owner chose faster feedback and isolated failures over that cost (#187) |
 | Cancel superseded runs | `concurrency` in `pipeline.yml` | A new commit cancels the older run of a pull request; a title edit has its own group; `main` is never cancelled; no label-event triggers |
 | Actions pinned by SHA | every workflow | The org's reusable workflows at github-workflows v0.50.3 (`8e402cc`), whose actions are SHA-pinned; Renovate proposes bumps |
 | Branch protection | `.github/rulesets/`, `scripts/apply-ruleset.sh`, `scripts/setup-repo.sh` | Pull requests only, squash, linear history, no force push, `Pipeline Complete` required; `v*` tags immutable. Prepared here, applied by the owner (`--audit` first) |

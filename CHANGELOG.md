@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.2...v0.5.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **verify:** typed verify contract in the handshake, and documented exit codes ([#177](https://github.com/JorisJonkers-dev/lodwright-rs/issues/177))
+
+### Features
+
+* **generate:** progress events for object and tree LOD ([#178](https://github.com/JorisJonkers-dev/lodwright-rs/issues/178)) ([8f20913](https://github.com/JorisJonkers-dev/lodwright-rs/commit/8f20913ff067c4742c7aa39b6ee440fda77f3311))
+* **release:** attach a universal macOS binary to each release ([#181](https://github.com/JorisJonkers-dev/lodwright-rs/issues/181)) ([10012bb](https://github.com/JorisJonkers-dev/lodwright-rs/commit/10012bbc52c04e8e2a6a8c47c600c2e0084fa4db))
+* **verify:** report per-block water IoU and object block agreement against a reference ([#188](https://github.com/JorisJonkers-dev/lodwright-rs/issues/188)) ([30ec22f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/30ec22f58ed90372c631d8b097199736fbf6fc7c))
+* **verify:** typed verify contract in the handshake, and documented exit codes ([#177](https://github.com/JorisJonkers-dev/lodwright-rs/issues/177)) ([27f428a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/27f428a24a8d90f2fb36ef907bf62c5821ac37d3))
+
+
+### Bug Fixes
+
+* **contract:** regenerate the events schema for the other block kind ([#185](https://github.com/JorisJonkers-dev/lodwright-rs/issues/185)) ([d7bdad2](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d7bdad2a5453ec5ffb8a6acbdf5a6f0dc99ff929))
+* **generate:** never write or remove outside the output folder through links or manifest paths ([#186](https://github.com/JorisJonkers-dev/lodwright-rs/issues/186)) ([a327d82](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a327d822c56f278c00ffed839637bd0d6991a9f1))
+* **generate:** read an unknown block kind as other and cover the request form with objects and trees ([#182](https://github.com/JorisJonkers-dev/lodwright-rs/issues/182)) ([1c6ebf3](https://github.com/JorisJonkers-dev/lodwright-rs/commit/1c6ebf3df7406a6988a912210f699a55ebb6a562))
+
 ## [0.4.2](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.1...v0.4.2) (2026-11-18)
 
 

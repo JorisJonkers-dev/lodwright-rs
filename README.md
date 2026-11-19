@@ -5,8 +5,8 @@ Tale of Two Wastelands, written in Rust. The existing generators are Windows-onl
 file-format documentation, our own measurements and synthetic tests.
 
 **Systems.** Built and tested on Linux and macOS (Apple silicon) on every pull request, and linked into the Toolbox's
-`raul` on Linux, Windows and macOS, which builds it from the pinned source. The release binary is Linux x86-64 for
-now; a macOS binary is #161.
+`raul` on Linux, Windows and macOS, which builds it from the pinned source. Each release attaches the binary for Linux
+x86-64 and for macOS (one universal binary for Apple silicon and Intel); the OCI package is Linux only.
 
 **Licence: GPL-3.0-only**, with two files translated from xEdit kept under MPL-2.0 ([docs/LICENSING.md](docs/LICENSING.md)).
 The clean-room rule is in [docs/clean-room.md](docs/clean-room.md).

@@ -12,7 +12,7 @@
 //!   it, and not through a manifest entry that climbs out of it.
 //!
 //! The tests marked `ignore` describe what the generator does not do yet; the fix lives in the generator's write
-//! path (`crates/lodwright-api/src/generate.rs` and `crates/lodwright-gen/src/terrain.rs`) and is tracked under #43.
+//! path (`crates/lodwright-api/src/generate.rs` and `crates/lodwright-gen/src/terrain.rs`) and is tracked under #167.
 //!
 //! Unix only: creating a symbolic link on Windows needs a privilege or developer mode that CI and most users do not
 //! have, and the guards resolve links through the same `canonicalize` call on every platform.

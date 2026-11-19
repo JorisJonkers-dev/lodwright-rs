@@ -477,7 +477,7 @@ fn add_block_reports(
     for w in &blocks.water {
         let level = w
             .path
-            .rsplit('/')
+            .rsplit(['/', '\\'])
             .next()
             .and_then(|name| name.split('.').find_map(|part| part.strip_prefix("level")))
             .and_then(|l| l.parse::<u32>().ok());

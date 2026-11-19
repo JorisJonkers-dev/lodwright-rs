@@ -482,6 +482,21 @@ fn a_known_differences_list_accepts_its_blocks_reports_stale_entries_and_prints_
     let (code, out, _) = go(&owned.iter().map(String::as_str).collect::<Vec<_>>());
     assert_eq!(code, EXIT_OK, "every difference is known: {out}");
     assert_golden(&golden("verify_known_differences.txt"), &out);
+    let mut json_args = owned.clone();
+    json_args.push("--json".to_owned());
+    let (code, json, _) = go(&json_args.iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(code, EXIT_OK);
+    let report: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(lodwright_contract::check_verify(&report), Ok(()));
+    let levels: Vec<u64> = report["water"]["per_level"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["level"].as_u64().unwrap())
+        .collect();
+    assert_eq!(levels, [4, 8, 16]);
+    assert_eq!(report["known"].as_array().unwrap().len(), 7);
+    assert_eq!(report["stale"].as_array().unwrap().len(), 2);
     // the lake has water blocks at levels 4, 8 and 16; without the level 16 entry, that block is a difference again
     let short = list.with_extension("short.txt");
     std::fs::write(

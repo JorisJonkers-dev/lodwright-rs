@@ -540,7 +540,7 @@ row with their hash section and records whether they give a test vector.
 Leads seen in the same file, recorded here and not as rows (they belong to issues 52 and 44): xEdit's writer sets the
 stored size of a v104 file to everything it wrote for that file, embedded name and uncompressed-size field included
 (comment in `TwbBSArchive.PackData`: "Size includes embedded filename and uncompressed size field"); and its checks warn
-that, for FO3, FNV and Skyrim, archives with the embedded-names flag holding non-texture files may crash the game, and
+that archives of the v104 type (FO3, FNV, Skyrim) or Skyrim SE with the embedded-names flag holding non-texture files may crash the game, and
 that cubemap textures need that flag. Issue 52 can use the first as a public source beside its measurement.
 
 What a second reader checks for each row: the functions named in its note at the same revision; that the row states

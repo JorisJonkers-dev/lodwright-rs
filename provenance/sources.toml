@@ -395,7 +395,7 @@ note = "The page says hashes are of lower-case names with backslashes and that t
 
 [[source]]
 id = "bsa-name-hash"
-fact = "xEdit computes the u64 name hash of a v104 (FO3, FNV) folder or file name as follows. The name is lower-cased; a file name is split at its last '.' into stem and extension (the extension keeps the dot), a folder name is not split. Low 32 bits, from the lowest byte: the last character of the stem (if the stem is not empty), the second-to-last character (if the stem is longer than 2), the length of the stem, the first character (if the stem is not empty); then the extension '.kf' sets 0x80, '.nif' 0x8000, '.dds' 0x8080 and '.wav' 0x80000000 in the low word. High 32 bits: h = 0, and for every stem character except the first and the last two, h = c + (h << 6) + (h << 16) - h in wrapping 32-bit arithmetic with c the unsigned byte; the same recurrence over the extension characters from a new zero gives h2; the high word is h + h2 (wrapping)."
+fact = "xEdit computes the u64 name hash of a v104 (FO3, FNV) folder or file name as follows. The name is lower-cased; a file name is split at its last '.' into stem and extension (the extension keeps the dot), a folder name is not split. Low 32 bits, from the lowest byte: the last character of the stem (if the stem is not empty), the second-to-last character (if the stem is longer than 2), the length of the stem as a byte (always written), the first character (if the stem is not empty), the bytes left zero otherwise; then the extension '.kf' sets 0x80, '.nif' 0x8000, '.dds' 0x8080 and '.wav' 0x80000000 in those low 32 bits. High 32 bits: h = 0, and for every stem character except the first and the last two, h = c + (h << 6) + (h << 16) - h in wrapping 32-bit arithmetic with c the unsigned byte; the same recurrence over the extension characters from a new zero gives h2; the high 32 bits are h + h2 (wrapping)."
 url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbHash.pas"
 licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
 date = 2026-11-19
@@ -417,14 +417,14 @@ note = "DRAFT for the C1 work item. Read HashSortTES4 and TwbBSArchive.CreateArc
 
 [[source]]
 id = "bsa-archive-registration"
-fact = "xEdit's loader, for FO3 and FNV, loads the archives named in the game INI's [Archive] sArchiveList (comma separated, read from the game INI and the custom INI), adds Update.bsa for FNV, and then for every plugin in load order loads each archive in the data folder whose name starts with the plugin's name without extension and ends in .bsa (prefix match). Its comment says all games before Skyrim load archives with this partial match, while Skyrim needs an exact name."
+fact = "xEdit's loader, for FO3 and FNV, loads the archives named in [Archive] sArchiveList (comma separated; from the game INI, or combined with the custom INI when that has an [Archive] section), adds Update.bsa for FNV, and then for every plugin in load order loads each archive in the data folder whose name starts with the plugin's name without extension and ends in .bsa (prefix match). Its comment says all games before Skyrim load archives with this partial match, while Skyrim needs an exact name."
 url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbImplementation.pas"
 licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
 date = 2026-11-19
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "DRAFT for the C1 work item. Read TwbLoadingGameContext.FindBSAs and TwbLoadingGameContext.HasBSAs (Core/wbImplementation.pas), the archive loading in xEdit/xeMainForm.pas, and the capability table in Core/wbInterface.pas (gcArchiveExactNameMatch only for Skyrim and Enderal, gcUpdateArchiveAlwaysLoaded only for FNV). This is how a tool models the game's archive loading, not a measurement of the game. It agrees with fnv-archive-loading (a guide, licence not stated) on loading with the plugin's name and adds the prefix match. OPEN: the game's behaviour on the target engine; owner decision D2 asks for an in-game test of plugin-named loading before packing ships."
+note = "DRAFT for the C1 work item. Read both TwbLoadingGameContext.FindBSAs overloads (one INI; game INI with custom INI through CheckAddFilesToString) and TwbLoadingGameContext.HasBSAs (Core/wbImplementation.pas), the archive loading in xEdit/xeMainForm.pas, and the capability table in Core/wbInterface.pas (gcArchiveExactNameMatch only for Skyrim and Enderal, gcUpdateArchiveAlwaysLoaded only for FNV). This is how a tool models the game's archive loading, not a measurement of the game. It agrees with fnv-archive-loading (a guide, licence not stated) on loading with the plugin's name and adds the prefix match. OPEN: the game's behaviour on the target engine; owner decision D2 asks for an in-game test of plugin-named loading before packing ships."
 
 [[source]]
 id = "land-vnml-layout"

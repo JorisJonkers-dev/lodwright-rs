@@ -42,8 +42,8 @@ Usage: lodwright [--help | --version [--json]]
                       [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-water] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
-        lodwright verify <folder> [--reference <folder> [--water-iou X]] [--json]
-        lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
+       lodwright verify <folder> [--reference <folder> [--water-iou X]] [--allow-in-repo] [--json]
+       lodwright schema <plan|result|request|manifest|verify|events|defaults> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
@@ -85,7 +85,8 @@ Options:
 
 Exit codes: 0 ok, 1 failed, 2 usage error, 3 unsupported.
 verify exits 0 clean, 1 findings, 2 usage error, 3 unreadable folder; a finding is an error in the folder or,
-with --reference, a difference from the reference.
+with --reference, a difference from the reference. A folder or reference inside a git working tree is a usage error
+unless --allow-in-repo is given for that run.
 ";
 
 /// Run the command line `args` (without the program name). Output goes to `out`, diagnostics to `err`.
@@ -254,12 +255,13 @@ fn write_all(out: &mut dyn Write, err: &mut dyn Write, text: &str) -> u8 {
 }
 
 fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    let (mut folder, mut reference, mut json) = (None, None, false);
+    let (mut folder, mut reference, mut json, mut allow_in_repo) = (None, None, false, false);
     let mut threshold: Option<f64> = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match *arg {
             "--json" => json = true,
+            "--allow-in-repo" => allow_in_repo = true,
             "--water-iou" => match iter.next().map(|t| t.parse::<f64>()) {
                 Some(Ok(t)) if (0.0..=1.0).contains(&t) => threshold = Some(t),
                 _ => return usage(err, "--water-iou needs a number from 0 to 1"),
@@ -286,6 +288,21 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
                 "lodwright: verify: the {role} {dir} cannot be read as a folder"
             );
             return EXIT_UNREADABLE;
+        }
+        // a folder generated from game data does not belong in a repository: refuse before reading a file of it
+        let resolved = std::fs::canonicalize(dir).unwrap_or_else(|_| Path::new(dir).to_path_buf());
+        if !allow_in_repo
+            && [Path::new(dir), resolved.as_path()]
+                .iter()
+                .any(|d| commands::inside_git_tree(&d.join("x")))
+        {
+            return usage(
+                err,
+                &format!(
+                    "the {role} {dir} is inside a git working tree; no file was read. Generated LOD comes from \
+                     game data and does not belong in a repository: move it out, or pass --allow-in-repo for this run"
+                ),
+            );
         }
     }
     let mut verification = lodwright_gen::verify_folder(Path::new(folder));

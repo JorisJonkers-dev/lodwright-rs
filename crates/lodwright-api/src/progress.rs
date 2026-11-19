@@ -4,6 +4,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use lodwright_contract::BlockKind;
 use serde::{Deserialize, Serialize};
 
 /// A step of a run.
@@ -36,7 +37,8 @@ impl Step {
     }
 }
 
-/// One progress event. A step starts with an event without counts; terrain then reports each finished block.
+/// One progress event. A step starts with an event without counts; terrain, objects and trees then report each
+/// finished block with `level`, `done` and `total`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressEvent {
     /// The step.
@@ -44,13 +46,13 @@ pub struct ProgressEvent {
     /// The world editor id, for the per-world steps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world: Option<String>,
-    /// The terrain level (cells per block edge), for a finished block.
+    /// Cells per block edge, for a finished block: the terrain level, 4 for an object block, 8 for a tree block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level: Option<u32>,
-    /// Blocks of this level finished so far.
+    /// Blocks of this step and level finished so far, in this world.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Option<u64>,
-    /// Blocks of this level in total.
+    /// Blocks of this step and level in total, in this world.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
     /// The block's files were kept from an earlier run.
@@ -70,6 +72,27 @@ impl ProgressEvent {
             total: None,
             up_to_date: false,
         }
+    }
+
+    /// The events-file line (`lodwright generate --events`) of a finished block; `None` for the start of a step and
+    /// for the steps that have no blocks. The line is made from this event, so the file and the callback cannot
+    /// tell different stories.
+    #[must_use]
+    pub fn block_line(&self) -> Option<lodwright_contract::Event> {
+        let kind = match self.step {
+            Step::Terrain => BlockKind::Terrain,
+            Step::Objects => BlockKind::Objects,
+            Step::Trees => BlockKind::Trees,
+            Step::ReadPlugins | Step::Manifest => return None,
+        };
+        Some(lodwright_contract::Event::Block {
+            kind: Some(kind),
+            world: self.world.clone()?,
+            level: self.level?,
+            done: self.done?,
+            of: self.total?,
+            up_to_date: self.up_to_date,
+        })
     }
 
     /// The stable label key of the event's step.
@@ -145,5 +168,41 @@ mod tests {
             serde_json::to_string(&e).unwrap(),
             r#"{"step":"terrain","world":"W","up_to_date":false}"#
         );
+        assert_eq!(e.block_line(), None);
+    }
+
+    fn finished(step: Step, level: u32) -> ProgressEvent {
+        ProgressEvent {
+            level: Some(level),
+            done: Some(2),
+            total: Some(5),
+            ..ProgressEvent::start(step, Some("W"))
+        }
+    }
+
+    #[test]
+    fn a_finished_block_of_each_step_renders_the_events_line_with_its_kind() {
+        let lines: Vec<String> = [
+            finished(Step::Terrain, 16),
+            finished(Step::Objects, 4),
+            finished(Step::Trees, 8),
+        ]
+        .iter()
+        .map(|e| e.block_line().unwrap().to_line())
+        .collect();
+        assert_eq!(
+            lines,
+            [
+                r#"{"event":"block","kind":"terrain","world":"W","level":16,"done":2,"of":5,"up_to_date":false}"#,
+                r#"{"event":"block","kind":"objects","world":"W","level":4,"done":2,"of":5,"up_to_date":false}"#,
+                r#"{"event":"block","kind":"trees","world":"W","level":8,"done":2,"of":5,"up_to_date":false}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_step_without_blocks_has_no_events_line_even_with_counts() {
+        assert_eq!(finished(Step::Manifest, 4).block_line(), None);
+        assert_eq!(finished(Step::ReadPlugins, 4).block_line(), None);
     }
 }

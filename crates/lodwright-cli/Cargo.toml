@@ -21,6 +21,8 @@ serde = "1.0.229"
 serde_json = "1.0.154"
 
 [dev-dependencies]
+lodwright-dds = { workspace = true }
+lodwright-nif = { workspace = true }
 lodwright-testkit = { workspace = true }
 
 [lints]

@@ -60,6 +60,20 @@ pub enum GenerateOutcome {
 /// `up_to_date`, but it keeps every block whose inputs did not change.
 const INTERRUPTED: &str = "";
 
+/// Cells per edge of an object block and of a tree block: the `level` of their progress events.
+const OBJECT_BLOCK_CELLS: u32 = lodwright_gen::BLOCK_CELLS.unsigned_abs();
+const TREE_BLOCK_CELLS: u32 = lodwright_core::trees::TREE_BLOCK_CELLS.unsigned_abs();
+
+/// A finished object or tree block of `world`. Neither is kept from an earlier run, so `up_to_date` is false.
+fn block_event(step: Step, world: &str, level: u32, done: u64, total: u64) -> ProgressEvent {
+    ProgressEvent {
+        level: Some(level),
+        done: Some(done),
+        total: Some(total),
+        ..ProgressEvent::start(step, Some(world))
+    }
+}
+
 fn terrain_settings(request: &Request) -> TerrainSettings {
     if request.terrain.levels.is_empty() {
         return TerrainSettings::default();
@@ -515,8 +529,22 @@ pub fn generate(
                         )
                         .with_detail(e)
                     })?;
-            let objects = lodwright_gen::generate_objects(world.name(), &instances, assets, out)
-                .map_err(|e| gen_error(&e))?;
+            let objects = lodwright_gen::generate_objects_with_progress(
+                world.name(),
+                &instances,
+                assets,
+                out,
+                &mut |done, total| {
+                    progress.report(&block_event(
+                        Step::Objects,
+                        world.name(),
+                        OBJECT_BLOCK_CELLS,
+                        done,
+                        total,
+                    ));
+                },
+            )
+            .map_err(|e| gen_error(&e))?;
             add_warnings(&mut doc, objects.warnings.clone());
             files.extend(objects.files.iter().map(to_manifest_file));
         }
@@ -533,7 +561,7 @@ pub fn generate(
                 lodwright_core::trees::tree_references(&loaded.plugins, world.form_id(), &bases)
                     .map_err(|e| load_order_error(&e))?;
             let south_west = world.bounds().map_or((0, 0), |b| (b.min_x, b.min_y));
-            let trees = lodwright_gen::generate_trees(
+            let trees = lodwright_gen::generate_trees_with_progress(
                 world.name(),
                 south_west,
                 &bases,
@@ -541,6 +569,15 @@ pub fn generate(
                 &request.plugins,
                 assets,
                 out,
+                &mut |done, total| {
+                    progress.report(&block_event(
+                        Step::Trees,
+                        world.name(),
+                        TREE_BLOCK_CELLS,
+                        done,
+                        total,
+                    ));
+                },
             )
             .map_err(|e| gen_error(&e))?;
             add_warnings(&mut doc, trees.warnings.clone());

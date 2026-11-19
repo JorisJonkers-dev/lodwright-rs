@@ -439,3 +439,30 @@ footer; that the new fact claims nothing beyond it. What settles the open questi
 that both override one LAND record, the later one changing only part of the record (for example VHGT but not the
 layers); compare the game's own terrain LOD or the in-game ground built from that load order with lodwright's output
 for both readings.
+
+## 2026-11-19: `land-vnml-layout`, `land-vtxt-layout` and `wrld-child-inherits` narrowed (issue 54)
+
+Specifier entry, role held: specifier for the corrections only (not the implementer of `layers.rs` or
+`worldspace.rs`). Nothing was re-read on this date: the UESP LAND and WRLD pages answered HTTP 403 to automated reads,
+and the discrepancies are the ones the second reader recorded on 2026-11-14 (issue 54) from those pages and from xEdit
+(revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016 generator C# repository, decompiled
+binaries, GPL or leaked code. Each fact now states only what its source states; what the code does beyond it is
+labelled as the project's choice in the note, with the open question.
+
+- `land-vnml-layout`: "rows from the south" removed from the fact. The reader shares one grid accessor with VCLR, whose
+  row order is recorded; nothing that generates LOD reads VNML, so no output depends on the clause today.
+- `land-vtxt-layout`: "positions not listed have no opacity" moved from the fact to the note as the project's choice.
+  The diffuse blend relies on it, so it is a LOD question, not only a record question: if the game treats an unlisted
+  position differently, generated terrain colours differ near layer edges.
+- `wrld-child-inherits`: now only the UESP Oblivion statement (climate, water and map data). The FNV flag names are
+  `wrld-parent` (already verified). The merged sentence about what the flags make a child take is an open question;
+  the code's default (no inheritance) and the `FlaggedDefaults` option are labelled as choices. Which worlds get LOD in
+  an all-worlds run depends on this.
+
+All three stay `verified = false`. What a second reader checks: that each fact now matches the UESP page (and, for VNML
+and VTXT, xEdit `wbLandNormals` and `wbLandLayers`) with nothing added. What settles the open points (owner, numbers
+only): for VTXT, in one owner plugin count, per ATXT layer, how many of the 289 positions are listed and whether listed
+points with opacity 0.0 occur (if every layer lists all 289, the question has no effect on output); for the child
+worlds, compare the game's own terrain LOD of a child world whose PNAM has "use land data" clear with lodwright's
+output under each inheritance option; for VNML, the row order can be read from a LAND record with a known slope
+direction (normal x or y component sign by row).

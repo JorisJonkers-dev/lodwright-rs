@@ -378,6 +378,10 @@ fn engine_url(owner: &str, commit: &str) -> String {
     format!("https://github.com/{owner}/nv-rs/blob/{commit}/crates/bsa/src/archive.rs")
 }
 
+fn good_url() -> String {
+    engine_url("JorisJonkers-dev", &"a".repeat(40))
+}
+
 fn good_engine_row() -> String {
     engine_row(
         &engine_url("JorisJonkers-dev", &"a".repeat(40)),
@@ -393,28 +397,88 @@ fn an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes() {
     assert!(with_rows(&repo, &good_engine_row()).is_empty());
 }
 
-#[test]
-fn an_engine_port_row_under_mit_with_its_notice_noted_passes() {
-    let repo = Repo::new();
-    let row = engine_row(
-        &engine_url("slaterain", &"a".repeat(40)),
-        "MIT",
-        Some("x"),
-        Some("n"),
-    ) + "licence_notice = \"kept in LEGAL.md\"\n";
-    assert!(with_rows(&repo, &row).is_empty());
+const NOTICES: &str =
+    "# Third-party notices\n\n## `dds-header`\n\nCopyright (c) Someone\nThe MIT licence text.\n";
+
+fn with_notices(repo: &Repo, row: &str, notices: Option<&str>) -> Vec<String> {
+    if let Some(notices) = notices {
+        repo.write("THIRD-PARTY-NOTICES.md", notices);
+    }
+    with_rows(repo, row)
 }
 
 #[test]
-fn an_engine_port_row_under_mit_without_its_notice_fails() {
-    let repo = Repo::new();
-    let row = engine_row(
-        &engine_url("slaterain", &"a".repeat(40)),
+fn an_engine_port_row_under_a_permissive_licence_with_notice_and_notices_entry_passes() {
+    for licence in [
         "MIT",
-        Some("x"),
-        Some("n"),
+        "BSD-3-Clause",
+        "BSD-2-Clause",
+        "Apache-2.0",
+        "Apache-2.0 WITH LLVM-exception",
+        "Zlib",
+        "GPL-3.0-only",
+    ] {
+        let repo = Repo::new();
+        let row = engine_row(&good_url(), licence, Some("x"), Some("n"))
+            + "licence_notice = \"copyright line kept\"\n";
+        assert_eq!(
+            with_notices(&repo, &row, Some(NOTICES)),
+            Vec::<String>::new(),
+            "{licence}"
+        );
+    }
+}
+
+#[test]
+fn an_engine_port_row_under_a_third_party_licence_without_a_notice_field_fails() {
+    let repo = Repo::new();
+    let row = engine_row(&good_url(), "MIT", Some("x"), Some("n"));
+    assert!(any_contains(
+        &with_notices(&repo, &row, Some(NOTICES)),
+        "licence_notice"
+    ));
+}
+
+#[test]
+fn a_third_party_row_without_a_notices_entry_fails() {
+    for notices in [None, Some("# Third-party notices\n")] {
+        let repo = Repo::new();
+        let row =
+            engine_row(&good_url(), "Zlib", Some("x"), Some("n")) + "licence_notice = \"kept\"\n";
+        assert!(
+            any_contains(
+                &with_notices(&repo, &row, notices),
+                "THIRD-PARTY-NOTICES.md"
+            ),
+            "{notices:?}"
+        );
+    }
+}
+
+#[test]
+fn a_notices_entry_without_text_fails() {
+    let repo = Repo::new();
+    let row = engine_row(&good_url(), "Zlib", Some("x"), Some("n")) + "licence_notice = \"kept\"\n";
+    let out = with_notices(&repo, &row, Some("# N\n\n## `dds-header`\n\n"));
+    assert!(any_contains(&out, "no notice text"));
+}
+
+#[test]
+fn a_notices_entry_for_an_unknown_or_original_code_row_fails() {
+    let repo = Repo::new();
+    let out = with_notices(
+        &repo,
+        &good_engine_row(),
+        Some("# N\n\n## `dds-header`\n\ntext\n\n## `ghost`\n\ntext\n"),
     );
-    assert!(any_contains(&with_rows(&repo, &row), "licence_notice"));
+    assert!(any_contains(&out, "ghost"));
+    assert!(any_contains(&out, "dds-header"));
+}
+
+#[test]
+fn gpl_or_later_rows_need_no_notices_entry() {
+    let repo = Repo::new();
+    assert!(with_notices(&repo, &good_engine_row(), None).is_empty());
 }
 
 #[test]
@@ -498,7 +562,11 @@ fn an_engine_port_row_must_name_exactly_one_engine_licence() {
         "GPL-3.0-or-later AND BSD-3-Clause",
         "GPL-3.0-or-later-ish",
         "MIT OR Apache-2.0",
-        "GPL-3.0-only",
+        "unknown",
+        "GPL-2.0-only",
+        "LGPL-3.0-only",
+        "AGPL-3.0-only",
+        "SSPL-1.0",
     ] {
         let repo = Repo::new();
         let row = engine_row(

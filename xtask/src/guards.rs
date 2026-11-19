@@ -70,8 +70,20 @@ const ENGINE_BLOB_PREFIXES: [&str; 2] = [
     "https://github.com/slaterain/nv-rs/blob/",
     "https://github.com/jorisjonkers-dev/nv-rs/blob/",
 ];
-/// The licences an engine-port row may state, exactly (lower case); an expression such as `A AND B` is refused.
-const ENGINE_LICENCES: [&str; 2] = ["gpl-3.0-or-later", "mit"];
+/// The SPDX identifiers an engine-port row may state, exactly (lower case); all are GPL-3.0 compatible and an expression
+/// such as `A AND B` is refused. Code with no licence, or one that cannot be identified (`fnv_decomp`), is refused.
+const ENGINE_LICENCES: [&str; 8] = [
+    "gpl-3.0-or-later",
+    "gpl-3.0-only",
+    "mit",
+    "bsd-2-clause",
+    "bsd-3-clause",
+    "apache-2.0",
+    "apache-2.0 with llvm-exception",
+    "zlib",
+];
+/// Where the notices of third-party code taken from the engine port are kept.
+const NOTICES_FILE: &str = "THIRD-PARTY-NOTICES.md";
 
 /// The retired name, matched case-insensitively.
 const OLD_NAME: &str = "lodgen";
@@ -299,7 +311,11 @@ fn is_iso_date(text: &str) -> bool {
     year >= 1 && (1..=days).contains(&day)
 }
 
-fn load_sources(root: &Path, v: &mut Violations) -> BTreeSet<String> {
+fn load_sources(
+    root: &Path,
+    v: &mut Violations,
+    notices_needed: &mut BTreeSet<String>,
+) -> BTreeSet<String> {
     let mut ids = BTreeSet::new();
     let Some(text) = read_text(root, SOURCES_FILE) else {
         let message = if root.join(SOURCES_FILE).exists() {
@@ -357,6 +373,9 @@ fn load_sources(root: &Path, v: &mut Violations) -> BTreeSet<String> {
             continue;
         }
         check_row(&label, row, v);
+        if needs_notice(row) {
+            notices_needed.insert(id.to_owned());
+        }
     }
     ids
 }
@@ -440,7 +459,10 @@ fn check_engine_row(
     if !ENGINE_LICENCES.contains(&licence.as_str()) {
         v.add(
             label,
-            "an engine-port row states the file's licence as exactly GPL-3.0-or-later or MIT",
+            &format!(
+                "an engine-port row states the SPDX identifier of the code it relies on, exactly one of: {}",
+                ENGINE_LICENCES.join(", ")
+            ),
         );
     }
     let mut fields = vec![
@@ -450,11 +472,14 @@ fn check_engine_row(
         ),
         (
             "engine_notes",
-            "what was checked in the engine's third-party notes (LEGAL.md) for this file",
+            "the GPL-3.0 compatibility reasoning and what was checked in the engine's LEGAL.md",
         ),
     ];
-    if licence == "mit" {
-        fields.push(("licence_notice", "where the MIT notice is kept"));
+    if needs_notice(row) {
+        fields.push((
+            "licence_notice",
+            "the copyright line and licence notice kept, and where",
+        ));
     }
     for (field, why) in fields {
         if row
@@ -463,6 +488,65 @@ fn check_engine_row(
             .is_none_or(|r| r.trim().is_empty())
         {
             v.add(label, &format!("an engine-port row names {field}: {why}"));
+        }
+    }
+}
+
+/// An engine-port row whose code is not the engine's own GPL-3.0-or-later work: its notice must be kept.
+fn needs_notice(row: &toml::Table) -> bool {
+    let text = |key: &str| row.get(key).and_then(toml::Value::as_str).unwrap_or("");
+    let haystack = format!("{} {}", text("url"), text("fact")).to_lowercase();
+    haystack.contains(ENGINE_NAME) && text("licence").trim().to_lowercase() != "gpl-3.0-or-later"
+}
+
+/// `THIRD-PARTY-NOTICES.md` holds one `## `<row id>`` section with text for each engine-port row that needs a notice,
+/// and no section for anything else.
+fn check_notices(root: &Path, needed: &BTreeSet<String>, v: &mut Violations) {
+    let Some(text) = read_text(root, NOTICES_FILE) else {
+        for id in needed {
+            v.add(
+                NOTICES_FILE,
+                &format!(
+                    "missing: row `{id}` relies on third-party code whose notice must be kept here"
+                ),
+            );
+        }
+        return;
+    };
+    let mut sections: BTreeMap<String, usize> = BTreeMap::new();
+    let mut current: Option<String> = None;
+    for line in text.lines() {
+        let heading = line
+            .trim_end()
+            .strip_prefix("## `")
+            .and_then(|rest| rest.strip_suffix('`'))
+            .filter(|id| !id.contains('`'));
+        if let Some(id) = heading {
+            sections.insert(id.to_owned(), 0);
+            current = Some(id.to_owned());
+        } else if let Some(count) = current.as_ref().and_then(|id| sections.get_mut(id)) {
+            if !line.trim().is_empty() {
+                *count += 1;
+            }
+        }
+    }
+    for id in needed.iter().filter(|id| !sections.contains_key(*id)) {
+        v.add(
+            NOTICES_FILE,
+            &format!("has no section `## `{id}`` for the row that relies on third-party code"),
+        );
+    }
+    for (id, count) in &sections {
+        if !needed.contains(id) {
+            v.add(
+                NOTICES_FILE,
+                &format!("section `{id}` is not an engine-port row that needs a notice"),
+            );
+        } else if *count == 0 {
+            v.add(
+                NOTICES_FILE,
+                &format!("section `{id}` has no notice text (copyright line and licence)"),
+            );
         }
     }
 }
@@ -516,7 +600,9 @@ fn check_provenance(
     lines: Option<&BTreeMap<String, Vec<String>>>,
     v: &mut Violations,
 ) {
-    let ids = load_sources(root, v);
+    let mut notices_needed = BTreeSet::new();
+    let ids = load_sources(root, v, &mut notices_needed);
+    check_notices(root, &notices_needed, v);
     match read_text(root, LOG_FILE) {
         None => v.add(LOG_FILE, "missing"),
         Some(log) => {

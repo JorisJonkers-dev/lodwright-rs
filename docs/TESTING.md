@@ -80,8 +80,8 @@ is echoed except names of files and numbers.
   the reference), 2 usage error (including a folder inside a git working tree without `--allow-in-repo`), 3 unreadable
   folder. Each has a CLI test in `crates/lodwright-cli/tests/cli.rs`.
 - Rules: read-only; never copies or embeds data from either folder into its output beyond counts and statistics.
-  It refuses a `--reference` or `--generated` path inside a git working tree unless `--allow-in-repo` is given;
-  that flag exists for tests that build folders with the testkit in a temporary directory.
+  It refuses a folder or a `--reference` inside a git working tree (usage error, exit 2, no file read) unless
+  `--allow-in-repo` is given; the flag applies to that run only.
 - Testing it: golden reports for testkit-built generated and reference folders (identical, shifted heights, a missing
   file, a wrong mip count).
 

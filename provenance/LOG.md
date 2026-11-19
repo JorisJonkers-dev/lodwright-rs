@@ -547,3 +547,5 @@ What a second reader checks for each row: the functions named in its note at the
 how xEdit behaves and nothing about the game beyond that. What the owner checks (numbers and names only): the folder
 and file hashes of a few records of an own v104 archive against the hash row; that its records ascend by hash; and the
 in-game load of a plugin-named archive on the target engine (D2).
+
+Status (2026-11-19): all three rows merge as `verified = false`, marked UNVERIFIED in their notes. They are drafts by design: a human second reader checks them as described above, and nothing implements the writer or the hash from them before that.

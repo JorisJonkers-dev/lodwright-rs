@@ -2,7 +2,7 @@
 //! The JSON contract as a caller sees it: documents, exit codes, versions and what never appears.
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_UNSUPPORTED, EXIT_USAGE, run};
-use lodwright_contract::{DocumentKind, check_plan, check_result, schema_json};
+use lodwright_contract::{Capabilities, DocumentKind, check_plan, check_result, schema_json};
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
 use std::path::{Path, PathBuf};
@@ -82,6 +82,57 @@ fn json_is_an_alias_of_format_json_and_the_document_passes_the_plan_check() {
     );
     assert_eq!(doc["worlds"][0]["bounds"]["west"], 2);
     assert_eq!(doc["worlds"][0]["bounds"]["east"], 3);
+}
+
+#[test]
+fn plan_reports_the_capabilities_of_this_build() {
+    let dir = data_folder("capabilities");
+    let (code, out, _) = go(&[
+        "plan",
+        "--data",
+        dir.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--json",
+    ]);
+    assert_eq!(code, EXIT_OK);
+    let doc = json(&out);
+    assert_eq!(
+        doc["capabilities"],
+        serde_json::to_value(Capabilities::current()).unwrap()
+    );
+}
+
+#[test]
+fn plan_says_the_memory_budget_is_not_held_while_running_and_a_killed_run_does_not_resume() {
+    let dir = data_folder("run-flags");
+    let (_, out, _) = go(&[
+        "plan",
+        "--data",
+        dir.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--json",
+    ]);
+    let caps = &json(&out)["capabilities"];
+    assert_eq!(
+        (
+            &caps["all_worlds"],
+            &caps["thread_count_independent"],
+            &caps["memory_budget_preflight"],
+            &caps["memory_budget_held"],
+            &caps["resume_after_cancel"],
+            &caps["resume_after_kill"],
+        ),
+        (
+            &true.into(),
+            &true.into(),
+            &true.into(),
+            &false.into(),
+            &true.into(),
+            &false.into()
+        )
+    );
 }
 
 #[test]

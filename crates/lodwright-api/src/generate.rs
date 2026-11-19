@@ -94,11 +94,33 @@ fn terrain_settings(request: &Request) -> TerrainSettings {
     }
 }
 
-/// Whether `path` (the output folder) lies inside a git working tree.
+/// `p` with its nearest existing ancestor resolved (links followed) and the rest appended: a not yet created output
+/// folder under a link is judged by where the link points.
+fn resolve(p: &Path) -> std::path::PathBuf {
+    let mut rest = Vec::new();
+    let mut cur = p.to_path_buf();
+    loop {
+        if let Ok(real) = cur.canonicalize() {
+            return rest.iter().rev().fold(real, |acc, c| acc.join(c));
+        }
+        let Some(name) = cur.file_name().map(std::ffi::OsStr::to_os_string) else {
+            return p.to_path_buf();
+        };
+        rest.push(name);
+        if !cur.pop() {
+            return p.to_path_buf();
+        }
+    }
+}
+
+/// Whether `path` (the output folder) lies inside a git working tree, judged both by its own path and by the folder
+/// it resolves to: a link that sits in a working tree or points into one is refused.
 fn inside_git_tree(path: &Path) -> bool {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     // the folder itself counts too: an output folder that is a working tree's root is inside it
-    absolute.ancestors().any(|dir| dir.join(".git").exists())
+    [absolute.clone(), resolve(&absolute)]
+        .iter()
+        .any(|p| p.ancestors().any(|dir| dir.join(".git").exists()))
 }
 
 fn refuse_output(request: &Request, allow_in_repo: bool) -> Result<(), Error> {
@@ -112,24 +134,6 @@ fn refuse_output(request: &Request, allow_in_repo: bool) -> Result<(), Error> {
             "refusing to write inside a git working tree",
         ));
     }
-    let resolve = |p: &Path| {
-        // the nearest existing ancestor, resolved, then the rest appended: a not yet created output folder
-        // inside the data folder is still caught
-        let mut rest = Vec::new();
-        let mut cur = p.to_path_buf();
-        loop {
-            if let Ok(real) = cur.canonicalize() {
-                return rest.iter().rev().fold(real, |acc, c| acc.join(c));
-            }
-            let Some(name) = cur.file_name().map(std::ffi::OsStr::to_os_string) else {
-                return p.to_path_buf();
-            };
-            rest.push(name);
-            if !cur.pop() {
-                return p.to_path_buf();
-            }
-        }
-    };
     if resolve(out).starts_with(resolve(data)) {
         return Err(Error::new(
             "output_in_data",
@@ -184,8 +188,23 @@ fn written_of(world: &str, files: &[ManifestFile], doc: &mut ResultDoc) {
     }
 }
 
+/// The manifest in `out`, if it can be read and every path it lists is a plain relative path: a manifest that names a
+/// path outside the output folder is not trusted, as if there were none.
 fn read_manifest(out: &Path) -> Option<Manifest> {
-    serde_json::from_slice(&std::fs::read(out.join(MANIFEST_FILE)).ok()?).ok()
+    let manifest: Manifest =
+        serde_json::from_slice(&std::fs::read(out.join(MANIFEST_FILE)).ok()?).ok()?;
+    let plain = manifest
+        .files
+        .iter()
+        .map(|f| f.path.as_str())
+        .chain(
+            manifest
+                .blocks
+                .iter()
+                .flat_map(|b| b.files.iter().map(String::as_str)),
+        )
+        .all(lodwright_gen::is_plain_relative);
+    plain.then_some(manifest)
 }
 
 /// Whether every file `manifest` lists is in `out` with the size and contents it was written with. A cancelled run
@@ -248,10 +267,9 @@ fn write_manifest(out: &Path, manifest: &Manifest) -> Result<(), Error> {
     let text = serde_json::to_string_pretty(manifest).map_err(|e| {
         Error::new("output_failed", "cannot write the manifest").with_detail(e.to_string())
     })? + "\n";
-    let temp = out.join(format!("{MANIFEST_FILE}.tmp"));
-    std::fs::write(&temp, text).map_err(|e| io_error("cannot write the manifest", &e))?;
-    std::fs::rename(&temp, out.join(MANIFEST_FILE))
-        .map_err(|e| io_error("cannot write the manifest", &e))
+    lodwright_gen::write_output_file(out, MANIFEST_FILE, text.as_bytes())
+        .map(|_| ())
+        .map_err(|e| gen_error(&e))
 }
 
 /// The manifest a cancelled run leaves: the files this run finished and every file of the earlier run that is still
@@ -306,7 +324,14 @@ fn interrupted_manifest(
 }
 
 fn gen_error(e: &lodwright_gen::GenError) -> Error {
-    Error::new("generate_failed", "LOD generation failed").with_detail(e.to_string())
+    match e {
+        lodwright_gen::GenError::LinkInOutput { .. } => Error::new(
+            "output_link",
+            "refusing to write through a link inside the output folder: remove the link and run again",
+        )
+        .with_detail(e.to_string()),
+        _ => Error::new("generate_failed", "LOD generation failed").with_detail(e.to_string()),
+    }
 }
 
 fn load_order_error(e: &impl std::fmt::Display) -> Error {
@@ -610,7 +635,10 @@ pub fn generate(
         // files of the old run that this run did not write or keep
         let kept: std::collections::BTreeSet<&str> = all.iter().map(|f| f.path.as_str()).collect();
         for f in old.files.iter().filter(|f| !kept.contains(f.path.as_str())) {
-            let _ = std::fs::remove_file(out.join(&f.path));
+            // the manifest's paths are plain (read_manifest); a folder on the way that became a link is left alone
+            if lodwright_gen::linked_folder(out, &f.path).is_none() {
+                let _ = std::fs::remove_file(out.join(&f.path));
+            }
         }
     }
     doc.blocks = counts;

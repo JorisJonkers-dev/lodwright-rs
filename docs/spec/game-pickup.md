@@ -22,4 +22,5 @@ generated LOD must load after texture mods). Packing into a BSA is optional; ter
 object texture archives compressed per the same guide. BSA writing is out of scope until its format is specified
 from a public document.
 
-Unknown: lookup order between a loose `.dlodsettings` and the BSA copy (M9).
+Unknown: lookup order between a loose `.dlodsettings` and the BSA copy, and between loose and archived block meshes and
+textures (M9; the full protocol is in [measurements.md](measurements.md#m9-in-full-loose-lod-against-archived-lod-93)).

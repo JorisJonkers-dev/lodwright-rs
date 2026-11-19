@@ -84,6 +84,17 @@ is echoed except names of files and numbers.
 - Testing it: golden reports for testkit-built generated and reference folders (identical, shifted heights, a missing
   file, a wrong mip count).
 
+## Tolerance bands for A/B comparisons
+
+A number from one run is not yet a measurement: before an A/B comparison (the protocol is #129) the A side is run
+several times on the same inputs, each run is checked with `lodwright verify <run> --reference <reference> --json`, and
+`lodwright bands run1.json run2.json run3.json` prints, per statistic, the minimum and maximum over those runs (three
+decimals, see `docs/contracts.md`, Bands). A zero-width band means the statistic is exact across runs, which is what a
+deterministic generator should give; a band with width says how much a statistic moves without any change. The B side
+is then verified the same way, and a statistic only counts as changed by the B side where its value leaves the A band.
+Bands are numbers only (block paths and values); the reports they come from stay out of the repository like any
+output made from game data.
+
 ## Benchmarks policy
 
 No benchmark runs in CI (shared runners are noisy and the machine's timing-sensitive work must not be disturbed).

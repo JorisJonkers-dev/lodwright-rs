@@ -2,7 +2,8 @@
 //! Command line of lodwright. The logic is here so tests can drive it without a process.
 //!
 //! Exit codes: 0 success, 1 failed (a result document is still printed with `--json`), 2 usage error or an
-//! unsupported `--schema-version`, 3 unsupported (a capability is not built yet).
+//! unsupported `--schema-version`, 3 unsupported (a capability is not built yet). `verify` has its own meanings for 1
+//! and 3: 1 findings (an error in the folder or a difference from the reference), 3 a folder that cannot be read.
 //!
 //! With `--json`, result and error documents go to stdout; stderr carries human text only.
 
@@ -27,6 +28,8 @@ pub const EXIT_FAILED: u8 = 1;
 pub const EXIT_USAGE: u8 = 2;
 /// Exit code: a capability is not built yet (`generate`).
 pub const EXIT_UNSUPPORTED: u8 = 3;
+/// Exit code of `verify`: the folder or the reference cannot be read (missing, not a folder, no permission).
+pub const EXIT_UNREADABLE: u8 = 3;
 
 const HELP: &str = "lodwright: clean-room terrain, object and tree LOD generator
 
@@ -56,7 +59,7 @@ Commands:
                         --out, or a request, it answers `unsupported` (exit 3) and writes nothing
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
-                        --reference also compare names and block types with another folder. Exit 1 on findings
+                        --reference also compare names and block types with another folder
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify or events
                         (one progress event line)
   contracts --json      print the contracts this build speaks and their schema versions, as
@@ -74,6 +77,8 @@ Options:
       --json     print JSON (an alias of --format json)
 
 Exit codes: 0 ok, 1 failed, 2 usage error, 3 unsupported.
+verify exits 0 clean, 1 findings, 2 usage error, 3 unreadable folder; a finding is an error in the folder or,
+with --reference, a difference from the reference.
 ";
 
 /// Run the command line `args` (without the program name). Output goes to `out`, diagnostics to `err`.
@@ -252,9 +257,15 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let Some(folder) = folder else {
         return usage(err, "verify needs the folder to check");
     };
-    if !Path::new(folder).is_dir() {
-        let _ = writeln!(err, "lodwright: verify: {folder} is not a folder");
-        return EXIT_FAILED;
+    for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
+        let Some(dir) = dir else { continue };
+        if std::fs::read_dir(dir).is_err() {
+            let _ = writeln!(
+                err,
+                "lodwright: verify: the {role} {dir} cannot be read as a folder"
+            );
+            return EXIT_UNREADABLE;
+        }
     }
     let mut verification = lodwright_gen::verify_folder(Path::new(folder));
     if let Some(reference) = reference {
@@ -262,7 +273,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
             lodwright_gen::compare_folders(Path::new(folder), Path::new(reference));
     }
     let doc = verify_document(&verification);
-    let ok = doc.ok;
+    let clean = doc.ok && doc.differences.is_empty();
     if json {
         let _ = writeln!(out, "{}", to_json(&doc));
     } else {
@@ -281,7 +292,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
             let _ = writeln!(out, "{}: {}", f.path, f.problem);
         }
     }
-    if ok { EXIT_OK } else { EXIT_FAILED }
+    if clean { EXIT_OK } else { EXIT_FAILED }
 }
 
 /// The `lodwright-verify` document of a verification.

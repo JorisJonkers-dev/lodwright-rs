@@ -26,6 +26,9 @@ it merges; it should merge only after the owner confirms the licence reading bel
   (`https://github.com/<owner>/nv-rs/blob/<commit>/<path>`), states that file's licence (GPL-3.0-or-later, or MIT for
   code contributed before 2026-10-16), and names a `second_reader` who did not implement the format and did not write
   that nv-rs code. The guard enforces the URL form, the licence and the field.
+- **Only those two licences.** Third-party code inside nv-rs under another licence (BSD, Apache-2.0 WITH
+  LLVM-exception, zlib, the GPL-3.0 translations of xNVSE and JIP LN) is not covered by this rule; the guard accepts a
+  row only when its licence starts with `GPL-3.0-or-later` or `MIT`. Widening that is a later owner decision.
 - **Preference:** a crate dependency over copied code; a described behaviour (a row, then lodwright's own code) over
   translated code. Copied code is never put into the two MPL-2.0 files.
 - **No game data**, ever.

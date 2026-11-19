@@ -238,6 +238,13 @@ class ProvenanceTests(unittest.TestCase):
         repo.commit()
         self.assertTrue(any("licence" in line for line in repo.check("provenance")))
 
+    def test_an_engine_port_row_must_start_with_the_engine_licence(self) -> None:
+        repo = Repo(self)
+        url = "https://github.com/slaterain/nv-rs/blob/" + "d" * 40 + "/crates/vorbis/src/lib.rs"
+        repo.write("provenance/sources.toml", self.engine_row(url, licence="BSD-3-Clause AND GPL-3.0-or-later"))
+        repo.commit()
+        self.assertTrue(any("licence" in line for line in repo.check("provenance")))
+
     def test_the_unlicensed_decompilation_reconstruction_is_refused_as_a_source(self) -> None:
         repo = Repo(self)
         repo.write("provenance/sources.toml", ROW.replace("124 bytes", "124 bytes (fnv_decomp)"))

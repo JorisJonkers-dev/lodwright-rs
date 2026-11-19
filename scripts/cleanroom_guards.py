@@ -211,8 +211,8 @@ def check_engine_row(label: str, row: dict, v: Violations) -> None:
     """A row citing the engine port: a file at a fixed commit, its licence, and a named second reader."""
     if not ENGINE_FILE_URL_RE.match(str(row["url"])):
         v.add(label, "an engine-port row cites one file at a 40-character commit (.../nv-rs/blob/<commit>/<path>)")
-    licence = str(row["licence"]).lower()
-    if not any(name in licence for name in ENGINE_LICENCES):
+    licence = str(row["licence"]).strip().lower()
+    if not licence.startswith(ENGINE_LICENCES):
         v.add(label, "an engine-port row states the file's licence (GPL-3.0-or-later or MIT)")
     reader = row.get("second_reader")
     if not isinstance(reader, str) or not reader.strip():

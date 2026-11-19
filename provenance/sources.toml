@@ -394,6 +394,39 @@ verified = true
 note = "The page says hashes are of lower-case names with backslashes and that the name block holds lower-case names. Lookup in this project is case insensitive and accepts a forward slash; that is a project choice for loose-file parity, not a recorded fact about the game. Second reader 2026-11-14: re-derived without the implementation: lower case and backslash re-read from the UESP Skyrim BSA page (hash inputs, name block, embedded path example); agrees."
 
 [[source]]
+id = "bsa-name-hash"
+fact = "xEdit computes the u64 name hash of a v104 (FO3, FNV) folder or file name as follows. The name is lower-cased; a file name is split at its last '.' into stem and extension (the extension keeps the dot), a folder name is not split. Low 32 bits, from the lowest byte: the last character of the stem (if the stem is not empty), the second-to-last character (if the stem is longer than 2), the length of the stem, the first character (if the stem is not empty); then the extension '.kf' sets 0x80, '.nif' 0x8000, '.dds' 0x8080 and '.wav' 0x80000000 in the low word. High 32 bits: h = 0, and for every stem character except the first and the last two, h = c + (h << 6) + (h << 16) - h in wrapping 32-bit arithmetic with c the unsigned byte; the same recurrence over the extension characters from a new zero gives h2; the high word is h + h2 (wrapping)."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbHash.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "DRAFT for the C1 work item. Read TwbHash._TES4 and TwbHash.TES5 in Core/wbHash.pas (overflow checks off around the function), and their use in TwbBSArchive.CreateArchive in Core/wbBSArchive.pas: for the FO3/FNV archive type (version 104, baFO3) the folder part is hashed with aHasExtension false and the file name with aHasExtension true, both unsigned; only the Oblivion type (v103) uses the signed-byte variant. The hash function does not convert a forward slash to a backslash; xEdit splits the folder from the file at the last backslash (or the last forward slash if there is none), and bsa-path-form says hashes are of lower-case names with backslashes. This is how one public tool writes archives, not a statement of the game's own lookup. OPEN: a public test vector (D4: a public format page with a test vector first). The UESP pages Skyrim_Mod:Archive_File_Format and Tes4Mod:BSA_File_Format, which describe the hash, answered HTTP 403 to automated reads on 2026-11-19 and were not read; a human reader compares this row with their hash section. An owner oracle check also gives test vectors: the folder and file hashes of a few records of an own v104 archive with their names (numbers and names only)."
+
+[[source]]
+id = "bsa-record-order"
+fact = "xEdit's v104 archive writer sorts the files by folder hash, then by file hash (both compared as unsigned 64-bit values), creates one folder record per distinct folder hash in that order, and writes each folder's file records in that order; so folder records ascend by folder hash and the file records of a folder ascend by file hash."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbBSArchive.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "DRAFT for the C1 work item. Read HashSortTES4 and TwbBSArchive.CreateArchive (the branch for Oblivion, Fallout 3, New Vegas, Skyrim and Skyrim SE). This is the order one public writer produces. OPEN: whether the game requires it (for example a binary search over hash-sorted records) or only tolerates it; no source read states the game's lookup. The UESP pages could not be read (HTTP 403). An in-game load of a writer's archive (issue 44's acceptance) and an owner check that the records of a vanilla archive ascend (numbers only) settle it."
+
+[[source]]
+id = "bsa-archive-registration"
+fact = "xEdit's loader, for FO3 and FNV, loads the archives named in the game INI's [Archive] sArchiveList (comma separated, read from the game INI and the custom INI), adds Update.bsa for FNV, and then for every plugin in load order loads each archive in the data folder whose name starts with the plugin's name without extension and ends in .bsa (prefix match). Its comment says all games before Skyrim load archives with this partial match, while Skyrim needs an exact name."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbImplementation.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "DRAFT for the C1 work item. Read TwbLoadingGameContext.FindBSAs and TwbLoadingGameContext.HasBSAs (Core/wbImplementation.pas), the archive loading in xEdit/xeMainForm.pas, and the capability table in Core/wbInterface.pas (gcArchiveExactNameMatch only for Skyrim and Enderal, gcUpdateArchiveAlwaysLoaded only for FNV). This is how a tool models the game's archive loading, not a measurement of the game. It agrees with fnv-archive-loading (a guide, licence not stated) on loading with the plugin's name and adds the prefix match. OPEN: the game's behaviour on the target engine; owner decision D2 asks for an in-game test of plugin-named loading before packing ships."
+
+[[source]]
 id = "land-vnml-layout"
 fact = "The VNML subrecord of LAND is 3267 bytes: a 33 x 33 grid of vertex normals, three bytes (x, y, z) per grid point."
 url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"

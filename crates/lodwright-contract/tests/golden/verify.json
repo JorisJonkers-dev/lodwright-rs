@@ -18,5 +18,33 @@
       "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif",
       "problem": "block types differ"
     }
-  ]
+  ],
+  "water": {
+    "blocks": 1,
+    "threshold": 0.95,
+    "under_threshold": 1,
+    "lowest": 0.333,
+    "mean": 0.333,
+    "per_block": [
+      {
+        "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif",
+        "iou": 0.333
+      }
+    ]
+  },
+  "objects": {
+    "blocks": 1,
+    "exact": 0,
+    "per_block": [
+      {
+        "path": "meshes/landscape/lod/island/blocks/island.level4.x0.y0.nif",
+        "vertices": 3,
+        "reference_vertices": 3,
+        "triangles": 1,
+        "reference_triangles": 1,
+        "unmatched_vertices": 1,
+        "exact": false
+      }
+    ]
+  }
 }

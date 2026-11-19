@@ -163,7 +163,7 @@ fn a_link_at_the_path_of_an_output_file_is_replaced_and_its_target_left_alone() 
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/43 until 2026-12-03; the generator follows a link into a git working tree"]
+#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator follows a link into a git working tree"]
 fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
     let root = temp("link-into-repo");
     let out = root.join("out");
@@ -176,7 +176,7 @@ fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/43 until 2026-12-03; the generator writes through a linked folder inside the output folder"]
+#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator writes through a linked folder inside the output folder"]
 fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
     let path = written_paths("dir-link-paths").remove(0);
     let first = path.split('/').next().unwrap().to_owned();
@@ -192,7 +192,7 @@ fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/43 until 2026-12-03; the generator writes its temporary file through a planted link"]
+#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator writes its temporary file through a planted link"]
 fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target() {
     let path = written_paths("temp-link-paths").remove(0);
     let root = temp("temp-link");
@@ -208,7 +208,7 @@ fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target(
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/43 until 2026-12-03; the generator removes an old manifest entry that climbs out of the output folder"]
+#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator removes an old manifest entry that climbs out of the output folder"]
 fn an_old_manifest_entry_outside_the_output_folder_is_never_removed() {
     let root = temp("manifest-escape");
     let (out, victim) = (root.join("out"), root.join("victim.txt"));

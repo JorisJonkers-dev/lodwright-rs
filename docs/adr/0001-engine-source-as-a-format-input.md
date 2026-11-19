@@ -24,15 +24,22 @@ This pull request writes the rule into `docs/clean-room.md` (allowed input 6) an
   whose URL or fact says "decompiled"; it now refuses "fnv_decomp" too.
 - **Each use is a row** that cites one nv-rs file on GitHub at a 40-character commit
   (`https://github.com/<owner>/nv-rs/blob/<commit>/<path>`; a raw URL, a mirror, a directory, a branch, a query or a
-  fragment is refused), states that file's licence as exactly `GPL-3.0-or-later` or `MIT` (MIT is for code contributed
-  before 2026-10-16 and the row's `licence_notice` says where the notice is kept), names a `second_reader` who did not
-  implement the format and did not write that nv-rs code, and an `engine_notes` field saying what was checked in nv-rs's
-  `LEGAL.md` third-party list and for translation markers. The guard enforces these fields and the URL and licence
-  forms.
-- **Only those two licences.** Third-party code inside nv-rs under another licence (BSD, Apache-2.0 WITH
-  LLVM-exception, zlib, the GPL-3.0 translations of xNVSE and JIP LN) is not covered by this rule: the guard accepts a
-  row only when its licence is exactly one of the two, never an expression such as `GPL-3.0-or-later AND BSD-3-Clause`.
-  Widening that is a later owner decision.
+  fragment is refused) and names:
+  - `licence`: the exact SPDX identifier of the code the row relies on, which is not always nv-rs's own licence.
+    Allowed: `GPL-3.0-or-later`, `GPL-3.0-only` (the xNVSE and JIP LN translations), `MIT`, `BSD-2-Clause`,
+    `BSD-3-Clause`, `Apache-2.0`, `Apache-2.0 WITH LLVM-exception` and `Zlib`. One identifier, never an expression such
+    as `A AND B`. A licence that cannot be identified, or code with no licence such as `fnv_decomp`, stays refused.
+  - `second_reader`: someone who did not implement the format and did not write that nv-rs code.
+  - `engine_notes`: the GPL-3.0 compatibility reasoning (Apache-2.0, BSD, zlib and MIT are compatible with GPL-3.0; the
+    GPL-3.0-only and GPL-3.0-or-later code is used under GPL-3.0-only) and what was checked in nv-rs's `LEGAL.md`
+    third-party list and for translation markers.
+  - `licence_notice`, for every licence except `GPL-3.0-or-later`: the copyright line and the licence notice kept, and
+    where.
+- **Notices.** For every such row the copyright line and licence text or notice are kept in `THIRD-PARTY-NOTICES.md` at
+  the repository root, in a section named after the row id, and shipped where the licence requires it (release
+  packaging includes that file). The guard checks the file against the rows: a section for each row that needs one, text
+  in each section, and no section for anything else. The guard checks that the compatibility note exists, not that it is
+  right; the second reader checks that.
 - **Preference:** a crate dependency over copied code; a described behaviour (a row, then lodwright's own code) over
   translated code. Copied code is never put into the two MPL-2.0 files.
 - **No game data**, ever.
@@ -41,7 +48,8 @@ This pull request writes the rule into `docs/clean-room.md` (allowed input 6) an
 used under the terms of GPL-3.0-only, so copying or linking it into a lodwright crate other than the two MPL-2.0 files
 is allowed. Each use records its licence in its own provenance row, and the engine's provenance notes (`LEGAL.md`,
 third-party code) are checked for third-party parts of the file before the row is written. MIT-era code is used with
-its notice kept. Describing behaviour from nv-rs is always allowed under the rule above.
+its notice kept. Third-party code inside nv-rs is covered by the notice rules above. Describing behaviour from nv-rs is
+always allowed under the rule above.
 
 ## Licence facts (checked 2026-11-19)
 
@@ -65,10 +73,12 @@ conclusion is drawn here.
 ## Decisions on the points that were open
 
 1. **Licence of a copied or linked piece: decided.** The reading is the owner's, quoted above: compatible, recorded per
-   row, with nv-rs's third-party notes checked. Third-party code under BSD, Apache-2.0 WITH LLVM-exception, zlib and the
-   translations of xNVSE and JIP LN stays outside the rule for now (the guard refuses a licence expression and any
-   licence but the two); the owner can widen it per licence later. Material that nv-rs marks as translated from the
-   game's program, from `fnv_decomp` or from the debug symbols is not covered by nv-rs's own licence and is not allowed.
+   row, with nv-rs's third-party notes checked. A second owner decision (2026-11-19) widens the scope: third-party code
+   inside nv-rs (xNVSE, JIP LN, BSD, zlib, Apache-2.0) may be used per row, provided the row names its exact SPDX
+   identifier, keeps its notice in `THIRD-PARTY-NOTICES.md` and records the GPL compatibility reasoning in
+   `engine_notes`. Code whose licence cannot be identified, or that has none (`fnv_decomp`), stays refused, and so does
+   material that nv-rs marks as translated from the game's program or the debug symbols, which nv-rs's own licence does
+   not cover.
 2. **Clean-room scope: decided.** D5 amends `docs/clean-room.md` only for nv-rs code that is not marked as translated
    from the decompiled program, `fnv_decomp` or the debug symbols, not for nv-rs as a whole. A lint cannot tell the two
    apart, because the marking lives in nv-rs, not in lodwright's rows. The second reader tells them apart by reading

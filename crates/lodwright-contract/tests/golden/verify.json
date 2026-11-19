@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "contract": "lodwright-verify",
+  "ok": false,
+  "terrain_blocks": 4,
+  "object_blocks": 1,
+  "tree_blocks": 0,
+  "textures": 8,
+  "settings": 1,
+  "errors": [
+    {
+      "path": "lodsettings/island.dlodsettings",
+      "problem": "the width disagrees with the corners"
+    }
+  ],
+  "differences": [
+    {
+      "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif",
+      "problem": "block types differ"
+    }
+  ]
+}

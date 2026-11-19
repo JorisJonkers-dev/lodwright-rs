@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Event",
+  "description": "One progress line.",
+  "oneOf": [
+    {
+      "description": "A block of a level finished.",
+      "type": "object",
+      "properties": {
+        "done": {
+          "description": "Blocks of this level finished so far.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "event": {
+          "type": "string",
+          "const": "block"
+        },
+        "level": {
+          "description": "Level (cells per block edge).",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "of": {
+          "description": "Blocks of this level in total.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "up_to_date": {
+          "description": "The block's files were kept from an earlier run (its inputs did not change).",
+          "type": "boolean",
+          "default": false
+        },
+        "world": {
+          "description": "World editor id.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event",
+        "world",
+        "level",
+        "done",
+        "of"
+      ]
+    }
+  ]
+}

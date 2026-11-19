@@ -49,8 +49,31 @@ fn contracts_json_lists_each_contract_with_its_versions() {
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "{\"contracts\":[{\"name\":\"lodwright-plan\",\"versions\":[1]},{\"name\":\"lodwright-result\",\"versions\":[1]},{\"name\":\"lodwright-request\",\"versions\":[1]},{\"name\":\"lodwright-api\",\"versions\":[1]}]}\n"
+        "{\"contracts\":[{\"name\":\"lodwright-plan\",\"versions\":[1]},{\"name\":\"lodwright-result\",\"versions\":[1]},{\"name\":\"lodwright-request\",\"versions\":[1]},{\"name\":\"lodwright-manifest\",\"versions\":[1]},{\"name\":\"lodwright-verify\",\"versions\":[1]},{\"name\":\"lodwright-events\",\"versions\":[1]},{\"name\":\"lodwright-api\",\"versions\":[1]}]}\n"
     );
+}
+
+#[test]
+fn version_json_lists_the_same_contracts_as_the_handshake() {
+    let version = lodwright(&["--version", "--json"]);
+    let handshake = lodwright(&["contracts", "--json"]);
+    let version: serde_json::Value = serde_json::from_slice(&version.stdout).unwrap();
+    let handshake: serde_json::Value = serde_json::from_slice(&handshake.stdout).unwrap();
+    assert_eq!(version["contracts"], handshake["contracts"]);
+}
+
+#[test]
+fn schema_prints_the_committed_schema_of_every_listed_document() {
+    for kind in ["plan", "result", "request", "manifest", "verify", "events"] {
+        let out = lodwright(&["schema", kind]);
+        assert_eq!(out.status.code(), Some(0), "{kind}");
+        let committed = std::fs::read_to_string(format!(
+            "{}/../../schemas/lodwright-{kind}.v1.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        assert_eq!(String::from_utf8(out.stdout).unwrap(), committed, "{kind}");
+    }
 }
 
 #[test]

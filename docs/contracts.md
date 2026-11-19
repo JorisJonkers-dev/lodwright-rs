@@ -1,8 +1,8 @@
 # Contracts
 
 lodwright emits JSON documents that other tools read. Each document is a contract and says so. lodwright owns these
-Contracts: plan, request, result, manifest, verify and the progress events. Their published schemas are authoritative;
-verify, manifest and events get their schema files and handshake entries in issue #87.
+Contracts: plan, request, result, manifest, verify and the progress events. Their published schemas are authoritative:
+each is under `schemas/`, printed by `lodwright schema <name>` and published with every release.
 Raul's Trusty Toolbox keeps the registry: which Contracts exist, which versions each Known-good set speaks, and a
 snapshot of each such version (ADR-0009 in
 [rauls-trusty-toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox/tree/main/docs/adr)). The Toolbox
@@ -13,17 +13,23 @@ Each document carries:
 * `schema_version`: an integer. It rises when a key is removed, renamed or retyped, or when a value is added to an enum
   that is not open. A new optional key does not raise it, so a reader ignores keys it does not know.
 * `contract`: the name of the contract, `<tool>-<noun>`. A reader refuses a document whose name is not the one it asked
-  for. Today: `lodwright-plan` (`lodwright plan --json`) and `lodwright-result` (`lodwright generate --json`, and the error
-  document of a failed `--json` command). Both are typed in `crates/lodwright-contract`; their schemas are under
-  `schemas/` and require `contract` with the constant name.
+  for. Today: `lodwright-plan` (`lodwright plan --json`), `lodwright-result` (`lodwright generate --json`, and the error
+  document of a failed `--json` command), `lodwright-request` (read by `generate --request`), `lodwright-manifest`
+  (`manifest.json` in the output folder) and `lodwright-verify` (`lodwright verify --json`). All are typed in
+  `crates/lodwright-contract`; their schemas are under `schemas/` and require `contract` with the constant name.
+
+The progress events (`lodwright-events`) are single JSON lines, not documents: they carry neither `schema_version` nor
+`contract`. Their schema (`lodwright schema events`) describes one line, and the handshake gives their version.
 
 ## Handshake
 
 `lodwright contracts --json` prints every contract this build emits and the schema versions it can emit, and exits 0:
 
 ```json
-{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
+{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
 ```
+
+`lodwright --version --json` lists the same contracts.
 
 `lodwright-api` is not a document: it is the version of the in-process library API (`crates/lodwright-api`,
 `lodwright_api::API_VERSION`). It rises when a call, a type or an error code of that API changes in a way an existing
@@ -55,3 +61,11 @@ others, and removes the old manifest's files it neither kept nor wrote. The resu
 (`generated`) and kept (`up_to_date`); each block event carries `up_to_date`. Object and tree LOD are rebuilt in full
 whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
+
+## Verify
+
+`lodwright verify <folder> --json` prints a `lodwright-verify` document (schema: `lodwright schema verify`): `ok` (no
+errors), how many terrain blocks, object blocks, tree blocks, textures and settings files were checked, `errors` (what is
+wrong with the folder) and `differences` (how it differs from `--reference`, empty without one). Each finding is a path
+relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
+Nothing read from a file is copied into the report: only file names and numbers.

@@ -9,7 +9,9 @@
 use std::io::Write;
 use std::path::Path;
 
-use lodwright_contract::{DocumentKind, Handshake, VersionInfo, schema_json};
+use lodwright_contract::{
+    DocumentKind, Handshake, VerifyDoc, VerifyFinding, VersionInfo, schema_json,
+};
 
 mod commands;
 mod failure;
@@ -37,7 +39,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--json]
        lodwright verify <folder> [--reference <folder>] [--json]
-       lodwright schema <plan|result|request> [--schema-version N]
+       lodwright schema <plan|result|request|manifest|verify|events> [--schema-version N]
        lodwright contracts --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
@@ -55,7 +57,8 @@ Commands:
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
                         --reference also compare names and block types with another folder. Exit 1 on findings
-  schema                print the JSON Schema of a document (plan or result)
+  schema                print the JSON Schema of a document: plan, result, request, manifest, verify or events
+                        (one progress event line)
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
   probe                 print only structure and numbers of one file (NIF header and shapes, DDS header and channel
@@ -210,7 +213,10 @@ fn schema_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         }
     }
     let Some(kind) = kind else {
-        return usage(err, "schema takes a document name: plan or result");
+        return usage(
+            err,
+            "schema takes a document name: plan, result, request, manifest, verify or events",
+        );
     };
     let version = version.unwrap_or_else(|| kind.versions().last().copied().unwrap_or(1));
     match schema_json(kind, version) {
@@ -255,43 +261,50 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         verification.differences =
             lodwright_gen::compare_folders(Path::new(folder), Path::new(reference));
     }
-    let findings = |list: &[lodwright_gen::Finding]| -> Vec<serde_json::Value> {
-        list.iter()
-            .map(|f| serde_json::json!({"path": f.path, "problem": f.problem}))
-            .collect()
-    };
-    let ok = verification.errors.is_empty();
+    let doc = verify_document(&verification);
+    let ok = doc.ok;
     if json {
-        let doc = serde_json::json!({
-            "schema_version": 1,
-            "contract": "lodwright-verify",
-            "ok": ok,
-            "terrain_blocks": verification.terrain_blocks,
-            "object_blocks": verification.object_blocks,
-            "tree_blocks": verification.tree_blocks,
-            "textures": verification.textures,
-            "settings": verification.settings,
-            "errors": findings(&verification.errors),
-            "differences": findings(&verification.differences),
-        });
-        let _ = writeln!(out, "{doc}");
+        let _ = writeln!(out, "{}", to_json(&doc));
     } else {
         let _ = writeln!(
             out,
             "{} terrain blocks, {} object blocks, {} tree blocks, {} textures, {} settings files: {} errors, {} differences",
-            verification.terrain_blocks,
-            verification.object_blocks,
-            verification.tree_blocks,
-            verification.textures,
-            verification.settings,
-            verification.errors.len(),
-            verification.differences.len()
+            doc.terrain_blocks,
+            doc.object_blocks,
+            doc.tree_blocks,
+            doc.textures,
+            doc.settings,
+            doc.errors.len(),
+            doc.differences.len()
         );
-        for f in verification.errors.iter().chain(&verification.differences) {
+        for f in doc.errors.iter().chain(&doc.differences) {
             let _ = writeln!(out, "{}: {}", f.path, f.problem);
         }
     }
     if ok { EXIT_OK } else { EXIT_FAILED }
+}
+
+/// The `lodwright-verify` document of a verification.
+fn verify_document(verification: &lodwright_gen::Verification) -> VerifyDoc {
+    let findings = |list: &[lodwright_gen::Finding]| -> Vec<VerifyFinding> {
+        list.iter()
+            .map(|f| VerifyFinding {
+                path: f.path.clone(),
+                problem: f.problem.clone(),
+            })
+            .collect()
+    };
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let mut doc = VerifyDoc::new();
+    doc.ok = verification.errors.is_empty();
+    doc.terrain_blocks = count(verification.terrain_blocks);
+    doc.object_blocks = count(verification.object_blocks);
+    doc.tree_blocks = count(verification.tree_blocks);
+    doc.textures = count(verification.textures);
+    doc.settings = count(verification.settings);
+    doc.errors = findings(&verification.errors);
+    doc.differences = findings(&verification.differences);
+    doc
 }
 
 fn usage(err: &mut dyn Write, problem: &str) -> u8 {

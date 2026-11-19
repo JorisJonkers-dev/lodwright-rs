@@ -14,7 +14,7 @@ every bump must pass `Pipeline Complete`.
 
 ## Release assets and the contract versions
 
-Every release carries these assets, built on Linux x86_64 by `release.yml` (`scripts/release-assets.sh`) and listed in
+Every release carries these assets, built on Linux x86_64 by `release.yml` (`cargo xtask release-assets`) and listed in
 `SHA256SUMS`. A build provenance attestation covers all of them (`gh attestation verify <file> --repo
 JorisJonkers-dev/lodwright-rs`).
 

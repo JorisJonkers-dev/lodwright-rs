@@ -11,6 +11,7 @@ members = [
     "crates/lodwright-api",
     "crates/lodwright-cli",
     "crates/lodwright-testkit",
+    "xtask",
 ]
 # fuzz/ is its own workspace (libfuzzer-sys stays out of the shipped crates).
 exclude = ["fuzz"]

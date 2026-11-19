@@ -43,11 +43,11 @@ tasks:
 
   guards:
     desc: Clean-room guards on the whole tree (SPDX headers, provenance references, game-data guard, .gitignore, retired name)
-    cmd: python3 -I scripts/cleanroom_guards.py all
+    cmd: cargo xtask guards all
 
   scripts:
-    desc: Self-tests of the repository's own scripts (throwaway git repositories, no network)
-    cmd: python3 -I -m unittest discover -s scripts -p 'test_*.py' -t scripts
+    desc: Self-tests of the repository tasks in xtask/ (throwaway git repositories, no network)
+    cmd: cargo test --locked -p xtask
 
   check:
     desc: Everything the pipeline runs on a pull request

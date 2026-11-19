@@ -75,7 +75,7 @@ the format becomes someone else's to implement. Nobody is penalised for disclosi
 
 ## What CI enforces
 
-`task guards` (`scripts/cleanroom_guards.py`, tested by `scripts/test_cleanroom_guards.py`) fails the pipeline when:
+`task guards` (`cargo xtask guards`, `xtask/src/guards.rs`, tested by `xtask/tests/guards.rs`) fails the pipeline when:
 
 - a `.rs`, `.py` or `.sh` file lacks `SPDX-License-Identifier: GPL-3.0-only` (or `MPL-2.0` for a file translated from
   MPL-2.0 sources) in its first five lines;

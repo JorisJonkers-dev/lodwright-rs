@@ -1,7 +1,7 @@
 # release-please keeps a release pull request open; merging it tags vX.Y.Z, writes CHANGELOG.md and bumps the
 # version in Cargo.toml and Cargo.lock (release-please-config.json). Nothing is published: no crates.io, no
 # registry. Each release gets the Linux x86_64 binary, the contract schemas and a SHA-256 file as release assets,
-# with a build provenance attestation over all of them (scripts/release-assets.sh, VERSIONING.md).
+# with a build provenance attestation over all of them (`cargo xtask release-assets`, VERSIONING.md).
 # `workflow_dispatch` is the dry run: it builds and attests the same assets from the selected ref and keeps them as a
 # workflow artifact instead of a release. With `tag` and `publish` it republishes that existing tag: its assets and OCI
 # package are pushed again.
@@ -108,7 +108,7 @@ jobs:
           workspaces: ". -> target"
           save-if: false
       - name: Build the assets
-        run: mise exec -- scripts/release-assets.sh dist
+        run: mise exec -- cargo xtask release-assets dist
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

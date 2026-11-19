@@ -55,7 +55,7 @@ conclusion is drawn here.
 | nv-rs translates parts of xNVSE 6.4.9 and JIP LN NVSE (GPL-3.0), and carries code under BSD (libvorbis, MT19937), MIT (Algohol), Apache-2.0 WITH LLVM-exception (MSVC STL) and zlib (DXVK) notices | nv-rs `LEGAL.md`, "Third-party code" |
 | lodwright-rs is GPL-3.0-only ("esplugin declares plain GPL-3.0"), except two files translated from xEdit that stay MPL-2.0 | lodwright `docs/LICENSING.md` |
 | lodwright's clean-room rule forbids decompiled or disassembled programs and decompiler output of any kind, anything under an unknown licence, and GPL, LGPL or AGPL *source* as an input for learning a format (linking a GPL-3.0 crate is allowed; copying its code is not) | lodwright `docs/clean-room.md` |
-| lodwright's CI guard refuses a provenance row whose URL or fact contains "decompil", "disassembl" or "leaked" | lodwright `scripts/cleanroom_guards.py` (`FORBIDDEN_SOURCES`) |
+| lodwright's CI guard refuses a provenance row whose URL or fact contains "decompil", "disassembl" or "leaked" | lodwright `xtask/src/guards.rs` (`FORBIDDEN_SOURCES`) |
 
 ## Open points before acceptance
 

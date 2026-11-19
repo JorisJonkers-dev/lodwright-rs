@@ -2,7 +2,7 @@
 //! The JSON contract as a caller sees it: documents, exit codes, versions and what never appears.
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_UNSUPPORTED, EXIT_USAGE, run};
-use lodwright_contract::{Capabilities, DocumentKind, check_plan, check_result, schema_json};
+use lodwright_contract::{DocumentKind, check_plan, check_result, schema_json};
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
 use std::path::{Path, PathBuf};
@@ -97,9 +97,23 @@ fn plan_reports_the_capabilities_of_this_build() {
     ]);
     assert_eq!(code, EXIT_OK);
     let doc = json(&out);
+    // the values are spelled out, so a change of what this build claims shows up here
     assert_eq!(
         doc["capabilities"],
-        serde_json::to_value(Capabilities::current()).unwrap()
+        serde_json::json!({
+            "terrain_mesh": true,
+            "terrain_texture": true,
+            "settings": true,
+            "object_lod": true,
+            "tree_lod": true,
+            "all_worlds": true,
+            "thread_count_independent": true,
+            "memory_budget_preflight": true,
+            "memory_budget_held": false,
+            "peak_memory_reported": cfg!(target_os = "linux"),
+            "resume_after_cancel": true,
+            "resume_after_kill": false,
+        })
     );
 }
 

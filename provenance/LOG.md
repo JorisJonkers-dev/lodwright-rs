@@ -1,7 +1,7 @@
 # Provenance log
 
 The human-readable side of `sources.toml`. Every row of that file is mentioned here by id, in backticks, with the
-story the table cannot hold: who read what, when, and what stayed open. `scripts/cleanroom_guards.py` fails the
+story the table cannot hold: who read what, when, and what stayed open. `cargo xtask guards` fails the
 build if a row is not mentioned. Rules: [docs/clean-room.md](../docs/clean-room.md).
 
 Roles: the *specifier* reads allowed inputs and records facts; the *implementer* codes from the recorded facts

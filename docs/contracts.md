@@ -15,8 +15,8 @@ Each document carries:
 * `contract`: the name of the contract, `<tool>-<noun>`. A reader refuses a document whose name is not the one it asked
   for. Today: `lodwright-plan` (`lodwright plan --json`), `lodwright-result` (`lodwright generate --json`, and the error
   document of a failed `--json` command), `lodwright-request` (read by `generate --request`), `lodwright-manifest`
-  (`manifest.json` in the output folder), `lodwright-verify` (`lodwright verify --json`) and `lodwright-defaults`
-  (`lodwright defaults --json`). All are typed in
+  (`manifest.json` in the output folder), `lodwright-verify` (`lodwright verify --json`), `lodwright-defaults`
+  (`lodwright defaults --json`) and `lodwright-bands` (`lodwright bands --json`). All are typed in
   `crates/lodwright-contract`; their schemas are under `schemas/` and require `contract` with the constant name.
 
 The progress events (`lodwright-events`) are single JSON lines, not documents: they carry neither `schema_version` nor
@@ -27,7 +27,7 @@ The progress events (`lodwright-events`) are single JSON lines, not documents: t
 `lodwright contracts --json` prints every contract this build emits and the schema versions it can emit, and exits 0:
 
 ```json
-{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
+{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-bands","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
 ```
 
 `lodwright --version --json` lists the same contracts.
@@ -51,6 +51,21 @@ folder, plugins in load order, worlds (empty: all), output folder, terrain level
 (exclude or keep by plugin, exclude by record or by model glob) and limits (threads, a memory budget). The request
 digest (`arguments_digest` in the result) covers every field. The library entry point for the same work is
 `lodwright_api::generate`, which takes the same request; the command is a wrapper over it.
+
+### Memory budget
+
+`limits.memory_mib` is checked twice. Before anything is read, a run whose plugins alone suggest more (four times their
+file sizes) is refused as `memory_limit`. While the run goes, each world's terrain step gets as many workers as the
+budget leaves room for: the limit, minus what the process holds at that moment (with the world's land textures loaded),
+minus the world's height raster, divided by what one worker needs: the largest block textures of the request (each with
+its mip chain and encoded file) plus 8 MiB for the block mesh and its planner. It never drops below one worker, and a
+result warning names each world that ran with fewer workers than asked for. The worker count never changes a byte of the
+output, so a run under a budget writes the same files as one without.
+
+The resident size is read on Linux (`VmRSS`), where the result also reports the peak (`peak_memory_mib`). On Windows
+and macOS the preflight estimate stands in for it, so the budget is measured on Linux and best effort elsewhere. Object
+and tree LOD run on one thread per world and are not scaled. The budget is a target, not a hard cap: a single worker
+that needs more than is left still runs. The Toolbox labels it advisory.
 
 ### Request defaults
 
@@ -158,6 +173,16 @@ Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 | 3 | unreadable folder: the folder or the reference is missing, not a folder, or cannot be listed; nothing is printed on stdout |
 
 `ok` in the report says only that the folder has no errors; the exit code also counts the differences.
+
+### Bands
+
+`lodwright bands <verify.json> ... [--json]` reads the `verify --json` reports of several runs of the same inputs and
+prints, per statistic, the minimum, the maximum and how many runs report it (`lodwright-bands`, schema: `lodwright
+schema bands`). The statistics are the report's counts (`terrain_blocks`, `errors`, `differences` and so on),
+`water.blocks`, `water.under_threshold`, `water.lowest`, `water.mean`, `objects.blocks`, `objects.exact`, and per
+block `water.iou:<path>` and `objects.unmatched_vertices:<path>`. Every value is rounded to three decimals first, so the
+order of float operations never widens a band; a band whose minimum equals its maximum is an exact match. A file that
+is not a verify report is a failure (exit 1); no file is a usage error (exit 2).
 
 ## Progress events
 

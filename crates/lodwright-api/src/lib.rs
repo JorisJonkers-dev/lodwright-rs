@@ -22,6 +22,7 @@
 //! [`API_VERSION`] is the version of this interface; `lodwright --version --json` lists it as the `lodwright-api`
 //! contract.
 
+mod budget;
 mod defaults;
 mod error;
 mod generate;

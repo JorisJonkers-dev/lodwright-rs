@@ -2,14 +2,13 @@
 //! Determinism under a memory budget: a run held to a low `limits.memory_mib` writes the same bytes as a run without
 //! one.
 //!
-//! Today the budget is a preflight estimate only (the run is refused when the plugin sizes suggest more), so nothing
-//! in the run changes under it yet. The test fixes the invariant the scheduling work must keep when it starts lowering
-//! the worker count and the batch size under pressure: same files, same bytes, same manifest entries.
+//! Under a budget too small for more than one worker, each world's terrain step runs on one worker instead of four
+//! (the result says so in a warning), and the output keeps every byte: same files, same bytes, same manifest entries.
 
 use std::path::{Path, PathBuf};
 
 use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, NoProgress, generate};
-use lodwright_contract::{MANIFEST_FILE, Manifest, Request};
+use lodwright_contract::{MANIFEST_FILE, Manifest, Request, ResultDoc};
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::plugin::PluginBuilder;
 use lodwright_testkit::world::{SyntheticWorld, world_group};
@@ -56,7 +55,7 @@ fn request(data: &Path, out: &Path) -> Request {
     request
 }
 
-fn run(request: Request) {
+fn run(request: Request) -> ResultDoc {
     match generate(
         &GenerateRequest::new(request),
         &mut NoProgress,
@@ -64,7 +63,10 @@ fn run(request: Request) {
     )
     .unwrap()
     {
-        GenerateOutcome::Done { result } => assert_eq!(result.code, "generated"),
+        GenerateOutcome::Done { result } => {
+            assert_eq!(result.code, "generated");
+            *result
+        }
         GenerateOutcome::Cancelled => panic!("the run was cancelled"),
     }
 }
@@ -98,23 +100,42 @@ fn manifest(out: &Path) -> Manifest {
     serde_json::from_slice(&std::fs::read(out.join(MANIFEST_FILE)).unwrap()).unwrap()
 }
 
-/// The output of an unconstrained run and of a run on one worker with a 1 MiB budget, over the same data.
-fn both_runs(name: &str) -> (PathBuf, PathBuf) {
+/// The output of an unconstrained run and of a run with a 1 MiB budget, both asking for four workers, over the same
+/// data, and the warnings of the budgeted run.
+fn both_runs(name: &str) -> (PathBuf, PathBuf, Vec<String>) {
     let data = data_folder(name);
     let (free, held) = (temp(&format!("{name}-free")), temp(&format!("{name}-held")));
     let mut unconstrained = request(&data, &free);
     unconstrained.limits.threads = Some(4);
-    run(unconstrained);
+    let free_doc = run(unconstrained);
+    assert!(
+        !free_doc
+            .warnings
+            .iter()
+            .any(|w| w.contains("memory budget")),
+        "{:?}",
+        free_doc.warnings
+    );
     let mut low = request(&data, &held);
-    low.limits.threads = Some(1);
+    low.limits.threads = Some(4);
     low.limits.memory_mib = Some(1);
-    run(low);
-    (free, held)
+    let warnings = run(low).warnings;
+    (free, held, warnings)
+}
+
+#[test]
+fn a_low_memory_budget_lowers_the_terrain_workers_of_every_world() {
+    let (_, _, warnings) = both_runs("workers");
+    let lowered: Vec<&String> = warnings
+        .iter()
+        .filter(|w| w.contains("the memory budget leaves room for 1 of 4 terrain workers"))
+        .collect();
+    assert_eq!(lowered.len(), 3, "{warnings:?}");
 }
 
 #[test]
 fn a_run_under_a_low_memory_budget_writes_the_same_files_byte_for_byte() {
-    let (free, held) = both_runs("bytes");
+    let (free, held, _) = both_runs("bytes");
     let (a, b) = (contents(&free), contents(&held));
     assert_ne!(a.len(), 0);
     assert_eq!(
@@ -128,7 +149,7 @@ fn a_run_under_a_low_memory_budget_writes_the_same_files_byte_for_byte() {
 
 #[test]
 fn a_run_under_a_low_memory_budget_lists_the_same_files_and_blocks_in_its_manifest() {
-    let (free, held) = both_runs("manifest");
+    let (free, held, _) = both_runs("manifest");
     let (a, b) = (manifest(&free), manifest(&held));
     assert_eq!(a.inputs_digest, b.inputs_digest);
     assert_eq!(a.files, b.files);
@@ -137,7 +158,7 @@ fn a_run_under_a_low_memory_budget_lists_the_same_files_and_blocks_in_its_manife
 
 #[test]
 fn a_run_under_a_low_memory_budget_builds_every_world() {
-    let (_, held) = both_runs("worlds");
+    let (_, held, _) = both_runs("worlds");
     let settings: Vec<String> = contents(&held)
         .into_iter()
         .map(|(n, _)| n)

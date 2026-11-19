@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(info.contracts, Handshake::current().contracts);
         assert_eq!(
             serde_json::to_string(&Handshake::current()).unwrap(),
-            r#"{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-api","versions":[1]}]}"#
+            r#"{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-bands","versions":[1]},{"name":"lodwright-api","versions":[1]}]}"#
         );
     }
 }

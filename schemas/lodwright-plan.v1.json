@@ -100,7 +100,7 @@
           "default": false
         },
         "memory_budget_held": {
-          "description": "`limits.memory_mib` is also held while the run goes on (fewer workers or smaller batches, same bytes).",
+          "description": "`limits.memory_mib` is also held while the run goes on: each world's terrain step gets as many workers as\nthe budget leaves room for (same bytes). Measured on Linux, best effort elsewhere.",
           "type": "boolean",
           "default": false
         },

@@ -109,7 +109,7 @@ fn plan_reports_the_capabilities_of_this_build() {
             "all_worlds": true,
             "thread_count_independent": true,
             "memory_budget_preflight": true,
-            "memory_budget_held": false,
+            "memory_budget_held": true,
             "peak_memory_reported": cfg!(target_os = "linux"),
             "resume_after_cancel": true,
             "resume_after_kill": false,
@@ -118,7 +118,7 @@ fn plan_reports_the_capabilities_of_this_build() {
 }
 
 #[test]
-fn plan_says_the_memory_budget_is_not_held_while_running_and_a_killed_run_does_not_resume() {
+fn plan_says_the_memory_budget_is_held_while_running_and_a_killed_run_does_not_resume() {
     let dir = data_folder("run-flags");
     let (_, out, _) = go(&[
         "plan",
@@ -142,7 +142,7 @@ fn plan_says_the_memory_budget_is_not_held_while_running_and_a_killed_run_does_n
             &true.into(),
             &true.into(),
             &true.into(),
-            &false.into(),
+            &true.into(),
             &true.into(),
             &false.into()
         )
@@ -235,6 +235,7 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
                 {"name": "lodwright-verify", "versions": [1]},
                 {"name": "lodwright-events", "versions": [1]},
                 {"name": "lodwright-defaults", "versions": [1]},
+                {"name": "lodwright-bands", "versions": [1]},
                 {"name": "lodwright-api", "versions": [1]}
             ])
         );

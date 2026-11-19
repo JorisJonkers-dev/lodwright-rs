@@ -50,7 +50,8 @@ pub struct Capabilities {
     /// `limits.memory_mib` refuses, before anything is written, a run whose plugins suggest it needs more.
     #[serde(default)]
     pub memory_budget_preflight: bool,
-    /// `limits.memory_mib` is also held while the run goes on (fewer workers or smaller batches, same bytes).
+    /// `limits.memory_mib` is also held while the run goes on: each world's terrain step gets as many workers as
+    /// the budget leaves room for (same bytes). Measured on Linux, best effort elsewhere.
     #[serde(default)]
     pub memory_budget_held: bool,
     /// The result reports the run's peak resident size (`peak_memory_mib`); measured on Linux only.
@@ -81,7 +82,7 @@ impl Capabilities {
             all_worlds: true,
             thread_count_independent: true,
             memory_budget_preflight: true,
-            memory_budget_held: false,
+            memory_budget_held: true,
             peak_memory_reported: cfg!(target_os = "linux"),
             resume_after_cancel: true,
             resume_after_kill: false,
@@ -257,10 +258,10 @@ mod tests {
     }
 
     #[test]
-    fn this_build_checks_the_memory_budget_before_the_run_but_does_not_hold_it_while_running() {
+    fn this_build_checks_the_memory_budget_before_the_run_and_holds_it_while_running() {
         let caps = Capabilities::current();
         assert!(caps.memory_budget_preflight);
-        assert!(!caps.memory_budget_held);
+        assert!(caps.memory_budget_held);
     }
 
     #[test]

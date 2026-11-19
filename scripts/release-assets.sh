@@ -2,12 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Build the release assets of the Linux x86_64 binary into one directory:
 #   lodwright-x86_64-unknown-linux-gnu   the binary
+#   lodwright-universal-apple-darwin     the macOS binary (arm64 and x86_64), built on macOS and passed in [macos-dir]
 #   lodwright-<document>.v<N>.json       the contract schemas (copied from schemas/, checked against the binary)
 #   SHA256SUMS                           the SHA-256 of every file above
-# The attestation is made by the release workflow over this directory. Usage: scripts/release-assets.sh <out-dir>
+# The attestation is made by the release workflow over this directory.
+# Usage: scripts/release-assets.sh <out-dir> [macos-dir]
 set -euo pipefail
 
-out="${1:?usage: scripts/release-assets.sh <out-dir>}"
+out="${1:?usage: scripts/release-assets.sh <out-dir> [macos-dir]}"
+macos="${2:-}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
@@ -38,6 +41,12 @@ for file in "${schemas[@]}"; do
   fi
   cp "$file" "$out/$name"
 done
+
+if [ -n "$macos" ]; then
+  mac="$macos/lodwright-universal-apple-darwin"
+  [ -f "$mac" ] || { echo "release-assets: $mac is missing" >&2; exit 1; }
+  install -m 0755 "$mac" "$out/lodwright-universal-apple-darwin"
+fi
 
 (cd "$out" && sha256sum -- * > ../SHA256SUMS.tmp)
 mv "$out/../SHA256SUMS.tmp" "$out/SHA256SUMS"

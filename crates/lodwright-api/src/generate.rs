@@ -350,7 +350,9 @@ pub fn generate(
         objects: request.objects.enabled || request.trees.enabled,
         land_layers: request.terrain.land_textures,
     };
-    if let Some(limit) = request.limits.memory_mib {
+    // the parsed plugins and the rasters take a few times the file sizes; the same estimate stands in for the
+    // resident size where the platform does not report it
+    let plugins_mib = request.limits.memory_mib.map(|_| {
         let bytes: u64 = request
             .plugins
             .iter()
@@ -358,13 +360,15 @@ pub fn generate(
             .filter_map(|p| std::fs::metadata(p).ok())
             .map(|m| m.len())
             .sum();
-        // the parsed plugins and the rasters take a few times the file sizes
-        if bytes.saturating_mul(4) / (1024 * 1024) > limit {
-            return Err(Error::new(
-                "memory_limit",
-                format!("the plugins need more than the {limit} MiB the request allows"),
-            ));
-        }
+        bytes.saturating_mul(4) / (1024 * 1024)
+    });
+    if let (Some(limit), Some(need)) = (request.limits.memory_mib, plugins_mib)
+        && need > limit
+    {
+        return Err(Error::new(
+            "memory_limit",
+            format!("the plugins need more than the {limit} MiB the request allows"),
+        ));
     }
     if cancel.is_cancelled() {
         return Ok(GenerateOutcome::Cancelled);
@@ -461,6 +465,23 @@ pub fn generate(
                 _ => lodwright_gen::LandTiles::empty(),
             };
             add_warnings(&mut doc, warnings);
+            // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
+            let workers = crate::budget::workers(
+                request.limits.memory_mib,
+                crate::budget::resident_mib().or(plugins_mib).unwrap_or(0),
+                crate::budget::raster_mib(world, &settings),
+                crate::budget::worker_mib(&settings),
+                threads,
+            );
+            if workers < threads {
+                add_warnings(
+                    &mut doc,
+                    vec![format!(
+                        "{}: the memory budget leaves room for {workers} of {threads} terrain workers",
+                        world.name()
+                    )],
+                );
+            }
             let report = {
                 let shared = Mutex::new(&mut *progress);
                 let block_done = |world: &str, level: u32, done: u64, of: u64, up_to_date: bool| {
@@ -480,7 +501,7 @@ pub fn generate(
                     &settings,
                     out,
                     &lodwright_gen::Options {
-                        threads,
+                        threads: workers,
                         land: Some(&tiles),
                         progress: Some(&block_done),
                         water: request.terrain.water,

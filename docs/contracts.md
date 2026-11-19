@@ -51,6 +51,21 @@ folder, plugins in load order, worlds (empty: all), output folder, terrain level
 digest (`arguments_digest` in the result) covers every field. The library entry point for the same work is
 `lodwright_api::generate`, which takes the same request; the command is a wrapper over it.
 
+### Memory budget
+
+`limits.memory_mib` is checked twice. Before anything is read, a run whose plugins alone suggest more (four times
+their file sizes) is refused as `memory_limit`. While the run goes, each world's terrain step gets as many workers as
+the budget leaves room for: the limit, minus what the process holds at that moment (with the world's land textures
+loaded), minus the world's height raster, divided by what one worker needs for the largest block textures of the
+request. It never drops below one worker, and a result warning names each world that ran with fewer workers than
+asked for. The worker count never changes a byte of the output, so a run under a budget writes the same files as one
+without.
+
+The resident size is read on Linux (`VmRSS`), where the result also reports the peak (`peak_memory_mib`). On Windows
+and macOS the preflight estimate stands in for it, so the budget is measured on Linux and best effort elsewhere. Object
+and tree LOD run on one thread per world and are not scaled. The budget is a target, not a hard cap: a single worker
+that needs more than is left still runs. The Toolbox labels it advisory.
+
 ### Adding a request option
 
 The request digest is the `sha256` of the request's JSON as lodwright writes it, and the manifest keeps it to answer

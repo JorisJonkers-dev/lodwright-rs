@@ -1,6 +1,6 @@
-# One pipeline ending in "Pipeline Complete", the only required check (estate convention). The checks are steps of
-# that one job (GitHub bills each job rounded up to a minute); the two reusable workflows (hygiene, PR title)
-# cannot be steps, so they are jobs that the last step gates on. `task check` runs the same checks locally.
+# One pipeline ending in "Pipeline Complete", the only required check (estate convention). Every check is its own job
+# and they run in parallel, so one failure does not hide the others and a rerun repeats only what failed; each job
+# calls the same `task` target that `task check` runs locally. "Pipeline Complete" only aggregates their results.
 name: Pipeline
 
 on:
@@ -45,8 +45,8 @@ jobs:
     uses: JorisJonkers-dev/github-workflows/.github/workflows/quarantine-check.yml@8e402cc4904be3f6bdb53bad3d9b5d7951bed491 # v0.50.3
 
   # lodwright is linked into the Toolbox's raul on Linux, Windows and macOS (Toolbox ADR-0006), so it is built and
-  # tested natively on macOS too (Apple silicon). Linux runs every check in Pipeline Complete itself; this job lints
-  # and tests, and Pipeline Complete gates on it.
+  # tested natively on macOS too (Apple silicon). The Linux checks are the jobs below; this job lints and tests
+  # on macOS, and Pipeline Complete gates on it.
   macos:
     name: Build and test (macos-latest)
     runs-on: macos-latest
@@ -67,19 +67,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo test --locked --workspace --no-fail-fast
 
-  pipeline-complete:
-    name: Pipeline Complete
-    needs: [hygiene, pr-title, quarantine, macos]
-    if: ${{ !cancelled() }}
+
+  # Documentation-only changes skip the Rust jobs. Every other check, and the aggregator, still runs.
+  changes:
+    name: Changed files
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      # Documentation-only changes skip the Rust steps. Every other check, and the gate below, still runs.
       - name: Changed files
         id: changes
         env:
@@ -93,54 +93,167 @@ jobs:
           if git diff --name-only "$BASE...$HEAD" | grep -qvE '^(docs/|LICENSE$|.*\.md$)'; then
             echo "code=true" >>"$GITHUB_OUTPUT"
           else
-            echo "code=false" >>"$GITHUB_OUTPUT"; echo "only documentation changed: the Rust steps are skipped"
+            echo "code=false" >>"$GITHUB_OUTPUT"; echo "only documentation changed: the Rust jobs are skipped"
           fi
 
+  fmt:
+    name: Format
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: true
+      - run: mise exec -- task fmt
 
+  clippy:
+    name: Clippy
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: ${{ steps.changes.outputs.code == 'true' }}
         with:
           workspaces: ". -> target"
+          shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: mise exec -- task clippy
 
-      # Separate steps so one failing check does not hide the others.
-      - name: Format
-        if: ${{ !cancelled() && steps.changes.outputs.code == 'true' }}
-        run: mise exec -- task fmt
-      - name: Clippy
-        if: ${{ !cancelled() && steps.changes.outputs.code == 'true' }}
-        run: mise exec -- task clippy
-      - name: Tests and coverage gate
-        if: ${{ !cancelled() && steps.changes.outputs.code == 'true' }}
-        run: mise exec -- task test
-      - name: Fuzz harnesses compile
-        if: ${{ !cancelled() && steps.changes.outputs.code == 'true' }}
-        run: mise exec -- task fuzz:check
-      - name: Dependencies
-        if: ${{ !cancelled() && steps.changes.outputs.code == 'true' }}
-        run: mise exec -- task deny
-      - name: Secrets
-        if: ${{ !cancelled() }}
-        run: mise exec -- task secrets
-      - name: Workflows
-        if: ${{ !cancelled() }}
-        run: mise exec -- task lint:actions
-      - name: Clean-room guards
-        if: ${{ !cancelled() }}
-        run: mise exec -- task guards
-      - name: Guard self-tests
-        if: ${{ !cancelled() }}
-        run: mise exec -- task scripts
+  test:
+    name: Tests and coverage gate
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ". -> target"
+          shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: mise exec -- task test
 
-      # A skipped job fails, except the two that only run on pull requests.
-      - name: Reusable-workflow jobs passed
-        if: ${{ !cancelled() }}
+  fuzz:
+    name: Fuzz harnesses compile
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: "fuzz -> target"
+          shared-key: fuzz
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: mise exec -- task fuzz:check
+
+  deny:
+    name: Dependencies
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - run: mise exec -- task deny
+
+  secrets:
+    name: Secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - run: mise exec -- task secrets
+
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - run: mise exec -- task lint:actions
+
+  guards:
+    name: Clean-room guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - run: mise exec -- task guards
+
+  scripts:
+    name: Guard self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          cache: true
+      - run: mise exec -- task scripts
+
+  # The one required check. It only reads the results of the jobs above (no checkout, no work): it fails when a needed
+  # job failed or was cancelled. A skipped job is fine: the Rust jobs are skipped on documentation-only changes and the
+  # two reusable workflows run on pull requests only.
+  pipeline-complete:
+    name: Pipeline Complete
+    needs: [hygiene, pr-title, quarantine, macos, changes, fmt, clippy, test, fuzz, deny, secrets, workflows, guards, scripts]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every needed job passed or was skipped
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
-          failed="$(jq -r 'to_entries[] | select(.value.result != "success") | select(.value.result != "skipped" or (.key | IN("hygiene", "pr-title") | not)) | "\(.key): \(.value.result)"' <<<"$NEEDS")"
+          failed="$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"' <<<"$NEEDS")"
           if [ -n "$failed" ]; then echo "$failed"; exit 1; fi

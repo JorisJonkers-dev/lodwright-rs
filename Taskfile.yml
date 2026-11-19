@@ -1,4 +1,5 @@
-# `task check` is what the Pipeline Complete job runs, so local and CI cannot drift.
+# `task check` is the set of checks the pipeline runs, one job per task target (Pipeline Complete aggregates them), so
+# local and CI cannot drift.
 version: "3"
 
 vars:

@@ -394,3 +394,92 @@ types agree; the rotation is random in the original and lodwright derives it fro
 differ in placement (gaps of 12 to 16 pixels against 2 in the original code, widths rounded to 4), which does not
 change what the game reads. Open: the order of references inside a block (the sets agree with ours as sets only) and
 the in-game result (owner).
+
+## 2026-11-19: `wrld-bounds` note corrected (issue 51)
+
+Specifier entry, role held: specifier for the correction only (not the implementer of the worldspace reader). Read
+`Core/wbDefinitionsCommon.pas` (`TwbGameDefCommon.wbWorldObjectBounds`) and `Core/wbInterface.pas` (`TwbGameDef.IsSF1`,
+`TwbFloatDef.ToValue`, `TwbFloatDef.FromValue`) of TES5Edit/TES5Edit at revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file headers), and `Core/wbDefinitionsFNV.pas` to confirm that the
+FNV WRLD definition uses `wbWorldObjectBounds`. Not read: the 2016 generator C# repository,
+decompiled binaries, GPL or leaked code.
+
+The fact of `wrld-bounds` (NAM0 minimum and NAM9 maximum, two f32 each, x then y) is unchanged. The note had the xEdit
+display factor the wrong way round: 1/100 is the Starfield branch of `IsSF1`; FO3 and FNV use 1/4096, and xEdit shows
+the stored value multiplied by that factor (and divides a value typed in by it before storing). The unit of the
+stored floats stays open: the factor converts between the stored f32 and the number xEdit shows; it does not state
+the unit. The row stays `verified = false` until a second reader re-reads the corrected note
+against the same two files. What that reader checks: the `IsSF1` argument order in `wbWorldObjectBounds`; that `IsSF1`
+returns the first argument only for Starfield; that `ToValue` multiplies by the scale. An owner check (NAM0 and NAM9 of
+one plugin's worldspace against the cell range of its LAND records, numbers only) would settle the unit.
+
+## 2026-11-19: `plugin-record-override` narrowed to what its source says (issue 53)
+
+Specifier entry, role held: specifier for the correction only (not the implementer of `texture.rs` or `worldspace.rs`).
+The UESP page `Tes4Mod:FormID` answered HTTP 403 to an automated read on this date, so it was not re-read; the quoted
+sentence is the one the specifier and the second reader recorded on 2026-11-14. A search for a public source with a
+stated licence that says the game replaces an overridden record whole was not successful: xEdit (MPL-2.0, revision
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`) models a winning override per record in its conflict view, but that is the
+tool's model and states nothing about the game. Two public pages discuss the point but cannot be rows: the xEdit
+documentation (repository TES5Edit/TES5Edit.github.io, no licence stated) and LOOT's "introduction to load orders"
+(repository loot/loot.github.io, GPL-3.0); neither was used beyond a search-result excerpt, and the owner may decide
+whether a GPL-3.0 documentation page counts as an allowed input. Not read: the 2016 generator C# repository, decompiled
+binaries, GPL or leaked code.
+
+Change: the fact now says only what the page supports (a record with the master's FormID replaces the master's data
+object) and that the page is silent on whole versus field-level replacement. Whole-record replacement is recorded in
+the note as the project's choice. The code was checked against that choice: `TextureResolver::from_load_order`
+(`texture.rs`) inserts each later LTEX and TXST over the earlier one by FormID, and `WorldIndex` and `build`
+(`worldspace.rs`) replace a WRLD record's resolved fields and a cell's heights, layers and water from the later plugin;
+nothing merges fields from two plugins. One small exception, consistent with the choice: a later WRLD without an editor
+id keeps the earlier name, which is a display label only.
+
+The row stays `verified = false`. What a second reader checks: the quoted sentence on the UESP page and its licence
+footer; that the new fact claims nothing beyond it. What settles the open question (owner, numbers only): two plugins
+that both override one LAND record, the later one changing only part of the record (for example VHGT but not the
+layers); compare the game's own terrain LOD or the in-game ground built from that load order with lodwright's output
+for both readings.
+
+## 2026-11-19: `land-vnml-layout`, `land-vtxt-layout` and `wrld-child-inherits` narrowed (issue 54)
+
+Specifier entry, role held: specifier for the corrections only (not the implementer of `layers.rs` or
+`worldspace.rs`). Nothing was re-read on this date: the UESP LAND and WRLD pages answered HTTP 403 to automated reads,
+and the discrepancies are the ones the second reader recorded on 2026-11-14 (issue 54) from those pages and from xEdit
+(revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b`, MPL-2.0). Not read: the 2016 generator C# repository, decompiled
+binaries, GPL or leaked code. Each fact now states only what its source states; what the code does beyond it is
+labelled as the project's choice in the note, with the open question.
+
+- `land-vnml-layout`: "rows from the south" removed from the fact. The reader shares one grid accessor with VCLR, whose
+  row order is recorded; nothing that generates LOD reads VNML, so no output depends on the clause today.
+- `land-vtxt-layout`: "positions not listed have no opacity" moved from the fact to the note as the project's choice.
+  The diffuse blend relies on it, so it is a LOD question, not only a record question: if the game treats an unlisted
+  position differently, generated terrain colours differ near layer edges.
+- `wrld-child-inherits`: now only the UESP Oblivion statement (climate, water and map data). The FNV flag names are
+  `wrld-parent` (already verified). The merged sentence about what the flags make a child take is an open question;
+  the code's default (no inheritance) and the `FlaggedDefaults` option are labelled as choices. Which worlds get LOD in
+  an all-worlds run depends on this.
+
+All three stay `verified = false`. What a second reader checks: that each fact now matches the UESP page (and, for VNML
+and VTXT, xEdit `wbLandNormals` and `wbLandLayers`) with nothing added. What settles the open points (owner, numbers
+only): for VTXT, in one owner plugin count, per ATXT layer, how many of the 289 positions are listed and whether listed
+points with opacity 0.0 occur (if every layer lists all 289, the question has no effect on output); for the child
+worlds, compare the game's own terrain LOD of a child world whose PNAM has "use land data" clear with lodwright's
+output under each inheritance option; for VNML, the row order can be read from a LAND record with a known slope
+direction (normal x or y component sign by row).
+
+## 2026-11-19: odd sizes in a mip chain (issue 60)
+
+Specifier entry, role held: specifier only (not the implementer of `lodwright-dds`). Read the Microsoft Learn page
+"Introduction To Textures in Direct3D 11" in the MicrosoftDocs/win32 repository (CC-BY-4.0) at revision
+`bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583`. No generator source, decompiled output or GPL code was read.
+
+- `dds-mip-odd-size` (new): the page's one odd-size example, 5 by 1 to 2 by 1 to 1 by 1, which is rounding down. The
+  page is about Direct3D 11 resources, not the DDS file format, and its general sentence ("the next lower level is
+  always even size") does not hold for rounding down in general, so only the example is recorded.
+
+`dds-mip-chain` is unchanged and stays `verified = false`. `crates/lodwright-dds/src/resize.rs` (`mip_size`,
+`mip_count`) now says in its comments that rounding an odd size down is the project's choice and cites both rows; no
+behaviour changed. What a second reader checks: the example and its numbers on that page, that the fact claims nothing
+beyond the example, and whether a Direct3D 11 resource page may stand for the DDS files the game reads (or whether an
+`oracle:` measurement is needed). What settles it on the game's side (owner, numbers only): `lodwright probe dds` on any
+own texture with an odd dimension, reporting width, height and mip count.

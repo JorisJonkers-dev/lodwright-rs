@@ -18,7 +18,11 @@ pub enum Filter {
 
 /// The size of mip level `level` (0 is the base): each level halves the previous one, rounding down, with a
 /// minimum of one pixel in each direction.
-// source: dds-mip-chain
+///
+/// Halving and the one-pixel floor are `dds-mip-chain`. Rounding an odd size down is this project's choice: the one
+/// odd-size example found in an allowed source (`dds-mip-odd-size`, a 5 by 1 texture whose next level is 2 by 1)
+/// agrees with it, but that row is not verified yet.
+// source: dds-mip-chain, dds-mip-odd-size
 #[must_use]
 pub fn mip_size(width: u32, height: u32, level: u32) -> (u32, u32) {
     (
@@ -27,8 +31,9 @@ pub fn mip_size(width: u32, height: u32, level: u32) -> (u32, u32) {
     )
 }
 
-/// The number of levels of a full chain down to 1 by 1: `floor(log2(max(width, height))) + 1`.
-// source: dds-mip-chain
+/// The number of levels of a full chain down to 1 by 1: `floor(log2(max(width, height))) + 1`. The count follows
+/// from rounding odd sizes down (see [`mip_size`]), which is this project's choice.
+// source: dds-mip-chain, dds-mip-odd-size
 #[must_use]
 pub fn mip_count(width: u32, height: u32) -> u32 {
     32 - width.max(height).max(1).leading_zeros()

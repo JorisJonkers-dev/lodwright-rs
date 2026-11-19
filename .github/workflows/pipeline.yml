@@ -44,9 +44,32 @@ jobs:
     name: Quarantine
     uses: JorisJonkers-dev/github-workflows/.github/workflows/quarantine-check.yml@8e402cc4904be3f6bdb53bad3d9b5d7951bed491 # v0.50.3
 
+  # lodwright is linked into the Toolbox's raul on Linux, Windows and macOS (Toolbox ADR-0006), so it is built and
+  # tested natively on macOS too (Apple silicon). Linux runs every check in Pipeline Complete itself; this job lints
+  # and tests, and Pipeline Complete gates on it.
+  macos:
+    name: Build and test (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ". -> target"
+          shared-key: macos
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Tests
+        if: ${{ !cancelled() }}
+        run: cargo test --locked --workspace --no-fail-fast
+
   pipeline-complete:
     name: Pipeline Complete
-    needs: [hygiene, pr-title, quarantine]
+    needs: [hygiene, pr-title, quarantine, macos]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -483,3 +483,35 @@ behaviour changed. What a second reader checks: the example and its numbers on t
 beyond the example, and whether a Direct3D 11 resource page may stand for the DDS files the game reads (or whether an
 `oracle:` measurement is needed). What settles it on the game's side (owner, numbers only): `lodwright probe dds` on any
 own texture with an odd dimension, reporting width, height and mip count.
+
+## 2026-11-19: block-compression precision and channel scaling of the probe decoder (issue 62)
+
+Specifier entry, role held: specifier only (not the implementer of `lodwright probe`). Read the Direct3D 11.3
+functional specification (`d3d/archive/D3D11_3_FunctionalSpec.htm` in microsoft/DirectX-Specs, CC-BY-4.0, revision
+`ae2cc81d8f97df9ce8597e25d84405273f09d08c`), sections 3.2.3.5, 3.2.3.6, 19.5.3, 19.5.6 to 19.5.9 and 25.1.1, and the Microsoft Learn pages `d3dformat`
+and the DDS programming guide in MicrosoftDocs/win32 (CC-BY-4.0) at revision `bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583`. No decoder source code of any
+project and no GPL, decompiled or leaked code was read.
+
+- `bc-endpoint-promotion`: 5 and 6 bit endpoints widen by MSB extension (bit replication); BC1 derived colours are
+  computed from the widened 8-bit values; error bound 1/255.
+- `bc3-alpha-interpolation`: BC3 alpha follows BC4U, computed in float with UNORM16 precision.
+- `unorm-conversion`: UNORM to float and float to UNORM (round half up) rules.
+- `d3d9-format-memory-order`: channel order of a pixel in memory, least significant bit first.
+
+Comparison with `crates/lodwright-core/src/probe/dds.rs` (read after the rows were written):
+- widening (`expand5`, `expand6`) is MSB extension: agrees;
+- BC1 four-colour and BC3 alpha integer formulas equal the specification's exact value rounded half up to 8 bits:
+  agrees with `bc-endpoint-promotion`, `bc3-alpha-interpolation` and `unorm-conversion`;
+- BC1 three-colour mode truncates `(a + b) / 2`; the rounded value is one higher when `a + b` is odd. This is inside
+  the specification's 1/255 bound, so the probe stays a conforming decoder, but its statistics can sit one below a
+  decoder that rounds. Recorded, not changed (a decoder change belongs to the probe's implementer);
+- uncompressed channels: `(value * 255 + max / 2) / max` equals UNORM to float followed by float to UNORM8 (with
+  `max` odd there is no exact half), so it agrees with `unorm-conversion`; pixels are assembled least significant
+  byte first, which agrees with `d3d9-format-memory-order`. That legacy DDS masked pixels follow the Direct3D 9
+  in-memory order rests on the programming guide's mapping table; no DDS page states the byte order in words.
+
+`probe-bc1-block-layout` and `probe-bc3-block-layout` stay `verified = false` and their notes now point at the new
+rows. What a second reader checks: each new row against the named sections (including the BC3 section's formula,
+which is printed with unpromoted names); the integer-rounding equivalences above; whether the three-colour truncation
+should be left (inside the bound) or changed to round half up. The rows say what a conforming decoder may do; they say
+nothing about the game, which never decodes in the probe's way.

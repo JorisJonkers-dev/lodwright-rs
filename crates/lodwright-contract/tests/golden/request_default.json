@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "contract": "lodwright-request",
+  "data_folder": "/data",
+  "plugins": [
+    "FalloutNV.esm"
+  ],
+  "worlds": [],
+  "output_dir": "/out",
+  "terrain": {
+    "enabled": true,
+    "levels": [],
+    "land_textures": true,
+    "water": true
+  },
+  "objects": {
+    "enabled": true
+  },
+  "trees": {
+    "enabled": true
+  },
+  "inclusion": {
+    "exclude_plugins": [],
+    "only_plugins": [],
+    "exclude_records": [],
+    "exclude_models": []
+  },
+  "limits": {}
+}

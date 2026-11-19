@@ -370,5 +370,7 @@ fn verify_passes_a_generated_folder_and_fails_a_damaged_one() {
         text.contains("\"ok\":false") && text.contains("24 bytes"),
         "{text}"
     );
+    let report: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(lodwright_contract::check_verify(&report), Ok(()), "{text}");
     assert_eq!(run(&["verify"]).0, 2);
 }

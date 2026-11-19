@@ -194,7 +194,7 @@ fn schema_prints_the_generated_schema_for_both_documents() {
 fn schema_rejects_a_missing_or_unknown_document_name() {
     for args in [
         vec!["schema"],
-        vec!["schema", "manifest"],
+        vec!["schema", "nope"],
         vec!["schema", "plan", "result"],
         vec!["schema", "plan", "--schema-version"],
         vec!["schema", "plan", "--schema-version", "x"],
@@ -217,6 +217,9 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
                 {"name": "lodwright-plan", "versions": [1]},
                 {"name": "lodwright-result", "versions": [1]},
                 {"name": "lodwright-request", "versions": [1]},
+                {"name": "lodwright-manifest", "versions": [1]},
+                {"name": "lodwright-verify", "versions": [1]},
+                {"name": "lodwright-events", "versions": [1]},
                 {"name": "lodwright-api", "versions": [1]}
             ])
         );

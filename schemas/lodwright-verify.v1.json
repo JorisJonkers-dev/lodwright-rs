@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerifyDoc",
+  "description": "Verify v1, the report of `lodwright verify --json`.",
+  "type": "object",
+  "properties": {
+    "contract": {
+      "description": "The contract name, `lodwright-verify`: a reader refuses a document that names another.",
+      "type": "string",
+      "const": "lodwright-verify"
+    },
+    "differences": {
+      "description": "Differences from the reference folder; empty when no reference was given.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/VerifyFinding"
+      }
+    },
+    "errors": {
+      "description": "What is wrong with the folder, sorted by path.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VerifyFinding"
+      }
+    },
+    "object_blocks": {
+      "description": "Object block meshes checked.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "ok": {
+      "description": "True when the folder has no errors.",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "description": "The document version; 1.",
+      "type": "integer",
+      "format": "uint32",
+      "const": 1,
+      "minimum": 0
+    },
+    "settings": {
+      "description": "Settings files checked.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "terrain_blocks": {
+      "description": "Terrain block meshes checked.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "textures": {
+      "description": "Textures checked.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "tree_blocks": {
+      "description": "Tree block files checked.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "contract",
+    "ok",
+    "terrain_blocks",
+    "object_blocks",
+    "tree_blocks",
+    "textures",
+    "settings",
+    "errors"
+  ],
+  "$defs": {
+    "VerifyFinding": {
+      "description": "One finding: a file and what is wrong with it, or how it differs from the reference.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The file, relative to the folder, forward slashes.",
+          "type": "string"
+        },
+        "problem": {
+          "description": "What is wrong, as prose for people; never matched on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "problem"
+      ]
+    }
+  }
+}

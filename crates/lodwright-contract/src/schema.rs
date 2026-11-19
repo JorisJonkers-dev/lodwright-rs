@@ -4,9 +4,13 @@
 use std::fmt;
 
 use schemars::schema_for;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::{PLAN_VERSIONS, Plan, REQUEST_VERSIONS, RESULT_VERSIONS, Request, ResultDoc};
+use crate::{
+    EVENTS_VERSIONS, Event, MANIFEST_VERSIONS, Manifest, PLAN_VERSIONS, Plan, REQUEST_VERSIONS,
+    RESULT_VERSIONS, Request, ResultDoc, VERIFY_VERSIONS, VerifyDoc,
+};
 
 /// Which document a schema or check is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,27 +21,54 @@ pub enum DocumentKind {
     Result,
     /// The request document.
     Request,
+    /// The manifest `generate` leaves in its output folder.
+    Manifest,
+    /// The report of `verify --json`.
+    Verify,
+    /// One progress event line.
+    Events,
 }
 
 impl DocumentKind {
-    /// `plan` or `result`.
+    /// Every kind, in the order the handshake lists them.
+    pub const ALL: [Self; 6] = [
+        Self::Plan,
+        Self::Result,
+        Self::Request,
+        Self::Manifest,
+        Self::Verify,
+        Self::Events,
+    ];
+
+    /// `plan`, `result`, `request`, `manifest`, `verify` or `events`.
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Plan => "plan",
             Self::Result => "result",
             Self::Request => "request",
+            Self::Manifest => "manifest",
+            Self::Verify => "verify",
+            Self::Events => "events",
         }
     }
 
-    /// Parse `plan` or `result`.
+    /// Parse a name that [`DocumentKind::name`] gives.
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "plan" => Some(Self::Plan),
-            "result" => Some(Self::Result),
-            "request" => Some(Self::Request),
-            _ => None,
+        Self::ALL.into_iter().find(|kind| kind.name() == text)
+    }
+
+    /// The contract name, for example `lodwright-plan`.
+    #[must_use]
+    pub fn contract(self) -> &'static str {
+        match self {
+            Self::Plan => crate::PLAN_CONTRACT,
+            Self::Result => crate::RESULT_CONTRACT,
+            Self::Request => crate::REQUEST_CONTRACT,
+            Self::Manifest => crate::MANIFEST_CONTRACT,
+            Self::Verify => crate::VERIFY_CONTRACT,
+            Self::Events => crate::EVENTS_CONTRACT,
         }
     }
 
@@ -48,6 +79,9 @@ impl DocumentKind {
             Self::Plan => PLAN_VERSIONS,
             Self::Result => RESULT_VERSIONS,
             Self::Request => REQUEST_VERSIONS,
+            Self::Manifest => MANIFEST_VERSIONS,
+            Self::Verify => VERIFY_VERSIONS,
+            Self::Events => EVENTS_VERSIONS,
         }
     }
 }
@@ -106,13 +140,16 @@ pub fn schema_json(kind: DocumentKind, version: u32) -> Result<String, SchemaErr
         DocumentKind::Plan => schema_for!(Plan),
         DocumentKind::Result => schema_for!(ResultDoc),
         DocumentKind::Request => schema_for!(Request),
+        DocumentKind::Manifest => schema_for!(Manifest),
+        DocumentKind::Verify => schema_for!(VerifyDoc),
+        DocumentKind::Events => schema_for!(Event),
     };
     let mut text = serde_json::to_string_pretty(&schema).expect("a schema serialises");
     text.push('\n');
     Ok(text)
 }
 
-fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
+fn check<T: DeserializeOwned>(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
     match value.get("schema_version") {
         None => return Err(SchemaError::Invalid("schema_version is missing".into())),
         Some(found) => {
@@ -128,11 +165,7 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
             }
         }
     }
-    let wanted = match kind {
-        DocumentKind::Plan => crate::PLAN_CONTRACT,
-        DocumentKind::Result => crate::RESULT_CONTRACT,
-        DocumentKind::Request => crate::REQUEST_CONTRACT,
-    };
+    let wanted = kind.contract();
     match value.get("contract").and_then(Value::as_str) {
         Some(name) if name == wanted => {}
         Some(other) => {
@@ -142,12 +175,9 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
         }
         None => return Err(SchemaError::Invalid("contract is missing".into())),
     }
-    let outcome = match kind {
-        DocumentKind::Plan => serde_json::from_value::<Plan>(value.clone()).map(drop),
-        DocumentKind::Result => serde_json::from_value::<ResultDoc>(value.clone()).map(drop),
-        DocumentKind::Request => serde_json::from_value::<Request>(value.clone()).map(drop),
-    };
-    outcome.map_err(|e| SchemaError::Invalid(e.to_string()))
+    serde_json::from_value::<T>(value.clone())
+        .map(drop)
+        .map_err(|e| SchemaError::Invalid(e.to_string()))
 }
 
 /// Check a plan document: a known `schema_version` and every required field. Unknown fields are ignored.
@@ -155,7 +185,7 @@ fn check(kind: DocumentKind, value: &Value) -> Result<(), SchemaError> {
 /// # Errors
 /// [`SchemaError`] when the document is refused.
 pub fn check_plan(value: &Value) -> Result<(), SchemaError> {
-    check(DocumentKind::Plan, value)
+    check::<Plan>(DocumentKind::Plan, value)
 }
 
 /// Check a request document, as [`check_plan`] does for a plan.
@@ -163,7 +193,7 @@ pub fn check_plan(value: &Value) -> Result<(), SchemaError> {
 /// # Errors
 /// [`SchemaError`] when the document is refused.
 pub fn check_request(value: &Value) -> Result<(), SchemaError> {
-    check(DocumentKind::Request, value)
+    check::<Request>(DocumentKind::Request, value)
 }
 
 /// Check a result document, as [`check_plan`] does for a plan.
@@ -171,13 +201,30 @@ pub fn check_request(value: &Value) -> Result<(), SchemaError> {
 /// # Errors
 /// [`SchemaError`] when the document is refused.
 pub fn check_result(value: &Value) -> Result<(), SchemaError> {
-    check(DocumentKind::Result, value)
+    check::<ResultDoc>(DocumentKind::Result, value)
+}
+
+/// Check a manifest document, as [`check_plan`] does for a plan.
+///
+/// # Errors
+/// [`SchemaError`] when the document is refused.
+pub fn check_manifest(value: &Value) -> Result<(), SchemaError> {
+    check::<Manifest>(DocumentKind::Manifest, value)
+}
+
+/// Check a verify document, as [`check_plan`] does for a plan.
+///
+/// # Errors
+/// [`SchemaError`] when the document is refused.
+pub fn check_verify(value: &Value) -> Result<(), SchemaError> {
+    check::<VerifyDoc>(DocumentKind::Verify, value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        DocumentKind, SchemaError, check_plan, check_result, schema_file_name, schema_json,
+        DocumentKind, SchemaError, check_plan, check_result, check_verify, schema_file_name,
+        schema_json,
     };
     use serde_json::json;
 
@@ -190,6 +237,39 @@ mod tests {
         assert_eq!(
             schema_file_name(DocumentKind::Result, 1),
             "lodwright-result.v1.json"
+        );
+        assert_eq!(
+            schema_file_name(DocumentKind::Verify, 1),
+            "lodwright-verify.v1.json"
+        );
+    }
+
+    #[test]
+    fn every_kind_parses_from_its_own_name() {
+        for kind in DocumentKind::ALL {
+            assert_eq!(DocumentKind::parse(kind.name()), Some(kind));
+            assert_eq!(kind.contract(), format!("lodwright-{}", kind.name()));
+        }
+        assert_eq!(DocumentKind::parse("nope"), None);
+    }
+
+    #[test]
+    fn every_kind_has_a_schema_at_each_version_it_speaks() {
+        for kind in DocumentKind::ALL {
+            for &version in kind.versions() {
+                assert!(schema_json(kind, version).is_ok(), "{}", kind.name());
+            }
+        }
+    }
+
+    #[test]
+    fn a_verify_report_naming_the_result_contract_is_refused() {
+        let doc = json!({"schema_version": 1, "contract": "lodwright-result"});
+        assert!(
+            check_verify(&doc)
+                .unwrap_err()
+                .to_string()
+                .contains("not \"lodwright-verify\"")
         );
     }
 

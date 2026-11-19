@@ -103,6 +103,9 @@ lodwright generate --data "<data folder>" --load-order plugins.txt --out ~/lod-t
 lodwright verify ~/lod-test
 ```
 
+`verify` exits 0 when the folder is clean, 1 when it lists a finding, 2 on a usage error and 3 when the folder is
+missing or cannot be read. Install the folder only after an exit code of 0.
+
 Look from a high place over open ground, over a lake and over a town, at a distance where LOD shows. Report per world,
 with the `lodwright --version` line: loads or crashes; terrain seams or holes; whether distant lakes show water at the
 right height (water planes are new and our own design); whether distant buildings stand in place and are textured;

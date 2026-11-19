@@ -81,6 +81,12 @@ others, and removes the old manifest's files it neither kept nor wrote. The resu
 whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
 
+Nothing is written, replaced or removed outside the output folder. The folder may itself be a link, and is then
+judged (data folder, git working tree) by where it points. Below it, a folder on a file's path that is a link is
+refused (`output_link`, nothing is written through it). A temporary file is always created new, so a link already at
+its path is removed, never followed. A manifest that lists an absolute path or one with `..` is not trusted and is
+treated as no manifest.
+
 ## Progress events
 
 `lodwright generate --events FILE` (either form of the command; `-` for stderr) writes one JSON line per finished

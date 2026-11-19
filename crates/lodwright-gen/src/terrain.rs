@@ -4,11 +4,11 @@
 //! Every block is independent, so blocks run on a bounded number of threads; the output does not depend on the
 //! thread count because each file's bytes depend only on the world and the settings, and the report is sorted.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use lodwright_contract::{Sha256Stream, sha256_digest};
+use lodwright_contract::Sha256Stream;
 use lodwright_core::layout::{self, BlockId};
 use lodwright_core::lod::LodSettings;
 use lodwright_core::raster::{BlockGrid, HeightRaster};
@@ -95,24 +95,7 @@ pub struct Report {
     pub cancelled: bool,
 }
 
-pub(crate) fn write_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
-    let target: PathBuf = out.join(rel);
-    let io = |source| GenError::Io {
-        what: rel.to_owned(),
-        source,
-    };
-    if let Some(dir) = target.parent() {
-        std::fs::create_dir_all(dir).map_err(io)?;
-    }
-    let temp = target.with_extension("tmp");
-    std::fs::write(&temp, bytes).map_err(io)?;
-    std::fs::rename(&temp, &target).map_err(io)?;
-    Ok(FileRecord {
-        path: rel.to_owned(),
-        bytes: bytes.len() as u64,
-        digest: sha256_digest(bytes),
-    })
-}
+pub(crate) use crate::output::write_output_file as write_file;
 
 fn dds(image: &Image) -> Result<Vec<u8>, GenError> {
     // source: game-lod-terrain-textures

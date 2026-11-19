@@ -6,13 +6,10 @@
 //! * An output folder that is itself a symbolic link is accepted, and the guards judge the folder it points to: a
 //!   user may keep the LOD on another disk behind a link, and refusing every link would refuse that for no gain.
 //!   A link that resolves into the data folder is refused as `output_in_data`, and one that resolves into a git
-//!   working tree should be refused as `output_in_repo`.
+//!   working tree is refused as `output_in_repo`.
 //! * A not yet existing output folder under a linked parent is judged by where it will be created.
 //! * Nothing is ever written, replaced or removed outside the output folder: not through a link planted inside
 //!   it, and not through a manifest entry that climbs out of it.
-//!
-//! The tests marked `ignore` describe what the generator does not do yet; the fix lives in the generator's write
-//! path (`crates/lodwright-api/src/generate.rs` and `crates/lodwright-gen/src/terrain.rs`) and is tracked under #167.
 //!
 //! Unix only: creating a symbolic link on Windows needs a privilege or developer mode that CI and most users do not
 //! have, and the guards resolve links through the same `canonicalize` call on every platform.
@@ -163,7 +160,6 @@ fn a_link_at_the_path_of_an_output_file_is_replaced_and_its_target_left_alone() 
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator follows a link into a git working tree"]
 fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
     let root = temp("link-into-repo");
     let out = root.join("out");
@@ -176,7 +172,6 @@ fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator writes through a linked folder inside the output folder"]
 fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
     let path = written_paths("dir-link-paths").remove(0);
     let first = path.split('/').next().unwrap().to_owned();
@@ -192,7 +187,6 @@ fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator writes its temporary file through a planted link"]
 fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target() {
     let path = written_paths("temp-link-paths").remove(0);
     let root = temp("temp-link");
@@ -208,7 +202,6 @@ fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target(
 }
 
 #[test]
-#[ignore = "quarantine: https://github.com/JorisJonkers-dev/lodwright-rs/issues/167 until 2026-12-03; the generator removes an old manifest entry that climbs out of the output folder"]
 fn an_old_manifest_entry_outside_the_output_folder_is_never_removed() {
     let root = temp("manifest-escape");
     let (out, victim) = (root.join("out"), root.join("victim.txt"));

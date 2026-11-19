@@ -13,6 +13,8 @@ use serde_json::Value;
 
 /// The release that introduced the request document and every option of its first version.
 const REQUEST_V1_SINCE: &str = "0.3.0";
+/// The release that introduces the options added after 0.5.0.
+const NEXT_RELEASE: &str = "0.6.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -70,10 +72,23 @@ pub fn request_defaults() -> Defaults {
         "terrain.land_textures",
         "terrain.water",
         "objects.enabled",
-        "trees.enabled",
     ] {
         options.push(option(&doc, key, OptionKind::Switch));
     }
+    // options that are off by default are not written while off: their default comes from the request type
+    let objects = Request::new("", &[], "").objects;
+    for (key, default) in [
+        ("objects.drop_under_terrain", objects.drop_under_terrain),
+        ("objects.drop_under_water", objects.drop_under_water),
+    ] {
+        options.push(OptionInfo {
+            default: Value::Bool(default),
+            tier: 3,
+            since: NEXT_RELEASE.to_owned(),
+            ..option(&doc, key, OptionKind::Switch)
+        });
+    }
+    options.push(option(&doc, "trees.enabled", OptionKind::Switch));
     options.push(OptionInfo {
         minimum: Some(f64::from(QUALITY_MIN)),
         ..per_level("quality", OptionKind::Number, |l| {
@@ -185,7 +200,12 @@ mod tests {
                     assert_eq!(request.validate(), Ok(()), "{}", o.key);
                 }
             } else {
-                assert_eq!(o.default, at(&doc, &o.key), "{}", o.key);
+                // a switch that is off by default is not written while off
+                let written = match at(&doc, &o.key) {
+                    Value::Null if o.kind == OptionKind::Switch => Value::Bool(false),
+                    v => v,
+                };
+                assert_eq!(o.default, written, "{}", o.key);
             }
         }
         assert_eq!(
@@ -235,7 +255,13 @@ mod tests {
         let d = request_defaults();
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);
-        assert!(d.options.iter().all(|o| o.since == "0.3.0"));
+        assert!(
+            d.options
+                .iter()
+                .all(|o| o.since == "0.3.0" || (o.tier == 3 && o.since == "0.6.0"))
+        );
+        let drop = d.option("objects.drop_under_water").unwrap();
+        assert_eq!((drop.tier, drop.default.clone()), (3, Value::Bool(false)));
         assert_eq!(d.option("limits.threads").unwrap().default, Value::Null);
         assert_eq!(
             d.option("terrain.water").unwrap().default,

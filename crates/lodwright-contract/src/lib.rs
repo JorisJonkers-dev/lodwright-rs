@@ -28,7 +28,8 @@ pub use request::{
     TERRAIN_LEVELS, TEXTURE_SIZE_RANGE, THREADS_MIN, TerrainRequest, TreesRequest,
 };
 pub use result::{
-    BlockCounts, ContractInfo, Handshake, ResultDoc, Status, VersionInfo, Written, peak_memory_mib,
+    BlockCounts, ContractInfo, DroppedFaces, Handshake, ResultDoc, Status, VersionInfo, Written,
+    peak_memory_mib,
 };
 pub use schema::{
     DocumentKind, SchemaError, check_manifest, check_plan, check_request, check_result,

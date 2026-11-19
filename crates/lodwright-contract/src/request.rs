@@ -73,11 +73,23 @@ pub struct ObjectsRequest {
     /// Write object LOD.
     #[serde(default = "yes")]
     pub enabled: bool,
+    /// Leave out object faces that lie wholly under the ground (all three corners below the terrain at their
+    /// position). Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub drop_under_terrain: bool,
+    /// Leave out object faces that lie wholly under the water of a cell that has water. Off by default; written
+    /// only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub drop_under_water: bool,
 }
 
 impl Default for ObjectsRequest {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            drop_under_terrain: false,
+            drop_under_water: false,
+        }
     }
 }
 

@@ -5,6 +5,7 @@ use std::fmt;
 
 /// Why generation failed.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum GenError {
     /// Planning or raster building failed.
     Core(lodwright_core::Error),

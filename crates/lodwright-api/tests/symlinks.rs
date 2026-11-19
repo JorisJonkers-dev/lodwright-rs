@@ -188,6 +188,19 @@ fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
 }
 
 #[test]
+fn an_output_folder_that_is_a_link_inside_a_git_working_tree_is_refused_wherever_it_points() {
+    let root = temp("link-in-repo");
+    let out = root.join("repo/lod");
+    let job = job(&root, &out);
+    std::fs::create_dir_all(root.join("repo/.git")).unwrap();
+    std::fs::create_dir_all(root.join("elsewhere")).unwrap();
+    symlink(root.join("elsewhere"), &out).unwrap();
+    let err = run(&job).unwrap_err();
+    assert_eq!(err.code, "output_in_repo");
+    assert_eq!(entries(&root.join("elsewhere")), Vec::<String>::new());
+}
+
+#[test]
 fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
     let path = written_paths("dir-link-paths").remove(0);
     let first = path.split('/').next().unwrap().to_owned();

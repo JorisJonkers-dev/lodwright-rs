@@ -113,7 +113,8 @@ fn resolve(p: &Path) -> std::path::PathBuf {
     }
 }
 
-/// Whether `path` (the output folder) lies inside a git working tree, judged by the folder it resolves to.
+/// Whether `path` (the output folder) lies inside a git working tree, judged both by its own path and by the folder
+/// it resolves to: a link that sits in a working tree or points into one is refused.
 fn inside_git_tree(path: &Path) -> bool {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     // the folder itself counts too: an output folder that is a working tree's root is inside it

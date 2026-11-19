@@ -395,14 +395,14 @@ note = "The page says hashes are of lower-case names with backslashes and that t
 
 [[source]]
 id = "land-vnml-layout"
-fact = "The VNML subrecord of LAND is 3267 bytes: a 33 x 33 grid of vertex normals, three bytes (x, y, z) per grid point, rows from the south."
+fact = "The VNML subrecord of LAND is 3267 bytes: a 33 x 33 grid of vertex normals, three bytes (x, y, z) per grid point."
 url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandNormals at TES5Edit/TES5Edit revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): array of 33 rows of 33 structs of three u8. The byte encoding of a component (signed or biased) is not stated by either source; the reader keeps the raw bytes."
+note = "Cross-read with xEdit Core/wbDefinitionsCommon.pas wbLandNormals at TES5Edit/TES5Edit revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b (MPL-2.0): array of 33 rows of 33 structs of three u8. The byte encoding of a component (signed or biased) is not stated by either source; the reader keeps the raw bytes. Corrected 2026-11-19: the fact used to end 'rows from the south', which neither source states for VNML (UESP gives the row order for VHGT and VCLR; xEdit names rows and columns without a direction). PROJECT CHOICE: the reader indexes VNML through the same grid accessor as VCLR (row-major from the south-west vertex, land-vclr-layout). Nothing that generates LOD reads VNML today. OPEN: the VNML row order."
 
 [[source]]
 id = "land-vclr-layout"
@@ -428,14 +428,14 @@ note = "UESP calls the FormID big-endian and the layer an unsigned short; xEdit 
 
 [[source]]
 id = "land-vtxt-layout"
-fact = "The VTXT subrecord of LAND is a run of 8-byte points for the preceding ATXT: u16 position (0 to 288, the index in the quadrant's 17 x 17 grid filled row by row from the bottom-left point), two unused bytes, f32 opacity (0.0 to 1.0). Positions not listed have no opacity (zero)."
+fact = "The VTXT subrecord of LAND is a run of 8-byte points for the preceding ATXT: u16 position (0 to 288, the index in the quadrant's 17 x 17 grid filled row by row from the bottom-left point), two unused bytes, f32 opacity (0.0 to 1.0)."
 url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/LAND"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 3 August 2024)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "xEdit wbLandLayers (same revision, MPL-2.0) reads u16 position, two unused bytes and a float opacity. 'Positions not listed are zero' is an inference from the list being sparse, not a statement of either source."
+note = "xEdit wbLandLayers (same revision, MPL-2.0) reads u16 position, two unused bytes and a float opacity. Corrected 2026-11-19: the fact used to end 'Positions not listed have no opacity (zero)', which neither source states. PROJECT CHOICE: decode_vtxt gives every position that no point lists an opacity of zero, and the diffuse blend uses that. OPEN: what the game does with a position no point lists."
 
 [[source]]
 id = "land-quadrant-grid"
@@ -472,14 +472,14 @@ note = "Read RegisterRecordDef(TXST, ...) in wbDefinitionsFNV.pas. Whether the p
 
 [[source]]
 id = "plugin-record-override"
-fact = "A plugin overrides a record of an earlier plugin by carrying a record with the same (resolved) FormID; the record of the later plugin in load order replaces the earlier one as a whole."
+fact = "A plugin overrides a record of an earlier plugin (its master) by carrying a record with the same (resolved) FormID: that shared FormID is how the game knows the later data object replaces the master's. The page does not say whether the replacement is of the whole record or field by field."
 url = "https://en.uesp.net/wiki/Tes4Mod:FormID"
 licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License')"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master. 'As a whole' (no field merging) is the conservative reading; Bethesda games' conflict resolution is whole-record, but no page read here states it."
+note = "The page says a record that reuses a master's FormID 'is how the game knows that your data object is replacing the data object' of the master (quoted by the specifier and the second reader on 2026-11-14; the page answered HTTP 403 to an automated read on 2026-11-19 and was not re-read then). Corrected 2026-11-19: the fact used to add 'replaces the earlier one as a whole', which no source read states. PROJECT CHOICE, not a recorded fact: lodwright applies whole-record replacement (the last plugin in load order that carries the FormID supplies every field of LTEX, TXST, LAND and WRLD; no field-level merging is done). OPEN: whether the game does the same; settled by a public source with a stated licence or by an owner oracle check (see LOG.md)."
 
 [[source]]
 id = "wrld-parent"
@@ -512,7 +512,7 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Read wbWorldObjectBounds. The UESP Oblivion page calls NAM0 and NAM9 'long[2]' (cell coordinates); xEdit reads floats for FNV with a display factor of 1/100 for these games. OPEN: the unit of the stored floats (cells or world units); the reader keeps them as stored and the planner does not use them."
+note = "Read wbWorldObjectBounds, which the FNV WRLD definition uses (Core/wbDefinitionsFNV.pas, RegisterRecordDef(WRLD, ...)). The UESP Oblivion page describes NAM0 and NAM9 for Oblivion as 'long[2]' (cell coordinates): integers in another game, which says nothing about the unit of FNV's floats. xEdit declares each coordinate as IsSF1(wbFloat(..., 1/100), wbFloat(..., 1/4096)); TwbGameDef.IsSF1 (Core/wbInterface.pas line 7377) returns its first argument only when the game is Starfield, so for FO3 and FNV the float's scale is 1/4096 and 1/100 is the Starfield branch (corrected 2026-11-19; the earlier note had the two the wrong way round). TwbFloatDef.ToValue multiplies the stored value by that scale and TwbFloatDef.FromValue divides an entered value by it (Core/wbInterface.pas), so xEdit shows (and accepts) an FNV bound as the stored f32 divided by 4096; the stored bytes are the plain f32. OPEN: the unit of the stored floats. A display divided by 4096 (the cell size, cell-size-units) suggests world units shown as cells, but no source states the unit; reading NAM0 and NAM9 of an owner plugin next to the cell grid of the same world (numbers only) settles it. The reader keeps the stored values; in this repository nothing that generates LOD reads them (only the accessor Worldspace::declared_bounds and its test)."
 
 [[source]]
 id = "cell-water"
@@ -527,14 +527,14 @@ note = "UESP: 'DATA ubyte[1] flags: 0x02 = Has water' and 'XCLW float: Water hei
 
 [[source]]
 id = "wrld-child-inherits"
-fact = "A child worldspace inherits climate, water and map data from its parent; the PNAM flags (bit 0 land data, bit 1 LOD data, bit 3 water data and others) say which groups of data a child takes."
+fact = "In Oblivion (the UESP page has no PNAM) a child worldspace inherits climate, water and map data from its parent named in WNAM."
 url = "https://en.uesp.net/wiki/Tes4Mod:Mod_File_Format/WRLD"
-licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 30 July 2024), and MPL-2.0 for the xEdit flag names"
+licence = "CC-BY-SA-2.5 (UESP wiki footer: 'Attribution-ShareAlike 2.5 License'; page last edited 30 July 2024)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "No public source read says that a child worldspace uses its parent's LAND cells, or what the game does for LOD with a flagged parent. OPEN QUESTION, recorded in docs/design.md. The conservative rule (no inheritance) is the default; the option FlaggedDefaults only lets a child with the 'use land data' flag take the parent's default land and water height (the DNAM struct that xEdit names 'Land Data')."
+note = "Corrected 2026-11-19: the fact used to merge this Oblivion statement with the FNV PNAM flags of xEdit ('the flags say which groups of data a child takes'), which neither source states. The xEdit claim is its own row, wrld-parent (FNV PNAM flags 'Use Land Data', 'Use LOD Data', 'Use Map Data', 'Use Water Data', 'Use Climate Data', 'Use Image Space Data'). OPEN: whether a FNV child inherits anything when a flag is clear, and whether a set flag means the child takes that data from its parent. No public source read says that a child worldspace uses its parent's LAND cells, or what the game does for LOD with a flagged parent. OPEN QUESTION, recorded in docs/design.md. PROJECT CHOICE: the conservative rule (no inheritance) is the default; the option FlaggedDefaults only lets a child with the 'use land data' flag take the parent's default land and water height (the DNAM struct that xEdit names 'Land Data')."
 
 [[source]]
 id = "nif-header-magic-version"
@@ -689,6 +689,17 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Page last updated 2019-08-23. The page's example sizes are all even: rounding down for an odd size is the Direct3D convention and is not stated there, so it stays open until a reference file answers it."
+
+[[source]]
+id = "dds-mip-odd-size"
+fact = "The page gives one example of a mip chain of an odd-sized texture: a 5 by 1 texture whose next level is 2 by 1 and whose next and last level is 1 by 1."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-resources-textures-intro"
+licence = "CC-BY-4.0 (Microsoft Learn documentation; MicrosoftDocs/win32 repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583, desktop-src/direct3d11/overviews-direct3d-11-resources-textures-intro.md (ms.date 05/31/2018), section 1D Textures. The page is about Direct3D 11 resources, not the DDS file format, and gives one odd-size example only. 5 to 2 is rounding down (rounding up would give 3). The same paragraph also says 'the next lower level is always even size (except when the lowest level reaches 1)', which rounding down does not give for every odd size (7 halves to 3); that general sentence is not recorded as a fact. OPEN until a second reader agrees, and until a reference file with an odd size (oracle:) confirms what the game's own textures use."
 
 [[source]]
 id = "bc-block-padding"

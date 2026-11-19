@@ -4,9 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
-    Bounds, Capabilities, DocumentKind, LevelPlan, Plan, PlannedBlock, ResultDoc, Status, ToolInfo,
-    VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_result, check_verify,
-    schema_file_name, schema_json, sha256_digest,
+    Bounds, Capabilities, DocumentKind, LevelPlan, Plan, PlannedBlock, Request, ResultDoc, Status,
+    ToolInfo, VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_request,
+    check_result, check_verify, schema_file_name, schema_json, sha256_digest,
 };
 use lodwright_testkit::golden::assert_golden;
 
@@ -136,6 +136,35 @@ fn the_verify_document_equals_its_golden_file() {
     assert_golden(&golden("verify.json"), &pretty(&sample_verify()));
 }
 
+/// The request every existing output folder was most likely made with: defaults everywhere.
+fn default_request() -> Request {
+    Request::new("/data", &["FalloutNV.esm"], "/out")
+}
+
+/// The digest of [`default_request`] as released. Not rewritten by `UPDATE_GOLDEN`: when this test fails, a change
+/// made every existing manifest's `request_digest` stale, and every output folder would be rebuilt for no reason. A
+/// new request option must not serialise while it has its default value (see docs/contracts.md).
+const DEFAULT_REQUEST_DIGEST: &str =
+    "sha256:029c0350d99a3a289ddf1ab79d491a5bc818c961099cb026cee70ef323ba5642";
+
+#[test]
+fn the_default_request_keeps_its_released_digest() {
+    assert_eq!(default_request().digest(), DEFAULT_REQUEST_DIGEST);
+}
+
+#[test]
+fn the_default_request_document_equals_its_golden_file() {
+    assert_golden(&golden("request_default.json"), &pretty(&default_request()));
+}
+
+#[test]
+fn a_request_read_from_its_golden_file_keeps_the_released_digest() {
+    let request: Request =
+        serde_json::from_str(&std::fs::read_to_string(golden("request_default.json")).unwrap())
+            .unwrap();
+    assert_eq!(request.digest(), DEFAULT_REQUEST_DIGEST);
+}
+
 #[test]
 fn committed_schemas_equal_the_generated_ones() {
     for kind in DocumentKind::ALL {
@@ -175,6 +204,7 @@ fn golden_documents_pass_their_own_schema_check() {
         ("result_unsupported.json", DocumentKind::Result),
         ("result_ok.json", DocumentKind::Result),
         ("verify.json", DocumentKind::Verify),
+        ("request_default.json", DocumentKind::Request),
     ] {
         let value: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(golden(name)).unwrap()).unwrap();
@@ -182,6 +212,7 @@ fn golden_documents_pass_their_own_schema_check() {
             DocumentKind::Plan => check_plan(&value),
             DocumentKind::Result => check_result(&value),
             DocumentKind::Verify => check_verify(&value),
+            DocumentKind::Request => check_request(&value),
             other => unreachable!("no golden {}", other.name()),
         };
         assert_eq!(outcome, Ok(()), "{name}");

@@ -13,7 +13,7 @@
 //! - provenance: every `// source: <id>[, <id>]` (`# source:` in Python, shell, TOML and YAML) names a row of
 //!   `provenance/sources.toml`; the rows are well formed (fields, unique ids, licence stated, no forbidden source) and
 //!   each id appears in `provenance/LOG.md`; a row citing the engine port names one file at a commit, its licence and
-//!   a `second_reader` (`docs/adr/0001-engine-source-as-a-format-input.md`).
+//!   a `second_reader` and `engine_notes` (`docs/adr/0001-engine-source-as-a-format-input.md`).
 //! - data: no file with a game-data extension, no file over [`MAX_BYTES`] and no file with NUL bytes, except the paths
 //!   in `provenance/fixture-allowlist.txt` (`<path> <reason>`, at most [`MAX_ALLOWLIST`] entries).
 //! - gitignore: `.gitignore` lists every game-data extension.
@@ -63,12 +63,14 @@ const FORBIDDEN_SOURCES: [&str; 5] = [
     "leaked",
     "fnv_decomp",
 ];
-/// The engine port's repositories (lower case); a row citing them follows `docs/adr/0001`.
-const ENGINE_REPOS: [&str; 2] = [
-    "https://github.com/slaterain/nv-rs/",
-    "https://github.com/jorisjonkers-dev/nv-rs/",
+/// The engine port's name (lower case): a row whose url or fact names it follows `docs/adr/0001`.
+const ENGINE_NAME: &str = "nv-rs";
+/// The only url form an engine-port row may use (lower case): the GitHub blob of one file at a commit.
+const ENGINE_BLOB_PREFIXES: [&str; 2] = [
+    "https://github.com/slaterain/nv-rs/blob/",
+    "https://github.com/jorisjonkers-dev/nv-rs/blob/",
 ];
-/// The licences an engine-port row may start with (lower case).
+/// The licences an engine-port row may state, exactly (lower case); an expression such as `A AND B` is refused.
 const ENGINE_LICENCES: [&str; 2] = ["gpl-3.0-or-later", "mit"];
 
 /// The retired name, matched case-insensitively.
@@ -396,9 +398,8 @@ fn check_row(label: &str, row: &toml::Table, v: &mut Violations) {
             v.add(label, &format!("names a forbidden input ({needle})"));
         }
     }
-    let lower_url = url.to_lowercase();
-    if ENGINE_REPOS.iter().any(|r| lower_url.starts_with(r)) {
-        check_engine_row(label, row, &lower_url, &licence, v);
+    if haystack.contains(ENGINE_NAME) {
+        check_engine_row(label, row, &url.to_lowercase(), &licence, v);
     }
 }
 
@@ -409,7 +410,9 @@ fn value_text(value: &toml::Value) -> String {
     }
 }
 
-/// A row citing the engine port: one file at a 40-character commit, its licence, and a named second reader.
+/// A row naming the engine port: one file at a 40-character commit on GitHub (a raw url, a mirror, a directory, a
+/// branch, a query or a fragment is refused), exactly one licence the rule covers, the second reader, and a note that
+/// the engine's third-party list was checked.
 fn check_engine_row(
     label: &str,
     row: &toml::Table,
@@ -417,38 +420,50 @@ fn check_engine_row(
     licence: &str,
     v: &mut Violations,
 ) {
-    let at_commit = ENGINE_REPOS.iter().any(|repo| {
-        lower_url
-            .strip_prefix(repo)
-            .and_then(|rest| rest.strip_prefix("blob/"))
-            .is_some_and(|rest| {
-                let (commit, path) = rest.split_at(rest.len().min(40));
-                commit.len() == 40
-                    && commit.chars().all(|c| c.is_ascii_hexdigit())
-                    && path.len() > 1
-                    && path.starts_with('/')
-                    && !path.chars().any(char::is_whitespace)
-            })
+    let at_commit = ENGINE_BLOB_PREFIXES.iter().any(|prefix| {
+        lower_url.strip_prefix(prefix).is_some_and(|rest| {
+            let (commit, path) = rest.split_at(rest.len().min(40));
+            commit.len() == 40
+                && commit.chars().all(|c| c.is_ascii_hexdigit())
+                && path.len() > 1
+                && path.starts_with('/')
+                && !path.ends_with('/')
+                && !path.contains(['?', '#'])
+                && !path.chars().any(char::is_whitespace)
+                && !path.split('/').any(|part| part == "..")
+        })
     });
     if !at_commit {
-        v.add(label, "an engine-port row cites one file at a 40-character commit (.../nv-rs/blob/<commit>/<path>)");
+        v.add(label, "an engine-port row cites one file at a 40-character commit (https://github.com/<owner>/nv-rs/blob/<commit>/<path>)");
     }
     let licence = licence.trim().to_lowercase();
-    if !ENGINE_LICENCES.iter().any(|l| licence.starts_with(l)) {
+    if !ENGINE_LICENCES.contains(&licence.as_str()) {
         v.add(
             label,
-            "an engine-port row states the file's licence (GPL-3.0-or-later or MIT)",
+            "an engine-port row states the file's licence as exactly GPL-3.0-or-later or MIT",
         );
     }
-    if row
-        .get("second_reader")
-        .and_then(toml::Value::as_str)
-        .is_none_or(|r| r.trim().is_empty())
-    {
-        v.add(
-            label,
-            "an engine-port row names its second_reader (not the implementer of the format)",
-        );
+    let mut fields = vec![
+        (
+            "second_reader",
+            "the reader, who is not the implementer of the format",
+        ),
+        (
+            "engine_notes",
+            "what was checked in the engine's third-party notes (LEGAL.md) for this file",
+        ),
+    ];
+    if licence == "mit" {
+        fields.push(("licence_notice", "where the MIT notice is kept"));
+    }
+    for (field, why) in fields {
+        if row
+            .get(field)
+            .and_then(toml::Value::as_str)
+            .is_none_or(|r| r.trim().is_empty())
+        {
+            v.add(label, &format!("an engine-port row names {field}: {why}"));
+        }
     }
 }
 

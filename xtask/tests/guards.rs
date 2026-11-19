@@ -363,10 +363,13 @@ fn broken_toml_fails() {
     ));
 }
 
-fn engine_row(url: &str, licence: &str, reader: Option<&str>) -> String {
+fn engine_row(url: &str, licence: &str, reader: Option<&str>, notes: Option<&str>) -> String {
     let mut row = ROW.replace(DDS_URL, url).replace("CC-BY-4.0", licence);
     if let Some(reader) = reader {
         row.push_str(&format!("second_reader = \"{reader}\"\n"));
+    }
+    if let Some(notes) = notes {
+        row.push_str(&format!("engine_notes = \"{notes}\"\n"));
     }
     row
 }
@@ -375,15 +378,43 @@ fn engine_url(owner: &str, commit: &str) -> String {
     format!("https://github.com/{owner}/nv-rs/blob/{commit}/crates/bsa/src/archive.rs")
 }
 
-#[test]
-fn an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes() {
-    let repo = Repo::new();
-    let row = engine_row(
+fn good_engine_row() -> String {
+    engine_row(
         &engine_url("JorisJonkers-dev", &"a".repeat(40)),
         "GPL-3.0-or-later",
         Some("someone else"),
-    );
+        Some("LEGAL.md third-party list read; original code"),
+    )
+}
+
+#[test]
+fn an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes() {
+    let repo = Repo::new();
+    assert!(with_rows(&repo, &good_engine_row()).is_empty());
+}
+
+#[test]
+fn an_engine_port_row_under_mit_with_its_notice_noted_passes() {
+    let repo = Repo::new();
+    let row = engine_row(
+        &engine_url("slaterain", &"a".repeat(40)),
+        "MIT",
+        Some("x"),
+        Some("n"),
+    ) + "licence_notice = \"kept in LEGAL.md\"\n";
     assert!(with_rows(&repo, &row).is_empty());
+}
+
+#[test]
+fn an_engine_port_row_under_mit_without_its_notice_fails() {
+    let repo = Repo::new();
+    let row = engine_row(
+        &engine_url("slaterain", &"a".repeat(40)),
+        "MIT",
+        Some("x"),
+        Some("n"),
+    );
+    assert!(any_contains(&with_rows(&repo, &row), "licence_notice"));
 }
 
 #[test]
@@ -393,8 +424,21 @@ fn an_engine_port_row_without_a_second_reader_fails() {
         &engine_url("slaterain", &"b".repeat(40)),
         "GPL-3.0-or-later",
         None,
+        Some("n"),
     );
     assert!(any_contains(&with_rows(&repo, &row), "second_reader"));
+}
+
+#[test]
+fn an_engine_port_row_without_the_third_party_check_fails() {
+    let repo = Repo::new();
+    let row = engine_row(
+        &engine_url("slaterain", &"b".repeat(40)),
+        "GPL-3.0-or-later",
+        Some("x"),
+        None,
+    );
+    assert!(any_contains(&with_rows(&repo, &row), "engine_notes"));
 }
 
 #[test]
@@ -404,30 +448,82 @@ fn an_engine_port_row_on_a_branch_instead_of_a_commit_fails() {
         &engine_url("slaterain", "main"),
         "GPL-3.0-or-later",
         Some("someone else"),
+        Some("n"),
     );
     assert!(any_contains(&with_rows(&repo, &row), "40-character commit"));
 }
 
 #[test]
-fn an_engine_port_row_without_the_engine_licence_fails() {
-    let repo = Repo::new();
-    let row = engine_row(
-        &engine_url("slaterain", &"c".repeat(40)),
-        "CC-BY-4.0",
-        Some("someone else"),
-    );
-    assert!(any_contains(&with_rows(&repo, &row), "licence"));
+fn an_engine_port_row_must_cite_a_file_not_a_directory_query_or_fragment() {
+    for tail in [
+        "/crates/bsa/",
+        "/crates/bsa/src/a.rs?plain=1",
+        "/crates/bsa/src/a.rs#L10",
+    ] {
+        let repo = Repo::new();
+        let url = format!(
+            "https://github.com/slaterain/nv-rs/blob/{}{tail}",
+            "a".repeat(40)
+        );
+        let row = engine_row(&url, "GPL-3.0-or-later", Some("x"), Some("n"));
+        assert!(
+            any_contains(&with_rows(&repo, &row), "40-character commit"),
+            "{tail}"
+        );
+    }
 }
 
 #[test]
-fn an_engine_port_row_must_start_with_the_engine_licence() {
+fn an_engine_port_row_through_a_raw_or_mirror_url_fails() {
+    let commit = "a".repeat(40);
+    for url in [
+        format!("https://raw.githubusercontent.com/slaterain/nv-rs/{commit}/crates/bsa/src/a.rs"),
+        format!("https://gitlab.com/someone/nv-rs/-/blob/{commit}/a.rs"),
+        format!("https://github.com/Slaterain/NV-RS/blob/{commit}/../../other/a.rs"),
+    ] {
+        let repo = Repo::new();
+        let row = engine_row(&url, "GPL-3.0-or-later", Some("x"), Some("n"));
+        assert!(
+            any_contains(&with_rows(&repo, &row), "40-character commit"),
+            "{url}"
+        );
+    }
+}
+
+#[test]
+fn an_engine_port_row_must_name_exactly_one_engine_licence() {
+    for licence in [
+        "CC-BY-4.0",
+        "BSD-3-Clause AND GPL-3.0-or-later",
+        "GPL-3.0-or-later AND BSD-3-Clause",
+        "GPL-3.0-or-later-ish",
+        "MIT OR Apache-2.0",
+        "GPL-3.0-only",
+    ] {
+        let repo = Repo::new();
+        let row = engine_row(
+            &engine_url("slaterain", &"d".repeat(40)),
+            licence,
+            Some("x"),
+            Some("n"),
+        );
+        assert!(
+            any_contains(&with_rows(&repo, &row), "licence"),
+            "{licence}"
+        );
+    }
+}
+
+#[test]
+fn the_engine_licence_check_ignores_case() {
     let repo = Repo::new();
     let row = engine_row(
         &engine_url("slaterain", &"d".repeat(40)),
-        "BSD-3-Clause AND GPL-3.0-or-later",
+        "gpl-3.0-or-later",
         Some("x"),
+        Some("n"),
     );
-    assert!(any_contains(&with_rows(&repo, &row), "licence"));
+    assert!(with_rows(&repo, &row).is_empty());
 }
 
 // --- data guard --------------------------------------------------------------------------------------------------

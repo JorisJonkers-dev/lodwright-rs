@@ -115,6 +115,8 @@ fn progress_starts_each_step_and_counts_every_terrain_block() {
     let level4: Vec<_> = blocks.iter().filter(|e| e.level == Some(4)).collect();
     assert_eq!(level4.len(), 2);
     assert_eq!(level4.last().unwrap().done, Some(2));
+    // every counted event has its events-file line, so the file and the callback tell the same story
+    assert!(blocks.iter().all(|e| e.block_line().is_some()));
 }
 
 #[test]

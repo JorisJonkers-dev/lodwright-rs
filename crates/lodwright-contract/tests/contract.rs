@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
     Bounds, Capabilities, DocumentKind, LevelPlan, Plan, PlannedBlock, Request, ResultDoc, Status,
-    ToolInfo, WorldPlan, Written, check_plan, check_request, check_result, schema_file_name,
-    schema_json, sha256_digest,
+    ToolInfo, VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_request,
+    check_result, check_verify, schema_file_name, schema_json, sha256_digest,
 };
 use lodwright_testkit::golden::assert_golden;
 
@@ -113,6 +113,29 @@ fn the_ok_result_equals_its_golden_file() {
     assert_golden(&golden("result_ok.json"), &pretty(&doc));
 }
 
+fn sample_verify() -> VerifyDoc {
+    let mut doc = VerifyDoc::new();
+    doc.ok = false;
+    doc.terrain_blocks = 4;
+    doc.object_blocks = 1;
+    doc.textures = 8;
+    doc.settings = 1;
+    doc.errors = vec![VerifyFinding {
+        path: "lodsettings/island.dlodsettings".into(),
+        problem: "the width disagrees with the corners".into(),
+    }];
+    doc.differences = vec![VerifyFinding {
+        path: "meshes/landscape/lod/island/island.level4.x0.y0.nif".into(),
+        problem: "block types differ".into(),
+    }];
+    doc
+}
+
+#[test]
+fn the_verify_document_equals_its_golden_file() {
+    assert_golden(&golden("verify.json"), &pretty(&sample_verify()));
+}
+
 /// The request every existing output folder was most likely made with: defaults everywhere.
 fn default_request() -> Request {
     Request::new("/data", &["FalloutNV.esm"], "/out")
@@ -144,15 +167,33 @@ fn a_request_read_from_its_golden_file_keeps_the_released_digest() {
 
 #[test]
 fn committed_schemas_equal_the_generated_ones() {
-    for kind in [
-        DocumentKind::Plan,
-        DocumentKind::Result,
-        DocumentKind::Request,
-    ] {
-        let generated = schema_json(kind, 1).unwrap();
-        // UPDATE_GOLDEN=1 rewrites the committed file; without it a drift fails here.
-        assert_golden(&schemas(&schema_file_name(kind, 1)), &generated);
+    for kind in DocumentKind::ALL {
+        for &version in kind.versions() {
+            let generated = schema_json(kind, version).unwrap();
+            // UPDATE_GOLDEN=1 rewrites the committed file; without it a drift fails here.
+            assert_golden(&schemas(&schema_file_name(kind, version)), &generated);
+        }
     }
+}
+
+#[test]
+fn every_committed_schema_belongs_to_a_kind_this_build_speaks() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    let mut expected: Vec<String> = DocumentKind::ALL
+        .into_iter()
+        .flat_map(|kind| {
+            kind.versions()
+                .iter()
+                .map(move |&v| schema_file_name(kind, v))
+        })
+        .collect();
+    expected.sort();
+    assert_eq!(names, expected);
 }
 
 #[test]
@@ -162,6 +203,7 @@ fn golden_documents_pass_their_own_schema_check() {
         ("plan_blocks.json", DocumentKind::Plan),
         ("result_unsupported.json", DocumentKind::Result),
         ("result_ok.json", DocumentKind::Result),
+        ("verify.json", DocumentKind::Verify),
         ("request_default.json", DocumentKind::Request),
     ] {
         let value: serde_json::Value =
@@ -169,7 +211,9 @@ fn golden_documents_pass_their_own_schema_check() {
         let outcome = match kind {
             DocumentKind::Plan => check_plan(&value),
             DocumentKind::Result => check_result(&value),
+            DocumentKind::Verify => check_verify(&value),
             DocumentKind::Request => check_request(&value),
+            other => unreachable!("no golden {}", other.name()),
         };
         assert_eq!(outcome, Ok(()), "{name}");
     }

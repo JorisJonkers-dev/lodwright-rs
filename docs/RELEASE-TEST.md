@@ -56,7 +56,8 @@ lodwright verify <scratch>/gen --reference <scratch>/reference
 
 Pass:
 
-- the first command reports 0 errors and 0 differences;
+- the first command exits 0 and reports 0 errors and 0 differences (the second exits 1 whenever it lists a
+  difference, which the reference's other worlds always cause, so its exit code is not the pass criterion);
 - against the reference, no file of the main world is missing or extra (the other worlds of the reference are not
   generated and are ignored, as is `manifest.json`);
 - every object block has the reference's vertex and triangle counts, and every vertex lies within 0.05 units of one

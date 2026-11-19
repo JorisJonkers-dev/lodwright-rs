@@ -2,14 +2,17 @@
 //! Command line of lodwright. The logic is here so tests can drive it without a process.
 //!
 //! Exit codes: 0 success, 1 failed (a result document is still printed with `--json`), 2 usage error or an
-//! unsupported `--schema-version`, 3 unsupported (a capability is not built yet).
+//! unsupported `--schema-version`, 3 unsupported (a capability is not built yet). `verify` has its own meanings for 1
+//! and 3: 1 findings (an error in the folder or a difference from the reference), 3 a folder that cannot be read.
 //!
 //! With `--json`, result and error documents go to stdout; stderr carries human text only.
 
 use std::io::Write;
 use std::path::Path;
 
-use lodwright_contract::{DocumentKind, Handshake, VersionInfo, schema_json};
+use lodwright_contract::{
+    DocumentKind, Handshake, VerifyDoc, VerifyFinding, VersionInfo, schema_json,
+};
 
 mod commands;
 mod failure;
@@ -25,6 +28,8 @@ pub const EXIT_FAILED: u8 = 1;
 pub const EXIT_USAGE: u8 = 2;
 /// Exit code: a capability is not built yet (`generate`).
 pub const EXIT_UNSUPPORTED: u8 = 3;
+/// Exit code of `verify`: the folder or the reference cannot be read (missing, not a folder, no permission).
+pub const EXIT_UNREADABLE: u8 = 3;
 
 const HELP: &str = "lodwright: clean-room terrain, object and tree LOD generator
 
@@ -37,7 +42,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
        lodwright verify <folder> [--reference <folder>] [--json]
-       lodwright schema <plan|result|request> [--schema-version N]
+       lodwright schema <plan|result|request|manifest|verify|events> [--schema-version N]
        lodwright contracts --json
        lodwright probe <nif|dds|settings|dtl> <file> [--json | --format text|json] [--allow-in-repo]
        lodwright heightmap --data <data-folder> (--plugin NAME ... | --load-order FILE) --world NAME
@@ -55,8 +60,9 @@ Commands:
                         writes one JSON line per finished terrain, object and tree block to FILE (- for stderr)
   verify                check a generated LOD folder against the game's formats: every NIF re-read and written back
                         byte for byte, indices, bounds, UVs, texture formats and mips, names, settings; with
-                        --reference also compare names and block types with another folder. Exit 1 on findings
-  schema                print the JSON Schema of a document (plan or result)
+                        --reference also compare names and block types with another folder
+  schema                print the JSON Schema of a document: plan, result, request, manifest, verify or events
+                        (one progress event line)
   contracts --json      print the contracts this build speaks and their schema versions, as
                         {\"contracts\":[{\"name\":...,\"versions\":[...]}]}
   probe                 print only structure and numbers of one file (NIF header and shapes, DDS header and channel
@@ -72,6 +78,8 @@ Options:
       --json     print JSON (an alias of --format json)
 
 Exit codes: 0 ok, 1 failed, 2 usage error, 3 unsupported.
+verify exits 0 clean, 1 findings, 2 usage error, 3 unreadable folder; a finding is an error in the folder or,
+with --reference, a difference from the reference.
 ";
 
 /// Run the command line `args` (without the program name). Output goes to `out`, diagnostics to `err`.
@@ -211,7 +219,10 @@ fn schema_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         }
     }
     let Some(kind) = kind else {
-        return usage(err, "schema takes a document name: plan or result");
+        return usage(
+            err,
+            "schema takes a document name: plan, result, request, manifest, verify or events",
+        );
     };
     let version = version.unwrap_or_else(|| kind.versions().last().copied().unwrap_or(1));
     match schema_json(kind, version) {
@@ -247,52 +258,65 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let Some(folder) = folder else {
         return usage(err, "verify needs the folder to check");
     };
-    if !Path::new(folder).is_dir() {
-        let _ = writeln!(err, "lodwright: verify: {folder} is not a folder");
-        return EXIT_FAILED;
+    for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
+        let Some(dir) = dir else { continue };
+        if std::fs::read_dir(dir).is_err() {
+            let _ = writeln!(
+                err,
+                "lodwright: verify: the {role} {dir} cannot be read as a folder"
+            );
+            return EXIT_UNREADABLE;
+        }
     }
     let mut verification = lodwright_gen::verify_folder(Path::new(folder));
     if let Some(reference) = reference {
         verification.differences =
             lodwright_gen::compare_folders(Path::new(folder), Path::new(reference));
     }
-    let findings = |list: &[lodwright_gen::Finding]| -> Vec<serde_json::Value> {
-        list.iter()
-            .map(|f| serde_json::json!({"path": f.path, "problem": f.problem}))
-            .collect()
-    };
-    let ok = verification.errors.is_empty();
+    let doc = verify_document(&verification);
+    let clean = doc.ok && doc.differences.is_empty();
     if json {
-        let doc = serde_json::json!({
-            "schema_version": 1,
-            "contract": "lodwright-verify",
-            "ok": ok,
-            "terrain_blocks": verification.terrain_blocks,
-            "object_blocks": verification.object_blocks,
-            "tree_blocks": verification.tree_blocks,
-            "textures": verification.textures,
-            "settings": verification.settings,
-            "errors": findings(&verification.errors),
-            "differences": findings(&verification.differences),
-        });
-        let _ = writeln!(out, "{doc}");
+        let _ = writeln!(out, "{}", to_json(&doc));
     } else {
         let _ = writeln!(
             out,
             "{} terrain blocks, {} object blocks, {} tree blocks, {} textures, {} settings files: {} errors, {} differences",
-            verification.terrain_blocks,
-            verification.object_blocks,
-            verification.tree_blocks,
-            verification.textures,
-            verification.settings,
-            verification.errors.len(),
-            verification.differences.len()
+            doc.terrain_blocks,
+            doc.object_blocks,
+            doc.tree_blocks,
+            doc.textures,
+            doc.settings,
+            doc.errors.len(),
+            doc.differences.len()
         );
-        for f in verification.errors.iter().chain(&verification.differences) {
+        for f in doc.errors.iter().chain(&doc.differences) {
             let _ = writeln!(out, "{}: {}", f.path, f.problem);
         }
     }
-    if ok { EXIT_OK } else { EXIT_FAILED }
+    if clean { EXIT_OK } else { EXIT_FAILED }
+}
+
+/// The `lodwright-verify` document of a verification.
+fn verify_document(verification: &lodwright_gen::Verification) -> VerifyDoc {
+    let findings = |list: &[lodwright_gen::Finding]| -> Vec<VerifyFinding> {
+        list.iter()
+            .map(|f| VerifyFinding {
+                path: f.path.clone(),
+                problem: f.problem.clone(),
+            })
+            .collect()
+    };
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let mut doc = VerifyDoc::new();
+    doc.ok = verification.errors.is_empty();
+    doc.terrain_blocks = count(verification.terrain_blocks);
+    doc.object_blocks = count(verification.object_blocks);
+    doc.tree_blocks = count(verification.tree_blocks);
+    doc.textures = count(verification.textures);
+    doc.settings = count(verification.settings);
+    doc.errors = findings(&verification.errors);
+    doc.differences = findings(&verification.differences);
+    doc
 }
 
 fn usage(err: &mut dyn Write, problem: &str) -> u8 {

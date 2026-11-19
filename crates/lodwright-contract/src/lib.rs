@@ -27,7 +27,8 @@ pub use plan::{
 };
 pub use request::{
     Inclusion, LevelRequest, Limits, MAX_VERTICES_RANGE, ObjectsRequest, QUALITY_MIN, Request,
-    TERRAIN_LEVELS, TEXTURE_SIZE_RANGE, THREADS_MIN, TerrainRequest, TreesRequest,
+    TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN, TerrainRequest,
+    TreesRequest,
 };
 pub use result::{
     BlockCounts, ContractInfo, Handshake, ResultDoc, Status, VersionInfo, Written, peak_memory_mib,

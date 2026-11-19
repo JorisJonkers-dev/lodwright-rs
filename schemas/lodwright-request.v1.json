@@ -224,6 +224,14 @@
             "$ref": "#/$defs/LevelRequest"
           }
         },
+        "texture_scales": {
+          "description": "How often a land texture repeats across a cell quadrant in the diffuse maps, by the land texture's absolute\n`FormID` (eight hex digits); a texture not listed repeats once. Empty by default; written only when set.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "format": "float"
+          }
+        },
         "water": {
           "description": "Write water planes into the terrain blocks that have ground below water.",
           "type": "boolean",

@@ -6,13 +6,15 @@
 
 use lodwright_contract::{
     DEFAULTS_CONTRACT, Defaults, LevelDefault, MAX_VERTICES_RANGE, OptionInfo, OptionKind,
-    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SIZE_RANGE, THREADS_MIN,
+    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN,
 };
 use lodwright_core::terrain::{LevelSettings, TerrainSettings};
 use serde_json::Value;
 
 /// The release that introduced the request document and every option of its first version.
 const REQUEST_V1_SINCE: &str = "0.3.0";
+/// The release that introduces the options added after 0.5.0.
+const NEXT_RELEASE: &str = "0.6.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -65,13 +67,18 @@ fn per_level(key: &str, kind: OptionKind, value: impl Fn(&LevelSettings) -> Valu
 pub fn request_defaults() -> Defaults {
     let doc = serde_json::to_value(Request::new("", &[], "")).expect("a request serialises");
     let mut options = vec![option(&doc, "worlds", OptionKind::List)];
-    for key in [
-        "terrain.enabled",
-        "terrain.land_textures",
-        "terrain.water",
-        "objects.enabled",
-        "trees.enabled",
-    ] {
+    for key in ["terrain.enabled", "terrain.land_textures", "terrain.water"] {
+        options.push(option(&doc, key, OptionKind::Switch));
+    }
+    options.push(OptionInfo {
+        default: Value::Object(serde_json::Map::new()),
+        minimum: Some(f64::from(TEXTURE_SCALE_RANGE.0)),
+        maximum: Some(f64::from(TEXTURE_SCALE_RANGE.1)),
+        tier: 3,
+        since: NEXT_RELEASE.to_owned(),
+        ..option(&doc, "terrain.texture_scales", OptionKind::Map)
+    });
+    for key in ["objects.enabled", "trees.enabled"] {
         options.push(option(&doc, key, OptionKind::Switch));
     }
     options.push(OptionInfo {
@@ -185,7 +192,14 @@ mod tests {
                     assert_eq!(request.validate(), Ok(()), "{}", o.key);
                 }
             } else {
-                assert_eq!(o.default, at(&doc, &o.key), "{}", o.key);
+                // an option that is empty by default is not written while empty
+                let written = match at(&doc, &o.key) {
+                    Value::Null if o.kind == OptionKind::Map => {
+                        Value::Object(serde_json::Map::new())
+                    }
+                    v => v,
+                };
+                assert_eq!(o.default, written, "{}", o.key);
             }
         }
         assert_eq!(
@@ -199,10 +213,11 @@ mod tests {
         for o in request_defaults().options {
             let accepts = |v: f64| {
                 #[allow(clippy::cast_possible_truncation)] // the bounds are small whole numbers
-                let value = if o.kind == OptionKind::Integer {
-                    Value::from(v as i64)
-                } else {
-                    Value::from(v)
+                let value = match o.kind {
+                    OptionKind::Integer => Value::from(v as i64),
+                    // a map's range is the range of each value
+                    OptionKind::Map => json!({ "0000ABCD": v }),
+                    _ => Value::from(v),
                 };
                 with(&o.key, &value).is_some_and(|r| r.validate().is_ok())
             };
@@ -235,7 +250,13 @@ mod tests {
         let d = request_defaults();
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);
-        assert!(d.options.iter().all(|o| o.since == "0.3.0"));
+        assert!(
+            d.options
+                .iter()
+                .all(|o| o.since == "0.3.0" || (o.tier == 3 && o.since == "0.6.0"))
+        );
+        let scales = d.option("terrain.texture_scales").unwrap();
+        assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         assert_eq!(d.option("limits.threads").unwrap().default, Value::Null);
         assert_eq!(
             d.option("terrain.water").unwrap().default,

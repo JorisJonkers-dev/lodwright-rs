@@ -20,7 +20,7 @@ pipeline the community generators provide for this game. Each row is one work it
 | 13 | Performance | Parallel terrain blocks, bounded worker count; the main worldspace takes about 9 seconds and 0.5 GiB with four workers | Memory cap option, streaming of large plugins |
 | 14 | CLI | `plan`, `heightmap`, `probe`, `generate`, `verify`, `schema` | Nothing known |
 | 17 | Water planes in terrain blocks | Done: flat planes at each cell's water height over the ground below it, written as the game's blocks do (`game-lod-water-shape`, `game-lod-water-height`); the covered ground overlaps the game's planes by 0.986 at level 4 and 0.91 to 0.98 above | The game's own outline and sloped edges, in-game check (owner) |
-| 15 | Integration for the Toolbox (`raul`) | Plan, result, request and manifest contracts; `lodwright-gen` library; stable exit codes; progress events (`--events FILE|-`, one line per terrain block) | Events for object LOD |
+| 15 | Integration for the Toolbox (`raul`) | Plan, result, request and manifest contracts; `lodwright-gen` library; stable exit codes; progress events (`--events FILE|-` with either form of `generate`, and the library's progress callback): one per finished terrain, object and tree block | Schema file and handshake entry for the events (#87) |
 | 16 | In-game acceptance | Owner only | Loading generated blocks in the game |
 
 What verification means here: tests build synthetic plugins and archives; real-data checks read the owner's install

@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, Progress, ProgressEvent, Step};
+use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, Progress, ProgressEvent};
 use lodwright_contract::{Capabilities, Request, ResultDoc, Status, peak_memory_mib};
 
 use crate::commands::{arguments_digest_of, failed_document};
@@ -33,27 +33,13 @@ fn request_from_options(options: &Options) -> Request {
     request
 }
 
-/// `--events`: one `lodwright` event line per finished terrain block, to a file or to stderr.
+/// `--events`: one `lodwright` event line per finished terrain, object or tree block, to a file or to stderr.
 struct EventLines(Box<dyn Write + Send>);
 
 impl Progress for EventLines {
     fn report(&mut self, event: &ProgressEvent) {
-        if let (Step::Terrain, Some(world), Some(level), Some(done), Some(of)) = (
-            event.step,
-            &event.world,
-            event.level,
-            event.done,
-            event.total,
-        ) {
-            let line = lodwright_contract::Event::Block {
-                world: world.clone(),
-                level,
-                done,
-                of,
-                up_to_date: event.up_to_date,
-            }
-            .to_line();
-            let _ = writeln!(self.0, "{line}");
+        if let Some(line) = event.block_line() {
+            let _ = writeln!(self.0, "{}", line.to_line());
         }
     }
 }

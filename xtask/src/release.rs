@@ -61,11 +61,35 @@ fn root() -> PathBuf {
         .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }
 
+/// The macOS asset (arm64 and x86_64 in one file), built on macOS and passed in as a directory.
+pub const MACOS_ASSET: &str = "lodwright-universal-apple-darwin";
+
+/// Copy the macOS binary from `dir` into `out` as an executable release asset.
+///
+/// # Errors
+/// A message when the file is missing or cannot be copied.
+pub fn add_macos(out: &Path, dir: &Path) -> Result<(), String> {
+    let source = dir.join(MACOS_ASSET);
+    if !source.is_file() {
+        return Err(format!("release-assets: {} is missing", source.display()));
+    }
+    let target = out.join(MACOS_ASSET);
+    std::fs::copy(&source, &target)
+        .map_err(|e| format!("release-assets: cannot copy the macOS binary: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("release-assets: cannot make the macOS binary executable: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Build the assets into `out`, which must be missing or empty.
 ///
 /// # Errors
 /// A message naming the step that failed; nothing is published.
-pub fn build(out: &Path) -> Result<(), String> {
+pub fn build(out: &Path, macos: Option<&Path>) -> Result<(), String> {
     if out.exists()
         && std::fs::read_dir(out)
             .map_err(|e| e.to_string())?
@@ -130,6 +154,9 @@ pub fn build(out: &Path) -> Result<(), String> {
         std::fs::write(out.join(&name), committed)
             .map_err(|e| format!("release-assets: cannot write {name}: {e}"))?;
     }
+    if let Some(dir) = macos {
+        add_macos(out, dir)?;
+    }
     let text = sums(out)?;
     std::fs::write(out.join("SHA256SUMS"), text)
         .map_err(|e| format!("release-assets: cannot write SHA256SUMS: {e}"))?;
@@ -158,6 +185,20 @@ mod tests {
         );
         assert_eq!(schema_kind_and_version("other.v1.json"), None);
         assert_eq!(schema_kind_and_version("lodwright-request.json"), None);
+    }
+
+    #[test]
+    fn the_macos_binary_is_copied_and_a_missing_one_is_an_error() {
+        let base = std::env::temp_dir().join(format!("xtask-macos-{}", std::process::id()));
+        let (out, mac) = (base.join("out"), base.join("mac"));
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::create_dir_all(&mac).unwrap();
+        let error = add_macos(&out, &mac).unwrap_err();
+        assert!(error.contains("is missing"), "{error}");
+        std::fs::write(mac.join(MACOS_ASSET), b"binary").unwrap();
+        add_macos(&out, &mac).unwrap();
+        assert_eq!(std::fs::read(out.join(MACOS_ASSET)).unwrap(), b"binary");
+        std::fs::remove_dir_all(&base).unwrap();
     }
 
     #[test]

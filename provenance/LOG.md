@@ -515,3 +515,37 @@ rows. What a second reader checks: each new row against the named sections (incl
 which is printed with unpromoted names); the integer-rounding equivalences above; whether the three-colour truncation
 should be left (inside the bound) or changed to round half up. The rows say what a conforming decoder may do; they say
 nothing about the game, which never decodes in the probe's way.
+
+## 2026-11-19: DRAFT rows for BSA writing: name hash, record order, archive registration (work item C1)
+
+Specifier entry, role held: specifier only; whoever specified these rows must not implement the BSA writer (issue 44)
+without a second reader. Draft: the rows are recorded so the owner or a separate reading session can complete them;
+they are not facts the writer may rely on until verified.
+
+Read: `Core/wbHash.pas`, `Core/wbBSArchive.pas`, `Core/wbImplementation.pas`, `Core/wbInterface.pas` and
+`xEdit/xeMainForm.pas` of TES5Edit/TES5Edit at revision `3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file headers and repository licence). xEdit is an
+allowed input (docs/clean-room.md, input 2). Not read: the 2016 generator C# repository, decompiled binaries, GPL or
+leaked code, and no game engine source (owner decision D5 does not apply to these rows).
+
+Could not be read: the UESP pages `Skyrim_Mod:Archive_File_Format` and `Tes4Mod:BSA_File_Format` (HTTP 403 to automated
+reads on this date). They are the public format pages owner decision D4 names first; a human reader compares the hash
+row with their hash section and records whether they give a test vector.
+
+- `bsa-name-hash`: the v104 hash as xEdit's archive writer computes it. No public test vector was found.
+- `bsa-record-order`: folder records by folder hash, file records by file hash, as xEdit writes them. Whether the game
+  requires this order is open.
+- `bsa-archive-registration`: how xEdit models archive loading for FO3 and FNV (INI list, Update.bsa, archives whose
+  name starts with a plugin's name). A model of a tool, not a measurement.
+
+Leads seen in the same file, recorded here and not as rows (they belong to issues 52 and 44): xEdit's writer sets the
+stored size of a v104 file to everything it wrote for that file, embedded name and uncompressed-size field included
+(comment in `TwbBSArchive.PackData`: "Size includes embedded filename and uncompressed size field"); and its checks warn
+that archives of the v104 type (FO3, FNV, Skyrim) or Skyrim SE with the embedded-names flag holding non-texture files may crash the game, and
+that cubemap textures need that flag. Issue 52 can use the first as a public source beside its measurement.
+
+What a second reader checks for each row: the functions named in its note at the same revision; that the row states
+how xEdit behaves and nothing about the game beyond that. What the owner checks (numbers and names only): the folder
+and file hashes of a few records of an own v104 archive against the hash row; that its records ascend by hash; and the
+in-game load of a plugin-named archive on the target engine (D2).
+
+Status (2026-11-19): all three rows merge as `verified = false`, marked UNVERIFIED in their notes. They are drafts by design: a human second reader checks them as described above, and nothing implements the writer or the hash from them before that.

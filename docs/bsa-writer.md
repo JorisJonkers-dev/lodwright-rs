@@ -5,8 +5,10 @@ here is built yet. Owner decisions: packing is opt-in and gated (D1), the archiv
 same name once an in-game test confirms it (D2, #132), packing is a step at the end of a generate (D3), and the Mod
 never holds loose and packed output at the same time (G2).
 
-Every format fact below names its row. Rows marked *draft* are in #165 (C1, `verified = false`); the writer may rely on
-them only after a second reader has verified them and #124's public test vector exists. Whoever specified those rows
+Every format fact below names its row. A row is *draft* when it is in #165 (C1) and, in general, when `verified = false`:
+`bsa-v104-data-blocks`, `plugin-record-header` and `plugin-subrecord-layout` are not verified yet either, and neither
+is the C1 trio. The writer may rely on a row only after a second reader has verified it, and on the C1 rows only after
+#124's public test vector exists. Whoever specified those rows
 does not implement the writer without that second reading (`docs/clean-room.md`).
 
 ## 1. What the writer takes and gives
@@ -23,16 +25,17 @@ PackOptions { compressed_by_default: bool }
 - `compress` per entry comes from the caller's per-kind rule (terrain uncompressed, object textures compressed). This
   is a performance default taken from the guide page that `fnv-archive-loading` cites (`docs/spec/game-pickup.md`);
   no row records it and it is not a format fact. The archive's compressed-by-
-  default flag is set to the majority choice, and entries that differ carry the invert bit (`bsa-v104-file-records`).
+  default flag is set when more than half of the entries are compressed (an exact tie is not compressed), so the choice
+  never depends on input order, and entries that differ carry the invert bit (`bsa-v104-file-records`).
 - The result reads back through the existing reader (`Archive::open`, `Archive::extract`): the first test.
 
 ## 2. Names
 
 - Each path is normalised to lower case with backslashes (`bsa-path-form`), then split at the last backslash into
   folder and file name. A path with no folder part is refused (the format keeps every file in a folder).
-- Choice: folder names longer than 254 bytes are refused. The folder name is a bzstring (`bsa-v104-folder-records`);
-  the reader takes its length from one byte that counts the NUL, so 254 bytes plus the NUL is the longest name writer
-  and reader agree on.
+- Choice: folder names and file names longer than 254 bytes are refused (the test archive builder asserts `< 255`, the
+  same limit). The folder name is a bzstring (`bsa-v104-folder-records`); the reader takes its length from one byte
+  that counts the NUL, so 254 bytes plus the NUL is the longest name writer and reader agree on.
 - Two input paths that normalise to the same name are refused (`PackError::CaseCollision` naming both). Linux file
   systems allow them; the archive cannot hold both.
 
@@ -48,8 +51,9 @@ PackOptions { compressed_by_default: bool }
 
 ## 4. Layout
 
-All from the verified rows `bsa-v104-header`, `bsa-v104-folder-records`, `bsa-v104-file-records`,
-`bsa-v104-data-blocks`:
+From the verified rows `bsa-v104-header`, `bsa-v104-folder-records` and `bsa-v104-file-records`, and from
+`bsa-v104-data-blocks`, which is **not verified yet** (the compressed-block layout in step 5 waits for its second
+reader):
 
 1. Header, 36 bytes: `BSA\0`, version 104, folder-record offset 36, archive flags `0x1 | 0x2` plus `0x4` when
    compressed by default, folder count, file count, total folder-name length (with the NULs, without the length
@@ -57,7 +61,8 @@ All from the verified rows `bsa-v104-header`, `bsa-v104-folder-records`, `bsa-v1
 2. Folder records, 16 bytes each: hash, file count, offset. The row says to subtract the total file-name length from
    the stored offset to get the folder block's position in the file, so the writer stores *position + total file-name
    length* (`bsa-v104-folder-records`).
-3. Folder blocks in record order: the bzstring folder name, then 16-byte file records (hash, size with bit 30 as the
+3. Folder blocks one after another in folder-record order (stated in `bsa-v104-folder-records`; no padding between
+   blocks is mentioned, so none is written): the bzstring folder name, then 16-byte file records (hash, size with bit 30 as the
    invert flag, offset of the data from the start of the archive).
 4. The file-name block: the lower-case file names with a NUL each, in file-record order.
 5. Data in file-record order: a compressed file is the u32 original size then the zlib stream, and its stored size is
@@ -67,7 +72,7 @@ All from the verified rows `bsa-v104-header`, `bsa-v104-folder-records`, `bsa-v1
   warns that archives with embedded names holding non-texture files may crash FO3 and FNV, and that cubemap textures
   need the flag (lead recorded in #165's log; LOD has no cubemaps).
 - File flags: lodwright's reader does not use them (`crates/lodwright-assets/src/bsa.rs`); the value to write is open (#124 can record it from the public page or
-  from an owner archive's header, numbers only). Until then the writer writes 0 and the in-game check (#132) decides.
+  from an owner archive's header, numbers only). Until then the writer writes 1 (the value the test archive builder writes, which the reader accepts); no row says what the game needs, and the in-game check (#132) decides. A row replaces this value, and the test builder follows it.
 
 ## 5. Limits (refused with a named error; which cases to refuse is a choice, the limits come from the rows)
 
@@ -78,7 +83,7 @@ All from the verified rows `bsa-v104-header`, `bsa-v104-folder-records`, `bsa-v1
 | Counts over `u32::MAX` | header fields are u32 | `ArchiveTooLarge` |
 | Same name twice after normalisation | section 2 | `CaseCollision` |
 | Equal hashes for different names | section 3 | `HashCollision` |
-| No folder part, folder name over 254 bytes | section 2 | `BadPath` |
+| No folder part, folder or file name over 254 bytes | section 2 | `BadPath` |
 | No file at all | an empty archive is not written | `Empty` |
 | Total folder-name or file-name length over `u32::MAX` | header fields are u32 | `ArchiveTooLarge` |
 
@@ -92,18 +97,23 @@ All from the verified rows `bsa-v104-header`, `bsa-v104-folder-records`, `bsa-v1
 
 ## 7. Tests (synthetic, in memory)
 
-- Round trip: writer to `Archive::open` and `extract`, for stored, compressed and mixed archives.
+- Round trip: writer to `Archive::open` and `extract`, for stored, compressed and mixed archives. This proves only that
+  writer and reader agree on the layout: the reader ignores hashes and does not check record order, and the test
+  archive builder writes stand-in hashes, so a wrong hash or order passes it.
+- Hash and order tests that can fail: the hash function against the public test vector and the draft row's worked
+  cases, and a check on the written bytes that reads the folder-record hashes and file-record hashes back from the
+  archive and asserts they are the hashes of the stored names and ascending as unsigned 64-bit values.
 - A golden of a tiny archive as hex text under the crate's test goldens (never a `.bsa`; the guard refuses it).
-- The hash function against the public test vector once #124 records it, and against the draft row's worked cases.
 - One test per refusal in section 5 (the size cases use a fake size, not gigabytes of data).
 - Property: any set of distinct short names round-trips and the records come out sorted.
 
 A round trip through our own reader proves only that writer and reader agree. Correctness for the game comes from the
-verified rows, the test vector and the in-game check (#132).
+verified rows, the test vector, the byte-level hash and order checks above and the in-game check (#132).
 
 ## 8. Stub plugin (#131)
 
-- A plugin whose only record is the TES4 header record (`plugin-record-header`, `plugin-subrecord-layout`): HEDR with
+- A plugin whose only record is the TES4 header record (`plugin-record-header`, `plugin-subrecord-layout`; both rows are not verified yet, so the stub waits for their second
+  reader): HEDR with
   the version, a record count of 0 and the next object id; no masters, since it holds no records that refer to a
   master. Named `<archive base name>.esp` next to `<archive base name>.bsa`.
 - Which HEDR version value and header flags the game accepts for an empty plugin has no row yet. The stub copies

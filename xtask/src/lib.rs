@@ -11,8 +11,8 @@ cargo xtask <command>
 
   guards [--root DIR] [--base REF] {spdx,provenance,data,gitignore,names,all}
                           the clean-room guards (docs/clean-room.md)
-  release-assets <out-dir>
-                          build the release assets: binary, schemas, SHA256SUMS
+  release-assets <out-dir> [macos-dir]
+                          build the release assets: binary, schemas, the macOS binary from macos-dir, SHA256SUMS
   setup-repo [--audit] [owner/repo]
                           audit or apply the GitHub settings that cannot live in a file (owner only)
   apply-rulesets [owner/repo]
@@ -25,8 +25,10 @@ pub fn main(args: &[String]) -> i32 {
     match args.first().map(String::as_str) {
         Some("guards") => guards::main(&args[1..]),
         Some("release-assets") => {
-            if let Some([out]) = args.get(1..) {
-                match release::build(std::path::Path::new(out)) {
+            let rest = args.get(1..).unwrap_or_default();
+            if let (1 | 2, Some(out)) = (rest.len(), rest.first()) {
+                let macos = rest.get(1).map(std::path::Path::new);
+                match release::build(std::path::Path::new(out), macos) {
                     Ok(()) => 0,
                     Err(message) => {
                         eprintln!("{message}");
@@ -34,7 +36,7 @@ pub fn main(args: &[String]) -> i32 {
                     }
                 }
             } else {
-                eprintln!("usage: cargo xtask release-assets <out-dir>");
+                eprintln!("usage: cargo xtask release-assets <out-dir> [macos-dir]");
                 2
             }
         }

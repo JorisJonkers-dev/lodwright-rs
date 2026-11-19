@@ -51,6 +51,42 @@ pub struct VerifyDoc {
     /// a reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub objects: Option<ObjectReport>,
+    /// With `--known-differences`: the differences the list names, with its reason and release. They are reported
+    /// and do not make the run fail. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub known: Vec<KnownDifference>,
+    /// With `--known-differences`: listed paths that no longer differ, so the list can lose them. Omitted when
+    /// empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stale: Vec<String>,
+}
+
+/// A difference the known-differences list names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct KnownDifference {
+    /// The file, relative to the folder, forward slashes.
+    pub path: String,
+    /// What differs, as prose for people; never matched on.
+    pub problem: String,
+    /// Why the difference is accepted, from the list.
+    pub reason: String,
+    /// The release expected to remove it, from the list.
+    pub release: String,
+}
+
+/// The water of one terrain level compared with the reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WaterLevel {
+    /// Cells per block edge.
+    pub level: u32,
+    /// Blocks of this level with water on either side.
+    pub blocks: u64,
+    /// Of those, the blocks under the threshold.
+    pub under_threshold: u64,
+    /// The lowest `IoU` of the level.
+    pub lowest: f64,
+    /// The mean `IoU` of the level.
+    pub mean: f64,
 }
 
 /// The water of the terrain blocks compared with the reference: the `IoU` (intersection over union) of the ground the
@@ -72,6 +108,10 @@ pub struct WaterReport {
     pub mean: Option<f64>,
     /// Every block with water, sorted by path.
     pub per_block: Vec<WaterBlock>,
+    /// The same numbers per terrain level, smallest level first: what the release notes list. Omitted when no
+    /// block has water.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub per_level: Vec<WaterLevel>,
 }
 
 /// The water `IoU` of one terrain block.
@@ -132,6 +172,8 @@ impl VerifyDoc {
             differences: Vec::new(),
             water: None,
             objects: None,
+            known: Vec::new(),
+            stale: Vec::new(),
         }
     }
 }

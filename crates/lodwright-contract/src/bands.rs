@@ -135,6 +135,7 @@ mod tests {
                 path: "meshes/w.nif".into(),
                 iou,
             }],
+            per_level: Vec::new(),
         });
         doc
     }

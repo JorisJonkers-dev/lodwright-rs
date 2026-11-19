@@ -75,6 +75,13 @@ Record from its summary lines (`water: ...` and `object blocks: ... exact`) or f
 the files compared, the missing and extra counts, the blocks with water, how many are under 0.95, the lowest and the
 mean IoU, and the object blocks exact out of all, with the path of each block that is not exact.
 
+A release may ship with known differences (decision D6). They are listed in the known-differences file kept with
+the release test notes (format in `docs/contracts.md`, Verify) and passed with `--known-differences <file>`: a listed
+block no longer fails the run, an unlisted one still does, and a stale entry (a block that no longer differs) is removed
+from the file before the release. The per-level water lines (`water level L: ...`, or `water.per_level` in the JSON)
+go into the release notes as the known difference per level: for each level the blocks under 0.95, the lowest and the
+mean IoU. Each later release test (R2, R3) updates the file with its own batch's known differences.
+
 ## 3. In-game load
 
 Run the game through `nv-rs-dev bench` from an nv-rs release build, as that repository's `docs/fork/BENCH.md`

@@ -163,6 +163,25 @@ compared in lower case):
   vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
   0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
 
+With `--reference`, `water.per_level` repeats the water summary per terrain level (blocks, how many are under the
+threshold, lowest and mean), smallest level first; the text report prints one `water level L:` line each. These are the
+numbers a release lists per level when it ships with known differences.
+
+`--known-differences FILE` (only with `--reference`) reads a list of accepted differences. One entry per line, three
+fields separated by tabs: the block path as `verify` prints it, the release expected to remove the difference, and the
+reason; blank lines and lines starting with `#` are ignored, and paths compare in lower case:
+
+```text
+# path	release	reason
+meshes/landscape/lod/wastelandnv/wastelandnv.level4.x-8.y12.nif	0.7.0	water outline not built yet (#151)
+```
+
+A difference whose path the list names moves from `differences` to `known` (with its problem, the reason and the
+release) and no longer makes the run exit 1; a difference the list does not name still does. A listed path that no
+longer differs is reported in `stale`, so the list does not grow forever. A list that cannot be read or has a line
+without its three fields is a usage error (exit 2) naming the line. The list holds block paths and words only, never
+data from the game.
+
 Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 
 | Code | Meaning |

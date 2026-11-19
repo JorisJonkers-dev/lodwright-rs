@@ -139,6 +139,7 @@ fn sample_verify() -> VerifyDoc {
             path: "meshes/landscape/lod/island/island.level4.x0.y0.nif".into(),
             iou: 0.333,
         }],
+        per_level: Vec::new(),
     });
     doc.objects = Some(ObjectReport {
         blocks: 1,

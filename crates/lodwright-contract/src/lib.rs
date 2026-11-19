@@ -15,7 +15,7 @@ mod result;
 mod schema;
 
 pub use digest::{Sha256Stream, arguments_digest, sha256_digest};
-pub use event::Event;
+pub use event::{BlockKind, Event};
 pub use manifest::{MANIFEST_CONTRACT, MANIFEST_FILE, Manifest, ManifestBlock, ManifestFile};
 pub use plan::{
     Bounds, Capabilities, LevelPlan, Plan, PlannedBlock, ToolInfo, WorldPlan, round_error,

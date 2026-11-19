@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, read_header};
-use lodwright_gen::{Assets, generate_objects};
+use lodwright_gen::{Assets, generate_objects, generate_objects_with_progress};
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriStripsData,
     NifFile, ObjectNet,
@@ -291,6 +291,39 @@ fn a_high_priority_reference_goes_to_both_files_and_a_missing_model_is_skipped()
         out.join("meshes/landscape/lod/mojave/blocks/mojave.level4.high.x0.y0.nif")
             .is_file()
     );
+}
+
+#[test]
+fn each_block_file_reports_once_in_order_and_the_count_reaches_the_total() {
+    let out = temp("progress");
+    let list = vec![
+        instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, true),
+        instance("a\\Wall.nif", 4096.0 * 9.0, 100.0, 0.0, 2, false),
+    ];
+    let mut seen = Vec::new();
+    let report =
+        generate_objects_with_progress("Mojave", &list, &assets(), &out, &mut |done, total| {
+            seen.push((done, total));
+        })
+        .unwrap();
+    // block x0 has a normal and a high-priority file, block x8 a normal one
+    assert_eq!(seen, [(1, 3), (2, 3), (3, 3)]);
+    assert_eq!(report.files.len(), 2 + 3, "the atlas pair and three block files");
+}
+
+#[test]
+fn a_world_without_a_usable_model_reports_no_block() {
+    let out = temp("progress-none");
+    let mut seen = Vec::new();
+    generate_objects_with_progress(
+        "Mojave",
+        &[instance("zzz.nif", 1.0, 1.0, 0.0, 1, false)],
+        &assets(),
+        &out,
+        &mut |done, total| seen.push((done, total)),
+    )
+    .unwrap();
+    assert!(seen.is_empty());
 }
 
 #[test]

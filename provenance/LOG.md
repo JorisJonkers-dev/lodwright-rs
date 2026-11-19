@@ -466,3 +466,20 @@ points with opacity 0.0 occur (if every layer lists all 289, the question has no
 worlds, compare the game's own terrain LOD of a child world whose PNAM has "use land data" clear with lodwright's
 output under each inheritance option; for VNML, the row order can be read from a LAND record with a known slope
 direction (normal x or y component sign by row).
+
+## 2026-11-19: odd sizes in a mip chain (issue 60)
+
+Specifier entry, role held: specifier only (not the implementer of `lodwright-dds`). Read the Microsoft Learn page
+"Introduction To Textures in Direct3D 11" in the MicrosoftDocs/win32 repository (CC-BY-4.0) at revision
+`bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583`. No generator source, decompiled output or GPL code was read.
+
+- `dds-mip-odd-size` (new): the page's one odd-size example, 5 by 1 to 2 by 1 to 1 by 1, which is rounding down. The
+  page is about Direct3D 11 resources, not the DDS file format, and its general sentence ("the next lower level is
+  always even size") does not hold for rounding down in general, so only the example is recorded.
+
+`dds-mip-chain` is unchanged and stays `verified = false`. `crates/lodwright-dds/src/resize.rs` (`mip_size`,
+`mip_count`) now says in its comments that rounding an odd size down is the project's choice and cites both rows; no
+behaviour changed. What a second reader checks: the example and its numbers on that page, that the fact claims nothing
+beyond the example, and whether a Direct3D 11 resource page may stand for the DDS files the game reads (or whether an
+`oracle:` measurement is needed). What settles it on the game's side (owner, numbers only): `lodwright probe dds` on any
+own texture with an odd dimension, reporting width, height and mip count.

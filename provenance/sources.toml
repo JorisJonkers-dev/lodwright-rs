@@ -691,6 +691,17 @@ verified = false
 note = "Page last updated 2019-08-23. The page's example sizes are all even: rounding down for an odd size is the Direct3D convention and is not stated there, so it stays open until a reference file answers it."
 
 [[source]]
+id = "dds-mip-odd-size"
+fact = "The page gives one example of a mip chain of an odd-sized texture: a 5 by 1 texture whose next level is 2 by 1 and whose next and last level is 1 by 1."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-resources-textures-intro"
+licence = "CC-BY-4.0 (Microsoft Learn documentation; MicrosoftDocs/win32 repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583, desktop-src/direct3d11/overviews-direct3d-11-resources-textures-intro.md (ms.date 05/31/2018), section 1D Textures. The page is about Direct3D 11 resources, not the DDS file format, and gives one odd-size example only. 5 to 2 is rounding down (rounding up would give 3). The same paragraph also says 'the next lower level is always even size (except when the lowest level reaches 1)', which rounding down does not give for every odd size (7 halves to 3); that general sentence is not recorded as a fact. OPEN until a second reader agrees, and until a reference file with an odd size (oracle:) confirms what the game's own textures use."
+
+[[source]]
 id = "bc-block-padding"
 fact = "Block compression works on 4 by 4 texel blocks, so a surface is stored rounded up to whole blocks; sampling uses the declared size and ignores the padding, and a level smaller than 4 by 4 still occupies one block."
 url = "https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression"

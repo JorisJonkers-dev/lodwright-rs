@@ -21,6 +21,7 @@ JorisJonkers-dev/lodwright-rs`).
 | Asset | What |
 | --- | --- |
 | `lodwright-x86_64-unknown-linux-gnu` | the binary |
+| `lodwright-universal-apple-darwin` | the macOS binary, one file for Apple silicon and Intel (built on macOS, joined with `lipo`); not signed yet, so macOS asks before the first run |
 | `lodwright-plan.v1.json` | JSON Schema of the plan document (`lodwright plan --json`) |
 | `lodwright-result.v1.json` | JSON Schema of the result and error document (`lodwright generate --json`) |
 | `lodwright-request.v1.json` | JSON Schema of the request document (`lodwright generate --request`) |

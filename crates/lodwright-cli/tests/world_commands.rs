@@ -86,6 +86,11 @@ fn plan_prints_json_for_every_world() {
     assert_eq!(code, EXIT_OK);
     // The tool version changes with every release, so the golden file holds a placeholder.
     let out = out.replace(env!("CARGO_PKG_VERSION"), "VERSION");
+    // Peak memory is measured on Linux only, so that one capability depends on the platform.
+    let out = out.replace(
+        &format!("\"peak_memory_reported\":{}", cfg!(target_os = "linux")),
+        "\"peak_memory_reported\":\"PLATFORM\"",
+    );
     assert_golden(&golden("plan.json"), &out);
 }
 

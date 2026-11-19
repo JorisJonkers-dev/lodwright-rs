@@ -99,22 +99,30 @@ to the next file's data (the "span"), and, for compressed files, with the bytes 
 - `zlib: size counts path` or `zlib: size excludes path`: the same question, answered from the compressed stream
   itself, which does not depend on the blocks being back to back.
 
+The script finds each folder's file records through the folder record's offset (minus the total file-name length,
+`bsa-v104-folder-records`), so it does not assume the folder blocks are back to back. It reads the archive through
+`mmap`, so a large archive is not loaded into memory. It refuses an archive with the big-endian flag 0x40 (Xbox 360)
+and one without flag 0x100. It takes the embedded path's length from its first byte (a bstring, `bsa-v104-data-blocks`,
+as the reader does). The span verdicts assume the data blocks follow each other with no gap; when they do not, the
+span lines say `neither` and the zlib lines still answer.
+
 ```python
-import struct, sys, zlib
-data = open(sys.argv[1], "rb").read()
+import mmap, struct, sys, zlib
+with open(sys.argv[1], "rb") as f:
+    data = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
 magic, version, folders_at, flags, n_folders, n_files, dir_len, name_len, file_flags = struct.unpack_from("<4sIIIIIIIH", data, 0)
 print("version", version, "flags", hex(flags), "folders", n_folders, "files", n_files)
-if magic != b"BSA\0" or version != 104 or not flags & 0x100:
-    sys.exit("not a v104 archive with flag 0x100: nothing to measure")
-pos, records = folders_at, []
-folders = [struct.unpack_from("<QII", data, folders_at + 16 * i) for i in range(n_folders)]
-pos = folders_at + 16 * n_folders
-for _, count, _ in folders:
+if magic != b"BSA\0" or version != 104 or flags & 0x40 or not flags & 0x100:
+    sys.exit("not a little-endian v104 archive with flag 0x100: nothing to measure")
+records = []
+for i in range(n_folders):
+    _, count, offset = struct.unpack_from("<QII", data, folders_at + 16 * i)
+    pos = offset - name_len
     if flags & 0x1:
         pos += 1 + data[pos]
     for _ in range(count):
-        _, size, offset = struct.unpack_from("<QII", data, pos)
-        records.append((offset, size))
+        _, size, file_offset = struct.unpack_from("<QII", data, pos)
+        records.append((file_offset, size))
         pos += 16
 records.sort()
 counts = {}
@@ -123,8 +131,7 @@ for i, (offset, size) in enumerate(records):
     compressed = bool(flags & 0x4) != bool(size & 0x40000000)
     end = records[i + 1][0] if i + 1 < len(records) else len(data)
     span = end - offset
-    path_len = data[offset]
-    head = 1 + path_len
+    head = 1 + data[offset]
     verdict = []
     if stored == span:
         verdict.append("span=size")
@@ -132,12 +139,18 @@ for i, (offset, size) in enumerate(records):
         verdict.append("span=size+path")
     if compressed:
         z = zlib.decompressobj()
-        z.decompress(data[offset + head + 4: end])
-        used = span - head - 4 - len(z.unused_data)
-        if used + 4 + head == stored:
-            verdict.append("zlib: size counts path")
-        if used + 4 == stored:
-            verdict.append("zlib: size excludes path")
+        try:
+            z.decompress(data[offset + head + 4: end])
+            if z.eof:
+                used = span - head - 4 - len(z.unused_data)
+                if used + 4 + head == stored:
+                    verdict.append("zlib: size counts path")
+                if used + 4 == stored:
+                    verdict.append("zlib: size excludes path")
+            else:
+                verdict.append("zlib: stream not complete")
+        except zlib.error:
+            verdict.append("zlib: not a zlib stream here")
     key = ("compressed" if compressed else "stored", " & ".join(verdict) or "neither")
     counts[key] = counts.get(key, 0) + 1
 for (kind, verdict), n in sorted(counts.items()):

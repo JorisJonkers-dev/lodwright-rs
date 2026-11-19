@@ -105,3 +105,41 @@ Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 | 3 | unreadable folder: the folder or the reference is missing, not a folder, or cannot be listed; nothing is printed on stdout |
 
 `ok` in the report says only that the folder has no errors; the exit code also counts the differences.
+
+## Progress events
+
+`lodwright generate --events FILE` (either form of the command; `-` for stderr) writes one JSON line per finished
+block, in the order the blocks finish:
+
+```json
+{"event":"block","kind":"objects","world":"Island","level":4,"done":1,"of":2,"up_to_date":false}
+```
+
+* `kind` is `terrain`, `objects` or `trees` (an open enum). A line without `kind` was written before the key existed
+  and is a terrain block.
+* `level` is the number of cells along a block edge: the terrain level, 4 for an object block, 8 for a tree block.
+* `done` and `of` count the blocks of that kind and level in that world; `of` is known before the first of them
+  finishes, and `done` reaches it. Object blocks count each block file, so a block with high-priority objects counts
+  twice (its normal and its `high` file).
+* `up_to_date` is true for a terrain block kept from an earlier run; object and tree blocks are always rebuilt, so
+  it is false for them.
+
+Per world, the terrain lines come first (level by level), then the object lines, then the tree lines. The terrain
+blocks of a level finish on several workers, so with more than one worker their lines may arrive with `done` out of
+order; a reader that shows progress keeps the highest `done` it has seen. Object and tree lines come in order.
+
+The library reports the same thing through its progress callback (`lodwright_api::Progress`): each step starts with
+a `ProgressEvent` without counts, and each finished block is a `ProgressEvent` with `step` (`terrain`, `objects` or
+`trees`), `world`, `level`, `done` and `total`. `ProgressEvent::block_line` turns such an event into the line above,
+and the command writes exactly those lines, so the file and the callback cannot disagree. A caller that maps the
+callback, as the Toolbox does, should:
+
+* treat an event with `done` and `total` as progress of its step (`label_key`: `lod.terrain`, `lod.objects`,
+  `lod.trees`), and every other event as the start of its step;
+* word `level` by step: a terrain level for `lod.terrain`, nothing user-facing for object and tree blocks (it is
+  the block size, not a quality level);
+* treat a step it does not know as the start of an unnamed step, not as an error.
+
+Object and tree block events were added without changing a type, a field or an error code of the library, so
+`lodwright-api` stays at version 1: a caller built for the earlier events keeps compiling and sees more progress
+events.

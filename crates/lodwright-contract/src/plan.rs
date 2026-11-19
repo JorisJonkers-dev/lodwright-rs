@@ -24,7 +24,8 @@ impl ToolInfo {
     }
 }
 
-/// What `generate` can do today.
+/// What `generate` can do today: the kinds of files it writes, then how it runs (worlds, scheduling, memory and
+/// determinism). The run flags are optional keys: a document without them reads them as false.
 #[allow(clippy::struct_excessive_bools)] // one flag per capability is the contract
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Capabilities {
@@ -38,10 +39,34 @@ pub struct Capabilities {
     pub object_lod: bool,
     /// Writes tree LOD.
     pub tree_lod: bool,
+    /// A request that names no world builds every world of the load order, one world at a time.
+    #[serde(default)]
+    pub all_worlds: bool,
+    /// The output bytes do not depend on the number of worker threads (`limits.threads`).
+    #[serde(default)]
+    pub thread_count_independent: bool,
+    /// `limits.memory_mib` refuses, before anything is written, a run whose plugins suggest it needs more.
+    #[serde(default)]
+    pub memory_budget_preflight: bool,
+    /// `limits.memory_mib` is also held while the run goes on (fewer workers or smaller batches, same bytes).
+    #[serde(default)]
+    pub memory_budget_held: bool,
+    /// The result reports the run's peak resident size (`peak_memory_mib`); measured on Linux only.
+    #[serde(default)]
+    pub peak_memory_reported: bool,
+    /// A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them.
+    #[serde(default)]
+    pub resume_after_cancel: bool,
+    /// A killed run (no cancel, for example the process ended) resumes to the bytes of an uninterrupted run.
+    #[serde(default)]
+    pub resume_after_kill: bool,
 }
 
 impl Capabilities {
-    /// This build: terrain meshes, terrain textures, the settings file, object LOD and tree LOD are written.
+    /// This build: terrain meshes, terrain textures, the settings file, object LOD and tree LOD are written; every
+    /// world is built when none is named; the bytes do not depend on the thread count; the memory budget is a
+    /// preflight estimate, not held while running; peak memory is reported on Linux; a cancelled run resumes, a killed
+    /// one does not yet.
     #[must_use]
     pub fn current() -> Self {
         Self {
@@ -50,10 +75,18 @@ impl Capabilities {
             settings: true,
             object_lod: true,
             tree_lod: true,
+            all_worlds: true,
+            thread_count_independent: true,
+            memory_budget_preflight: true,
+            memory_budget_held: false,
+            peak_memory_reported: cfg!(target_os = "linux"),
+            resume_after_cancel: true,
+            resume_after_kill: false,
         }
     }
 
-    /// The names of the capabilities that are false, in a fixed order.
+    /// The names of the file kinds `generate` does not write, in a fixed order. The run flags are not listed: they
+    /// say how a run behaves, not what it can produce.
     #[must_use]
     pub fn missing(&self) -> Vec<String> {
         [
@@ -206,6 +239,70 @@ mod tests {
             ..Capabilities::default()
         };
         assert!(!caps.missing().contains(&"settings".to_owned()));
+    }
+
+    #[test]
+    fn this_build_writes_every_file_kind() {
+        assert_eq!(Capabilities::current().missing(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn this_build_builds_every_world_and_its_bytes_do_not_depend_on_the_thread_count() {
+        let caps = Capabilities::current();
+        assert!(caps.all_worlds);
+        assert!(caps.thread_count_independent);
+    }
+
+    #[test]
+    fn this_build_checks_the_memory_budget_before_the_run_but_does_not_hold_it_while_running() {
+        let caps = Capabilities::current();
+        assert!(caps.memory_budget_preflight);
+        assert!(!caps.memory_budget_held);
+    }
+
+    #[test]
+    fn this_build_reports_peak_memory_on_linux_only() {
+        assert_eq!(
+            Capabilities::current().peak_memory_reported,
+            cfg!(target_os = "linux")
+        );
+    }
+
+    #[test]
+    fn this_build_resumes_after_a_cancel_but_not_after_a_kill() {
+        let caps = Capabilities::current();
+        assert!(caps.resume_after_cancel);
+        assert!(!caps.resume_after_kill);
+    }
+
+    #[test]
+    fn the_run_flags_are_never_listed_as_missing() {
+        let caps = Capabilities {
+            terrain_mesh: true,
+            terrain_texture: true,
+            settings: true,
+            object_lod: true,
+            tree_lod: true,
+            ..Capabilities::default()
+        };
+        assert_eq!(caps.missing(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_document_without_the_run_flags_reads_them_as_false() {
+        let text = r#"{"terrain_mesh":true,"terrain_texture":true,"settings":true,"object_lod":true,"tree_lod":true}"#;
+        let caps: Capabilities = serde_json::from_str(text).unwrap();
+        assert_eq!(
+            caps,
+            Capabilities {
+                terrain_mesh: true,
+                terrain_texture: true,
+                settings: true,
+                object_lod: true,
+                tree_lod: true,
+                ..Capabilities::default()
+            }
+        );
     }
 
     #[test]

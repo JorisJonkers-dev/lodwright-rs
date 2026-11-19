@@ -119,7 +119,7 @@
           "default": false
         },
         "resume_after_cancel": {
-          "description": "A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them.",
+          "description": "A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them\n(`lodwright-api`'s `a_cancel_after_the_first_block_leaves_a_manifest_the_next_call_resumes_from`).",
           "type": "boolean",
           "default": false
         },
@@ -141,7 +141,7 @@
           "type": "boolean"
         },
         "thread_count_independent": {
-          "description": "The output bytes do not depend on the number of worker threads (`limits.threads`).",
+          "description": "The output bytes do not depend on the number of worker threads (`limits.threads`). Terrain blocks are the only\nwork spread over threads; `lodwright-gen`'s `the_thread_count_does_not_change_a_single_byte` shows it for them,\nand object and tree LOD are built on one thread per world.",
           "type": "boolean",
           "default": false
         },

@@ -132,8 +132,11 @@ block, in the order the blocks finish:
   and is a terrain block.
 * `level` is the number of cells along a block edge: the terrain level, 4 for an object block, 8 for a tree block.
 * `done` and `of` count the blocks of that kind and level in that world; `of` is known before the first of them
-  finishes, and `done` reaches it. Object blocks count each block file, so a block with high-priority objects counts
-  twice (its normal and its `high` file).
+  finishes, and `done` reaches it. Object blocks count each block file the world's objects fall into, so a block
+  with high-priority objects counts twice (its normal and its `high` file); a block whose objects all turn out to be
+  left out (for example over the vertex limit, with a warning) still counts, without a file.
+* A reader that meets a `kind` it does not know treats the line as progress of an unnamed kind (the Rust type reads
+  it as `BlockKind::Other`).
 * `up_to_date` is true for a terrain block kept from an earlier run; object and tree blocks are always rebuilt, so
   it is false for them.
 

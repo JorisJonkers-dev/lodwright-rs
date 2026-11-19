@@ -273,13 +273,12 @@ fn object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_worl
 }
 
 #[test]
-fn the_request_form_writes_the_events_file_too() {
+fn the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lines() {
     let d = data("request");
     let out = temp("request-out");
     let events = temp("request.ndjson");
-    let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
-    request.objects.enabled = false;
-    request.trees.enabled = false;
+    // no thread limit: terrain blocks may finish in any order, object and tree lines may not
+    let request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
     let file = temp("request.json");
     std::fs::write(&file, serde_json::to_string(&request).unwrap()).unwrap();
     let code = go(&[
@@ -290,8 +289,28 @@ fn the_request_form_writes_the_events_file_too() {
         events.to_str().unwrap(),
     ]);
     assert_eq!(code, 0);
-    let kinds: Vec<_> = lines(&events).into_iter().map(|l| l.0).collect();
-    assert_eq!(kinds, [Some(BlockKind::Terrain); 4]);
+    let all = lines(&events);
+    let (terrain, rest) = all.split_at(4);
+    let mut levels: Vec<u32> = terrain
+        .iter()
+        .map(|l| {
+            assert_eq!((l.0, l.2, l.3), (Some(BlockKind::Terrain), 1, 1));
+            l.1
+        })
+        .collect();
+    levels.sort_unstable();
+    assert_eq!(levels, [4, 8, 16, 32]);
+    let objects = Some(BlockKind::Objects);
+    let trees = Some(BlockKind::Trees);
+    assert_eq!(
+        rest,
+        [
+            (objects, 4, 1, 2),
+            (objects, 4, 2, 2),
+            (trees, 8, 1, 2),
+            (trees, 8, 2, 2),
+        ]
+    );
     let _ = std::fs::remove_dir_all(&out);
     let _ = std::fs::remove_dir_all(&d);
 }

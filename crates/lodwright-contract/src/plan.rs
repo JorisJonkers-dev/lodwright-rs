@@ -42,7 +42,9 @@ pub struct Capabilities {
     /// A request that names no world builds every world of the load order, one world at a time.
     #[serde(default)]
     pub all_worlds: bool,
-    /// The output bytes do not depend on the number of worker threads (`limits.threads`).
+    /// The output bytes do not depend on the number of worker threads (`limits.threads`). Terrain blocks are the only
+    /// work spread over threads; `lodwright-gen`'s `the_thread_count_does_not_change_a_single_byte` shows it for them,
+    /// and object and tree LOD are built on one thread per world.
     #[serde(default)]
     pub thread_count_independent: bool,
     /// `limits.memory_mib` refuses, before anything is written, a run whose plugins suggest it needs more.
@@ -54,7 +56,8 @@ pub struct Capabilities {
     /// The result reports the run's peak resident size (`peak_memory_mib`); measured on Linux only.
     #[serde(default)]
     pub peak_memory_reported: bool,
-    /// A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them.
+    /// A cancelled run leaves a manifest of its finished blocks, and the next run with the same request keeps them
+    /// (`lodwright-api`'s `a_cancel_after_the_first_block_leaves_a_manifest_the_next_call_resumes_from`).
     #[serde(default)]
     pub resume_after_cancel: bool,
     /// A killed run (no cancel, for example the process ended) resumes to the bytes of an uninterrupted run.

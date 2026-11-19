@@ -15,6 +15,9 @@ pub enum BlockKind {
     Objects,
     /// A tree LOD block file.
     Trees,
+    /// A kind this build does not know, written by a later version. Never written by this build.
+    #[serde(other)]
+    Other,
 }
 
 /// One progress line.
@@ -103,6 +106,21 @@ mod tests {
                 up_to_date: false
             }
         );
+    }
+
+    #[test]
+    fn a_kind_this_build_does_not_know_reads_as_other() {
+        let event: Event = serde_json::from_str(
+            r#"{"event":"block","kind":"water","world":"W","level":4,"done":1,"of":2}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            event,
+            Event::Block {
+                kind: Some(BlockKind::Other),
+                ..
+            }
+        ));
     }
 
     #[test]

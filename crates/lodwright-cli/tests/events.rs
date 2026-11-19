@@ -3,7 +3,9 @@
 
 use lodwright_cli::run;
 use lodwright_contract::{BlockKind, Event, Request};
+use lodwright_core::trees::TreeBase;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
+use lodwright_gen::billboard_path;
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriStripsData,
     NifFile, ObjectNet,
@@ -95,11 +97,7 @@ fn lod_model() -> Vec<u8> {
                         num_vertices: 3,
                         keep_flags: 0,
                         compress_flags: 0,
-                        vertices: Some(vec![
-                            [0.0, 0.0, 0.0],
-                            [100.0, 0.0, 0.0],
-                            [0.0, 100.0, 0.0],
-                        ]),
+                        vertices: Some(vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]),
                         vector_flags: 1,
                         material_crc: 0,
                         normals: None,
@@ -187,7 +185,16 @@ fn data(name: &str) -> PathBuf {
         ("Island.esm", plugin),
         ("meshes/a/wall_lod.nif", lod_model()),
         (
-            "textures/terrain/lodgen/island.esm/oak_00000101.dds",
+            &billboard_path(
+                "Island.esm",
+                &TreeBase {
+                    form_id: 0x101,
+                    signature: *b"TREE",
+                    model: "oak.spt".into(),
+                    bounds: None,
+                    plugin: 0,
+                },
+            ),
             billboard(),
         ),
     ];

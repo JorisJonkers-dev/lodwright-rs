@@ -655,7 +655,7 @@ mod tests {
             &mut |done, total| seen.push((done, total)),
         )
         .unwrap();
-        assert!(seen.is_empty());
+        assert_eq!(seen, Vec::<(u64, u64)>::new());
         let _ = std::fs::remove_dir_all(&out);
     }
 

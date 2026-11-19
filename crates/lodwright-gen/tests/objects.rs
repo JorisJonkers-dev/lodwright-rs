@@ -308,7 +308,11 @@ fn each_block_file_reports_once_in_order_and_the_count_reaches_the_total() {
         .unwrap();
     // block x0 has a normal and a high-priority file, block x8 a normal one
     assert_eq!(seen, [(1, 3), (2, 3), (3, 3)]);
-    assert_eq!(report.files.len(), 2 + 3, "the atlas pair and three block files");
+    assert_eq!(
+        report.files.len(),
+        2 + 3,
+        "the atlas pair and three block files"
+    );
 }
 
 #[test]
@@ -323,7 +327,7 @@ fn a_world_without_a_usable_model_reports_no_block() {
         &mut |done, total| seen.push((done, total)),
     )
     .unwrap();
-    assert!(seen.is_empty());
+    assert_eq!(seen, Vec::<(u64, u64)>::new());
 }
 
 #[test]

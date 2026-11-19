@@ -21,9 +21,15 @@ here has been re-read by a second reader or checked against real files yet.
 2. **Block names are `<world>.level<L>.x<X>.y<Y>.nif`**, not `<World>.<L>.<x>.<y>` (`fnv-lod-terrain-names`,
    `fnv-lod-object-block-names`). The old rows `lod-block-naming` and `lod-terrain-paths` are superseded pending the
    owner's tree.
-3. **The settings file is `LODSettings/<world>.dlodsettings`**, not `.lod` (`fnv-lod-settings-dlodsettings`). Its byte
-   layout is not public; Skyrim's `.lod` struct is a candidate shape (`skyrim-lod-settings-struct`).
-4. **Normal map name**: `<world>.n.level<L>.x<X>.y<Y>.dds` per one excerpt, not a `_n` suffix. Single source.
+3. **The settings file is `lodsettings/<world>.dlodsettings`**, not `.lod`: measured in the game's own files
+   (`game-dlodsettings-layout`); public excerpts write it `LODSettings\<world>.dlodsettings`
+   (`fnv-lod-settings-dlodsettings`). Its byte layout is not public; it was measured as 24 bytes on the owner's
+   files (`game-dlodsettings-layout`), and Skyrim's 16-byte `.lod` struct (`skyrim-lod-settings-struct`) does not
+   match it.
+4. **Texture names**: diffuse and normal map are both `<world>.n.level<L>.x<X>.y<Y>.dds`, in `diffuse` and `normals`
+   folders, measured on the owner's files (`game-lod-terrain-layout`); not a `_n` suffix. The earlier reading of a
+   diffuse name without `n` (`fnv-lod-terrain-names`) was an inference and is superseded.
 5. Not public, so a measurement protocol is given instead of a spec: NIF block contents (vertex layout, strips or
    triangles, UV, normals, shader properties), `.dlodsettings` bytes, `.dtl` bytes, the atlas UV remap, DDS format of
-   the shipped textures.
+   the shipped textures. Several have since been measured as `oracle:` rows (see each page); those rows are
+   unverified until a second reader re-derives them (#94).

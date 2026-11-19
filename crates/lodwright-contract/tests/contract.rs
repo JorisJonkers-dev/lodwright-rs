@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
     Bounds, Capabilities, DocumentKind, LevelPlan, Plan, PlannedBlock, Request, ResultDoc, Status,
-    ToolInfo, VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_request, check_result,
-    check_verify, schema_file_name, schema_json, sha256_digest,
+    ToolInfo, VerifyDoc, VerifyFinding, WorldPlan, Written, check_plan, check_request,
+    check_result, check_verify, schema_file_name, schema_json, sha256_digest,
 };
 use lodwright_testkit::golden::assert_golden;
 

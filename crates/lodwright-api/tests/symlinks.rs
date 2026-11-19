@@ -78,6 +78,22 @@ fn entries(dir: &Path) -> Vec<String> {
     names
 }
 
+/// A guarded run either finishes (and then leaves its manifest) or refuses with an output error; anything else, for
+/// example a plugin it could not read, would let a test pass without the guard being reached.
+fn reached_the_output(out: &Path, result: Result<GenerateOutcome, lodwright_api::Error>) {
+    match result {
+        Ok(_) => assert!(
+            out.join(MANIFEST_FILE).is_file(),
+            "a finished run leaves its manifest"
+        ),
+        Err(e) => assert!(
+            e.code.starts_with("output_"),
+            "refused for another reason: {}",
+            e.code
+        ),
+    }
+}
+
 #[test]
 fn an_output_folder_that_is_a_link_into_the_data_folder_is_refused() {
     let root = temp("link-into-data");
@@ -182,7 +198,7 @@ fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
     symlink(&outside, out.join(&first)).unwrap();
     let mut job = job(&root, &out);
     job.overwrite = true;
-    let _ = run(&job);
+    reached_the_output(&out, run(&job));
     assert_eq!(entries(&outside), Vec::<String>::new());
 }
 
@@ -197,7 +213,7 @@ fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target(
     symlink(&victim, &planted).unwrap();
     let mut job = job(&root, &out);
     job.overwrite = true;
-    let _ = run(&job);
+    reached_the_output(&out, run(&job));
     assert_eq!(std::fs::read(&victim).unwrap(), b"not LOD");
 }
 
@@ -222,6 +238,6 @@ fn an_old_manifest_entry_outside_the_output_folder_is_never_removed() {
         serde_json::to_string(&old).unwrap(),
     )
     .unwrap();
-    let _ = run(&job(&root, &out));
+    reached_the_output(&out, run(&job(&root, &out)));
     assert!(victim.is_file());
 }

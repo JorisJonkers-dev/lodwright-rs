@@ -1,8 +1,8 @@
 # Contracts
 
 lodwright emits JSON documents that other tools read. Each document is a contract and says so. lodwright owns these
-Contracts: plan, request, result, manifest, verify and the progress events. Their published schemas are authoritative;
-verify, manifest and events get their schema files and handshake entries in issue #87.
+Contracts: plan, request, result, manifest, verify and the progress events. Their published schemas are authoritative:
+each is under `schemas/`, printed by `lodwright schema <name>` and published with every release.
 Raul's Trusty Toolbox keeps the registry: which Contracts exist, which versions each Known-good set speaks, and a
 snapshot of each such version (ADR-0009 in
 [rauls-trusty-toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox/tree/main/docs/adr)). The Toolbox
@@ -13,17 +13,23 @@ Each document carries:
 * `schema_version`: an integer. It rises when a key is removed, renamed or retyped, or when a value is added to an enum
   that is not open. A new optional key does not raise it, so a reader ignores keys it does not know.
 * `contract`: the name of the contract, `<tool>-<noun>`. A reader refuses a document whose name is not the one it asked
-  for. Today: `lodwright-plan` (`lodwright plan --json`) and `lodwright-result` (`lodwright generate --json`, and the error
-  document of a failed `--json` command). Both are typed in `crates/lodwright-contract`; their schemas are under
-  `schemas/` and require `contract` with the constant name.
+  for. Today: `lodwright-plan` (`lodwright plan --json`), `lodwright-result` (`lodwright generate --json`, and the error
+  document of a failed `--json` command), `lodwright-request` (read by `generate --request`), `lodwright-manifest`
+  (`manifest.json` in the output folder) and `lodwright-verify` (`lodwright verify --json`). All are typed in
+  `crates/lodwright-contract`; their schemas are under `schemas/` and require `contract` with the constant name.
+
+The progress events (`lodwright-events`) are single JSON lines, not documents: they carry neither `schema_version` nor
+`contract`. Their schema (`lodwright schema events`) describes one line, and the handshake gives their version.
 
 ## Handshake
 
 `lodwright contracts --json` prints every contract this build emits and the schema versions it can emit, and exits 0:
 
 ```json
-{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
+{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-api","versions":[1]}]}
 ```
+
+`lodwright --version --json` lists the same contracts.
 
 `lodwright-api` is not a document: it is the version of the in-process library API (`crates/lodwright-api`,
 `lodwright_api::API_VERSION`). It rises when a call, a type or an error code of that API changes in a way an existing
@@ -87,6 +93,25 @@ refused (`output_link`, nothing is written through it). A temporary file is alwa
 its path is removed, never followed. A manifest that lists an absolute path or one with `..` is not trusted and is
 treated as no manifest.
 
+## Verify
+
+`lodwright verify <folder> --json` prints a `lodwright-verify` document (schema: `lodwright schema verify`): `ok` (no
+errors), how many terrain blocks, object blocks, tree blocks, textures and settings files were checked, `errors` (what is
+wrong with the folder) and `differences` (how it differs from `--reference`, empty without one). Each finding is a path
+relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
+Nothing read from a file is copied into the report: only file names and numbers.
+
+Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | clean: no error in the folder and, with `--reference`, no difference |
+| 1 | findings: at least one error or difference; the report is still printed |
+| 2 | usage error: no folder, an unknown option, an option without its value |
+| 3 | unreadable folder: the folder or the reference is missing, not a folder, or cannot be listed; nothing is printed on stdout |
+
+`ok` in the report says only that the folder has no errors; the exit code also counts the differences.
+
 ## Progress events
 
 `lodwright generate --events FILE` (either form of the command; `-` for stderr) writes one JSON line per finished
@@ -100,8 +125,11 @@ block, in the order the blocks finish:
   and is a terrain block.
 * `level` is the number of cells along a block edge: the terrain level, 4 for an object block, 8 for a tree block.
 * `done` and `of` count the blocks of that kind and level in that world; `of` is known before the first of them
-  finishes, and `done` reaches it. Object blocks count each block file, so a block with high-priority objects counts
-  twice (its normal and its `high` file).
+  finishes, and `done` reaches it. Object blocks count each block file the world's objects fall into, so a block
+  with high-priority objects counts twice (its normal and its `high` file); a block whose objects all turn out to be
+  left out (for example over the vertex limit, with a warning) still counts, without a file.
+* A reader that meets a `kind` it does not know treats the line as progress of an unnamed kind (the Rust type reads
+  it as `BlockKind::Other`).
 * `up_to_date` is true for a terrain block kept from an earlier run; object and tree blocks are always rebuilt, so
   it is false for them.
 

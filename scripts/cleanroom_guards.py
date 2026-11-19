@@ -56,10 +56,11 @@ BAD_LICENCES = {"", "unknown", "none", "unlicensed", "all rights reserved", "n/a
 FORBIDDEN_SOURCES = ("github.com/tes5edit/xlodgen", "decompil", "disassembl", "leaked", "fnv_decomp")
 # The engine port's source is an input only under docs/adr/0001-engine-source-as-a-format-input.md: a row citing it
 # names the file at a fixed commit, a licence the engine port grants, and the second reader who is not its implementer.
-ENGINE_URL_RE = re.compile(r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/", re.IGNORECASE)
+ENGINE_NAME = "nv-rs"
 ENGINE_FILE_URL_RE = re.compile(
-    r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/blob/[0-9a-f]{40}/\S+$", re.IGNORECASE
+    r"^https://github\.com/(slaterain|jorisjonkers-dev)/nv-rs/blob/[0-9a-f]{40}/[^\s?#]*[^\s?#/]$", re.IGNORECASE
 )
+# Exactly one licence atom, never an expression: a file under "A AND B" is not covered by this rule.
 ENGINE_LICENCES = ("gpl-3.0-or-later", "mit")
 
 # The retired project name, and the name of the tool it reimplemented, may only appear where the lineage is
@@ -203,20 +204,26 @@ def check_row(label: str, row: dict, v: Violations) -> None:
     for needle in FORBIDDEN_SOURCES:
         if needle in haystack:
             v.add(label, f"names a forbidden input ({needle})")
-    if ENGINE_URL_RE.match(url):
+    if ENGINE_NAME in haystack:
         check_engine_row(label, row, v)
 
 
 def check_engine_row(label: str, row: dict, v: Violations) -> None:
-    """A row citing the engine port: a file at a fixed commit, its licence, and a named second reader."""
-    if not ENGINE_FILE_URL_RE.match(str(row["url"])):
-        v.add(label, "an engine-port row cites one file at a 40-character commit (.../nv-rs/blob/<commit>/<path>)")
+    """A row naming the engine port: one file at a fixed commit on GitHub, one licence the rule covers, the second
+    reader, and a note that the engine's third-party list was checked. Any other URL form (raw, mirror, directory,
+    branch, query, fragment) is refused, so the file read is the file the row names."""
+    if not ENGINE_FILE_URL_RE.match(str(row["url"])) or ".." in str(row["url"]).split("/"):
+        v.add(label, "an engine-port row cites one file at a 40-character commit (https://github.com/<owner>/nv-rs/blob/<commit>/<path>)")
     licence = str(row["licence"]).strip().lower()
-    if not licence.startswith(ENGINE_LICENCES):
-        v.add(label, "an engine-port row states the file's licence (GPL-3.0-or-later or MIT)")
-    reader = row.get("second_reader")
-    if not isinstance(reader, str) or not reader.strip():
-        v.add(label, "an engine-port row names its second_reader (not the implementer of the format)")
+    if licence not in ENGINE_LICENCES:
+        v.add(label, "an engine-port row states the file's licence as exactly GPL-3.0-or-later or MIT")
+    for field, why in (
+        ("second_reader", "the reader, who is not the implementer of the format"),
+        ("engine_notes", "what was checked in the engine's third-party notes (LEGAL.md) for this file"),
+    ) + ((("licence_notice", "where the MIT notice is kept"),) if licence == "mit" else ()):
+        value = row.get(field)
+        if not isinstance(value, str) or not value.strip():
+            v.add(label, f"an engine-port row names {field}: {why}")
 
 
 def comment_ref_re(suffix: str) -> re.Pattern[str] | None:

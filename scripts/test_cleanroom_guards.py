@@ -202,48 +202,76 @@ class ProvenanceTests(unittest.TestCase):
         repo.commit()
         self.assertTrue(any("forbidden input" in line for line in repo.check("provenance")))
 
-    def engine_row(self, url: str, licence: str = "GPL-3.0-or-later", reader: str | None = "someone else") -> str:
+    def engine_row(
+        self,
+        url: str,
+        licence: str = "GPL-3.0-or-later",
+        reader: str | None = "someone else",
+        notes: str | None = "LEGAL.md third-party list read; the file is original code",
+    ) -> str:
         row = ROW.replace(
             "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header", url
         ).replace("CC-BY-4.0", licence)
         if reader is not None:
             row += f'second_reader = "{reader}"\n'
+        if notes is not None:
+            row += f'engine_notes = "{notes}"\n'
         return row
 
-    def test_an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes(self) -> None:
+    def engine_check(self, row: str) -> list[str]:
         repo = Repo(self)
-        url = "https://github.com/JorisJonkers-dev/nv-rs/blob/" + "a" * 40 + "/crates/bsa/src/archive.rs"
-        repo.write("provenance/sources.toml", self.engine_row(url))
+        repo.write("provenance/sources.toml", row)
         repo.commit()
-        self.assertEqual(repo.check("provenance"), [])
+        return repo.check("provenance")
+
+    GOOD_URL = "https://github.com/JorisJonkers-dev/nv-rs/blob/" + "a" * 40 + "/crates/bsa/src/archive.rs"
+
+    def test_an_engine_port_row_with_a_file_at_a_commit_a_licence_and_a_reader_passes(self) -> None:
+        self.assertEqual(self.engine_check(self.engine_row(self.GOOD_URL)), [])
+
+    def test_an_engine_port_row_under_mit_with_its_notice_noted_passes(self) -> None:
+        row = self.engine_row(self.GOOD_URL, licence="MIT") + 'licence_notice = "kept in LEGAL.md"\n'
+        self.assertEqual(self.engine_check(row), [])
+
+    def test_an_engine_port_row_under_mit_without_its_notice_fails(self) -> None:
+        out = self.engine_check(self.engine_row(self.GOOD_URL, licence="MIT"))
+        self.assertTrue(any("licence_notice" in line for line in out))
 
     def test_an_engine_port_row_without_a_second_reader_fails(self) -> None:
-        repo = Repo(self)
-        url = "https://github.com/slaterain/nv-rs/blob/" + "b" * 40 + "/crates/bsa/src/archive.rs"
-        repo.write("provenance/sources.toml", self.engine_row(url, reader=None))
-        repo.commit()
-        self.assertTrue(any("second_reader" in line for line in repo.check("provenance")))
+        out = self.engine_check(self.engine_row(self.GOOD_URL, reader=None))
+        self.assertTrue(any("second_reader" in line for line in out))
+
+    def test_an_engine_port_row_without_the_third_party_check_fails(self) -> None:
+        out = self.engine_check(self.engine_row(self.GOOD_URL, notes=None))
+        self.assertTrue(any("engine_notes" in line for line in out))
 
     def test_an_engine_port_row_on_a_branch_instead_of_a_commit_fails(self) -> None:
-        repo = Repo(self)
         url = "https://github.com/slaterain/nv-rs/blob/main/crates/bsa/src/archive.rs"
-        repo.write("provenance/sources.toml", self.engine_row(url))
-        repo.commit()
-        self.assertTrue(any("40-character commit" in line for line in repo.check("provenance")))
+        self.assertTrue(any("40-character commit" in line for line in self.engine_check(self.engine_row(url))))
 
-    def test_an_engine_port_row_without_the_engine_licence_fails(self) -> None:
-        repo = Repo(self)
-        url = "https://github.com/slaterain/nv-rs/blob/" + "c" * 40 + "/crates/bsa/src/archive.rs"
-        repo.write("provenance/sources.toml", self.engine_row(url, licence="CC-BY-4.0"))
-        repo.commit()
-        self.assertTrue(any("licence" in line for line in repo.check("provenance")))
+    def test_an_engine_port_row_must_cite_a_file_not_a_directory_query_or_fragment(self) -> None:
+        for tail in ("/crates/bsa/", "/crates/bsa/src/a.rs?plain=1", "/crates/bsa/src/a.rs#L10"):
+            url = "https://github.com/slaterain/nv-rs/blob/" + "a" * 40 + tail
+            out = self.engine_check(self.engine_row(url))
+            self.assertTrue(any("40-character commit" in line for line in out), tail)
 
-    def test_an_engine_port_row_must_start_with_the_engine_licence(self) -> None:
-        repo = Repo(self)
-        url = "https://github.com/slaterain/nv-rs/blob/" + "d" * 40 + "/crates/vorbis/src/lib.rs"
-        repo.write("provenance/sources.toml", self.engine_row(url, licence="BSD-3-Clause AND GPL-3.0-or-later"))
-        repo.commit()
-        self.assertTrue(any("licence" in line for line in repo.check("provenance")))
+    def test_an_engine_port_row_through_a_raw_or_mirror_url_fails(self) -> None:
+        for url in (
+            "https://raw.githubusercontent.com/slaterain/nv-rs/" + "a" * 40 + "/crates/bsa/src/a.rs",
+            "https://gitlab.com/someone/nv-rs/-/blob/" + "a" * 40 + "/a.rs",
+            "https://github.com/Slaterain/NV-RS/blob/" + "a" * 40 + "/../../other/a.rs",
+        ):
+            out = self.engine_check(self.engine_row(url))
+            self.assertTrue(any("40-character commit" in line for line in out), url)
+
+    def test_an_engine_port_row_must_name_exactly_one_engine_licence(self) -> None:
+        for licence in ("CC-BY-4.0", "BSD-3-Clause AND GPL-3.0-or-later", "GPL-3.0-or-later AND BSD-3-Clause",
+                        "GPL-3.0-or-later-ish", "MIT OR Apache-2.0", "GPL-3.0-only"):
+            out = self.engine_check(self.engine_row(self.GOOD_URL, licence=licence))
+            self.assertTrue(any("licence" in line for line in out), licence)
+
+    def test_the_licence_check_is_not_case_sensitive(self) -> None:
+        self.assertEqual(self.engine_check(self.engine_row(self.GOOD_URL, licence="gpl-3.0-or-later")), [])
 
     def test_the_unlicensed_decompilation_reconstruction_is_refused_as_a_source(self) -> None:
         repo = Repo(self)

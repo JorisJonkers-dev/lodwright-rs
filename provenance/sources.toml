@@ -837,7 +837,7 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. The page does not say in which domain the interpolation runs or how 5 and 6 bit values widen to 8 bits; lodwright probe widens by bit replication and interpolates in 8 bits, so its statistics can differ by one from another decoder."
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. The page does not say in which domain the interpolation runs or how 5 and 6 bit values widen to 8 bits; lodwright probe widens by bit replication and interpolates in 8 bits, so its statistics can differ by one from another decoder. 2026-11-19: both are now in bc-endpoint-promotion (MSB extension; derived colours from the promoted 8-bit values, error bound 1/255). The probe's integer formulas (2a + b + 1)/3 and (a + 2b + 1)/3 equal the exact quotient converted by unorm-conversion (round half up), since a third is never exactly one half. In three-colour mode the probe truncates (a + b)/2, which is one lower than round half up when a + b is odd: inside the 1/255 bound, not equal to the rounded value."
 
 [[source]]
 id = "probe-bc3-block-layout"
@@ -848,7 +848,51 @@ date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. The byte table of the page lists the codes of row 0 first in byte 2, which is the little-endian reading used here."
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583. The byte table of the page lists the codes of row 0 first in byte 2, which is the little-endian reading used here. 2026-11-19: the colour block's promotion and interpolation domain are in bc-endpoint-promotion, the alpha precision in bc3-alpha-interpolation. The probe's integer formulas (k*a0 + (7-k)*a1 + 3)/7 and ((5-k)*a0 + k*a1 + 2)/5 equal the exact float quotient converted to 8 bits by unorm-conversion (no seventh or fifth is exactly one half), so the probe gives the specification's value rounded to UNORM8; the specification asks for UNORM16 filtering precision, which an 8-bit statistic does not use."
+
+[[source]]
+id = "bc-endpoint-promotion"
+fact = "In BC1, BC2 and BC3 the two 5:6:5 endpoint colours are promoted to 8-bit UNORM by MSB extension: the value is shifted left by the missing bits and its own most significant bits fill the new low bits. The derived colours are computed from the promoted values, per channel: in BC1's four-colour mode color_2 = (2*color_0_p + color_1_p)/3 and color_3 = (color_0_p + 2*color_1_p)/3, in its three-colour mode color_2 = (color_0_p + color_1_p)/2. Filtering must occur with at least UNORM8 precision, and the allowed absolute error is 1/255."
+url = "https://github.com/microsoft/DirectX-Specs/blob/ae2cc81d8f97df9ce8597e25d84405273f09d08c/d3d/archive/D3D11_3_FunctionalSpec.htm"
+licence = "CC-BY-4.0 (microsoft/DirectX-Specs repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "D3D11.3 functional specification, sections 19.5.3 (promotion to wider UNORM values, UNORMPromote), 19.5.6 (BC1), 19.5.7 (BC2) and 19.5.8 (BC3, which says colour palette entries follow the BC1 rules; its own formula is printed with color_0 and color_1 where BC1 uses the promoted names). Section 25.1.1 maps DXT1 to BC1 and DXT4/DXT5 to BC3. The specification states whether the division is exact or rounded only through the error bound."
+
+[[source]]
+id = "bc3-alpha-interpolation"
+fact = "BC3 alpha decodes as BC4U: the two 8-bit endpoints are converted to float; when alpha_0 > alpha_1 the six derived values are (6*a0 + 1*a1)/7 to (1*a0 + 6*a1)/7, otherwise four derived values (4*a0 + 1*a1)/5 to (1*a0 + 4*a1)/5 followed by 0.0 and 1.0. Filtering must occur with at least UNORM16 precision; the endpoints, 0.0 and 1.0 must be exact; the allowed absolute error is 1/65535."
+url = "https://github.com/microsoft/DirectX-Specs/blob/ae2cc81d8f97df9ce8597e25d84405273f09d08c/d3d/archive/D3D11_3_FunctionalSpec.htm"
+licence = "CC-BY-4.0 (microsoft/DirectX-Specs repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "D3D11.3 functional specification, sections 19.5.8 ('Alpha values decode as with BC4U') and 19.5.9 (BC4U)."
+
+[[source]]
+id = "unorm-conversion"
+fact = "UNORM to float: the n-bit value is converted to float and divided by (2^n - 1). Float to UNORM: NaN gives 0, values are clamped to 0.0..1.0, multiplied by (2^n - 1), 0.5 is added and the fraction dropped; a tolerance of 0.6 ULP on the integer side is permitted."
+url = "https://github.com/microsoft/DirectX-Specs/blob/ae2cc81d8f97df9ce8597e25d84405273f09d08c/d3d/archive/D3D11_3_FunctionalSpec.htm"
+licence = "CC-BY-4.0 (microsoft/DirectX-Specs repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "D3D11.3 functional specification, sections 3.2.3.5 and 3.2.3.6. These are the specification's general format conversion rules; that a masked channel of a legacy DDS file is read with them is the specifier's reading, not a statement of the DDS pages."
+
+[[source]]
+id = "d3d9-format-memory-order"
+fact = "Direct3D 9 format names list channels from the most significant bit to the least significant bit (the page's example, ARGB: alpha highest, blue lowest); surface data is stored in memory from the least significant bit to the most significant bit, so the channel order in memory is blue first, alpha last."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dformat"
+licence = "CC-BY-4.0 (Microsoft Learn documentation; MicrosoftDocs/win32 repository licence)"
+date = 2026-11-19
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583, desktop-src/direct3d9/d3dformat.md (ms.date 05/31/2018), the paragraph after the format list. The DDS programming guide (desktop-src/direct3ddds/dx-graphics-dds-pguide.md, same revision) maps D3D9 formats to DDS bit masks (D3DFMT_A8R8G8B8: red mask 0xff0000, alpha mask 0xff000000), which ties the masks to that in-memory order."
 
 [[source]]
 id = "game-lod-terrain-layout"

@@ -400,13 +400,15 @@ the in-game result (owner).
 Specifier entry, role held: specifier for the correction only (not the implementer of the worldspace reader). Read
 `Core/wbDefinitionsCommon.pas` (`TwbGameDefCommon.wbWorldObjectBounds`) and `Core/wbInterface.pas` (`TwbGameDef.IsSF1`,
 `TwbFloatDef.ToValue`, `TwbFloatDef.FromValue`) of TES5Edit/TES5Edit at revision
-`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file headers). Not read: the 2016 generator C# repository,
+`3ccc9e7d733becfcc97940cf0c877fa3d6213c5b` (MPL-2.0 file headers), and `Core/wbDefinitionsFNV.pas` to confirm that the
+FNV WRLD definition uses `wbWorldObjectBounds`. Not read: the 2016 generator C# repository,
 decompiled binaries, GPL or leaked code.
 
 The fact of `wrld-bounds` (NAM0 minimum and NAM9 maximum, two f32 each, x then y) is unchanged. The note had the xEdit
 display factor the wrong way round: 1/100 is the Starfield branch of `IsSF1`; FO3 and FNV use 1/4096, and xEdit shows
-the stored value multiplied by that factor. The unit of the stored floats stays open: the factor is a display choice of
-xEdit, not a statement of the unit. The row stays `verified = false` until a second reader re-reads the corrected note
+the stored value multiplied by that factor (and divides a value typed in by it before storing). The unit of the
+stored floats stays open: the factor converts between the stored f32 and the number xEdit shows; it does not state
+the unit. The row stays `verified = false` until a second reader re-reads the corrected note
 against the same two files. What that reader checks: the `IsSF1` argument order in `wbWorldObjectBounds`; that `IsSF1`
 returns the first argument only for Starfield; that `ToValue` multiplies by the scale. An owner check (NAM0 and NAM9 of
 one plugin's worldspace against the cell range of its LAND records, numbers only) would settle the unit.

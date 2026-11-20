@@ -369,8 +369,9 @@ pub fn generate_terrain(
     let cancelled = cancelled.into_inner();
     if let Some(bounds) = world.bounds().filter(|_| !cancelled) {
         let clamp = |v: i32| i16::try_from(v).unwrap_or(if v < 0 { i16::MIN } else { i16::MAX });
+        let (anchor_x, anchor_y) = world.grid_anchor();
         let settings_file = LodSettings::for_bounds(
-            (clamp(bounds.min_x), clamp(bounds.min_y)),
+            (clamp(anchor_x), clamp(anchor_y)),
             (clamp(bounds.max_x), clamp(bounds.max_y)),
             highest,
         );

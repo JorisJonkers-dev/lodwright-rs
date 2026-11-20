@@ -154,10 +154,20 @@ impl Worldspace {
             let c = (v / CELL_UNITS).floor();
             (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
         };
-        match (cell(b.min[0]), cell(b.min[1])) {
-            (Some(x), Some(y)) => (x, y),
-            _ => (0, 0),
+        let (Some(mut x), Some(mut y)) = (cell(b.min[0]), cell(b.min[1])) else {
+            return (0, 0);
+        };
+        // The game's tree of WastelandNV starts at (-64, -64) where NAM0 says (-65, -65): a minimum
+        // corner that lies below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
+        if let Some(data) = self.bounds() {
+            if data.min_x > x && data.min_x.rem_euclid(32) == 0 {
+                x = data.min_x;
+            }
+            if data.min_y > y && data.min_y.rem_euclid(32) == 0 {
+                y = data.min_y;
+            }
         }
+        (x, y)
     }
 
     /// The water height of cell (`x`, `y`) for the mesh stage: its `XCLW`, else the world's default water
@@ -619,6 +629,34 @@ mod tests {
         let world = Worldspace::from_cells(0x0100_0042, "01000042", []);
         assert_eq!(world.name(), "01000042");
         assert_eq!(world.bounds(), None);
+    }
+
+    #[test]
+    fn the_grid_anchor_is_the_minimum_corner_cell_unless_the_land_starts_on_the_32_grid() {
+        let flat = |cells: &[(i32, i32)], min: [f32; 2]| {
+            Worldspace::from_cells(1, "W", cells.iter().map(|c| (*c, CellHeights::flat(1.0))))
+                .with_declared_bounds(crate::plugin::DeclaredBounds {
+                    min,
+                    max: [min[0] + 8192.0, min[1] + 8192.0],
+                })
+        };
+        // no corners: the origin
+        let none = Worldspace::from_cells(1, "W", [((3, 4), CellHeights::flat(1.0))]);
+        assert_eq!(none.grid_anchor(), (0, 0));
+        // corner cell (-6, -5) below the land: the corner
+        let cells = [(-4, -4), (2, 2)];
+        assert_eq!(
+            flat(&cells, [-6.0 * 4096.0, -5.0 * 4096.0]).grid_anchor(),
+            (-6, -5)
+        );
+        // a corner one cell below land that starts on the 32 grid (WastelandNV): the land
+        let cells = [(-64, -64), (63, 63)];
+        assert_eq!(
+            flat(&cells, [-65.0 * 4096.0, -65.0 * 4096.0]).grid_anchor(),
+            (-64, -64)
+        );
+        // not finite: the origin
+        assert_eq!(flat(&cells, [f32::NAN, 0.0]).grid_anchor(), (0, 0));
     }
 
     #[test]

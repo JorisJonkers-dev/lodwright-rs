@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.7.0...v0.8.0) (2026-11-20)
+
+
+### Features
+
+* **verify:** report per-channel texture correlation against the reference ([#91](https://github.com/JorisJonkers-dev/lodwright-rs/issues/91)) ([#212](https://github.com/JorisJonkers-dev/lodwright-rs/issues/212)) ([3732eb0](https://github.com/JorisJonkers-dev/lodwright-rs/commit/3732eb0f7cf02d2c9c9aff3b86d78374514b878d))
+
 ## [0.7.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.6.0...v0.7.0) (2026-11-20)
 
 

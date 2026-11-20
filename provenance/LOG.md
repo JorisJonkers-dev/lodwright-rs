@@ -562,3 +562,32 @@ no row. The owner accepted it on 2026-11-20; whether the game reads it is an in-
 `docs/spec/object-lod.md` section 4 records the order of trees within a block (agrees only as a set) and the segment table
 of object blocks (meaning unknown) as known differences, with numbers already recorded in the rows above. No new format
 fact, no row. Neither is visible to `verify`, so neither can be on the known-differences list.
+
+## 2026-11-20: owner measurements run on the Linux machine (#52, #148, #152, #155, #93, #125)
+
+Measurements on the local game files, read in place, numbers only; scratch tools outside every repository. Role: specifier
+(measurements); nothing here was implemented from them, and no row is flipped to verified.
+
+- `bsa-v104-data-blocks` (#52): the M10 protocol on the three archives with flag 0x100 (New Vegas texture archives 1 and
+  2, Fallout 3 texture archive; flags 0x107). All 34355 files are compressed, and for every one the stored size counts the
+  embedded path (the distance to the next block and the bytes the zlib stream uses both agree). No archive with the flag
+  and stored files exists on the machine, so that case is unmeasured. Row note updated; `verified` stays false (no second
+  reader).
+- `game-lod-water-shape`, `game-lod-water-height` (#148): the per-level water table of `verify --reference` for the main
+  world (lodwright 0.6.0), 164 blocks with water, 82 under an IoU of 0.95, lowest 0.000, mean 0.829; level 4: 98 blocks,
+  39 under, mean 0.874; level 8: 39, 19, 0.831; level 16: 19, 16, 0.650; level 32: 8, 8, 0.688. Recorded on the issue;
+  the rows are not changed, the outline vertex counts, slope depth and inset of the ticket text are not in verify's output.
+- #152: not decidable from file times (every file carries the install stamp); the record edit stamps put two of the four
+  shifted blocks at the newest visible-when-distant placements of the worldspace and the other two at ranks 32 and 43 of
+  289. Not confirmed for any block; no known-differences entry added.
+- `wrld-bounds` (#155): stored NAM0 and NAM9 are world units, multiples of 4096, and contain the LAND cell range in all 30
+  worldspaces of the master and four DLC plugins. `plugin-record-override`: 7 of 42467 LAND records are overridden, all
+  with the same subrecord set as the master, so whole replacement and merging do not differ on stock data.
+  `land-vtxt-layout`: 76046 layers, 75854 sparse (minimum 1 position), no listed entry with opacity 0.0.
+  `wrld-child-inherits`: 17 child worldspaces, all with only the map-data bit set, all with LAND of their own, all with
+  LOD in the game's own tree. The four rows stay `verified = false`.
+- #93: partial. Loose files at archived paths were opened by nv-rs in the 0.3.0 release test (INI default
+  bInvalidateOlderFiles=1); drawn content, the INI and timestamp variables and the Proton case are not measured.
+- `game-lod-block-borders` (#125): new row, `verified = false`. Every border vertex of the game's terrain blocks has a skirt
+  vertex at the constant height -14098 (175259 of 175262 at level 4, with the other levels equally complete); neighbours
+  share border heights where both have a vertex, not the vertex sets (same set in 43 of 2600 same-level pairs).

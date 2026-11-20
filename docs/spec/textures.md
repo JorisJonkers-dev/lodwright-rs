@@ -59,10 +59,10 @@ Measured (`game-lod-object-layout`, `game-object-atlas`): the main world's objec
 Maximum atlas size and per-texture limit are generator options (`fnv-lod-texture-options`). The packing rule and the
 UV scale stay open (`docs/spec/object-lod.md`).
 
-## 4. Specular in alpha (proposal, owner decision needed, #92)
+## 4. Specular in alpha (own design, accepted, #92)
 
-Status: a proposal for the owner to accept, change or reject. Nothing in the code follows it, and no row below is
-verified. Until it is accepted, #92 stays unstarted.
+Status: accepted by the owner on 2026-11-20 as lodwright's own design. No row below is verified, and the in-game
+check (item 4) is still the owner's.
 
 What is established, and what is not:
 
@@ -73,7 +73,7 @@ What is established, and what is not:
 - A land texture record holds one specular exponent (`ltex-texture-set`, SNAM). No per-pixel specular source exists in the
   terrain records.
 
-Proposed own design, declared as such (no format fact is claimed):
+Own design, declared as such (no format fact is claimed):
 
 1. Carrier: the alpha channel of the normal map, not of the diffuse map. This follows the convention of the texture set
    above, and keeps the diffuse map as it is.
@@ -86,5 +86,5 @@ Proposed own design, declared as such (no format fact is claimed):
    accepts BC3 in place of BC1 there. Both are in-game checks for the owner (the Release test of R1, #156). If the
    game ignores it, the option has no use and #92 is dropped.
 
-Questions for the owner: is the normal map the right carrier, is the weighted exponent an acceptable stand-in for a
-specular map, and does the option stay at tier 3 (advanced) as #92 says.
+Decided: the normal map is the carrier, the weighted exponent stands in for a specular map, and the option is tier 3
+(advanced) and off by default.

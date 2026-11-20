@@ -9,7 +9,7 @@ publish.workspace = true
 description = "Clean-room core of lodwright: format readers and writers, heightfield and raster math."
 
 [dependencies]
-miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.9.0", default-features = false, features = ["with-alloc"] }
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

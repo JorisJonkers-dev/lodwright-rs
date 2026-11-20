@@ -555,3 +555,8 @@ Status (2026-11-19): all three rows merge as `verified = false`, marked UNVERIFI
 `docs/spec/textures.md` section 4 states a proposed carrier and value for specular in the terrain texture alpha channel as
 lodwright's own design, built from `txst-texture-paths` and `ltex-texture-set`. It records no new format fact and adds
 no row. It is a draft that needs an owner decision before any code follows; whether the game reads it is an in-game check.
+## 2026-11-20: known differences of object and tree LOD (#159)
+
+`docs/spec/object-lod.md` section 4 records the order of trees within a block (agrees only as a set) and the segment table
+of object blocks (meaning unknown) as known differences, with numbers already recorded in the rows above. No new format
+fact, no row. Neither is visible to `verify`, so neither can be on the known-differences list.

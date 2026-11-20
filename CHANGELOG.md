@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.5.0...v0.6.0) (2026-11-20)
+
+
+### Features
+
+* **api:** expose the effective request defaults through lodwright-api ([#190](https://github.com/JorisJonkers-dev/lodwright-rs/issues/190)) ([bc9bd95](https://github.com/JorisJonkers-dev/lodwright-rs/commit/bc9bd95e23396dc643f1c2f74448f854557c0303))
+* **generate:** hold the memory budget while the run goes ([#192](https://github.com/JorisJonkers-dev/lodwright-rs/issues/192)) ([7bf3194](https://github.com/JorisJonkers-dev/lodwright-rs/commit/7bf31940e69ab091a413b9bad63488b9b9daecc6))
+* **objects:** optionally drop object faces under the terrain and the water ([#195](https://github.com/JorisJonkers-dev/lodwright-rs/issues/195)) ([7e04dd6](https://github.com/JorisJonkers-dev/lodwright-rs/commit/7e04dd6293df297456e8dccfe079d0f6f2f44d6a))
+* **terrain:** per-texture tiling scale in the terrain diffuse maps ([#196](https://github.com/JorisJonkers-dev/lodwright-rs/issues/196)) ([11fe78a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/11fe78a0d5f7bcd05f8635b7700058f04b430a10))
+* **verify:** a known-differences list with reasons, and the water numbers per level ([#197](https://github.com/JorisJonkers-dev/lodwright-rs/issues/197)) ([235dd83](https://github.com/JorisJonkers-dev/lodwright-rs/commit/235dd830bbda0955c8c07fab8ac19b1a3340eae6))
+* **verify:** print the minimum and maximum of each statistic over several runs ([#194](https://github.com/JorisJonkers-dev/lodwright-rs/issues/194)) ([b1cb304](https://github.com/JorisJonkers-dev/lodwright-rs/commit/b1cb304a096e3bab195a18b610e916c56768919f))
+
+
+### Bug Fixes
+
+* **deps:** update minor and patch dependencies ([#199](https://github.com/JorisJonkers-dev/lodwright-rs/issues/199)) ([6a7ac8e](https://github.com/JorisJonkers-dev/lodwright-rs/commit/6a7ac8e08410b8f6193919e872fa4b8acee9279c))
+
 ## [0.5.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.4.2...v0.5.0) (2026-11-19)
 
 

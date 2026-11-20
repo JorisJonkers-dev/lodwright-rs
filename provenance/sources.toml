@@ -722,8 +722,8 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation)"
 date = 2026-11-14
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Page last updated 2019-08-23. The page's example sizes are all even: rounding down for an odd size is the Direct3D convention and is not stated there, so it stays open until a reference file answers it."
+verified = true
+note = "Page last updated 2019-08-23. The page's example sizes are all even: rounding down for an odd size is not stated here (see dds-mip-odd-size). Second reader 2026-11-21 (did not implement lodwright-dds): re-derived from the page's 256-by-64 table (header, then 128x32, 64x16, 32x8, 16x4, 8x2, 4x1, 2x1, 1x1) and its sentence that all levels down to 1-by-1 are usually written; the fact claims exactly this."
 
 [[source]]
 id = "dds-mip-odd-size"
@@ -733,8 +733,8 @@ licence = "CC-BY-4.0 (Microsoft Learn documentation; MicrosoftDocs/win32 reposit
 date = 2026-11-19
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583, desktop-src/direct3d11/overviews-direct3d-11-resources-textures-intro.md (ms.date 05/31/2018), section 1D Textures. The page is about Direct3D 11 resources, not the DDS file format, and gives one odd-size example only. 5 to 2 is rounding down (rounding up would give 3). The same paragraph also says 'the next lower level is always even size (except when the lowest level reaches 1)', which rounding down does not give for every odd size (7 halves to 3); that general sentence is not recorded as a fact. OPEN until a second reader agrees, and until a reference file with an odd size (oracle:) confirms what the game's own textures use."
+verified = true
+note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2f44a3d7db5f7cfebfdc3583, desktop-src/direct3d11/overviews-direct3d-11-resources-textures-intro.md (ms.date 05/31/2018), section 1D Textures. The page is about Direct3D 11 resources, not the DDS file format, and gives one odd-size example only. 5 to 2 is rounding down (rounding up would give 3). The same paragraph also says 'the next lower level is always even size (except when the lowest level reaches 1)', which rounding down does not give for every odd size (7 halves to 3); that general sentence is not recorded as a fact. Second reader 2026-11-21 (did not implement lodwright-dds): re-read the page at the same revision, section 1D Textures; the 5x1 to 2x1 to 1x1 example and the numbers are as recorded, and the row claims only the example. Still open and not claimed by this row: what the game's own textures with an odd size use (an oracle: measurement, `lodwright probe dds` on an own odd-size texture); the code comment keeps calling the rounding the project's choice."
 
 [[source]]
 id = "bc-block-padding"

@@ -45,6 +45,11 @@ meshes\landscape\lod\<world>\blocks\<name>.nif
 - Vertex cap (design.md uses 32767 for 16-bit indices): a NIF constraint of the engine's loader is not documented
   publicly; treat 65535 as the format limit and 32767 as the plan's choice until measured.
 - Water LOD and border handling: not documented in a public source read here; see section 6 for what was measured.
+- Border scheme (own design, from the measurement `game-lod-block-borders`): the game's blocks neither share border
+  vertices nor leave the border open; every border vertex has a second vertex at the constant height -14098 (a vertical
+  skirt). lodwright's option `terrain.levels[].skirts` writes exactly that and is off by default (it adds up to one
+  vertex per border vertex, inside the level's vertex cap). Shared edge vertices were not chosen: the game's two sides are
+  simplified separately, so coupling the blocks would change digest semantics for no match with the reference.
 
 ## 6. Water planes
 

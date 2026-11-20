@@ -108,6 +108,16 @@ opaque with one warning. This is lodwright's own design (`docs/spec/textures.md`
 is an owner check. Off, the files are byte-identical to earlier versions and the block digests do not change; on, the
 exponents enter the digest of that level's blocks only.
 
+### Skirts at block borders
+
+`terrain.levels[].skirts` (off by default, written only when on; tier 3, since 0.9.0) closes the gap to a neighbouring
+block, of the same or another level, the way the game's own blocks do: under every border vertex a second vertex at
+the constant height -14098 and two triangles per border edge, facing away from the block (`game-lod-block-borders`,
+`docs/spec/terrain-lod.md` section 5). Blocks are not coupled, so no neighbour data enters a digest; the switch enters the
+digest of that level's blocks only, and off the files and digests are as before. The skirt vertices count against the
+level's vertex cap: the surface is meshed with the room that is left. Whether the skirts remove the visible cracks in
+the game is an owner check (release test R2).
+
 ### Object faces under the ground and the water
 
 `objects.drop_under_terrain` and `objects.drop_under_water` (both off by default, written only when on) leave out

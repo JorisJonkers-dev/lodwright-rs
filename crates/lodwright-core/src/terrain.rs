@@ -464,11 +464,23 @@ mod tests {
                 .filter(|v| v[2] == super::SKIRT_HEIGHT)
                 .count();
             assert_eq!(low, border.len());
-            // the border is a closed ring of edges as many as its vertices, and each adds two triangles
-            assert_eq!(
-                skirted.triangle_count() - plain.triangle_count(),
-                2 * border.len()
-            );
+            // every triangle edge along the border adds two triangles
+            let mut edges = 0;
+            for t in plain.indices.chunks_exact(3) {
+                for (p, q) in [(0, 1), (1, 2), (2, 0)] {
+                    let (a, b) = (
+                        plain.vertices[usize::from(t[p])],
+                        plain.vertices[usize::from(t[q])],
+                    );
+                    if (a[0] == b[0] && (a[0] == 0.0 || a[0] == edge))
+                        || (a[1] == b[1] && (a[1] == 0.0 || a[1] == edge))
+                    {
+                        edges += 1;
+                    }
+                }
+            }
+            assert!(edges > 0);
+            assert_eq!(skirted.triangle_count() - plain.triangle_count(), 2 * edges);
         }
     }
 

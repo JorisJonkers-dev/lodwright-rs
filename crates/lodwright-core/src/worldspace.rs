@@ -157,13 +157,13 @@ impl Worldspace {
         let (Some(mut x), Some(mut y)) = (cell(b.min[0]), cell(b.min[1])) else {
             return (0, 0);
         };
-        // The game's tree of WastelandNV starts at (-64, -64) where NAM0 says (-65, -65): a minimum
-        // corner that lies below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
+        // The game's tree of WastelandNV starts at (-64, -64) where NAM0 says (-65, -65): a corner
+        // exactly one cell below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
         if let Some(data) = self.bounds() {
-            if data.min_x > x && data.min_x.rem_euclid(32) == 0 {
+            if data.min_x == x + 1 && data.min_x.rem_euclid(32) == 0 {
                 x = data.min_x;
             }
-            if data.min_y > y && data.min_y.rem_euclid(32) == 0 {
+            if data.min_y == y + 1 && data.min_y.rem_euclid(32) == 0 {
                 y = data.min_y;
             }
         }

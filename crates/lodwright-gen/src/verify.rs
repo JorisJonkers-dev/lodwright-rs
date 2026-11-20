@@ -45,7 +45,7 @@ pub struct Verification {
     pub differences: Vec<Finding>,
 }
 
-fn files_below(root: &Path) -> Vec<(String, PathBuf)> {
+pub(crate) fn files_below(root: &Path) -> Vec<(String, PathBuf)> {
     fn walk(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) {
         let Ok(read) = std::fs::read_dir(dir) else {
             return;

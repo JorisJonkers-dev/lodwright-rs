@@ -55,6 +55,10 @@ pub struct VerifyDoc {
     /// a reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub objects: Option<ObjectReport>,
+    /// With a reference: the per-channel correlation of the terrain diffuse (and normal map) of every block present
+    /// on both sides with the reference's. Omitted without a reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation: Option<CorrelationReport>,
     /// With `--known-differences`: the differences the list names, with its reason and release. They are reported
     /// and do not make the run fail. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -209,6 +213,73 @@ pub struct ObjectBlock {
     pub exact: bool,
 }
 
+/// A Pearson correlation per colour channel, from -1 to 1, rounded to three decimals.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Channels {
+    /// The red channel.
+    pub r: f64,
+    /// The green channel.
+    pub g: f64,
+    /// The blue channel.
+    pub b: f64,
+}
+
+/// The correlations of a set of blocks: the mean and the lowest per channel.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CorrelationSummary {
+    /// Blocks in the set.
+    pub blocks: u64,
+    /// The mean of the blocks' correlations, per channel.
+    pub mean: Channels,
+    /// The lowest correlation of any block, per channel.
+    pub lowest: Channels,
+}
+
+/// The texture correlation of one terrain level.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CorrelationLevel {
+    /// Cells per block edge.
+    pub level: u32,
+    /// The diffuse textures of this level.
+    pub diffuse: CorrelationSummary,
+    /// The normal maps of this level; omitted when none could be compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normals: Option<CorrelationSummary>,
+}
+
+/// The Pearson correlation per colour channel between the terrain textures of the blocks present on both sides and
+/// the reference's, over the pixels of the decoded images (alpha is not compared). Two flat channels correlate as 1
+/// when they hold the same value and 0 otherwise; a flat channel against a varying one is 0. A pair whose size
+/// differs, or that cannot be decoded, is left out. Numbers are rounded to three decimals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CorrelationReport {
+    /// Blocks whose diffuse textures were compared.
+    pub blocks: u64,
+    /// The summary of all compared diffuse textures; omitted when none was compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diffuse: Option<CorrelationSummary>,
+    /// The summary of all compared normal maps; omitted when none was compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normals: Option<CorrelationSummary>,
+    /// Every compared block, sorted by path.
+    pub per_block: Vec<CorrelationBlock>,
+    /// The same summaries per terrain level, smallest level first. Omitted when no block was compared.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub per_level: Vec<CorrelationLevel>,
+}
+
+/// The texture correlation of one terrain block.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CorrelationBlock {
+    /// The diffuse texture, relative to the folder, lower case.
+    pub path: String,
+    /// The correlation of the diffuse texture.
+    pub diffuse: Channels,
+    /// The correlation of the normal map; omitted when it is missing on a side or cannot be compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normals: Option<Channels>,
+}
+
 impl VerifyDoc {
     /// An empty report of a clean folder: no files counted, no findings.
     #[must_use]
@@ -227,6 +298,7 @@ impl VerifyDoc {
             water: None,
             terrain: None,
             objects: None,
+            correlation: None,
             known: Vec::new(),
             stale: Vec::new(),
         }

@@ -46,5 +46,49 @@
         "exact": false
       }
     ]
+  },
+  "correlation": {
+    "blocks": 1,
+    "diffuse": {
+      "blocks": 1,
+      "mean": {
+        "r": 0.9,
+        "g": 0.8,
+        "b": 0.7
+      },
+      "lowest": {
+        "r": 0.9,
+        "g": 0.8,
+        "b": 0.7
+      }
+    },
+    "per_block": [
+      {
+        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds",
+        "diffuse": {
+          "r": 0.9,
+          "g": 0.8,
+          "b": 0.7
+        }
+      }
+    ],
+    "per_level": [
+      {
+        "level": 4,
+        "diffuse": {
+          "blocks": 1,
+          "mean": {
+            "r": 0.9,
+            "g": 0.8,
+            "b": 0.7
+          },
+          "lowest": {
+            "r": 0.9,
+            "g": 0.8,
+            "b": 0.7
+          }
+        }
+      }
+    ]
   }
 }

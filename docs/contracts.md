@@ -210,8 +210,8 @@ wrong with the folder) and `differences` (how it differs from `--reference`, emp
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
 
-With `--reference`, the report also carries three optional keys, measured per block mesh present on both sides (names
-compared in lower case):
+With `--reference`, the report also carries four optional keys, measured per block present on both sides (names compared
+in lower case):
 
 * `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
   two water planes cover seen from above. It is sampled at the centres of a 400 by 400 grid over the bounds of both
@@ -230,6 +230,16 @@ compared in lower case):
 * `objects`: for every object block, the vertex and triangle counts on both sides and the number of vertices with no
   vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
   0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
+* `correlation`: for every terrain block whose diffuse texture (`textures/landscape/lod/<world>/diffuse/`) is in both
+  folders, the Pearson correlation per colour channel (`r`, `g`, `b`; alpha is not compared) of the decoded pixels with
+  the reference's, from -1 to 1, and the same for the normal map (`normals/`) when both sides have it. This is the
+  number the issue #91 acceptance asks for: how closely the generated terrain diffuse follows the game's own. A channel
+  that is flat in both images correlates as 1 when both hold the same value and as 0 otherwise; a channel flat in only
+  one is 0. A pair that differs in size, or cannot be decoded, is left out (`verify` reports those files elsewhere).
+  `per_block` lists every pair; `diffuse` and `normals` give the summary over all blocks (`blocks`, the `mean` and the
+  `lowest` per channel) and `per_level` repeats it per terrain level, smallest first. Numbers are rounded to three
+  decimals. It never turns into a difference and never changes the exit code. The text report prints
+  `texture correlation:` and `texture correlation level L:` lines.
 
 With `--reference`, `water.per_level` repeats the water summary per terrain level (blocks, how many are under the
 threshold, lowest and mean), smallest level first; the text report prints one `water level L:` line each. These are the

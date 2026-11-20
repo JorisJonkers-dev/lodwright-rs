@@ -15,7 +15,7 @@ document is the rule for everyone who writes code or docs here. The study behind
 
 ## Roles
 
-- **Specifier**: reads allowed inputs and writes down format facts: one row in `provenance/sources.toml` per fact,
+- **Specifier**: reads allowed inputs and writes down format facts: one row per fact (a new row is its own file `provenance/rows/<id>.toml`; `provenance/sources.toml` and `LOG.md` are frozen history, so parallel pull requests never collide),
   a story in `provenance/LOG.md`, and, when a fact needs a page of prose, a document under `docs/formats/`.
 - **Implementer**: writes code from the recorded facts and the open MPL sources only. When something is not
   recorded, the implementer does not look it up in a closed source: they ask the specifier for a new row, or file

@@ -1,3 +1,5 @@
+# FROZEN: new rows are not added here; each new row is its own file provenance/rows/<id>.toml (see the README
+# there). Edits to existing rows (a second reader, a corrected note) stay here.
 # Machine-readable provenance: every format fact the code relies on is a row here. Code points at a row with a
 # `// source: <id>` comment (`# source:` in Python, shell and TOML); cargo xtask guards fails the build for
 # a reference without a row, a row without a licence, a forbidden source, or a row LOG.md does not mention.

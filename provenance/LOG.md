@@ -4,6 +4,9 @@ The human-readable side of `sources.toml`. Every row of that file is mentioned h
 story the table cannot hold: who read what, when, and what stayed open. `cargo xtask guards` fails the
 build if a row is not mentioned. Rules: [docs/clean-room.md](../docs/clean-room.md).
 
+Frozen: this file is history up to 2026-11-21. A new row is its own file under `provenance/rows/`, whose `note` is its
+log entry; nothing is appended here any more.
+
 Roles: the *specifier* reads allowed inputs and records facts; the *implementer* codes from the recorded facts
 (and the open MPL sources) only. One person may hold both roles at different times; the entries say which.
 

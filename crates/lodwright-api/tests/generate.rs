@@ -119,6 +119,27 @@ fn progress_starts_each_step_and_counts_every_terrain_block() {
     assert!(blocks.iter().all(|e| e.block_line().is_some()));
 }
 
+fn staging(out: &std::path::Path) -> PathBuf {
+    let mut name = out.file_name().unwrap().to_os_string();
+    name.push(".lodwright-staging");
+    out.with_file_name(name)
+}
+
+fn checkpoint(out: &std::path::Path) -> Manifest {
+    serde_json::from_slice(&std::fs::read(staging(out).join("checkpoint.json")).unwrap()).unwrap()
+}
+
+/// Cancel the call at the first finished terrain block.
+fn cancel_at_first_block() -> (CancelToken, impl FnMut(&ProgressEvent)) {
+    let cancel = CancelToken::new();
+    let stopper = cancel.clone();
+    (cancel, move |e: &ProgressEvent| {
+        if e.done.is_some() {
+            stopper.cancel();
+        }
+    })
+}
+
 #[test]
 fn a_token_cancelled_before_the_call_writes_nothing() {
     let (job, out) = job("cancel-first");
@@ -127,23 +148,22 @@ fn a_token_cancelled_before_the_call_writes_nothing() {
     let outcome = generate(&job, &mut NoProgress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
     assert!(!out.exists());
+    assert!(!staging(&out).exists());
 }
 
 #[test]
-fn a_cancel_after_the_first_block_leaves_a_manifest_the_next_call_resumes_from() {
+fn a_cancel_after_the_first_block_keeps_the_staging_folder_the_next_call_resumes_from() {
     let (job, out) = job("resume");
-    let cancel = CancelToken::new();
-    let stopper = cancel.clone();
-    let mut progress = |e: &ProgressEvent| {
-        if e.done.is_some() {
-            stopper.cancel();
-        }
-    };
+    let (cancel, mut progress) = cancel_at_first_block();
     let outcome = generate(&job, &mut progress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
-    let partial = manifest(&out);
+    assert!(
+        !out.exists(),
+        "the output folder is only written on success"
+    );
+    let partial = checkpoint(&out);
     assert_eq!(partial.blocks.len(), 1, "only the first block finished");
-    assert_ne!(partial.request_digest, job.request.digest());
+    assert_eq!(partial.request_digest, job.request.digest());
     assert!(
         !partial
             .files
@@ -156,46 +176,44 @@ fn a_cancel_after_the_first_block_leaves_a_manifest_the_next_call_resumes_from()
     assert_eq!(counts.up_to_date, 1, "the finished block is kept");
     assert!(counts.generated > 0);
     assert_eq!(manifest(&out).request_digest, job.request.digest());
+    assert!(!staging(&out).exists(), "staging is swapped into place");
+    assert!(!out.join("checkpoint.json").exists());
 }
 
 #[test]
-fn a_cancel_during_a_second_run_after_the_request_changed_lists_every_file_on_disk() {
+fn a_resumed_run_writes_the_files_an_uninterrupted_run_writes() {
+    let (job, out) = job("resume-bytes");
+    let (cancel, mut progress) = cancel_at_first_block();
+    generate(&job, &mut progress, &cancel).unwrap();
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    let (clean, clean_out) = self::job("resume-bytes-clean");
+    done(generate(&clean, &mut NoProgress, &CancelToken::new()).unwrap());
+    let (a, b) = (manifest(&out), manifest(&clean_out));
+    assert_eq!(a.files, b.files, "same files with the same digests");
+    assert_eq!(a.blocks, b.blocks);
+    assert_eq!(files_on_disk(&out), files_on_disk(&clean_out));
+}
+
+#[test]
+fn a_cancel_during_a_second_run_leaves_the_previous_output_untouched() {
     let (mut job, out) = job("changed-resume");
-    // the first run writes the whole output, water off
     job.request.terrain.water = false;
     let first = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(first.code, "generated");
     let first_manifest = manifest(&out);
-    assert_ne!(first_manifest.files.len(), 0);
-    // the second run turns water on, so every terrain block has to be built again, and is cancelled after the
-    // first block: the files the first run wrote are still on disk and the interrupted manifest must list them
+    let before = files_on_disk(&out);
+    // water on: every terrain block is built again; cancelled after the first block
     job.request.terrain.water = true;
-    let cancel = CancelToken::new();
-    let stopper = cancel.clone();
-    let mut progress = |e: &ProgressEvent| {
-        if e.done.is_some() {
-            stopper.cancel();
-        }
-    };
+    let (cancel, mut progress) = cancel_at_first_block();
     let outcome = generate(&job, &mut progress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
-    let partial = manifest(&out);
     assert_eq!(
-        partial.request_digest, "",
-        "the manifest is the interrupted one"
+        manifest(&out),
+        first_manifest,
+        "the previous manifest stands"
     );
-    assert_eq!(partial.blocks.len(), 1, "only the first block finished");
-    let listed: Vec<String> = partial.files.iter().map(|f| f.path.clone()).collect();
-    let mut on_disk = files_on_disk(&out);
-    on_disk.retain(|p| p != MANIFEST_FILE);
-    assert_eq!(listed, on_disk, "every file on disk is listed");
-    assert!(
-        partial
-            .files
-            .iter()
-            .any(|f| first_manifest.files.iter().any(|o| o.path == f.path)),
-        "the files of the first run are kept in the manifest"
-    );
+    assert_eq!(files_on_disk(&out), before, "and so do its files");
+    assert_eq!(checkpoint(&out).blocks.len(), 1);
     // the next run without a cancel finishes and leaves nothing the manifest does not list
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(result.code, "generated");
@@ -209,14 +227,7 @@ fn a_cancel_during_a_second_run_after_the_request_changed_lists_every_file_on_di
     let mut on_disk = files_on_disk(&out);
     on_disk.retain(|p| p != MANIFEST_FILE);
     assert_eq!(listed, on_disk, "no stray file is left");
-    assert!(
-        final_manifest
-            .files
-            .iter()
-            .all(|f| out.join(&f.path).is_file())
-    );
-    // every block was rebuilt for the current request, not kept from the first run: the output is the one a
-    // clean run of the same request writes into an empty folder
+    assert!(!staging(&out).exists());
     let verification = lodwright_gen::verify_folder(&out);
     assert!(verification.errors.is_empty(), "{:?}", verification.errors);
     let (mut clean_job, clean_out) = self::job("changed-resume-clean");
@@ -234,6 +245,29 @@ fn a_cancel_during_a_second_run_after_the_request_changed_lists_every_file_on_di
 }
 
 #[test]
+fn a_changed_request_discards_the_staging_folder_of_the_interrupted_one() {
+    let (mut job, out) = job("changed-request");
+    let (cancel, mut progress) = cancel_at_first_block();
+    generate(&job, &mut progress, &cancel).unwrap();
+    let stale: Vec<String> = checkpoint(&out)
+        .files
+        .iter()
+        .map(|f| f.path.clone())
+        .collect();
+    assert!(!stale.is_empty());
+    job.request.terrain.water = !job.request.terrain.water;
+    let (cancel, mut progress) = cancel_at_first_block();
+    generate(&job, &mut progress, &cancel).unwrap();
+    let now = checkpoint(&out);
+    assert_eq!(
+        now.request_digest,
+        job.request.digest(),
+        "a clean start for the new request"
+    );
+    assert_eq!(now.blocks.len(), 1);
+}
+
+#[test]
 fn a_cancel_between_the_terrain_step_and_a_later_step_is_cancelled() {
     let (mut job, out) = job("cancel-after-terrain");
     // the terrain step starts and then the cancel is seen before the first block; objects would follow it
@@ -248,13 +282,10 @@ fn a_cancel_between_the_terrain_step_and_a_later_step_is_cancelled() {
     let outcome = generate(&job, &mut progress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
     // the cancel is checked before each block, so no block finished
-    let partial = manifest(&out);
+    let partial = checkpoint(&out);
     assert_eq!(partial.blocks.len(), 0);
-    assert_eq!(partial.request_digest, "");
     assert!(partial.files.is_empty(), "{:?}", partial.files);
-    let mut on_disk = files_on_disk(&out);
-    on_disk.retain(|p| p != MANIFEST_FILE);
-    assert!(on_disk.is_empty(), "{on_disk:?}");
+    assert!(!out.exists());
 }
 
 #[test]
@@ -277,11 +308,15 @@ fn a_cancel_on_the_last_event_of_the_last_step_is_cancelled() {
     };
     let outcome = generate(&second, &mut progress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
-    assert_eq!(manifest(&out).request_digest, "", "an interrupted manifest");
+    assert!(
+        !out.exists(),
+        "no manifest and no output: the run did not succeed"
+    );
+    assert!(staging(&out).join("checkpoint.json").is_file());
 }
 
 #[test]
-fn an_interrupted_manifest_carries_no_block_of_a_run_with_other_plugins() {
+fn a_checkpoint_carries_no_block_of_a_run_with_other_plugins() {
     let (job, out) = job("changed-inputs");
     done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert!(
@@ -294,20 +329,38 @@ fn an_interrupted_manifest_carries_no_block_of_a_run_with_other_plugins() {
         .cell(5, 0, Heights::flat(40.0));
     let plugin = std::path::Path::new(&job.request.data_folder).join("Island.esm");
     std::fs::write(plugin, world_plugin(&[], &world, false)).unwrap();
-    let cancel = CancelToken::new();
-    let stopper = cancel.clone();
-    let mut progress = |e: &ProgressEvent| {
-        if e.done.is_some() {
-            stopper.cancel();
-        }
-    };
+    let (cancel, mut progress) = cancel_at_first_block();
     let outcome = generate(&job, &mut progress, &cancel).unwrap();
     assert_eq!(outcome, GenerateOutcome::Cancelled);
     assert_eq!(
-        manifest(&out).blocks.len(),
+        checkpoint(&out).blocks.len(),
         1,
         "only the block this run built; the first run's other block was built from other plugins"
     );
+}
+
+#[test]
+fn a_swap_killed_between_its_renames_is_restored_by_the_next_call() {
+    let (job, out) = job("swap-recover");
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    let before = manifest(&out);
+    // the state a kill between "set the output aside" and "move staging in" leaves
+    let mut old = out.file_name().unwrap().to_os_string();
+    old.push(".lodwright-old");
+    std::fs::rename(&out, out.with_file_name(old)).unwrap();
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "up_to_date");
+    assert_eq!(manifest(&out), before);
+}
+
+#[test]
+fn a_file_the_user_keeps_at_the_top_of_the_output_survives_a_regenerate() {
+    let (mut job, out) = job("carry-over");
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    std::fs::write(out.join("notes.txt"), b"mine").unwrap();
+    job.request.terrain.water = !job.request.terrain.water;
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(std::fs::read(out.join("notes.txt")).unwrap(), b"mine");
 }
 
 #[test]

@@ -448,6 +448,88 @@ fn a_block_under_the_water_iou_threshold_is_a_difference_and_exits_one() {
 }
 
 #[test]
+fn a_known_differences_list_accepts_its_blocks_reports_stale_entries_and_prints_levels() {
+    let (mine, theirs) = (
+        generate_lake("known-a", true),
+        generate_lake("known-b", false),
+    );
+    let list = std::env::temp_dir().join(format!("lodwright-known-{}.txt", std::process::id()));
+    let entries: String = [4, 8, 16, 32]
+        .iter()
+        .map(|level| {
+            format!(
+                "meshes/landscape/lod/lake/lake.level{level}.x0.y0.nif\t0.7.0\tthe reference has no water here\n"
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let mut text = format!("# path\trelease\treason\n{entries}");
+    text.push_str("meshes/landscape/lod/lake/lake.level4.x4.y0.nif\t0.7.0\tfixed already\n");
+    std::fs::write(&list, &text).unwrap();
+    let args = |list: &std::path::Path| {
+        vec![
+            "verify".to_owned(),
+            mine.to_str().unwrap().to_owned(),
+            "--reference".to_owned(),
+            theirs.to_str().unwrap().to_owned(),
+            "--water-iou".to_owned(),
+            "0.95".to_owned(),
+            "--known-differences".to_owned(),
+            list.to_str().unwrap().to_owned(),
+        ]
+    };
+    let owned = args(&list);
+    let (code, out, _) = go(&owned.iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(code, EXIT_OK, "every difference is known: {out}");
+    assert_golden(&golden("verify_known_differences.txt"), &out);
+    let mut json_args = owned.clone();
+    json_args.push("--json".to_owned());
+    let (code, json, _) = go(&json_args.iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(code, EXIT_OK);
+    let report: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(lodwright_contract::check_verify(&report), Ok(()));
+    let levels: Vec<u64> = report["water"]["per_level"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["level"].as_u64().unwrap())
+        .collect();
+    assert_eq!(levels, [4, 8, 16]);
+    assert_eq!(report["known"].as_array().unwrap().len(), 7);
+    assert_eq!(report["stale"].as_array().unwrap().len(), 2);
+    // the lake has water blocks at levels 4, 8 and 16; without the level 16 entry, that block is a difference again
+    let short = list.with_extension("short.txt");
+    std::fs::write(
+        &short,
+        text.replace("lake.level16.x0.y0.nif", "elsewhere.nif"),
+    )
+    .unwrap();
+    let owned = args(&short);
+    let (code, out, _) = go(&owned.iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(code, EXIT_FAILED, "{out}");
+    assert!(
+        out.contains("lake.level16.x0.y0.nif: water IoU 0.000 is under 0.95"),
+        "{out}"
+    );
+    // a list needs a reference, and a malformed list is a usage error that names its line
+    assert_eq!(
+        go(&[
+            "verify",
+            mine.to_str().unwrap(),
+            "--known-differences",
+            list.to_str().unwrap()
+        ])
+        .0,
+        EXIT_USAGE
+    );
+    std::fs::write(&short, "just-a-path.nif\n").unwrap();
+    let owned = args(&short);
+    let (code, _, err) = go(&owned.iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(code, EXIT_USAGE);
+    assert!(err.contains("line 1"), "{err}");
+}
+
+#[test]
 fn verify_without_a_reference_prints_no_block_reports() {
     let mine = generate_lake("alone", true);
     let (code, text, _) = go(&["verify", mine.to_str().unwrap(), "--json"]);

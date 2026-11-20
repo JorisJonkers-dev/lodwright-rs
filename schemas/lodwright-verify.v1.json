@@ -24,6 +24,13 @@
         "$ref": "#/$defs/VerifyFinding"
       }
     },
+    "known": {
+      "description": "With `--known-differences`: the differences the list names, with its reason and release. They are reported\nand do not make the run fail. Omitted when empty.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/KnownDifference"
+      }
+    },
     "object_blocks": {
       "description": "Object block meshes checked.",
       "type": "integer",
@@ -57,6 +64,13 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "stale": {
+      "description": "With `--known-differences`: listed paths that no longer differ, so the list can lose them. Omitted when\nempty.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "terrain_blocks": {
       "description": "Terrain block meshes checked.",
@@ -100,6 +114,34 @@
     "errors"
   ],
   "$defs": {
+    "KnownDifference": {
+      "description": "A difference the known-differences list names.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "The file, relative to the folder, forward slashes.",
+          "type": "string"
+        },
+        "problem": {
+          "description": "What differs, as prose for people; never matched on.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why the difference is accepted, from the list.",
+          "type": "string"
+        },
+        "release": {
+          "description": "The release expected to remove it, from the list.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "problem",
+        "reason",
+        "release"
+      ]
+    },
     "ObjectBlock": {
       "description": "One object block compared with the reference's.",
       "type": "object",
@@ -220,6 +262,47 @@
         "iou"
       ]
     },
+    "WaterLevel": {
+      "description": "The water of one terrain level compared with the reference.",
+      "type": "object",
+      "properties": {
+        "blocks": {
+          "description": "Blocks of this level with water on either side.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "level": {
+          "description": "Cells per block edge.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "lowest": {
+          "description": "The lowest `IoU` of the level.",
+          "type": "number",
+          "format": "double"
+        },
+        "mean": {
+          "description": "The mean `IoU` of the level.",
+          "type": "number",
+          "format": "double"
+        },
+        "under_threshold": {
+          "description": "Of those, the blocks under the threshold.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "level",
+        "blocks",
+        "under_threshold",
+        "lowest",
+        "mean"
+      ]
+    },
     "WaterReport": {
       "description": "The water of the terrain blocks compared with the reference: the `IoU` (intersection over union) of the ground the\ntwo water planes cover, seen from above, sampled at the centres of a 400 by 400 grid over the bounds of both\nplanes. Numbers are rounded to three decimals.",
       "type": "object",
@@ -251,6 +334,13 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/WaterBlock"
+          }
+        },
+        "per_level": {
+          "description": "The same numbers per terrain level, smallest level first: what the release notes list. Omitted when no\nblock has water.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WaterLevel"
           }
         },
         "threshold": {

@@ -12,12 +12,13 @@ use std::path::Path;
 
 use lodwright_contract::{
     DocumentKind, Handshake, ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, VersionInfo,
-    WaterBlock, WaterReport, schema_json,
+    WaterBlock, WaterLevel, WaterReport, schema_json,
 };
 
 mod commands;
 mod failure;
 mod generate;
+mod known;
 mod options;
 mod probe;
 
@@ -42,7 +43,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-water] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
-       lodwright verify <folder> [--reference <folder> [--water-iou X]] [--allow-in-repo] [--json]
+       lodwright verify <folder> [--reference <folder> [--water-iou X] [--known-differences FILE]] [--allow-in-repo] [--json]
        lodwright schema <plan|result|request|manifest|verify|events|defaults|bands> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
@@ -308,11 +309,16 @@ fn bands_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 
 fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let (mut folder, mut reference, mut json, mut allow_in_repo) = (None, None, false, false);
     let mut threshold: Option<f64> = None;
+    let mut known_file: Option<&str> = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match *arg {
             "--json" => json = true,
             "--allow-in-repo" => allow_in_repo = true,
+            "--known-differences" => match iter.next() {
+                Some(f) => known_file = Some(*f),
+                None => return usage(err, "--known-differences needs a file"),
+            },
             "--water-iou" => match iter.next().map(|t| t.parse::<f64>()) {
                 Some(Ok(t)) if (0.0..=1.0).contains(&t) => threshold = Some(t),
                 _ => return usage(err, "--water-iou needs a number from 0 to 1"),
@@ -331,6 +337,14 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     if threshold.is_some() && reference.is_none() {
         return usage(err, "--water-iou needs --reference");
     }
+    if known_file.is_some() && reference.is_none() {
+        return usage(err, "--known-differences needs --reference");
+    }
+    let known_list = match known_file.map(known::read) {
+        None => None,
+        Some(Ok(list)) => Some(list),
+        Some(Err(e)) => return usage(err, &e),
+    };
     for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
         let Some(dir) = dir else { continue };
         if std::fs::read_dir(dir).is_err() {
@@ -369,6 +383,9 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let mut doc = verify_document(&verification);
     if let Some(blocks) = &blocks {
         add_block_reports(&mut doc, blocks, threshold);
+    }
+    if let Some(list) = &known_list {
+        known::apply(&mut doc, list);
     }
     let clean = doc.ok && doc.differences.is_empty();
     if json {
@@ -455,7 +472,32 @@ fn add_block_reports(
     let mean = (!blocks.water.is_empty()).then(|| {
         round3(blocks.water.iter().map(|w| w.iou).sum::<f64>() / blocks.water.len() as f64)
     });
+    // per level, from the block's file name (`<world>.level<L>.x<X>.y<Y>.nif`)
+    let mut levels: std::collections::BTreeMap<u32, Vec<f64>> = std::collections::BTreeMap::new();
+    for w in &blocks.water {
+        let level = w
+            .path
+            .rsplit(['/', '\\'])
+            .next()
+            .and_then(|name| name.split('.').find_map(|part| part.strip_prefix("level")))
+            .and_then(|l| l.parse::<u32>().ok());
+        if let Some(level) = level {
+            levels.entry(level).or_default().push(w.iou);
+        }
+    }
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    let per_level: Vec<WaterLevel> = levels
+        .into_iter()
+        .map(|(level, ious)| WaterLevel {
+            level,
+            blocks: count(ious.len()),
+            under_threshold: count(ious.iter().filter(|i| **i < limit).count()),
+            lowest: round3(ious.iter().copied().fold(f64::INFINITY, f64::min)),
+            mean: round3(ious.iter().sum::<f64>() / ious.len() as f64),
+        })
+        .collect();
     doc.water = Some(WaterReport {
+        per_level,
         blocks: count(blocks.water.len()),
         threshold: limit,
         under_threshold: count(blocks.water.iter().filter(under).count()),
@@ -500,6 +542,26 @@ fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
             w.threshold,
             number(w.lowest),
             number(w.mean)
+        );
+        for l in &w.per_level {
+            let _ = writeln!(
+                out,
+                "water level {}: {} blocks, {} under {}, lowest {:.3}, mean {:.3}",
+                l.level, l.blocks, l.under_threshold, w.threshold, l.lowest, l.mean
+            );
+        }
+    }
+    for k in &doc.known {
+        let _ = writeln!(
+            out,
+            "{}: known: {} ({}; expected gone in {})",
+            k.path, k.problem, k.reason, k.release
+        );
+    }
+    for path in &doc.stale {
+        let _ = writeln!(
+            out,
+            "{path}: stale: listed as a known difference but no longer differs"
         );
     }
     if let Some(o) = &doc.objects {

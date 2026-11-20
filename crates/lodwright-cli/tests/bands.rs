@@ -38,6 +38,7 @@ fn report(iou: f64, unmatched: u64) -> VerifyDoc {
             path: "meshes/landscape/lod/w/w.level4.x0.y0.nif".into(),
             iou,
         }],
+        per_level: Vec::new(),
     });
     doc.objects = Some(ObjectReport {
         blocks: 1,

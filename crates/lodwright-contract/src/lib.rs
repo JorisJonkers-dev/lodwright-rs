@@ -38,7 +38,10 @@ pub use schema::{
     DocumentKind, SchemaError, check_manifest, check_plan, check_request, check_result,
     check_verify, schema_file_name, schema_json,
 };
-pub use verify::{ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, WaterBlock, WaterReport};
+pub use verify::{
+    KnownDifference, ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, WaterBlock, WaterLevel,
+    WaterReport,
+};
 
 /// The plan document versions this build prints and reads, newest last.
 pub const PLAN_VERSIONS: &[u32] = &[1];

@@ -320,6 +320,25 @@ pub fn verify_folder(root: &Path) -> Verification {
     };
     let files = files_below(root);
     let names: BTreeMap<String, &PathBuf> = files.iter().map(|(n, p)| (n.clone(), p)).collect();
+    // the cell each world's block grid starts at is the south-west cell of its settings file (`game-lod-block-grid`)
+    let anchors: BTreeMap<String, (i32, i32)> = files
+        .iter()
+        .filter_map(|(rel, path)| {
+            let lower = rel.to_ascii_lowercase();
+            let world = lower
+                .strip_prefix("lodsettings/")?
+                .strip_suffix(".dlodsettings")?
+                .to_owned();
+            let parsed = LodSettings::parse(&std::fs::read(path).ok()?).ok()?;
+            Some((
+                world,
+                (
+                    i32::from(parsed.south_west.0),
+                    i32::from(parsed.south_west.1),
+                ),
+            ))
+        })
+        .collect();
     let mut terrain: Vec<(String, u32, i32, i32)> = Vec::new();
     let mut trees: Vec<(String, Vec<u8>)> = Vec::new();
     let mut lists: Vec<(String, Vec<u8>)> = Vec::new();
@@ -343,10 +362,17 @@ pub fn verify_folder(root: &Path) -> Verification {
                 None => ctx.err(rel, "the name is not a block name"),
                 Some((level, x, y, _)) => {
                     let size = level as f32 * 4096.0;
-                    let multiple = x.rem_euclid(i32::try_from(level).unwrap_or(1)) == 0
-                        && y.rem_euclid(i32::try_from(level).unwrap_or(1)) == 0;
-                    if !multiple {
-                        ctx.err(rel, "the coordinates are not multiples of the level");
+                    let world = lower
+                        .strip_prefix("meshes/landscape/lod/")
+                        .and_then(|r| r.split('/').next())
+                        .unwrap_or("");
+                    let (ax, ay) = anchors.get(world).copied().unwrap_or((0, 0));
+                    let step = i32::try_from(level).unwrap_or(1);
+                    if (x - ax).rem_euclid(step) != 0 || (y - ay).rem_euclid(step) != 0 {
+                        ctx.err(
+                            rel,
+                            "the coordinates are not on the world's grid (multiples of the level from its start)",
+                        );
                     }
                     ctx.check_geometry(rel, &nif, (!object).then_some(size), object);
                     if object {

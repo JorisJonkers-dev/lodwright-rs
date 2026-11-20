@@ -617,6 +617,21 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_on_an_anchored_grid_verifies_without_errors() {
+        let out = temp("anchor-verify");
+        generate_terrain(
+            &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
+            &TerrainSettings::default(),
+            &out,
+            &Options::default(),
+        )
+        .unwrap();
+        let verified = crate::verify::verify_folder(&out);
+        assert!(verified.errors.is_empty(), "{:?}", verified.errors);
+        assert!(verified.terrain_blocks > 0);
+    }
+
+    #[test]
     fn a_corner_on_the_grid_or_no_corner_gives_the_old_names_and_digests() {
         let plain = level4_names(&world(), "plain");
         assert_eq!(level4_names(&bounded([0.0, 0.0]), "zero"), plain);

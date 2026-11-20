@@ -53,3 +53,27 @@ A base without a billboard is not a tree here; it is drawn from its `_lod` model
 
 Differences from the files measured: the atlas is DXT5 with box-filtered mips; rectangles keep 16 pixels apart; the rotation is
 derived from the form id; the order of trees within a group follows load and record order.
+
+## 4. Known differences from the game's own files
+
+Both entries are numbers and words only. Neither is a rule lodwright follows from the game's files.
+
+### Tree order within a block
+
+Measured on three sets of tree LOD files that mods ship (`game-tree-lod-dtl`, `game-tree-lod-lst`): of 17,419 trees that
+a set and the generated output share, 17,404 have the same type, position, scale and form id; the files agree as sets of
+trees. The order of the trees inside a block file does not agree. lodwright writes load and record order; the order of the
+shipped files was not derived, and no rule for it is recorded. `verify` compares trees as a set and does not report the
+order, so no entry exists on the known-differences list of `docs/contracts.md` (Verify): there is no differing path to
+list. Whether the order matters to the game is an in-game check for the owner. Related, already recorded above: the
+rotation is derived from the form id, where the original draws it at random.
+
+### Segment table of object blocks
+
+Object blocks carry a segment table (`game-lod-object-block-nif`). Measured: its presence and that the counts of the
+blocks compared agree (all 295 of the main world's blocks have equal vertex and triangle counts). Not measured: what a
+segment stands for, what the game reads it for, and whether any value other than the one lodwright writes changes how the
+block draws. **Unknown.** No meaning is assumed and none is to be guessed from other formats: a guess is a clean-room
+risk. `verify` does not compare the table's contents, so it too has no list entry. A measurement that varies it in the
+game is an owner step; until then the segment table is a known unknown of the object LOD (gap list row 9).
+

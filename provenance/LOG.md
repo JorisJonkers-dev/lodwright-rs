@@ -549,3 +549,9 @@ and file hashes of a few records of an own v104 archive against the hash row; th
 in-game load of a plugin-named archive on the target engine (D2).
 
 Status (2026-11-19): all three rows merge as `verified = false`, marked UNVERIFIED in their notes. They are drafts by design: a human second reader checks them as described above, and nothing implements the writer or the hash from them before that.
+
+## 2026-11-20: specular in alpha is a proposal (#92)
+
+`docs/spec/textures.md` section 4 states a proposed carrier and value for specular in the terrain texture alpha channel as
+lodwright's own design, built from `txst-texture-paths` and `ltex-texture-set`. It records no new format fact and adds
+no row. It is a draft that needs an owner decision before any code follows; whether the game reads it is an in-game check.

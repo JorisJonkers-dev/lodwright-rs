@@ -152,7 +152,7 @@ answers `up_to_date` without writing. The manifest also lists every terrain bloc
 depend on (the generator version, the level settings, the water and land texture switches, the block's heights and,
 per cell, the water height, the land layers and the pixels of the land textures they name). A run with a different
 request or input keeps a block whose digest is unchanged and whose files still have the recorded digests, builds the
-others, and removes the old manifest's files it neither kept nor wrote. The result's `blocks` counts the blocks built
+others, and the old manifest's files it neither kept nor wrote are gone after the swap (below). The result's `blocks` counts the blocks built
 (`generated`) and kept (`up_to_date`); each block event carries `up_to_date`. Object and tree LOD are rebuilt in full
 whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
@@ -163,6 +163,45 @@ refused (`output_link`, nothing is written through it). A temporary file is alwa
 its path is removed, never followed. A manifest that lists an absolute path or one with `..` is not trusted and is
 treated as no manifest.
 
+### Staging, cancel and kill
+
+A run builds into a staging folder next to the output folder, `<output>.lodwright-staging`, and replaces the output
+folder only when every world and step has finished. The output folder is therefore never half written: after a
+cancel, a kill (`SIGKILL`, a crash, power loss) or a failed run it is the previous complete output, untouched (apart from the two-rename window of the swap, below). Blocks
+the previous output holds and whose digests are unchanged are hard linked into staging (copied where links are not
+possible).
+
+- **Checkpoint.** After each world (every step of it) and on a cancel, the run writes `checkpoint.json` into staging
+  through a temporary file and a rename: the request digest, the inputs digest and every file and terrain block
+  finished so far. A file is listed only after it is in place. The checkpoint is never part of the output.
+- **Resume.** The next run finds the staging folder. A checkpoint for the same request digest and inputs digest is
+  resumed: the terrain blocks it lists whose files still have the recorded digests are kept, the rest is built. Any
+  other staging folder (another request or other inputs, no checkpoint) is removed and the run starts clean. The
+  finished folder equals the one an uninterrupted run writes, file for file, because a block's bytes depend only on its
+  inputs. Object and tree LOD of a world interrupted part-way are built again for that world; the checkpoint is
+  written per world, so a kill inside a world's terrain step repeats that step.
+- **Swap.** The finished staging folder holds exactly the manifest's files; the previous output folder is renamed to
+  `<output>.lodwright-old`, staging takes its name and the old folder is removed. A directory cannot be renamed over
+  a non-empty one, so this is two renames; a kill between them leaves no output folder and an `.lodwright-old` folder,
+  and the next run puts that folder back before anything else. Top-level entries of the previous output that the new
+  output does not have (a file the user keeps there) are carried over. Staging and the output folder must be on the same
+  file system.
+- **Space.** Before building, the run compares the free space of the output's file system with the size of the
+  previous output (less what staging already holds) and refuses with `output_no_space` when it cannot fit. It does
+  not apply where the platform does not report free space.
+- The two sibling names `<output>.lodwright-staging` and `<output>.lodwright-old` are reserved. `plan` reports
+  `resume_after_kill` as true.
+
+Version note. This changes where a run writes and when the output folder appears, not a document: the capability
+flag `resume_after_kill` already existed, no manifest, request or result key was added, removed or retyped, and
+`output_no_space` is a new value of an open error code string. `schema_version` of every document stays 1 (a later
+optional manifest field would not raise it either), and no call, type or existing error code of the library changed, so
+`lodwright-api` stays at version 1. A consumer built for the earlier contract keeps working and sees a run that no longer
+touches the output folder until it has finished.
+
+Not yet in the contract (see `docs/interrupted-runs.md`): the lock that refuses two runs on one output folder, the
+swap marker and the `fsync` of files and folders.
+
 ## Verify
 
 `lodwright verify <folder> --json` prints a `lodwright-verify` document (schema: `lodwright schema verify`): `ok` (no
@@ -171,7 +210,7 @@ wrong with the folder) and `differences` (how it differs from `--reference`, emp
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
 
-With `--reference`, the report also carries two optional keys, measured per block mesh present on both sides (names
+With `--reference`, the report also carries three optional keys, measured per block mesh present on both sides (names
 compared in lower case):
 
 * `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
@@ -180,6 +219,14 @@ compared in lower case):
   The summary gives the blocks, the `threshold`, how many are `under_threshold`, the `lowest` and the `mean`; every
   measured number is rounded to three decimals. `threshold` is `--water-iou` when given, otherwise 0.95 (the G5 goal), and only
   `--water-iou` turns a block under it into a difference (and so exit 1).
+* `terrain`: for every terrain block mesh present on both sides, how far the ground heights differ. The ground of both
+  meshes (the first shape of the block) is sampled on a 33 by 33 grid over the bounds of the block's mesh, at the points
+  both meshes cover, and the absolute height difference is taken in game units: per block the `max` and the `mean`, and
+  in the summary the blocks compared, the `tolerance`, how many blocks are `over_tolerance`, the largest `max` and the
+  mean of the means, plus `per_level` like the water summary. Numbers are rounded to three decimals. `tolerance` is
+  `--height-tolerance U` when given, otherwise 1 unit, and only `--height-tolerance` turns a block over it into a
+  difference (and so exit 1). A block pair that shares no sampled point is left out. Versions of this document stay at 1:
+  the key is optional and readers ignore keys they do not know.
 * `objects`: for every object block, the vertex and triangle counts on both sides and the number of vertices with no
   vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
   0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
@@ -219,7 +266,8 @@ Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 `lodwright bands <verify.json> ... [--json]` reads the `verify --json` reports of several runs of the same inputs and
 prints, per statistic, the minimum, the maximum and how many runs report it (`lodwright-bands`, schema: `lodwright
 schema bands`). The statistics are the report's counts (`terrain_blocks`, `errors`, `differences` and so on),
-`water.blocks`, `water.under_threshold`, `water.lowest`, `water.mean`, `objects.blocks`, `objects.exact`, and per
+`water.blocks`, `water.under_threshold`, `water.lowest`, `water.mean`, `terrain.blocks`, `terrain.over_tolerance`,
+`terrain.max`, `terrain.mean`, `terrain.max:<path>` per block, `objects.blocks`, `objects.exact`, and per
 block `water.iou:<path>` and `objects.unmatched_vertices:<path>`. Every value is rounded to three decimals first, so the
 order of float operations never widens a band; a band whose minimum equals its maximum is an exact match. A file that
 is not a verify report is a failure (exit 1); no file is a usage error (exit 2).

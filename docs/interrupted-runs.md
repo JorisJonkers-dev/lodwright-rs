@@ -1,6 +1,6 @@
-# Interrupted runs: staging, swap, cancel and resume (design, not implemented)
+# Interrupted runs: staging, swap, cancel and resume
 
-Status: proposal for the owner's review (issue #43, "kill and resume across worlds"). Nothing here is built yet.
+Status: staging, per-world checkpoints, swap, recovery of a killed swap and the free-space check are built (issue #134); the lock (section 4), the swap marker (sections 1 and 3) and `fsync` are not. Where this page and `contracts.md` differ, `contracts.md` is current.
 The contract today is in [contracts.md](contracts.md) under "Request and manifest".
 
 ## The problem

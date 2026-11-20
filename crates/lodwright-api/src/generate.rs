@@ -51,14 +51,11 @@ pub enum GenerateOutcome {
         /// The `lodwright-result` document (`status` `ok`; `code` `generated` or `up_to_date`).
         result: Box<ResultDoc>,
     },
-    /// The cancel token stopped the call. The output folder holds a manifest of the blocks that finished, so the
-    /// next call with the same request keeps them and builds the rest.
+    /// The cancel token stopped the call. The output folder is untouched; the staging folder next to it
+    /// (`<output>.lodwright-staging`) holds a checkpoint of the blocks that finished, so the next call with the same
+    /// request keeps them and builds the rest.
     Cancelled,
 }
-
-/// The `request_digest` of a manifest a cancelled run leaves: it never matches a request, so the next run is not
-/// `up_to_date`, but it keeps every block whose inputs did not change.
-const INTERRUPTED: &str = "";
 
 /// Cells per edge of an object block and of a tree block: the `level` of their progress events.
 const OBJECT_BLOCK_CELLS: u32 = lodwright_gen::BLOCK_CELLS.unsigned_abs();
@@ -208,20 +205,7 @@ fn written_of(world: &str, files: &[ManifestFile], doc: &mut ResultDoc) {
 /// The manifest in `out`, if it can be read and every path it lists is a plain relative path: a manifest that names a
 /// path outside the output folder is not trusted, as if there were none.
 fn read_manifest(out: &Path) -> Option<Manifest> {
-    let manifest: Manifest =
-        serde_json::from_slice(&std::fs::read(out.join(MANIFEST_FILE)).ok()?).ok()?;
-    let plain = manifest
-        .files
-        .iter()
-        .map(|f| f.path.as_str())
-        .chain(
-            manifest
-                .blocks
-                .iter()
-                .flat_map(|b| b.files.iter().map(String::as_str)),
-        )
-        .all(lodwright_gen::is_plain_relative);
-    plain.then_some(manifest)
+    crate::staging::read_manifest_file(out, MANIFEST_FILE)
 }
 
 /// Whether every file `manifest` lists is in `out` with the size and contents it was written with. A cancelled run
@@ -278,66 +262,6 @@ fn to_manifest_file(f: &FileRecord) -> ManifestFile {
 
 fn io_error(what: &str, e: &std::io::Error) -> Error {
     Error::new("output_failed", what).with_detail(e.to_string())
-}
-
-fn write_manifest(out: &Path, manifest: &Manifest) -> Result<(), Error> {
-    let text = serde_json::to_string_pretty(manifest).map_err(|e| {
-        Error::new("output_failed", "cannot write the manifest").with_detail(e.to_string())
-    })? + "\n";
-    lodwright_gen::write_output_file(out, MANIFEST_FILE, text.as_bytes())
-        .map(|_| ())
-        .map_err(|e| gen_error(&e))
-}
-
-/// The manifest a cancelled run leaves: the files this run finished and every file of the earlier run that is still
-/// on disk (so nothing on disk is unlisted and the next run can clean it up), and the blocks of this run plus those
-/// of the earlier run that this run did not replace, that are still on disk and that were built for the same request
-/// (`request_digest`): a block of a different request is stale terrain and is not carried over. The next run keeps
-/// what is still valid and removes the rest.
-fn interrupted_manifest(
-    version: &str,
-    request_digest: &str,
-    inputs_digest: &str,
-    old: Option<&Manifest>,
-    out: &Path,
-    files: Vec<ManifestFile>,
-    blocks: Vec<ManifestBlock>,
-) -> Manifest {
-    let built: std::collections::BTreeSet<&str> = blocks.iter().map(|b| b.key.as_str()).collect();
-    let mut all: BTreeMap<String, ManifestFile> = BTreeMap::new();
-    let mut by_key: BTreeMap<String, ManifestBlock> = BTreeMap::new();
-    if let Some(old) = old {
-        all.extend(
-            old.files
-                .iter()
-                .filter(|f| out.join(&f.path).is_file())
-                .map(|f| (f.path.clone(), f.clone())),
-        );
-        // a block of the old run stays listed only when it was built for this request, its files are on disk and
-        // this run did not build it again; a block of another request is stale terrain
-        let same_request = old.request_digest == request_digest;
-        let same_inputs = old.inputs_digest == inputs_digest;
-        by_key.extend(
-            old.blocks
-                .iter()
-                .filter(|b| {
-                    same_request
-                        && same_inputs
-                        && !built.contains(b.key.as_str())
-                        && b.files.iter().all(|p| all.contains_key(p))
-                })
-                .map(|b| (b.key.clone(), b.clone())),
-        );
-    }
-    all.extend(files.into_iter().map(|f| (f.path.clone(), f)));
-    by_key.extend(blocks.into_iter().map(|b| (b.key.clone(), b)));
-    Manifest::new(
-        version,
-        INTERRUPTED,
-        inputs_digest,
-        all.into_values().collect(),
-    )
-    .with_blocks(by_key.into_values().collect())
 }
 
 fn gen_error(e: &lodwright_gen::GenError) -> Error {
@@ -418,6 +342,9 @@ pub fn generate(
     progress.report(&ProgressEvent::start(Step::ReadPlugins, None));
     let loaded = load_plugins_with(data, &request.plugins, read)?;
     let digest = request.digest();
+    // an output folder that is a link is replaced where it points: the swap renames the folder, never the link
+    let target = std::fs::canonicalize(out).unwrap_or_else(|_| out.to_path_buf());
+    crate::staging::recover_swap(&target)?;
     let old = read_manifest(out);
     let mut doc = ResultDoc::new(version, Status::Ok, "generated", "LOD written");
     doc.inputs_digest = Some(loaded.inputs_digest.clone());
@@ -444,11 +371,10 @@ pub fn generate(
     if cancel.is_cancelled() {
         return Ok(GenerateOutcome::Cancelled);
     }
-    if old.is_some() {
-        // the old manifest goes first, so an interrupted run leaves no manifest that claims changed files; its
-        // blocks are kept where their inputs did not change and its other files are removed at the end
-        let _ = std::fs::remove_file(out.join(MANIFEST_FILE));
-    }
+    // the run builds beside the output folder and replaces it only when it succeeds: a kill, a cancel or a failure
+    // leaves the previous output untouched and the staging folder to resume from
+    let stage = crate::staging::staging_of(&target);
+    let resume = crate::staging::resume_or_clear(&stage, &digest, &loaded.inputs_digest)?;
     let worlds = Worldspace::from_load_order(&loaded.plugins).map_err(|e| load_order_error(&e))?;
     let wanted: Vec<Option<&str>> = if request.worlds.is_empty() {
         vec![None]
@@ -488,8 +414,43 @@ pub fn generate(
         .iter()
         .filter_map(|(id, scale)| Some((u32::from_str_radix(id, 16).ok()?, *scale)))
         .collect();
-    std::fs::create_dir_all(out).map_err(|e| io_error("cannot create the output folder", &e))?;
-    let reuse = |key: &str, inputs: &str| reusable(out, old.as_ref()?, key, inputs);
+    // room for the staging copy: about the size of the previous output, less what staging already holds
+    let staged: u64 = resume
+        .as_ref()
+        .map_or(0, |c| c.files.iter().map(|f| f.bytes).sum());
+    let need = old
+        .as_ref()
+        .map_or(0, |o| o.files.iter().map(|f| f.bytes).sum::<u64>())
+        .saturating_sub(staged);
+    if let Some(free) = crate::staging::free_bytes(&target) {
+        crate::staging::check_room(need, free)?;
+    }
+    std::fs::create_dir_all(&stage)
+        .map_err(|e| io_error("cannot create the staging folder", &e))?;
+    let reuse = |key: &str, inputs: &str| {
+        if let Some(found) = resume
+            .as_ref()
+            .and_then(|c| reusable(&stage, c, key, inputs))
+        {
+            return Some(found);
+        }
+        let found = reusable(out, old.as_ref()?, key, inputs)?;
+        // a kept block of the previous output is linked into the staging folder (copied where links fail)
+        found
+            .iter()
+            .all(|f| crate::staging::link_or_copy(out, &stage, &f.path).is_some())
+            .then_some(found)
+    };
+    let checkpoint = |files: &[ManifestFile], blocks: &[ManifestBlock]| {
+        crate::staging::write_checkpoint(
+            &stage,
+            version,
+            &digest,
+            &loaded.inputs_digest,
+            files,
+            blocks,
+        )
+    };
     let stop = || cancel.is_cancelled();
     let mut all: Vec<ManifestFile> = Vec::new();
     let mut blocks: Vec<ManifestBlock> = Vec::new();
@@ -552,7 +513,7 @@ pub fn generate(
                 lodwright_gen::generate_terrain(
                     world,
                     &settings,
-                    out,
+                    &stage,
                     &lodwright_gen::Options {
                         threads: workers,
                         land: Some(&tiles),
@@ -624,7 +585,7 @@ pub fn generate(
                 world.name(),
                 &instances,
                 assets,
-                out,
+                &stage,
                 surfaces,
                 &mut |done, total| {
                     progress.report(&block_event(
@@ -665,7 +626,7 @@ pub fn generate(
                 &refs,
                 &request.plugins,
                 assets,
-                out,
+                &stage,
                 &mut |done, total| {
                     progress.report(&block_event(
                         Step::Trees,
@@ -682,6 +643,7 @@ pub fn generate(
         }
         written_of(world.name(), &files, &mut doc);
         all.extend(files);
+        checkpoint(&all, &blocks)?;
         if stop() {
             // a cancel that came with the last event of this world's last step is seen here, not ignored
             cancelled = true;
@@ -689,33 +651,17 @@ pub fn generate(
         }
     }
     if cancelled {
-        // no manifest step event: the interrupted manifest is written, not generated
-        let manifest = interrupted_manifest(
-            version,
-            &digest,
-            &loaded.inputs_digest,
-            old.as_ref(),
-            out,
-            all,
-            blocks,
-        );
-        write_manifest(out, &manifest)?;
+        // no manifest step event: the checkpoint is written, not generated; the output folder is not touched
+        checkpoint(&all, &blocks)?;
         return Ok(GenerateOutcome::Cancelled);
     }
     progress.report(&ProgressEvent::start(Step::Manifest, None));
-    if let Some(old) = &old {
-        // files of the old run that this run did not write or keep
-        let kept: std::collections::BTreeSet<&str> = all.iter().map(|f| f.path.as_str()).collect();
-        for f in old.files.iter().filter(|f| !kept.contains(f.path.as_str())) {
-            // the manifest's paths are plain (read_manifest); a folder on the way that became a link is left alone
-            if lodwright_gen::linked_folder(out, &f.path).is_none() {
-                let _ = std::fs::remove_file(out.join(&f.path));
-            }
-        }
-    }
     doc.blocks = counts;
     let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
-    write_manifest(out, &manifest)?;
+    // staging holds exactly the manifest's files: whatever else a killed run left in it is dropped
+    crate::staging::prune(&stage, &manifest.files);
+    crate::staging::finish_manifest(&stage, &manifest)?;
+    crate::staging::swap(&target, &stage)?;
     doc.manifest = Some(MANIFEST_FILE.to_owned());
     Ok(GenerateOutcome::Done {
         result: Box::new(doc),

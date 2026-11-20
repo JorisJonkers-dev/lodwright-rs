@@ -28,6 +28,7 @@ mod error;
 mod generate;
 pub mod load;
 mod progress;
+mod staging;
 
 pub use defaults::request_defaults;
 pub use error::Error;

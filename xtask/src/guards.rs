@@ -11,8 +11,9 @@
 //! - spdx: every `.rs`, `.py` and `.sh` file has `SPDX-License-Identifier: GPL-3.0-only` (or `MPL-2.0`) in its first
 //!   five lines.
 //! - provenance: every `// source: <id>[, <id>]` (`# source:` in Python, shell, TOML and YAML) names a row of
-//!   `provenance/sources.toml`; the rows are well formed (fields, unique ids, licence stated, no forbidden source) and
-//!   each id appears in `provenance/LOG.md`; a row citing the engine port names one file at a commit, its licence and
+//!   `provenance/sources.toml` or `provenance/rows/<id>.toml` (one row per file; the table and `LOG.md` are frozen and a
+//!   pull request may not add rows or entries to them); the rows are well formed (fields, unique ids, licence stated, no forbidden source) and
+//!   each id of the frozen table appears in `provenance/LOG.md` (a row file carries its own `note`); a row citing the engine port names one file at a commit, its licence and
 //!   a `second_reader` and `engine_notes` (`docs/adr/0001-engine-source-as-a-format-input.md`).
 //! - data: no file with a game-data extension, no file over [`MAX_BYTES`] and no file with NUL bytes, except the paths
 //!   in `provenance/fixture-allowlist.txt` (`<path> <reason>`, at most [`MAX_ALLOWLIST`] entries).
@@ -34,6 +35,8 @@ const SPDX_TAG: &str = "SPDX-License-Identifier:";
 const SPDX_LINES: usize = 5;
 
 const SOURCES_FILE: &str = "provenance/sources.toml";
+/// New rows live one per file here (`<id>.toml` holding one `[[source]]`); `sources.toml` and `LOG.md` are frozen.
+const ROWS_DIR: &str = "provenance/rows";
 const LOG_FILE: &str = "provenance/LOG.md";
 const ALLOWLIST_FILE: &str = "provenance/fixture-allowlist.txt";
 const REQUIRED_FIELDS: [&str; 7] = [
@@ -311,12 +314,35 @@ fn is_iso_date(text: &str) -> bool {
     year >= 1 && (1..=days).contains(&day)
 }
 
+/// The rows of one file: `label` names the file in messages.
+fn parse_rows(label: &str, text: &str, v: &mut Violations) -> Vec<toml::Value> {
+    let table: toml::Table = match text.parse() {
+        Ok(table) => table,
+        Err(error) => {
+            v.add(
+                label,
+                &format!("not valid TOML: {}", error.to_string().trim()),
+            );
+            return Vec::new();
+        }
+    };
+    table
+        .get("source")
+        .and_then(toml::Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// Every row: the frozen `sources.toml` first, then one file per row under [`ROWS_DIR`] in name order. `frozen` gets
+/// the ids of the frozen table, the only ones `LOG.md` must mention (a row file carries its own note).
 fn load_sources(
     root: &Path,
     v: &mut Violations,
     notices_needed: &mut BTreeSet<String>,
+    frozen: &mut BTreeSet<String>,
 ) -> BTreeSet<String> {
     let mut ids = BTreeSet::new();
+    let mut batches: Vec<(String, Vec<toml::Value>, bool)> = Vec::new();
     let Some(text) = read_text(root, SOURCES_FILE) else {
         let message = if root.join(SOURCES_FILE).exists() {
             "not valid TOML: not UTF-8"
@@ -326,55 +352,73 @@ fn load_sources(
         v.add(SOURCES_FILE, message);
         return ids;
     };
-    let table: toml::Table = match text.parse() {
-        Ok(table) => table,
-        Err(error) => {
-            v.add(
-                SOURCES_FILE,
-                &format!("not valid TOML: {}", error.to_string().trim()),
-            );
-            return ids;
-        }
-    };
-    let rows = table
-        .get("source")
-        .and_then(toml::Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    for (index, row) in rows.iter().enumerate() {
-        let label = format!("{SOURCES_FILE} row {}", index + 1);
-        let Some(row) = row.as_table() else {
-            v.add(&label, "is not a table");
+    batches.push((
+        SOURCES_FILE.to_owned(),
+        parse_rows(SOURCES_FILE, &text, v),
+        true,
+    ));
+    let mut files: Vec<String> = std::fs::read_dir(root.join(ROWS_DIR))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| Path::new(n).extension().is_some_and(|e| e == "toml"))
+        .collect();
+    files.sort();
+    for name in files {
+        let rel = format!("{ROWS_DIR}/{name}");
+        let Some(text) = read_text(root, &rel) else {
+            v.add(&rel, "not valid TOML: not UTF-8");
             continue;
         };
-        let missing: Vec<&str> = REQUIRED_FIELDS
-            .iter()
-            .copied()
-            .filter(|f| !row.contains_key(*f))
-            .collect();
-        if !missing.is_empty() {
-            v.add(&label, &format!("missing field(s): {}", missing.join(", ")));
-            continue;
+        let rows = parse_rows(&rel, &text, v);
+        if rows.len() != 1 {
+            v.add(&rel, "must hold exactly one [[source]] row");
         }
-        let id = row["id"].as_str().unwrap_or("");
-        if !is_id(id) {
-            v.add(
-                &label,
-                &format!(
-                    "id {} must be lowercase letters, digits and hyphens",
-                    value_text(&row["id"])
-                ),
-            );
-            continue;
-        }
-        let label = format!("{SOURCES_FILE} row {id}");
-        if !ids.insert(id.to_owned()) {
-            v.add(&label, "duplicate id");
-            continue;
-        }
-        check_row(&label, row, v);
-        if needs_notice(row) {
-            notices_needed.insert(id.to_owned());
+        batches.push((rel, rows, false));
+    }
+    for (file, rows, is_frozen) in &batches {
+        for (index, row) in rows.iter().enumerate() {
+            let label = format!("{file} row {}", index + 1);
+            let Some(row) = row.as_table() else {
+                v.add(&label, "is not a table");
+                continue;
+            };
+            let missing: Vec<&str> = REQUIRED_FIELDS
+                .iter()
+                .copied()
+                .filter(|f| !row.contains_key(*f))
+                .collect();
+            if !missing.is_empty() {
+                v.add(&label, &format!("missing field(s): {}", missing.join(", ")));
+                continue;
+            }
+            let id = row["id"].as_str().unwrap_or("");
+            if !is_id(id) {
+                v.add(
+                    &label,
+                    &format!(
+                        "id {} must be lowercase letters, digits and hyphens",
+                        value_text(&row["id"])
+                    ),
+                );
+                continue;
+            }
+            let label = format!("{file} row {id}");
+            if !*is_frozen && *file != format!("{ROWS_DIR}/{id}.toml") {
+                v.add(&label, "a row file is named after its id (<id>.toml)");
+            }
+            if !ids.insert(id.to_owned()) {
+                v.add(&label, "duplicate id");
+                continue;
+            }
+            if *is_frozen {
+                frozen.insert(id.to_owned());
+            }
+            check_row(&label, row, v);
+            if needs_notice(row) {
+                notices_needed.insert(id.to_owned());
+            }
         }
     }
     ids
@@ -603,12 +647,13 @@ fn check_provenance(
     v: &mut Violations,
 ) {
     let mut notices_needed = BTreeSet::new();
-    let ids = load_sources(root, v, &mut notices_needed);
+    let mut frozen = BTreeSet::new();
+    let ids = load_sources(root, v, &mut notices_needed, &mut frozen);
     check_notices(root, &notices_needed, v);
     match read_text(root, LOG_FILE) {
         None => v.add(LOG_FILE, "missing"),
         Some(log) => {
-            for id in &ids {
+            for id in &frozen {
                 if !log.contains(&format!("`{id}`")) {
                     v.add(
                         LOG_FILE,
@@ -630,6 +675,18 @@ fn check_provenance(
         Some(lines) => {
             for (rel, added) in lines {
                 check_refs(rel, added, &ids, v);
+            }
+            // sources.toml and LOG.md are frozen: a new row is a new file under provenance/rows
+            for (rel, added) in lines {
+                let new_row =
+                    rel == SOURCES_FILE && added.iter().any(|l| l.starts_with("[[source]]"));
+                let new_entry = rel == LOG_FILE && added.iter().any(|l| l.starts_with("- `"));
+                if new_row || new_entry {
+                    v.add(
+                        rel,
+                        &format!("is frozen: add a new row as its own file {ROWS_DIR}/<id>.toml"),
+                    );
+                }
             }
         }
     }

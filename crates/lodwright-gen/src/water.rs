@@ -24,20 +24,29 @@ pub(crate) struct WaterMesh {
 
 /// Greedy rectangles over a square boolean grid: (x, y, width, height) in squares, row by row.
 fn rectangles(wet: &[bool], n: usize) -> Vec<(usize, usize, usize, usize)> {
-    let mut used = vec![false; wet.len()];
-    let free = |used: &[bool], x: usize, y: usize| wet[y * n + x] && !used[y * n + x];
+    let keys: Vec<Option<u32>> = wet.iter().map(|w| w.then_some(0)).collect();
+    rectangles_by_key(&keys, n)
+}
+
+/// Greedy rectangles over a square grid of keys (`None` is dry): a rectangle holds squares of one key only.
+fn rectangles_by_key(keys: &[Option<u32>], n: usize) -> Vec<(usize, usize, usize, usize)> {
+    let mut used = vec![false; keys.len()];
+    let free = |used: &[bool], x: usize, y: usize, key: Option<u32>| {
+        keys[y * n + x].is_some() && keys[y * n + x] == key && !used[y * n + x]
+    };
     let mut out = Vec::new();
     for y in 0..n {
         for x in 0..n {
-            if !free(&used, x, y) {
+            let key = keys[y * n + x];
+            if !free(&used, x, y, key) {
                 continue;
             }
             let mut w = 1;
-            while x + w < n && free(&used, x + w, y) {
+            while x + w < n && free(&used, x + w, y, key) {
                 w += 1;
             }
             let mut h = 1;
-            while y + h < n && (x..x + w).all(|xx| free(&used, xx, y + h)) {
+            while y + h < n && (x..x + w).all(|xx| free(&used, xx, y + h, key)) {
                 h += 1;
             }
             for yy in y..y + h {
@@ -69,6 +78,9 @@ pub(crate) fn water_mesh(
     let step = (cells / 4).max(1);
     let per_cell = (CELL_INTERVALS / step).max(1);
     let square = CELL_UNITS / per_cell as f32;
+    if cells > 4 {
+        return coarse_water(world, samples, cells, cell);
+    }
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
     let mut segments = [0_u32; 16];
     // cells in x-major order, so a level 4 block's triangles come in segment order
@@ -126,6 +138,76 @@ pub(crate) fn water_mesh(
     })
 }
 
+/// The water plane of a block above level 4 (a plain shape without segments): wet squares of equal water height merge
+/// into rectangles across cell borders, which keeps the covered ground and heights of the per-cell plane and writes
+/// fewer vertices (the game's blocks above level 4 carry a median of 61, 38 and 30 water vertices, `game-lod-water-outline`).
+fn coarse_water(
+    world: &Worldspace,
+    samples: &[f32],
+    cells: usize,
+    cell: (i32, i32),
+) -> Option<WaterMesh> {
+    let span = cells * CELL_INTERVALS + 1;
+    let step = (cells / 4).max(1);
+    let per_cell = (CELL_INTERVALS / step).max(1);
+    let square = CELL_UNITS / per_cell as f32;
+    let n = cells * per_cell;
+    let mut heights = vec![f32::NAN; n * n];
+    let mut keys: Vec<Option<u32>> = vec![None; n * n];
+    for cx in 0..cells {
+        for cy in 0..cells {
+            let (wx, wy) = (
+                cell.0 + i32::try_from(cx).ok()?,
+                cell.1 + i32::try_from(cy).ok()?,
+            );
+            // source: game-lod-water-height
+            let Some(height) = world.water_height(wx, wy) else {
+                continue;
+            };
+            for qy in 0..per_cell {
+                for qx in 0..per_cell {
+                    let (x0, y0) = (
+                        cx * CELL_INTERVALS + qx * step,
+                        cy * CELL_INTERVALS + qy * step,
+                    );
+                    let (sum, count) = (y0..=y0 + step)
+                        .flat_map(|y| (x0..=x0 + step).map(move |x| samples[y * span + x]))
+                        .filter(|h| !h.is_nan())
+                        .fold((0.0_f32, 0_u32), |(s, c), h| (s + h, c + 1));
+                    if count > 0 && sum / (count as f32) < height {
+                        let at = (cy * per_cell + qy) * n + cx * per_cell + qx;
+                        heights[at] = height;
+                        keys[at] = Some(height.to_bits());
+                    }
+                }
+            }
+        }
+    }
+    let (mut vertices, mut indices) = (Vec::new(), Vec::new());
+    for (x, y, w, h) in rectangles_by_key(&keys, n) {
+        let height = heights[y * n + x];
+        let first = u16::try_from(vertices.len()).ok()?;
+        let (x0, y0) = (x as f32 * square, y as f32 * square);
+        let (x1, y1) = (x0 + w as f32 * square, y0 + h as f32 * square);
+        vertices.extend([
+            [x0, y0, height],
+            [x1, y0, height],
+            [x0, y1, height],
+            [x1, y1, height],
+        ]);
+        u16::try_from(vertices.len() - 1).ok()?;
+        indices.extend([0, 1, 2, 2, 1, 3].map(|i| first + i));
+    }
+    if vertices.is_empty() {
+        return None;
+    }
+    Some(WaterMesh {
+        vertices,
+        indices,
+        segments: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{rectangles, water_mesh};
@@ -166,6 +248,36 @@ mod tests {
         assert_eq!(mesh.segments, Some(want));
         assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0)).is_none());
         assert!(water_mesh(&world(None), &samples, 4, (0, 0)).is_none());
+    }
+
+    #[test]
+    fn at_coarser_levels_cells_of_one_water_height_merge_and_other_heights_do_not() {
+        let span = 8 * 32 + 1;
+        let mut samples = vec![f32::NAN; span * span];
+        // ground at 0 over the two cells (0, 0) and (1, 0)
+        for y in 0..=32 {
+            for x in 0..=64 {
+                samples[y * span + x] = 0.0;
+            }
+        }
+        let water = |a: f32, b: f32| {
+            let mut w = Worldspace::from_cells(
+                1,
+                "Mojave",
+                vec![
+                    ((0, 0), CellHeights::flat(0.0)),
+                    ((1, 0), CellHeights::flat(0.0)),
+                ],
+            );
+            w.set_cell_water(0, 0, true, Some(a));
+            w.set_cell_water(1, 0, true, Some(b));
+            w
+        };
+        let same = water_mesh(&water(10.0, 10.0), &samples, 8, (0, 0)).unwrap();
+        assert_eq!(same.vertices.len(), 4, "one rectangle over both cells");
+        assert_eq!(same.vertices[3], [8192.0, 4096.0, 10.0]);
+        let apart = water_mesh(&water(10.0, 20.0), &samples, 8, (0, 0)).unwrap();
+        assert_eq!(apart.vertices.len(), 8);
     }
 
     #[test]

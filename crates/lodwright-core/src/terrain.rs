@@ -178,10 +178,35 @@ pub fn build_block_mesh(
     block_x: i32,
     block_y: i32,
 ) -> Option<(usize, TerrainMesh, f32)> {
+    build_block_mesh_dropping(raster, settings, block_x, block_y, None)
+}
+
+/// Faces to leave out because the water hides them.
+#[derive(Clone, Copy)]
+pub struct DropUnderWater<'a> {
+    /// The water height at a block-local position, `None` where there is no water.
+    pub water_at: &'a dyn Fn(f32, f32) -> Option<f32>,
+    /// A face is left out when its three corners all lie at least this far below the water there.
+    pub offset: f32,
+}
+
+/// [`build_block_mesh`] that also leaves out the faces `drop` names (before skirts are added). When that would leave
+/// no face at all, the block keeps all of them.
+#[must_use]
+pub fn build_block_mesh_dropping(
+    raster: &HeightRaster,
+    settings: &LevelSettings,
+    block_x: i32,
+    block_y: i32,
+    drop: Option<DropUnderWater<'_>>,
+) -> Option<(usize, TerrainMesh, f32)> {
     let samples = raster.block_samples(block_x, block_y)?;
     let span = usize::try_from(settings.level).ok()? * CELL_INTERVALS + 1;
     let cap = settings.max_vertices.min(MAX_VERTICES);
     let mut meshed = crate::rtin::mesh_block(&samples, span, settings.tolerance(), cap)?;
+    if let Some(kept) = drop.and_then(|d| drop_under_water(&meshed.mesh, &d)) {
+        meshed.mesh = kept;
+    }
     if settings.skirts {
         // The skirt vertices count against the cap: mesh the surface with the room that is left.
         let edge = f32::from(u16::try_from(span - 1).ok()?) * VERTEX_SPACING;
@@ -202,6 +227,55 @@ pub fn build_block_mesh(
         }
     }
     Some((meshed.finest_step, meshed.mesh, meshed.max_error))
+}
+
+/// The mesh without the faces whose three corners all lie `offset` or more below the water at the face's centre, and
+/// without the vertices only those faces used. `None` when no face goes or every face would go.
+// Own design, no format source: docs/spec/terrain-lod.md, section 7.
+fn drop_under_water(mesh: &TerrainMesh, drop: &DropUnderWater<'_>) -> Option<TerrainMesh> {
+    let keep: Vec<bool> = mesh
+        .indices
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|tri| {
+            let v = tri.map(|i| mesh.vertices[usize::from(i)]);
+            let centre = (
+                (v[0][0] + v[1][0] + v[2][0]) / 3.0,
+                (v[0][1] + v[1][1] + v[2][1]) / 3.0,
+            );
+            match (drop.water_at)(centre.0, centre.1) {
+                Some(water) => !v.iter().all(|p| p[2] <= water - drop.offset),
+                None => true,
+            }
+        })
+        .collect();
+    if keep.iter().all(|k| *k) || keep.iter().all(|k| !*k) {
+        return None;
+    }
+    let mut remap = vec![u16::MAX; mesh.vertices.len()];
+    let mut out = TerrainMesh {
+        vertices: Vec::new(),
+        indices: Vec::new(),
+    };
+    for (tri, _) in mesh
+        .indices
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(&keep)
+        .filter(|(_, k)| **k)
+    {
+        for &i in tri {
+            let slot = &mut remap[usize::from(i)];
+            if *slot == u16::MAX {
+                *slot = u16::try_from(out.vertices.len()).ok()?;
+                out.vertices.push(mesh.vertices[usize::from(i)]);
+            }
+            out.indices.push(*slot);
+        }
+    }
+    Some(out)
 }
 
 /// Height of the lower vertex of a skirt, the same for every border vertex of every block.
@@ -511,6 +585,70 @@ mod tests {
             ];
             assert!(n[0] * mid[0] + n[1] * mid[1] > 0.0, "{tri:?} faces inwards");
         }
+    }
+
+    fn drop_mesh(water: Option<f32>, offset: f32, skirts: bool) -> (super::TerrainMesh, usize) {
+        let world = stepped_world();
+        let raster = HeightRaster::build(&world, BlockGrid::new(4).unwrap())
+            .unwrap()
+            .unwrap();
+        let mut l = level(4, 1.0);
+        l.skirts = skirts;
+        let here = move |_: f32, _: f32| water;
+        let drop = super::DropUnderWater {
+            water_at: &here,
+            offset,
+        };
+        let plain = build_block_mesh(&raster, &l, 0, 0).unwrap().1;
+        let got = super::build_block_mesh_dropping(&raster, &l, 0, 0, Some(drop))
+            .unwrap()
+            .1;
+        (got, plain.triangle_count())
+    }
+
+    #[test]
+    fn faces_whose_corners_all_lie_below_the_water_are_dropped() {
+        let (mesh, all) = drop_mesh(Some(150.0), 0.0, false);
+        assert!(
+            mesh.triangle_count() < all,
+            "{} {all}",
+            mesh.triangle_count()
+        );
+        assert!(mesh.triangle_count() > 0);
+        for tri in mesh.indices.as_chunks::<3>().0 {
+            assert!(
+                tri.iter()
+                    .any(|i| mesh.vertices[usize::from(*i)][2] > 150.0),
+                "a face under the water was kept"
+            );
+        }
+        // no vertex is left that no face uses, and every index is valid
+        let mut used = vec![false; mesh.vertices.len()];
+        for i in &mesh.indices {
+            used[usize::from(*i)] = true;
+        }
+        assert!(used.iter().all(|u| *u));
+    }
+
+    #[test]
+    fn the_offset_the_missing_water_and_the_everything_case_keep_the_mesh() {
+        let (_, all) = drop_mesh(None, 0.0, false);
+        assert_eq!(drop_mesh(None, 0.0, false).0.triangle_count(), all);
+        // an offset deeper than any face: nothing is that far below the water
+        assert_eq!(
+            drop_mesh(Some(150.0), 100_000.0, false).0.triangle_count(),
+            all
+        );
+        // water above everything would drop every face: the block keeps them all
+        assert_eq!(drop_mesh(Some(1.0e6), 0.0, false).0.triangle_count(), all);
+    }
+
+    #[test]
+    fn skirts_are_added_after_the_drop_and_survive_it() {
+        let (mesh, _) = drop_mesh(Some(150.0), 0.0, true);
+        assert!(mesh.vertices.iter().any(|v| v[2] == super::SKIRT_HEIGHT));
+        let surface = drop_mesh(Some(150.0), 0.0, false).0;
+        assert!(mesh.triangle_count() > surface.triangle_count());
     }
 
     #[test]

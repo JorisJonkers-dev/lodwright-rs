@@ -26,9 +26,9 @@ pub use plan::{
     Bounds, Capabilities, LevelPlan, Plan, PlannedBlock, ToolInfo, WorldPlan, round_error,
 };
 pub use request::{
-    Inclusion, LevelRequest, Limits, MAX_VERTICES_RANGE, ObjectsRequest, QUALITY_MIN, Request,
-    TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN, TerrainRequest,
-    TreesRequest,
+    DROP_UNDER_WATER_RANGE, Inclusion, LevelRequest, Limits, MAX_VERTICES_RANGE, ObjectsRequest,
+    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN,
+    TerrainRequest, TreesRequest,
 };
 pub use result::{
     BlockCounts, ContractInfo, DroppedFaces, Handshake, ResultDoc, Status, VersionInfo, Written,

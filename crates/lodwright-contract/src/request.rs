@@ -41,6 +41,10 @@ pub struct LevelRequest {
     pub diffuse_size: u32,
     /// Edge of the normal map in pixels, a power of two from 4 to 4096.
     pub normal_size: u32,
+    /// Carry specular in the alpha channel of the normal map, written as BC3 (own design, `docs/spec/textures.md`).
+    /// Off by default and written only when set; off keeps the normal map opaque BC1.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub specular_alpha: bool,
 }
 
 /// Terrain settings.
@@ -328,6 +332,7 @@ mod tests {
                 max_vertices: 2000,
                 diffuse_size: 256,
                 normal_size: 256,
+                specular_alpha: false,
             };
             f(&mut l);
             r.terrain.levels.push(l);

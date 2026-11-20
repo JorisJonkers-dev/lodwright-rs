@@ -21,6 +21,8 @@ pub struct LandTexture {
     pub icon: Option<String>,
     /// The `TNAM` texture-set `FormID`.
     pub texture_set: Option<u32>,
+    /// The `SNAM` specular exponent (its first byte), when the record has one.
+    pub specular_exponent: Option<u8>,
 }
 
 impl LandTexture {
@@ -32,6 +34,7 @@ impl LandTexture {
             editor_id: None,
             icon: None,
             texture_set: None,
+            specular_exponent: None,
         }
     }
 }
@@ -128,6 +131,21 @@ impl TextureResolver {
             .filter(|path| !path.is_empty())
     }
 
+    /// The `SNAM` specular exponent of an `LTEX`, when the winning record has one.
+    #[must_use]
+    pub fn specular_exponent(&self, form_id: u32) -> Option<u8> {
+        // source: ltex-texture-set
+        self.land.get(&form_id)?.specular_exponent
+    }
+
+    /// The lowest and highest specular exponent of any `LTEX` of the load order; `None` when none has one.
+    #[must_use]
+    pub fn specular_range(&self) -> Option<(u8, u8)> {
+        let mut all = self.land.values().filter_map(|t| t.specular_exponent);
+        let first = all.next()?;
+        Some(all.fold((first, first), |(lo, hi), e| (lo.min(e), hi.max(e))))
+    }
+
     /// The normal-map path of an `LTEX`: the `TX01` of its texture set.
     #[must_use]
     pub fn normal_path(&self, form_id: u32) -> Option<&str> {
@@ -195,6 +213,27 @@ mod tests {
             resolver.texture_set(0x0A00).unwrap().editor_id.as_deref(),
             Some("DirtSet")
         );
+    }
+
+    #[test]
+    fn the_specular_exponent_is_read_and_the_range_spans_the_load_order() {
+        let bytes = PluginBuilder::new()
+            .group(record_group(
+                *b"LTEX",
+                vec![
+                    ltex_record(0x0B00, "Dull", None, None).with_subrecord(*b"SNAM", vec![10]),
+                    ltex_record(0x0B01, "Shiny", None, None).with_subrecord(*b"SNAM", vec![200]),
+                    ltex_record(0x0B02, "None", None, None),
+                ],
+            ))
+            .build();
+        let resolver = TextureResolver::from_load_order(&load(&[("Base.esm", bytes)])).unwrap();
+        assert_eq!(resolver.specular_exponent(0x0B00), Some(10));
+        assert_eq!(resolver.specular_exponent(0x0B01), Some(200));
+        assert_eq!(resolver.specular_exponent(0x0B02), None);
+        assert_eq!(resolver.specular_range(), Some((10, 200)));
+        let none = TextureResolver::from_load_order(&load(&[("Base.esm", base_plugin())])).unwrap();
+        assert_eq!(none.specular_range(), None);
     }
 
     #[test]

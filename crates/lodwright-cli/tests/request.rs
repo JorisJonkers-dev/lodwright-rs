@@ -98,6 +98,7 @@ fn a_changed_request_replaces_the_old_files_and_a_deleted_file_is_regenerated() 
         max_vertices: 500,
         diffuse_size: 64,
         normal_size: 64,
+        specular_alpha: false,
     }];
     let file = write_request(&out, &request);
     let (code, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
@@ -126,6 +127,7 @@ fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
         max_vertices: 500,
         diffuse_size: 64,
         normal_size: 64,
+        specular_alpha: false,
     };
     let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
     request.terrain.land_textures = false;
@@ -171,6 +173,7 @@ fn bad_requests_and_unsafe_outputs_are_refused_with_codes() {
         max_vertices: 100,
         diffuse_size: 64,
         normal_size: 64,
+        specular_alpha: false,
     }];
     let file = write_request(&out, &request);
     let (code, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);

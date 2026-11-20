@@ -74,6 +74,22 @@ fn block_event(step: Step, world: &str, level: u32, done: u64, total: u64) -> Pr
     }
 }
 
+/// What a run that writes specular in the alpha channel has to say about the exponents of the land textures: that
+/// none exists (the alpha stays opaque), or which textures have none (their specular counts as the lowest value).
+fn specular_warnings(tiles: &lodwright_gen::LandTiles) -> Vec<String> {
+    if tiles.specular_range().is_none() {
+        return vec![
+            "specular alpha: no land texture of the load order has a specular exponent, so the normal maps stay opaque"
+                .to_owned(),
+        ];
+    }
+    tiles
+        .without_specular()
+        .into_iter()
+        .map(|id| format!("specular alpha: land texture {id:08X} has no specular exponent, counted as the lowest"))
+        .collect()
+}
+
 fn terrain_settings(request: &Request) -> TerrainSettings {
     if request.terrain.levels.is_empty() {
         return TerrainSettings::default();
@@ -89,6 +105,7 @@ fn terrain_settings(request: &Request) -> TerrainSettings {
                 max_vertices: l.max_vertices as usize,
                 diffuse_size: l.diffuse_size,
                 normal_size: l.normal_size,
+                specular_alpha: l.specular_alpha,
             })
             .collect(),
     }
@@ -497,6 +514,9 @@ pub fn generate(
                 }
                 _ => lodwright_gen::LandTiles::empty(),
             };
+            if settings.levels.iter().any(|l| l.specular_alpha) {
+                warnings.extend(specular_warnings(&tiles));
+            }
             add_warnings(&mut doc, warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
@@ -700,4 +720,16 @@ pub fn generate(
     Ok(GenerateOutcome::Done {
         result: Box::new(doc),
     })
+}
+
+#[cfg(test)]
+mod specular_tests {
+    use super::specular_warnings;
+
+    #[test]
+    fn no_exponent_anywhere_warns_once_that_the_alpha_stays_opaque() {
+        let warnings = specular_warnings(&lodwright_gen::LandTiles::empty());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("stay opaque"));
+    }
 }

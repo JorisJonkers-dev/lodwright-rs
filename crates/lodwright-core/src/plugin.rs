@@ -522,6 +522,10 @@ impl Walker {
                         b"TNAM" if payload.len() >= 4 => {
                             texture.texture_set = Some(le_u32(payload, 0));
                         }
+                        // the row does not state the width: the first byte is read, whatever follows is ignored
+                        b"SNAM" if !payload.is_empty() => {
+                            texture.specular_exponent = Some(payload[0]);
+                        }
                         _ => {}
                     }
                 }

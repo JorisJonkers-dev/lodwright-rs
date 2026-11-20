@@ -22,6 +22,8 @@ pub struct Tile {
     rgb: Vec<[u8; 3]>,
     /// How often the texture repeats across a cell quadrant: 1 unless the request sets another.
     scale: Scale,
+    /// The specular exponent of the land texture (`SNAM`), when its record has one.
+    specular: Option<u8>,
 }
 
 /// A tiling scale, kept as its bits so that a tile stays `Eq`.
@@ -49,6 +51,7 @@ impl Tile {
         Self {
             rgb: vec![rgb; (TILE * TILE) as usize],
             scale: Scale::ONE,
+            specular: None,
         }
     }
 
@@ -63,6 +66,19 @@ impl Tile {
     pub fn with_scale(mut self, scale: f32) -> Self {
         self.scale = Scale(scale.to_bits());
         self
+    }
+
+    /// The same tile with the specular exponent of its land texture.
+    #[must_use]
+    pub fn with_specular(mut self, exponent: Option<u8>) -> Self {
+        self.specular = exponent;
+        self
+    }
+
+    /// The specular exponent of the land texture, when its record has one.
+    #[must_use]
+    pub fn specular(&self) -> Option<u8> {
+        self.specular
     }
 
     /// The colour at (`u`, `v`) in 0..1 of a cell quadrant, repeating [`Tile::scale`] times, bilinear.
@@ -95,6 +111,8 @@ impl Tile {
 #[derive(Debug, Clone, Default)]
 pub struct LandTiles {
     tiles: HashMap<u32, Tile>,
+    /// Lowest and highest specular exponent of the load order's land textures; `None` when no record has one.
+    specular_range: Option<(u8, u8)>,
 }
 
 impl LandTiles {
@@ -107,7 +125,10 @@ impl LandTiles {
     /// Tiles given directly (for tests).
     #[cfg(test)]
     pub(crate) fn from_tiles(tiles: HashMap<u32, Tile>) -> Self {
-        Self { tiles }
+        Self {
+            tiles,
+            specular_range: None,
+        }
     }
 
     /// The same tiles with the tiling scale of each land texture in `scales` (absolute `FormID` to repeats per
@@ -120,6 +141,33 @@ impl LandTiles {
             }
         }
         self
+    }
+
+    /// The same tiles with the exponent range of the load order, which the specular alpha is scaled over (for tests).
+    #[cfg(test)]
+    pub(crate) fn with_specular_range(mut self, range: Option<(u8, u8)>) -> Self {
+        self.specular_range = range;
+        self
+    }
+
+    /// Lowest and highest specular exponent of the load order's land textures; `None` when no record has one.
+    #[must_use]
+    pub fn specular_range(&self) -> Option<(u8, u8)> {
+        self.specular_range
+    }
+
+    /// The land textures that have a tile but no specular exponent, sorted. A run that writes specular alpha warns
+    /// about them: their specular counts as the lowest value.
+    #[must_use]
+    pub fn without_specular(&self) -> Vec<u32> {
+        let mut ids: Vec<u32> = self
+            .tiles
+            .iter()
+            .filter(|(_, t)| t.specular.is_none())
+            .map(|(id, _)| *id)
+            .collect();
+        ids.sort_unstable();
+        ids
     }
 
     /// The tile of land texture `id` (absolute `FormID`).
@@ -170,11 +218,15 @@ impl LandTiles {
                     Tile {
                         rgb,
                         scale: Scale::ONE,
+                        specular: resolver.specular_exponent(id),
                     },
                 );
             }
         }
-        Self { tiles }
+        Self {
+            tiles,
+            specular_range: resolver.specular_range(),
+        }
     }
 }
 
@@ -205,6 +257,7 @@ mod tests {
         Tile {
             rgb,
             scale: Scale::ONE,
+            specular: None,
         }
     }
 
@@ -251,6 +304,7 @@ mod tests {
         }
         let tiles = LandTiles {
             tiles: HashMap::from([(1, ramp()), (2, ramp())]),
+            specular_range: None,
         }
         .with_scales(&BTreeMap::from([(2, 4.0), (9, 3.0)]));
         assert_eq!(tiles.get(1).unwrap().scale(), 1.0);

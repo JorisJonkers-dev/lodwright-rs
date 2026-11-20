@@ -15,6 +15,8 @@ use serde_json::Value;
 const REQUEST_V1_SINCE: &str = "0.3.0";
 /// The release that introduces the options added after 0.5.0.
 const NEXT_RELEASE: &str = "0.6.0";
+/// The release that introduces specular in the alpha of the normal maps.
+const SPECULAR_SINCE: &str = "0.7.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -120,6 +122,13 @@ pub fn request_defaults() -> Defaults {
             ..per_level(key, OptionKind::Integer, |l| Value::from(size(l)))
         });
     }
+    options.push(OptionInfo {
+        tier: 3,
+        since: SPECULAR_SINCE.to_owned(),
+        ..per_level("specular_alpha", OptionKind::Switch, |l| {
+            Value::Bool(l.specular_alpha)
+        })
+    });
     for key in [
         "inclusion.exclude_plugins",
         "inclusion.only_plugins",
@@ -264,9 +273,8 @@ mod tests {
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);
         assert!(
-            d.options
-                .iter()
-                .all(|o| o.since == "0.3.0" || (o.tier == 3 && o.since == "0.6.0"))
+            d.options.iter().all(|o| o.since == "0.3.0"
+                || (o.tier == 3 && (o.since == "0.6.0" || o.since == "0.7.0")))
         );
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));

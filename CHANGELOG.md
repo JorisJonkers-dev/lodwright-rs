@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.6.0...v0.7.0) (2026-11-20)
+
+
+### Features
+
+* **generate:** build in a staging folder and swap it in on success, resume a cancelled or killed run ([#209](https://github.com/JorisJonkers-dev/lodwright-rs/issues/209)) ([e2844d9](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e2844d9351486c44f958b4807131ed5cf643a22d)), closes [#134](https://github.com/JorisJonkers-dev/lodwright-rs/issues/134)
+* **terrain:** specular in the alpha of the normal maps, off by default ([#210](https://github.com/JorisJonkers-dev/lodwright-rs/issues/210)) ([807fe55](https://github.com/JorisJonkers-dev/lodwright-rs/commit/807fe55ea84ba950e9d1594610b4f8b2ea886a1b))
+* **verify:** compare terrain heights against the reference, with a tolerance and per-level numbers ([#206](https://github.com/JorisJonkers-dev/lodwright-rs/issues/206)) ([c639cf2](https://github.com/JorisJonkers-dev/lodwright-rs/commit/c639cf237f097eb416c347e2bed73e74bd83159d))
+
 ## [0.6.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.5.0...v0.6.0) (2026-11-20)
 
 

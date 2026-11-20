@@ -150,6 +150,7 @@ impl BsaBuilder {
             } else {
                 block.extend_from_slice(&file.data);
             }
+            // Measured on the game's own archives: with flag 0x100 the stored size counts the embedded path.
             let mut size = size32(block.len());
             if file.invert {
                 size |= SIZE_INVERT;

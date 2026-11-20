@@ -62,8 +62,9 @@ impl Entry {
         self.compressed
     }
 
-    /// Bytes the entry occupies in the archive (after any embedded path, including the compressed block's length
-    /// word).
+    /// Bytes the entry occupies in the archive from its offset: with archive flag 0x100 the embedded path (one
+    /// length byte plus the path) is counted, then, for a compressed file, the length word and the zlib stream
+    /// (measured on 34355 files of the game's own archives, row `bsa-v104-data-blocks`).
     #[must_use]
     pub fn stored_size(&self) -> u32 {
         self.stored_size
@@ -299,7 +300,12 @@ impl Archive {
             let name_len = usize::from(*block.first().ok_or(Error::Truncated {
                 what: "an embedded path",
             })?);
-            block.drain(..(1 + name_len).min(block.len()));
+            if 1 + name_len > block.len() {
+                return Err(Error::Truncated {
+                    what: "an embedded path",
+                });
+            }
+            block.drain(..=name_len);
         }
         if !entry.compressed {
             return if block.len() as u64 > cap {
@@ -381,6 +387,57 @@ mod tests {
     fn embedded_names_are_skipped_in_both_modes() {
         read_back(&build(BsaBuilder::new().embed_names()));
         read_back(&build(BsaBuilder::new().compressed().embed_names()));
+    }
+
+    #[test]
+    fn the_stored_size_counts_the_embedded_path() {
+        // The measured rule: with flag 0x100 the stored size is the path (one length byte and the path), plus the
+        // length word and the zlib stream when compressed. The expected sizes are computed here, not by the builder.
+        let path = "a\\b.bin";
+        let data = [9_u8; 40];
+        let plain = BsaBuilder::new().embed_names().file(path, &data).build();
+        let archive = Archive::open(&mut Cursor::new(&plain)).unwrap();
+        let entry = archive.find(path).unwrap();
+        assert_eq!(entry.stored_size() as usize, 1 + path.len() + data.len());
+        let zipped = BsaBuilder::new()
+            .compressed()
+            .embed_names()
+            .file(path, &data)
+            .build();
+        let archive = Archive::open(&mut Cursor::new(&zipped)).unwrap();
+        let entry = archive.find(path).unwrap();
+        // The independent check of the measurement: the last block ends where the archive ends, and the stream
+        // consumes everything after the length word.
+        let body = entry.stored_size() as usize - (1 + path.len() + 4);
+        assert_eq!(
+            &zipped[zipped.len() - body..zipped.len() - body + 2],
+            &[0x78, 0x9c][..],
+            "a zlib header follows the path and the length word"
+        );
+        // The last block ends at the end of the archive: no byte after the counted size.
+        assert_eq!(
+            u64::from(entry.offset) + u64::from(entry.stored_size()),
+            zipped.len() as u64
+        );
+    }
+
+    #[test]
+    fn an_embedded_path_longer_than_its_block_is_truncated() {
+        let mut bytes = BsaBuilder::new()
+            .embed_names()
+            .file("a\\b.bin", &[1; 8])
+            .build();
+        // Point the length byte of the one block past the end of the archive.
+        let archive = Archive::open(&mut Cursor::new(&bytes)).unwrap();
+        let at = archive.entries()[0].offset as usize;
+        bytes[at] = 255;
+        let mut cursor = Cursor::new(&bytes);
+        let archive = Archive::open(&mut cursor).unwrap();
+        let entry = &archive.entries()[0];
+        assert!(matches!(
+            archive.extract(&mut cursor, entry, CAP),
+            Err(Error::Truncated { .. })
+        ));
     }
 
     #[test]

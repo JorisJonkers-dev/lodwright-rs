@@ -98,8 +98,8 @@ pub struct Report {
 pub(crate) use crate::output::write_output_file as write_file;
 
 fn dds(image: &Image, format: Format) -> Result<Vec<u8>, GenError> {
-    // source: game-lod-terrain-textures (BC1); BC3 only for a normal map that carries specular in alpha, own design
-    // (docs/spec/textures.md section 4)
+    // source: game-lod-terrain-textures
+    // BC3 is only for a normal map that carries specular in alpha, own design (docs/spec/textures.md section 4)
     Ok(encode(
         image,
         &EncodeOptions {

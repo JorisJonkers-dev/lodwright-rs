@@ -103,6 +103,7 @@ fn terrain_settings(request: &Request) -> TerrainSettings {
                 diffuse_size: l.diffuse_size,
                 normal_size: l.normal_size,
                 specular_alpha: l.specular_alpha,
+                skirts: l.skirts,
             })
             .collect(),
     }

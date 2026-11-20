@@ -45,6 +45,10 @@ pub struct LevelRequest {
     /// Off by default and written only when set; off keeps the normal map opaque BC1.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub specular_alpha: bool,
+    /// Close the gap between neighbouring blocks with a skirt under every border vertex, as the game's own blocks
+    /// do (`docs/spec/terrain-lod.md`). Off by default and written only when set.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skirts: bool,
 }
 
 /// Terrain settings.
@@ -333,6 +337,7 @@ mod tests {
                 diffuse_size: 256,
                 normal_size: 256,
                 specular_alpha: false,
+                skirts: false,
             };
             f(&mut l);
             r.terrain.levels.push(l);

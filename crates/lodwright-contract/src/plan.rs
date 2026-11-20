@@ -68,9 +68,9 @@ pub struct Capabilities {
 
 impl Capabilities {
     /// This build: terrain meshes, terrain textures, the settings file, object LOD and tree LOD are written; every
-    /// world is built when none is named; the bytes do not depend on the thread count; the memory budget is a
-    /// preflight estimate, not held while running; peak memory is reported on Linux; a cancelled run resumes, a killed
-    /// one does not yet.
+    /// world is built when none is named; the bytes do not depend on the thread count; the memory budget is
+    /// held while running; peak memory is reported on Linux; a cancelled run and a killed run both resume from the
+    /// staging folder.
     #[must_use]
     pub fn current() -> Self {
         Self {
@@ -85,7 +85,7 @@ impl Capabilities {
             memory_budget_held: true,
             peak_memory_reported: cfg!(target_os = "linux"),
             resume_after_cancel: true,
-            resume_after_kill: false,
+            resume_after_kill: true,
         }
     }
 
@@ -273,10 +273,10 @@ mod tests {
     }
 
     #[test]
-    fn this_build_resumes_after_a_cancel_but_not_after_a_kill() {
+    fn this_build_resumes_after_a_cancel_and_after_a_kill() {
         let caps = Capabilities::current();
         assert!(caps.resume_after_cancel);
-        assert!(!caps.resume_after_kill);
+        assert!(caps.resume_after_kill);
     }
 
     #[test]

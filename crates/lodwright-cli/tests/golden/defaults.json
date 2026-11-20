@@ -36,6 +36,15 @@
       "tier": 1
     },
     {
+      "default": {},
+      "key": "terrain.texture_scales",
+      "kind": "map",
+      "maximum": 16.0,
+      "minimum": 0.0625,
+      "since": "0.6.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

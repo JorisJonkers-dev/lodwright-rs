@@ -6,7 +6,7 @@
 
 use lodwright_contract::{
     DEFAULTS_CONTRACT, Defaults, LevelDefault, MAX_VERTICES_RANGE, OptionInfo, OptionKind,
-    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SIZE_RANGE, THREADS_MIN,
+    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN,
 };
 use lodwright_core::terrain::{LevelSettings, TerrainSettings};
 use serde_json::Value;
@@ -67,14 +67,18 @@ fn per_level(key: &str, kind: OptionKind, value: impl Fn(&LevelSettings) -> Valu
 pub fn request_defaults() -> Defaults {
     let doc = serde_json::to_value(Request::new("", &[], "")).expect("a request serialises");
     let mut options = vec![option(&doc, "worlds", OptionKind::List)];
-    for key in [
-        "terrain.enabled",
-        "terrain.land_textures",
-        "terrain.water",
-        "objects.enabled",
-    ] {
+    for key in ["terrain.enabled", "terrain.land_textures", "terrain.water"] {
         options.push(option(&doc, key, OptionKind::Switch));
     }
+    options.push(OptionInfo {
+        default: Value::Object(serde_json::Map::new()),
+        minimum: Some(f64::from(TEXTURE_SCALE_RANGE.0)),
+        maximum: Some(f64::from(TEXTURE_SCALE_RANGE.1)),
+        tier: 3,
+        since: NEXT_RELEASE.to_owned(),
+        ..option(&doc, "terrain.texture_scales", OptionKind::Map)
+    });
+    options.push(option(&doc, "objects.enabled", OptionKind::Switch));
     // options that are off by default are not written while off: their default comes from the request type
     let objects = Request::new("", &[], "").objects;
     for (key, default) in [
@@ -200,8 +204,11 @@ mod tests {
                     assert_eq!(request.validate(), Ok(()), "{}", o.key);
                 }
             } else {
-                // a switch that is off by default is not written while off
+                // an option that is empty or off by default is not written while so
                 let written = match at(&doc, &o.key) {
+                    Value::Null if o.kind == OptionKind::Map => {
+                        Value::Object(serde_json::Map::new())
+                    }
                     Value::Null if o.kind == OptionKind::Switch => Value::Bool(false),
                     v => v,
                 };
@@ -219,10 +226,11 @@ mod tests {
         for o in request_defaults().options {
             let accepts = |v: f64| {
                 #[allow(clippy::cast_possible_truncation)] // the bounds are small whole numbers
-                let value = if o.kind == OptionKind::Integer {
-                    Value::from(v as i64)
-                } else {
-                    Value::from(v)
+                let value = match o.kind {
+                    OptionKind::Integer => Value::from(v as i64),
+                    // a map's range is the range of each value
+                    OptionKind::Map => json!({ "0000ABCD": v }),
+                    _ => Value::from(v),
                 };
                 with(&o.key, &value).is_some_and(|r| r.validate().is_ok())
             };
@@ -260,6 +268,8 @@ mod tests {
                 .iter()
                 .all(|o| o.since == "0.3.0" || (o.tier == 3 && o.since == "0.6.0"))
         );
+        let scales = d.option("terrain.texture_scales").unwrap();
+        assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();
         assert_eq!((drop.tier, drop.default.clone()), (3, Value::Bool(false)));
         assert_eq!(d.option("limits.threads").unwrap().default, Value::Null);

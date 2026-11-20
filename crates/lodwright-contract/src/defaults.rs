@@ -19,6 +19,8 @@ pub enum OptionKind {
     Number,
     /// A list of text entries.
     List,
+    /// A map from a text key to a number.
+    Map,
 }
 
 /// The default of one terrain level, for an option set per level.

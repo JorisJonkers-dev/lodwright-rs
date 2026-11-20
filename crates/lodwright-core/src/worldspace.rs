@@ -262,6 +262,11 @@ impl Worldspace {
         self.water.insert((x, y), CellWater { has_water, height });
     }
 
+    /// Set the texture layers of cell (`x`, `y`) as a LAND record would (for tests and tools).
+    pub fn set_cell_layers(&mut self, x: i32, y: i32, layers: CellLayers) {
+        self.layers.insert((x, y), layers);
+    }
+
     /// Build a world directly from cells (for tests and tools).
     #[must_use]
     pub fn from_cells(

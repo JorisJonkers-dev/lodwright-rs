@@ -20,6 +20,20 @@ const TILE: u32 = 32;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tile {
     rgb: Vec<[u8; 3]>,
+    /// How often the texture repeats across a cell quadrant: 1 unless the request sets another.
+    scale: Scale,
+}
+
+/// A tiling scale, kept as its bits so that a tile stays `Eq`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Scale(u32);
+
+impl Scale {
+    const ONE: Self = Self(0x3F80_0000);
+
+    fn get(self) -> f32 {
+        f32::from_bits(self.0)
+    }
 }
 
 impl Tile {
@@ -34,13 +48,29 @@ impl Tile {
     pub fn flat(rgb: [u8; 3]) -> Self {
         Self {
             rgb: vec![rgb; (TILE * TILE) as usize],
+            scale: Scale::ONE,
         }
     }
 
-    /// The colour at (`u`, `v`) in 0..1, repeating, bilinear.
+    /// How often the texture repeats across a cell quadrant (1 by default).
+    #[must_use]
+    pub fn scale(&self) -> f32 {
+        self.scale.get()
+    }
+
+    /// The same tile repeating `scale` times across a cell quadrant.
+    #[must_use]
+    pub fn with_scale(mut self, scale: f32) -> Self {
+        self.scale = Scale(scale.to_bits());
+        self
+    }
+
+    /// The colour at (`u`, `v`) in 0..1 of a cell quadrant, repeating [`Tile::scale`] times, bilinear.
     #[must_use]
     pub fn sample(&self, u: f32, v: f32) -> [u8; 3] {
         let n = TILE as usize;
+        let scale = self.scale.get();
+        let (u, v) = (u * scale, v * scale);
         let (fu, fv) = (
             u.rem_euclid(1.0) * n as f32 - 0.5,
             v.rem_euclid(1.0) * n as f32 - 0.5,
@@ -72,6 +102,24 @@ impl LandTiles {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Tiles given directly (for tests).
+    #[cfg(test)]
+    pub(crate) fn from_tiles(tiles: HashMap<u32, Tile>) -> Self {
+        Self { tiles }
+    }
+
+    /// The same tiles with the tiling scale of each land texture in `scales` (absolute `FormID` to repeats per
+    /// cell quadrant); a texture that is not listed keeps 1.
+    #[must_use]
+    pub fn with_scales(mut self, scales: &std::collections::BTreeMap<u32, f32>) -> Self {
+        for (id, scale) in scales {
+            if let Some(tile) = self.tiles.remove(id) {
+                self.tiles.insert(*id, tile.with_scale(*scale));
+            }
+        }
+        self
     }
 
     /// The tile of land texture `id` (absolute `FormID`).
@@ -117,7 +165,13 @@ impl LandTiles {
                     .iter()
                     .map(|p| [p[0], p[1], p[2]])
                     .collect();
-                tiles.insert(id, Tile { rgb });
+                tiles.insert(
+                    id,
+                    Tile {
+                        rgb,
+                        scale: Scale::ONE,
+                    },
+                );
             }
         }
         Self { tiles }
@@ -139,7 +193,20 @@ pub fn blend(base: [u8; 3], layers: &[([u8; 3], f32)]) -> [u8; 3] {
 
 #[cfg(test)]
 mod tests {
-    use super::{Tile, blend};
+    use super::{LandTiles, Scale, TILE, Tile, blend};
+    use std::collections::{BTreeMap, HashMap};
+
+    /// A tile whose red channel rises from west to east.
+    fn ramp() -> Tile {
+        let n = TILE as usize;
+        let rgb = (0..n * n)
+            .map(|i| [u8::try_from((i % n) * 8).unwrap(), 0, 0])
+            .collect();
+        Tile {
+            rgb,
+            scale: Scale::ONE,
+        }
+    }
 
     #[test]
     fn layers_blend_over_the_base_by_opacity_in_order() {
@@ -161,5 +228,36 @@ mod tests {
         for (u, v) in [(0.0, 0.0), (0.37, 0.91), (1.5, -0.25), (123.4, 0.0)] {
             assert_eq!(t.sample(u, v), [10, 20, 30]);
         }
+    }
+
+    #[test]
+    fn a_tile_with_scale_two_repeats_twice_as_often_across_a_quadrant() {
+        let once = ramp();
+        let twice = ramp().with_scale(2.0);
+        for u in [0.1_f32, 0.2, 0.3, 0.45] {
+            assert_eq!(twice.sample(u, 0.5), once.sample(u * 2.0, 0.5), "{u}");
+            // the second repeat starts where the first did
+            assert_eq!(twice.sample(u + 0.5, 0.5), twice.sample(u, 0.5), "{u}");
+        }
+        assert_ne!(twice.sample(0.25, 0.5), once.sample(0.25, 0.5));
+    }
+
+    #[test]
+    fn scale_one_samples_exactly_as_before_and_unlisted_textures_keep_it() {
+        let plain = ramp();
+        let scaled = ramp().with_scale(1.0);
+        for u in [0.0_f32, 0.13, 0.5, 0.99] {
+            assert_eq!(plain.sample(u, 0.3), scaled.sample(u, 0.3));
+        }
+        let tiles = LandTiles {
+            tiles: HashMap::from([(1, ramp()), (2, ramp())]),
+        }
+        .with_scales(&BTreeMap::from([(2, 4.0), (9, 3.0)]));
+        assert_eq!(tiles.get(1).unwrap().scale(), 1.0);
+        assert_eq!(tiles.get(2).unwrap().scale(), 4.0);
+        assert!(
+            tiles.get(9).is_none(),
+            "a scale for a texture the world does not use adds nothing"
+        );
     }
 }

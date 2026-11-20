@@ -148,6 +148,11 @@
           "description": "A list of text entries.",
           "type": "string",
           "const": "list"
+        },
+        {
+          "description": "A map from a text key to a number.",
+          "type": "string",
+          "const": "map"
         }
       ],
       "x-open-enum": true

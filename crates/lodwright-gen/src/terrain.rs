@@ -151,6 +151,11 @@ fn block_inputs(
                     for p in tile.pixels() {
                         h.update(p);
                     }
+                    // only a scale other than 1 enters the digest, so blocks built before scales existed are kept
+                    #[allow(clippy::float_cmp)] // 1 is exact
+                    if tile.scale() != 1.0 {
+                        h.update(&tile.scale().to_le_bytes());
+                    }
                 }
             }
         }
@@ -352,8 +357,10 @@ pub fn generate_terrain(
 
 #[cfg(test)]
 mod tests {
-    use super::{Options, generate_terrain};
+    use super::{Job, Options, block_inputs, generate_terrain};
+    use crate::diffuse::{LandTiles, Tile};
     use lodwright_core::land::CellHeights;
+    use lodwright_core::layers::CellLayers;
     use lodwright_core::terrain::TerrainSettings;
     use lodwright_core::worldspace::Worldspace;
     use lodwright_nif::NifFile;
@@ -568,6 +575,46 @@ mod tests {
         let bad = Worldspace::from_cells(1, "../x", std::iter::empty());
         assert!(
             generate_terrain(&bad, &TerrainSettings::default(), &out, &Options::default()).is_err()
+        );
+    }
+
+    #[test]
+    fn a_tiling_scale_other_than_one_changes_the_digest_of_the_blocks_that_use_the_texture() {
+        let mut w = world();
+        w.set_cell_layers(
+            0,
+            0,
+            CellLayers {
+                normals: None,
+                colors: None,
+                base: [Some(7); 4],
+                alpha: Vec::new(),
+            },
+        );
+        let job = Job {
+            level: TerrainSettings::default().levels[0],
+            cell: (0, 0),
+        };
+        let tiles = |scales: &[(u32, f32)]| {
+            LandTiles::from_tiles(std::collections::HashMap::from([(
+                7,
+                Tile::flat([90, 80, 70]),
+            )]))
+            .with_scales(&scales.iter().copied().collect())
+        };
+        let plain = block_inputs(&w, &[], &job, &tiles(&[]), true);
+        assert_eq!(
+            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), true),
+            plain
+        );
+        assert_ne!(
+            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), true),
+            plain
+        );
+        // a scale for a texture the block does not use leaves its digest alone
+        assert_eq!(
+            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true),
+            plain
         );
     }
 }

@@ -4,6 +4,8 @@
 //! The request carries everything that decides the output, so its digest (`request_digest`) says whether an
 //! existing output folder is up to date: the same request over the same plugin contents gives the same files.
 
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +17,8 @@ pub const TERRAIN_LEVELS: [u32; 4] = [4, 8, 16, 32];
 pub const MAX_VERTICES_RANGE: (u32, u32) = (3, 32767);
 /// The edge of a terrain texture in pixels: lowest and highest accepted (a power of two).
 pub const TEXTURE_SIZE_RANGE: (u32, u32) = (4, 4096);
+/// How often a land texture may repeat across a cell quadrant: lowest and highest accepted tiling scale.
+pub const TEXTURE_SCALE_RANGE: (f32, f32) = (0.0625, 16.0);
 /// The lowest accepted terrain quality.
 pub const QUALITY_MIN: f32 = 0.0;
 /// The fewest worker threads a request may ask for.
@@ -54,6 +58,10 @@ pub struct TerrainRequest {
     /// Write water planes into the terrain blocks that have ground below water.
     #[serde(default = "yes")]
     pub water: bool,
+    /// How often a land texture repeats across a cell quadrant in the diffuse maps, by the land texture's absolute
+    /// `FormID` (eight hex digits); a texture not listed repeats once. Empty by default; written only when set.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub texture_scales: BTreeMap<String, f32>,
 }
 
 impl Default for TerrainRequest {
@@ -63,6 +71,7 @@ impl Default for TerrainRequest {
             levels: Vec::new(),
             land_textures: true,
             water: true,
+            texture_scales: BTreeMap::new(),
         }
     }
 }
@@ -246,6 +255,17 @@ impl Request {
                 ));
             }
         }
+        let (low, high) = TEXTURE_SCALE_RANGE;
+        for (id, scale) in &self.terrain.texture_scales {
+            if id.len() != 8 || u32::from_str_radix(id, 16).is_err() {
+                return Err(format!("texture_scales key {id:?} is not eight hex digits"));
+            }
+            if !scale.is_finite() || !(low..=high).contains(scale) {
+                return Err(format!(
+                    "texture_scales {id} is {scale}, not from {low} to {high}"
+                ));
+            }
+        }
         if self.limits.threads.is_some_and(|t| t < THREADS_MIN) {
             return Err("threads must be at least 1".into());
         }
@@ -338,5 +358,17 @@ mod tests {
         let mut r = base();
         r.limits.threads = Some(0);
         assert!(r.validate().unwrap_err().contains("threads"));
+        let mut r = base();
+        r.terrain.texture_scales.insert("0000ABCD".into(), 2.0);
+        assert_eq!(r.validate(), Ok(()));
+        r.terrain.texture_scales.insert("0000ABCE".into(), 0.0);
+        assert!(
+            r.validate()
+                .unwrap_err()
+                .contains("texture_scales 0000ABCE")
+        );
+        let mut r = base();
+        r.terrain.texture_scales.insert("oak".into(), 2.0);
+        assert!(r.validate().unwrap_err().contains("hex"));
     }
 }

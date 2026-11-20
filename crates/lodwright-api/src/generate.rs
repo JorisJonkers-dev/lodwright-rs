@@ -464,6 +464,13 @@ pub fn generate(
     let resolver = lodwright_core::texture::TextureResolver::from_load_order(&loaded.plugins)
         .map_err(|e| load_order_error(&e))?;
     let settings = terrain_settings(request);
+    // validate() has checked that every key is eight hex digits
+    let texture_scales: BTreeMap<u32, f32> = request
+        .terrain
+        .texture_scales
+        .iter()
+        .filter_map(|(id, scale)| Some((u32::from_str_radix(id, 16).ok()?, *scale)))
+        .collect();
     std::fs::create_dir_all(out).map_err(|e| io_error("cannot create the output folder", &e))?;
     let reuse = |key: &str, inputs: &str| reusable(out, old.as_ref()?, key, inputs);
     let stop = || cancel.is_cancelled();
@@ -486,6 +493,7 @@ pub fn generate(
             let tiles = match (&assets, request.terrain.land_textures) {
                 (Some(assets), true) => {
                     lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
+                        .with_scales(&texture_scales)
                 }
                 _ => lodwright_gen::LandTiles::empty(),
             };

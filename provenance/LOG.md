@@ -594,3 +594,5 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-block-grid` (#219): new row, `verified = false`. The block grid of a world in the game's own tree starts at the cell of
   the world's minimum corner (NAM0 / 4096), the same for every level; level 4 block coordinates modulo 4 against the corner
   cell in five worlds of the #147 run (corner (-6, -5) gives (2, 3), and so on). Not second-read.
+- `game-lod-water-outline` (#148): new row, `verified = false`. Water shape numbers of the game's main world per level: sloped edge at
+  -14098 everywhere, irregular top vertices, vertex counts per block, 71 blocks with an extra empty one-vertex shape. Not second-read.

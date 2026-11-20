@@ -410,7 +410,12 @@ fn defaults_prints_every_request_option_with_its_default_and_range() {
     let doc: lodwright_contract::Defaults = serde_json::from_str(&out).unwrap();
     assert_eq!(doc, lodwright_api::request_defaults());
     let text = serde_json::to_string_pretty(&json(&out)).unwrap() + "\n";
-    let text = text.replace(env!("CARGO_PKG_VERSION"), "VERSION");
+    // Only the build's own version field is masked: a `since` of the next release must stay readable, or the golden
+    // fails on the release pull request that bumps the crate version to that release.
+    let text = text.replace(
+        &format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION")),
+        "\"version\": \"VERSION\"",
+    );
     lodwright_testkit::golden::assert_golden(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/defaults.json"),
         &text,

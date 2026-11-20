@@ -96,7 +96,11 @@ fn a_killed_run_resumes_to_the_bytes_of_an_uninterrupted_run() {
     for blocks in [3, 20] {
         let _ = std::fs::remove_dir_all(&out);
         let _ = std::fs::remove_dir_all(staging(&out));
-        let _ = kill_after(&request, &temp("events.jsonl"), blocks);
+        let alive = kill_after(&request, &temp("events.jsonl"), blocks);
+        assert!(
+            alive || blocks > 3,
+            "the process ended before the kill: the test proves nothing"
+        );
         // a kill never leaves a half-built output folder: either none (killed before the swap) or the finished one
         if out.exists() {
             assert!(out.join(MANIFEST_FILE).is_file(), "output without manifest");

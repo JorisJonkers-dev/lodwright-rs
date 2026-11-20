@@ -193,11 +193,23 @@ pub(crate) fn free_bytes(out: &Path) -> Option<u64> {
     fs4::available_space(parent).ok()
 }
 
-/// Replace `out` by `stage`: the previous output is moved aside, the staging folder takes its name and the previous
-/// one is removed. Top-level entries of the previous output that the new one does not have (a file the user put
-/// there) are carried over. A failed rename puts the previous output back.
+/// Move the top-level entries of `old` that `new` does not have (a file the user keeps in the output folder) into `new`.
+fn carry_over(old: &Path, new: &Path) {
+    if let Ok(entries) = std::fs::read_dir(old) {
+        for entry in entries.flatten() {
+            let target = new.join(entry.file_name());
+            if !exists(&target) {
+                let _ = std::fs::rename(entry.path(), target);
+            }
+        }
+    }
+}
+
+/// Replace `out` by `stage`: the previous output is moved aside, the staging folder takes its name, top-level entries
+/// of the previous output that the new one does not have are carried over and the previous one is removed. A failed
+/// rename puts the previous output back. The checkpoint is removed last, so a kill between the renames leaves staging
+/// resumable.
 pub(crate) fn swap(out: &Path, stage: &Path) -> Result<(), Error> {
-    let _ = std::fs::remove_file(stage.join(CHECKPOINT_FILE));
     let old = old_of(out);
     if exists(&old) {
         std::fs::remove_dir_all(&old)
@@ -207,14 +219,6 @@ pub(crate) fn swap(out: &Path, stage: &Path) -> Result<(), Error> {
     if had_old {
         std::fs::rename(out, &old)
             .map_err(|e| failed("cannot set the previous output folder aside", &e))?;
-        if let Ok(entries) = std::fs::read_dir(&old) {
-            for entry in entries.flatten() {
-                let target = stage.join(entry.file_name());
-                if !exists(&target) {
-                    let _ = std::fs::rename(entry.path(), target);
-                }
-            }
-        }
     }
     if let Err(e) = std::fs::rename(stage, out) {
         if had_old {
@@ -222,7 +226,9 @@ pub(crate) fn swap(out: &Path, stage: &Path) -> Result<(), Error> {
         }
         return Err(failed("cannot move the staging folder into place", &e));
     }
+    let _ = std::fs::remove_file(out.join(CHECKPOINT_FILE));
     if had_old {
+        carry_over(&old, out);
         let _ = std::fs::remove_dir_all(&old);
     }
     Ok(())
@@ -242,8 +248,110 @@ pub(crate) fn finish_manifest(stage: &Path, manifest: &Manifest) -> Result<(), E
 
 #[cfg(test)]
 mod tests {
-    use super::{check_room, sibling};
-    use std::path::Path;
+    use super::{
+        CHECKPOINT_FILE, check_room, prune, recover_swap, resume_or_clear, sibling, swap,
+        write_checkpoint,
+    };
+    use lodwright_contract::ManifestFile;
+    use std::path::{Path, PathBuf};
+
+    fn temp(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lodwright-staging-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn file(path: &str) -> ManifestFile {
+        ManifestFile {
+            path: path.to_owned(),
+            bytes: 1,
+            digest: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_swap_puts_staging_in_place_keeps_the_users_top_level_files_and_drops_the_checkpoint() {
+        let root = temp("swap");
+        let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
+        std::fs::create_dir_all(out.join("meshes")).unwrap();
+        std::fs::write(out.join("meshes/old.nif"), b"old").unwrap();
+        std::fs::write(out.join("notes.txt"), b"mine").unwrap();
+        std::fs::create_dir_all(stage.join("meshes")).unwrap();
+        std::fs::write(stage.join("meshes/new.nif"), b"new").unwrap();
+        std::fs::write(stage.join(CHECKPOINT_FILE), b"{}").unwrap();
+        swap(&out, &stage).unwrap();
+        assert!(out.join("meshes/new.nif").is_file());
+        assert!(!out.join("meshes/old.nif").exists());
+        assert_eq!(std::fs::read(out.join("notes.txt")).unwrap(), b"mine");
+        assert!(!out.join(CHECKPOINT_FILE).exists());
+        assert!(!stage.exists() && !root.join("out.lodwright-old").exists());
+    }
+
+    #[test]
+    fn a_swap_with_no_previous_output_is_one_rename() {
+        let root = temp("swap-first");
+        let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::write(stage.join("a.txt"), b"a").unwrap();
+        swap(&out, &stage).unwrap();
+        assert!(out.join("a.txt").is_file() && !stage.exists());
+    }
+
+    #[test]
+    fn a_swap_killed_after_the_first_rename_is_put_back_and_one_killed_after_the_second_is_cleaned_up()
+     {
+        let root = temp("recover");
+        let out = root.join("out");
+        let old = root.join("out.lodwright-old");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("a.txt"), b"a").unwrap();
+        recover_swap(&out).unwrap();
+        assert!(out.join("a.txt").is_file() && !old.exists());
+        // both exist: the swap had finished; the user's file in the old folder is not lost
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("keep.txt"), b"k").unwrap();
+        recover_swap(&out).unwrap();
+        assert!(out.join("keep.txt").is_file() && !old.exists());
+    }
+
+    #[test]
+    fn staging_of_another_request_or_without_a_checkpoint_is_removed_and_the_same_one_is_kept() {
+        let root = temp("resume");
+        let stage = root.join("s");
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::write(stage.join("x.txt"), b"x").unwrap();
+        assert!(resume_or_clear(&stage, "r", "i").unwrap().is_none());
+        assert!(!stage.exists(), "no checkpoint: removed");
+        std::fs::create_dir_all(&stage).unwrap();
+        write_checkpoint(&stage, "0", "r", "i", &[file("x.txt")], &[]).unwrap();
+        assert!(resume_or_clear(&stage, "r", "other").unwrap().is_none());
+        assert!(!stage.exists(), "other inputs: removed");
+        std::fs::create_dir_all(&stage).unwrap();
+        write_checkpoint(&stage, "0", "r", "i", &[file("x.txt")], &[]).unwrap();
+        assert_eq!(
+            resume_or_clear(&stage, "r", "i")
+                .unwrap()
+                .unwrap()
+                .files
+                .len(),
+            1
+        );
+        assert!(stage.exists());
+    }
+
+    #[test]
+    fn prune_removes_unlisted_files_and_the_folders_they_leave_empty() {
+        let root = temp("prune");
+        std::fs::create_dir_all(root.join("a/b")).unwrap();
+        std::fs::create_dir_all(root.join("keep")).unwrap();
+        std::fs::write(root.join("a/b/stray.txt"), b"s").unwrap();
+        std::fs::write(root.join("keep/f.txt"), b"f").unwrap();
+        prune(&root, &[file("keep/f.txt")]);
+        assert!(root.join("keep/f.txt").is_file());
+        assert!(!root.join("a").exists());
+    }
 
     #[test]
     fn a_sibling_sits_next_to_the_folder() {

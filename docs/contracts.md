@@ -156,7 +156,7 @@ treated as no manifest.
 
 A run builds into a staging folder next to the output folder, `<output>.lodwright-staging`, and replaces the output
 folder only when every world and step has finished. The output folder is therefore never half written: after a
-cancel, a kill (`SIGKILL`, a crash, power loss) or a failed run it is the previous complete output, untouched. Blocks
+cancel, a kill (`SIGKILL`, a crash, power loss) or a failed run it is the previous complete output, untouched (apart from the two-rename window of the swap, below). Blocks
 the previous output holds and whose digests are unchanged are hard linked into staging (copied where links are not
 possible).
 

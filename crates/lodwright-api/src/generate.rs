@@ -458,6 +458,8 @@ pub fn generate(
     let mut counts: Option<BlockCounts> = None;
     let mut cancelled = false;
     'worlds: for world in chosen {
+        // the grid every level's blocks start from, as the terrain stage finds it (after dropping outlying edges)
+        let anchor = world.without_outliers().grid_anchor();
         let mut files: Vec<ManifestFile> = Vec::new();
         if request.terrain.enabled {
             if stop() {
@@ -581,6 +583,7 @@ pub fn generate(
                     .objects
                     .drop_under_water
                     .then_some(&water as lodwright_gen::HeightAt),
+                grid_anchor: anchor,
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),
@@ -619,7 +622,7 @@ pub fn generate(
             let refs =
                 lodwright_core::trees::tree_references(&loaded.plugins, world.form_id(), &bases)
                     .map_err(|e| load_order_error(&e))?;
-            let south_west = world.bounds().map_or((0, 0), |b| (b.min_x, b.min_y));
+            let south_west = anchor;
             let trees = lodwright_gen::generate_trees_with_progress(
                 world.name(),
                 south_west,

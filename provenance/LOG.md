@@ -596,3 +596,6 @@ Measurements on the local game files, read in place, numbers only; scratch tools
   cell in five worlds of the #147 run (corner (-6, -5) gives (2, 3), and so on). Not second-read.
 - `game-lod-water-outline` (#148): new row, `verified = false`. Water shape numbers of the game's main world per level: sloped edge at
   -14098 everywhere, irregular top vertices, vertex counts per block, 71 blocks with an extra empty one-vertex shape. Not second-read.
+- `game-lod-block-grid` (#219, second step): object blocks, tree blocks and the settings file's south-west cell start at the
+  same cell as the terrain blocks in all 26 worlds with a reference; WastelandNV needs the exception recorded in the row
+  (corner cell -65, game -64). Still not second-read.

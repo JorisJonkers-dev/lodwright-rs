@@ -467,6 +467,7 @@ fn faces_wholly_under_the_ground_are_dropped_and_faces_above_or_crossing_it_are_
         Surfaces {
             ground: Some(&ground),
             water: None,
+            ..Surfaces::default()
         },
     );
     assert_eq!(
@@ -496,6 +497,7 @@ fn faces_under_water_are_dropped_only_in_cells_that_have_water() {
         Surfaces {
             ground: None,
             water: Some(&water),
+            ..Surfaces::default()
         },
     );
     assert_eq!(
@@ -515,8 +517,50 @@ fn a_model_with_every_face_dropped_writes_no_block_and_counts_its_faces() {
         Surfaces {
             ground: Some(&ground),
             water: None,
+            ..Surfaces::default()
         },
     );
     assert_eq!(report.dropped_under_terrain, 1);
     assert_eq!(vertices, None);
+}
+
+#[test]
+fn object_blocks_start_at_the_grid_anchor() {
+    // an anchor of (-6, -5): the cell (0, 0) lies in the block that starts at (-2, -1)
+    let list = vec![instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)];
+    let out = std::env::temp_dir().join(format!("lodwright-anchor-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    generate_objects_with_progress(
+        "Mojave",
+        &list,
+        &assets(),
+        &out,
+        Surfaces {
+            grid_anchor: (-6, -5),
+            ..Surfaces::default()
+        },
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let mut found = Vec::new();
+    for entry in walk(&out) {
+        found.push(entry);
+    }
+    assert!(
+        found.iter().any(|f| f.contains("level4.x-2.y-1")),
+        "{found:?}"
+    );
+}
+
+fn walk(dir: &std::path::Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(dir).unwrap().flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(walk(&p));
+        } else {
+            out.push(p.to_string_lossy().into_owned());
+        }
+    }
+    out
 }

@@ -34,7 +34,9 @@ case-insensitive on Windows; on Linux write exactly one case consistently (lower
 The block grid of a world does not start at cell 0, 0: it starts at the cell of the world's minimum corner (`NAM0`
 divided by 4096, rounded down) and repeats every `<L>` cells, the same start for every level (`game-lod-block-grid`,
 measured in #147). So a world whose minimum corner is cell (-6, -5) has level 4 blocks named at x of 2 modulo 4 and y
-of 3 modulo 4. Where the corner cell is a multiple of the level, the names are the old ones. A world without corners,
+of 3 modulo 4. Where the corner cell is a multiple of the level, the names are the old ones. Object blocks, tree blocks and the south-west cell of the settings file start at the same cell. One exception is
+needed for the main world, whose `NAM0` is cell -65 where the game starts at -64: when the first cell with LAND (after
+dropping outlying edges) lies on the 32 grid exactly one cell above the corner cell, it is the start. A world without corners,
 or with corners that are not finite or lie beyond a million cells, starts at 0, 0. The start is part of the digest of a
 terrain block (when it is not a multiple of the level) and each block's manifest key names its cell, so a run with a
 different start rebuilds the block.

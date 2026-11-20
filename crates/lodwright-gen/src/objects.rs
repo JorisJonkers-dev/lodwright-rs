@@ -54,6 +54,9 @@ pub struct Surfaces<'a> {
     pub ground: Option<HeightAt<'a>>,
     /// The water height of cells that have water; a face whose three corners all lie below it is left out.
     pub water: Option<HeightAt<'a>>,
+    /// The cell where the block grid of the world starts (`Worldspace::grid_anchor`); object blocks are 4 by 4
+    /// cells from there. (0, 0) is the default.
+    pub grid_anchor: (i32, i32),
 }
 
 type Mat = [[f32; 3]; 3];
@@ -519,9 +522,10 @@ pub fn generate_objects_with_progress(
             continue;
         }
         let (cx, cy) = cell_of(i);
+        let (ax, ay) = surfaces.grid_anchor;
         let key = (
-            cx.div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
-            cy.div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+            ax + (cx - ax).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+            ay + (cy - ay).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
             i.high_priority,
         );
         groups.entry(key).or_default().push(i);

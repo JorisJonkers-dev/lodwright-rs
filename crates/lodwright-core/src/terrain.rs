@@ -192,7 +192,8 @@ pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<Terr
     let world = &world.without_outliers();
     let mut blocks = Vec::new();
     for level in &settings.levels {
-        let grid = BlockGrid::new(level.level).map_err(|_| Error::ZeroLevel)?;
+        let grid =
+            BlockGrid::anchored(level.level, world.grid_anchor()).map_err(|_| Error::ZeroLevel)?;
         let Some(raster) = HeightRaster::build(world, grid)? else {
             continue;
         };
@@ -203,7 +204,7 @@ pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<Terr
             for bx in 0..cells_w / level.level {
                 let cell_x = origin_x + i32::try_from(bx).unwrap_or(0) * step;
                 let cell_y = origin_y + i32::try_from(by).unwrap_or(0) * step;
-                let (block_x, block_y) = (grid.block_of(cell_x), grid.block_of(cell_y));
+                let (block_x, block_y) = (grid.block_of_x(cell_x), grid.block_of_y(cell_y));
                 let Some((decimation, mesh, error)) =
                     build_block_mesh(&raster, level, block_x, block_y)
                 else {

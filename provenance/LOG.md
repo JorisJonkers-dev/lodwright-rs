@@ -591,3 +591,6 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-block-borders` (#125): new row, `verified = false`. Every border vertex of the game's terrain blocks has a skirt
   vertex at the constant height -14098 (175259 of 175262 at level 4, with the other levels equally complete); neighbours
   share border heights where both have a vertex, not the vertex sets (same set in 43 of 2600 same-level pairs).
+- `game-lod-block-grid` (#219): new row, `verified = false`. The block grid of a world in the game's own tree starts at the cell of
+  the world's minimum corner (NAM0 / 4096), the same for every level; level 4 block coordinates modulo 4 against the corner
+  cell in five worlds of the #147 run (corner (-6, -5) gives (2, 3), and so on). Not second-read.

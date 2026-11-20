@@ -133,6 +133,14 @@ fn block_inputs(
         // the alpha is scaled over the exponent range of the load order
         h.update(format!("specular-range={:?}", tiles.specular_range()).as_bytes());
     }
+    // the grid origin enters the digest only where it is not a multiple of the block size, so blocks of worlds that
+    // start on the grid are kept
+    let (ax, ay) = world.grid_anchor();
+    let size = i32::try_from(job.level.level).unwrap_or(1).max(1);
+    let offset = (ax.rem_euclid(size), ay.rem_euclid(size));
+    if offset != (0, 0) {
+        h.update(format!("grid-offset={offset:?}").as_bytes());
+    }
     for s in samples {
         h.update(&s.to_le_bytes());
     }
@@ -185,7 +193,7 @@ fn run_job(
 ) -> Result<Option<BlockRecord>, GenError> {
     let level = &job.level;
     let grid = raster.grid();
-    let (bx, by) = (grid.block_of(job.cell.0), grid.block_of(job.cell.1));
+    let (bx, by) = (grid.block_of_x(job.cell.0), grid.block_of_y(job.cell.1));
     let samples = raster.block_samples(bx, by).unwrap_or_default();
     let name = world.name();
     let key = format!(
@@ -307,7 +315,8 @@ pub fn generate_terrain(
         if cancelled.load(Ordering::Relaxed) {
             break;
         }
-        let grid = BlockGrid::new(level.level).map_err(|_| lodwright_core::Error::ZeroLevel)?;
+        let grid = BlockGrid::anchored(level.level, world.grid_anchor())
+            .map_err(|_| lodwright_core::Error::ZeroLevel)?;
         let Some(raster) = HeightRaster::build(world, grid)? else {
             continue;
         };
@@ -564,6 +573,69 @@ mod tests {
         )
         .unwrap();
         assert_eq!(a, b);
+    }
+
+    fn bounded(min: [f32; 2]) -> Worldspace {
+        world().with_declared_bounds(lodwright_core::plugin::DeclaredBounds {
+            min,
+            max: [min[0] + 40960.0, min[1] + 40960.0],
+        })
+    }
+
+    fn level4_names(world: &Worldspace, tag: &str) -> Vec<String> {
+        let out = temp(tag);
+        let report = generate_terrain(
+            world,
+            &TerrainSettings::default(),
+            &out,
+            &Options::default(),
+        )
+        .unwrap();
+        let mut names: Vec<String> = report
+            .files
+            .iter()
+            .filter(|f| f.path.contains(".level4.") && f.path.contains(".nif"))
+            .map(|f| f.path.clone())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn blocks_are_named_from_the_minimum_corner_of_the_world() {
+        // corner cell (-6, -5): the cells 0..3 x 0..2 fall into level 4 blocks starting at -6 + 4k and -5 + 4k
+        let names = level4_names(&bounded([-6.0 * 4096.0, -5.0 * 4096.0]), "anchor");
+        let tails: Vec<&str> = names
+            .iter()
+            .map(|n| n.rsplit('/').next().unwrap())
+            .collect();
+        assert_eq!(
+            tails,
+            ["mojave.level4.x-2.y-1.nif", "mojave.level4.x2.y-1.nif"]
+        );
+    }
+
+    #[test]
+    fn a_corner_on_the_grid_or_no_corner_gives_the_old_names_and_digests() {
+        let plain = level4_names(&world(), "plain");
+        assert_eq!(level4_names(&bounded([0.0, 0.0]), "zero"), plain);
+        assert_eq!(
+            level4_names(&bounded([-8.0 * 4096.0, -4.0 * 4096.0]), "mult"),
+            plain
+        );
+    }
+
+    #[test]
+    fn the_grid_start_changes_the_digest_only_off_the_grid() {
+        let samples = vec![0.0_f32; 4];
+        let job = |cell| Job {
+            level: TerrainSettings::default().levels[0],
+            cell,
+        };
+        let tiles = LandTiles::empty();
+        let digest = |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, true);
+        assert_eq!(digest(&world()), digest(&bounded([-8.0 * 4096.0, 0.0])));
+        assert_ne!(digest(&world()), digest(&bounded([-6.0 * 4096.0, 0.0])));
     }
 
     #[test]

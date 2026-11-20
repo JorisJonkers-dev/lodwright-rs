@@ -18,6 +18,8 @@ pub const MAX_SAMPLES: u128 = 1 << 27;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockGrid {
     block_cells: u32,
+    /// The cell where block 0 starts, per axis (0, 0 unless set with [`BlockGrid::anchored`]).
+    anchor: (i32, i32),
 }
 
 impl BlockGrid {
@@ -29,7 +31,28 @@ impl BlockGrid {
         if block_cells == 0 {
             return Err(Error::ZeroBlockSize);
         }
-        Ok(Self { block_cells })
+        Ok(Self {
+            block_cells,
+            anchor: (0, 0),
+        })
+    }
+
+    /// A grid whose blocks start at `anchor` (a cell) and repeat every `block_cells` cells in both directions, so
+    /// that the block origins are `anchor` plus a multiple of the size.
+    ///
+    /// # Errors
+    /// [`Error::ZeroBlockSize`] when `block_cells` is zero.
+    pub fn anchored(block_cells: u32, anchor: (i32, i32)) -> Result<Self, Error> {
+        Ok(Self {
+            anchor,
+            ..Self::new(block_cells)?
+        })
+    }
+
+    /// The cell where block 0 starts.
+    #[must_use]
+    pub fn anchor(self) -> (i32, i32) {
+        self.anchor
     }
 
     /// Cells per block edge.
@@ -38,16 +61,39 @@ impl BlockGrid {
         self.block_cells
     }
 
-    /// Index of the block that contains `cell`. Rounds towards negative infinity, so cell -1 is in block -1.
+    /// Index along x of the block that contains `cell`. Rounds towards negative infinity from the anchor, so the
+    /// cell left of the anchor is in block -1.
     #[must_use]
-    pub fn block_of(self, cell: i32) -> i32 {
-        cell.div_euclid(self.step())
+    pub fn block_of_x(self, cell: i32) -> i32 {
+        Self::index(cell, self.anchor.0, self.step())
     }
 
-    /// First cell of `block`. Saturates at the ends of the `i32` range.
+    /// Index along y of the block that contains `cell`.
     #[must_use]
-    pub fn block_origin(self, block: i32) -> i32 {
-        block.saturating_mul(self.step())
+    pub fn block_of_y(self, cell: i32) -> i32 {
+        Self::index(cell, self.anchor.1, self.step())
+    }
+
+    /// First cell along x of `block`. Saturates at the ends of the `i32` range.
+    #[must_use]
+    pub fn block_origin_x(self, block: i32) -> i32 {
+        Self::first(block, self.anchor.0, self.step())
+    }
+
+    /// First cell along y of `block`.
+    #[must_use]
+    pub fn block_origin_y(self, block: i32) -> i32 {
+        Self::first(block, self.anchor.1, self.step())
+    }
+
+    fn index(cell: i32, anchor: i32, step: i32) -> i32 {
+        let d = i64::from(cell) - i64::from(anchor);
+        i32::try_from(d.div_euclid(i64::from(step))).unwrap_or(i32::MAX)
+    }
+
+    fn first(block: i32, anchor: i32, step: i32) -> i32 {
+        let v = i64::from(block) * i64::from(step) + i64::from(anchor);
+        i32::try_from(v).unwrap_or(if v < 0 { i32::MIN } else { i32::MAX })
     }
 
     fn step(self) -> i32 {
@@ -80,13 +126,13 @@ impl HeightRaster {
         let Some(bounds) = world.bounds() else {
             return Ok(None);
         };
-        let first_x = grid.block_of(bounds.min_x);
-        let first_y = grid.block_of(bounds.min_y);
+        let first_x = grid.block_of_x(bounds.min_x);
+        let first_y = grid.block_of_y(bounds.min_y);
         let block_cells = i64::from(grid.block_cells());
         let cells_w =
-            (i64::from(grid.block_of(bounds.max_x)) - i64::from(first_x) + 1) * block_cells;
+            (i64::from(grid.block_of_x(bounds.max_x)) - i64::from(first_x) + 1) * block_cells;
         let cells_h =
-            (i64::from(grid.block_of(bounds.max_y)) - i64::from(first_y) + 1) * block_cells;
+            (i64::from(grid.block_of_y(bounds.max_y)) - i64::from(first_y) + 1) * block_cells;
         let intervals = i128::try_from(CELL_INTERVALS).unwrap_or(32);
         let width = i128::from(cells_w) * intervals + 1;
         let height = i128::from(cells_h) * intervals + 1;
@@ -98,7 +144,7 @@ impl HeightRaster {
             usize::try_from(width).unwrap_or(0),
             usize::try_from(height).unwrap_or(0),
         );
-        let origin = (grid.block_origin(first_x), grid.block_origin(first_y));
+        let origin = (grid.block_origin_x(first_x), grid.block_origin_y(first_y));
         let mut raster = Self {
             grid,
             origin,
@@ -185,8 +231,8 @@ impl HeightRaster {
     #[must_use]
     pub fn block_samples(&self, block_x: i32, block_y: i32) -> Option<Vec<f32>> {
         let span = usize::try_from(self.grid.block_cells()).ok()? * CELL_INTERVALS + 1;
-        let first_x = i64::from(self.grid.block_of(self.origin.0));
-        let first_y = i64::from(self.grid.block_of(self.origin.1));
+        let first_x = i64::from(self.grid.block_of_x(self.origin.0));
+        let first_y = i64::from(self.grid.block_of_y(self.origin.1));
         let local_x = usize::try_from(i64::from(block_x) - first_x).ok()?;
         let local_y = usize::try_from(i64::from(block_y) - first_y).ok()?;
         let blocks_w = usize::try_from(self.cells.0 / self.grid.block_cells()).ok()?;
@@ -245,6 +291,40 @@ mod tests {
         assert_eq!(raster.sample(0, 0), None);
         assert_eq!(raster.sample(raster.width(), 0), None);
         assert_eq!(raster.height_range(), Some((80.0, 80.0)));
+    }
+
+    #[test]
+    fn an_anchored_grid_starts_blocks_at_the_anchor_for_every_level() {
+        // minimum corner cell (-6, -5), as BoulderCityWorld
+        for level in [4_u32, 8, 16, 32] {
+            let grid = BlockGrid::anchored(level, (-6, -5)).unwrap();
+            let raster = HeightRaster::build(&world(&[(-6, -5, 8.0), (3, 2, 8.0)]), grid)
+                .unwrap()
+                .unwrap();
+            let step = i32::try_from(level).unwrap();
+            let (ox, oy) = raster.origin_cell();
+            assert_eq!((ox, oy), (-6, -5), "level {level}");
+            assert_eq!(
+                (ox - -6).rem_euclid(step),
+                0,
+                "origins are the anchor plus multiples of the level"
+            );
+            assert_eq!(grid.block_of_x(-7), -1);
+            assert_eq!(grid.block_origin_y(1), -5 + step);
+        }
+        let g4 = BlockGrid::anchored(4, (-6, -5)).unwrap();
+        // congruent to (2, 3) modulo 4
+        assert_eq!(g4.block_origin_x(1).rem_euclid(4), 2);
+        assert_eq!(g4.block_origin_y(1).rem_euclid(4), 3);
+    }
+
+    #[test]
+    fn a_grid_at_the_origin_is_the_old_grid() {
+        let old = BlockGrid::new(8).unwrap();
+        let same = BlockGrid::anchored(8, (0, 0)).unwrap();
+        assert_eq!(old, same);
+        assert_eq!(old.block_of_x(-1), -1);
+        assert_eq!(old.block_origin_x(-2), -16);
     }
 
     #[test]
@@ -359,12 +439,12 @@ mod tests {
     #[test]
     fn cells_map_to_blocks_across_the_origin() {
         let grid = BlockGrid::new(8).unwrap();
-        assert_eq!(grid.block_of(0), 0);
-        assert_eq!(grid.block_of(7), 0);
-        assert_eq!(grid.block_of(8), 1);
-        assert_eq!(grid.block_of(-1), -1);
-        assert_eq!(grid.block_of(-8), -1);
-        assert_eq!(grid.block_of(-9), -2);
+        assert_eq!(grid.block_of_x(0), 0);
+        assert_eq!(grid.block_of_x(7), 0);
+        assert_eq!(grid.block_of_x(8), 1);
+        assert_eq!(grid.block_of_x(-1), -1);
+        assert_eq!(grid.block_of_x(-8), -1);
+        assert_eq!(grid.block_of_x(-9), -2);
     }
 
     #[test]
@@ -372,7 +452,7 @@ mod tests {
         for size in [1_u32, 4, 8, 16, 32] {
             let grid = BlockGrid::new(size).unwrap();
             for cell in -70..70 {
-                let origin = grid.block_origin(grid.block_of(cell));
+                let origin = grid.block_origin_x(grid.block_of_x(cell));
                 assert!(
                     origin <= cell && cell < origin + i32::try_from(size).unwrap(),
                     "{size} {cell}"
@@ -389,6 +469,6 @@ mod tests {
     #[test]
     fn block_origin_saturates_instead_of_overflowing() {
         let grid = BlockGrid::new(32).unwrap();
-        assert_eq!(grid.block_origin(i32::MAX), i32::MAX);
+        assert_eq!(grid.block_origin_x(i32::MAX), i32::MAX);
     }
 }

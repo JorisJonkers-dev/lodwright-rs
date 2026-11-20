@@ -1,3 +1,5 @@
+# FROZEN: new rows are not added here; each new row is its own file provenance/rows/<id>.toml (see the README
+# there). Edits to existing rows (a second reader, a corrected note) stay here.
 # Machine-readable provenance: every format fact the code relies on is a row here. Code points at a row with a
 # `// source: <id>` comment (`# source:` in Python, shell and TOML); cargo xtask guards fails the build for
 # a reference without a row, a row without a licence, a forbidden source, or a row LOG.md does not mention.
@@ -1186,14 +1188,3 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Measured in the full run of #147 (ten plugins of Fallout New Vegas and its DLCs, verify against the game's tree). Level 4 block coordinates modulo 4 against the minimum corner cell: BoulderCityWorld (-6, -5) gives 2, 3; FreesideWorld (-10, -8) gives 2, 0; GamorrahWorld (-9, -6) gives 3, 2; NVDLC04NukeNCR (-6, -6) gives 2, 2; NVDLC04Road01World (-3, -3) gives 1, 1. Worlds whose corner cell is a multiple of 8 (WastelandNV and the DLC main worlds) are indistinguishable from the grid at 0, 0. The child worlds follow the same rule. The unit of NAM0 (world units) is the measurement of #155 (wrld-bounds). Re-measured after the first change (full run of #147, 26 worlds with a reference): the object blocks, the tree blocks and the south-west cell of the settings file start at the same cell as the terrain blocks, in every world. The cell is the NAM0 cell in 25 of the 26 worlds; WastelandNV is the exception: NAM0 is cell -65 and the game's tree starts at -64 (its LAND begins at -64 on x; the row at -65 holds few cells). The rule used is the NAM0 cell unless the first cell with LAND, after dropping outlying edges, lies on the 32 grid exactly one cell above it; this fits all 26 and is not understood beyond that. Not second-read."
-
-[[source]]
-id = "game-lod-water-outline"
-fact = "In the water shapes of the game's own terrain blocks of the main world (second and later shapes, vertex positions only) the sloped edge is one height, -14098, at every level (12, 14, 9 and 5 percent of the water vertices at levels 4, 8, 16 and 32; a few level 4 vertices lie between at -12242.667 and -12010.75); the top vertices are irregular, about 20 percent on the level's sample grid, and at level 4 some 11 percent lie outside the block (to -32 in y and beyond), none at the higher levels; the median water vertex count per block with water is 307, 61, 38 and 30 at levels 4, 8, 16 and 32 (minimum 5, 4, 4, 4; maximum 4239, 229, 138, 162); a one-vertex shape with all coordinates zero sits between the terrain shape and the water shape in 47, 16, 6 and 2 blocks (71 in all)."
-url = "oracle:game-lod-files"
-licence = "Vertex counts and positions of the owner's own game files compared as numbers; no content is recorded"
-date = 2026-11-21
-recorded_by = "J.W. Jonkers"
-role = "specifier"
-verified = false
-note = "Measured on the reference tree extracted from the game's archives for WastelandNV (1024, 256, 64 and 16 blocks at levels 4, 8, 16 and 32; 98, 39, 19 and 8 with water; the generator's output has 97, 38, 18 and 8, and one block per level 4, 8 and 16 where the game has water and it has none). Method: dump the vertices of each shape with the repository's NIF reader. Complements game-lod-water-shape and game-lod-water-height; the empty shape count is higher than the 25 differing block types that verify reports because verify counts only differences. Not measured: the inset distance and how a neighbour-sourced block takes its height. Not second-read."

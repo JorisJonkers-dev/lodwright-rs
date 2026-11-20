@@ -4,6 +4,9 @@ The human-readable side of `sources.toml`. Every row of that file is mentioned h
 story the table cannot hold: who read what, when, and what stayed open. `cargo xtask guards` fails the
 build if a row is not mentioned. Rules: [docs/clean-room.md](../docs/clean-room.md).
 
+Frozen: this file is history up to 2026-11-21. A new row is its own file under `provenance/rows/`, whose `note` is its
+log entry; nothing is appended here any more.
+
 Roles: the *specifier* reads allowed inputs and records facts; the *implementer* codes from the recorded facts
 (and the open MPL sources) only. One person may hold both roles at different times; the entries say which.
 
@@ -597,5 +600,3 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-block-grid` (#219, second step): object blocks, tree blocks and the settings file's south-west cell start at the
   same cell as the terrain blocks in all 26 worlds with a reference; WastelandNV needs the exception recorded in the row
   (corner cell -65, game -64). Still not second-read.
-- `game-lod-water-outline` (#148): new row, `verified = false`. Water shape numbers of the game's main world per level: sloped edge at
-  -14098 everywhere, irregular top vertices, vertex counts per block, 71 blocks with an extra empty one-vertex shape. Not second-read.

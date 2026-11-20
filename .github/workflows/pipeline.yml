@@ -45,11 +45,15 @@ jobs:
     uses: JorisJonkers-dev/github-workflows/.github/workflows/quarantine-check.yml@b14d5e031f1abd5bec45e50c898e9e73f3ffc534 # v0.50.4
 
   # lodwright is linked into the Toolbox's raul on Linux, Windows and macOS (Toolbox ADR-0006), so it is built and
-  # tested natively on macOS too (Apple silicon). The Linux checks are the jobs below; this job lints and tests
-  # on macOS, and Pipeline Complete gates on it.
-  macos:
-    name: Build and test (macos-latest)
-    runs-on: macos-latest
+  # tested natively on Windows and macOS too (Apple silicon). The Linux checks are the jobs below; this job lints
+  # and tests on both, and Pipeline Complete gates on it.
+  platforms:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +63,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: ". -> target"
-          shared-key: macos
+          shared-key: ${{ matrix.os }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -245,7 +249,7 @@ jobs:
   # two reusable workflows run on pull requests only.
   pipeline-complete:
     name: Pipeline Complete
-    needs: [hygiene, pr-title, quarantine, macos, changes, fmt, clippy, test, fuzz, deny, secrets, workflows, guards, scripts]
+    needs: [hygiene, pr-title, quarantine, platforms, changes, fmt, clippy, test, fuzz, deny, secrets, workflows, guards, scripts]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

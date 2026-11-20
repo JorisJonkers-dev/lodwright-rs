@@ -5,8 +5,9 @@
 //! the terrain level settings of `lodwright-core`; every range from the constants `Request::validate` checks.
 
 use lodwright_contract::{
-    DEFAULTS_CONTRACT, Defaults, LevelDefault, MAX_VERTICES_RANGE, OptionInfo, OptionKind,
-    QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SCALE_RANGE, TEXTURE_SIZE_RANGE, THREADS_MIN,
+    DEFAULTS_CONTRACT, DROP_UNDER_WATER_RANGE, Defaults, LevelDefault, MAX_VERTICES_RANGE,
+    OptionInfo, OptionKind, QUALITY_MIN, Request, TERRAIN_LEVELS, TEXTURE_SCALE_RANGE,
+    TEXTURE_SIZE_RANGE, THREADS_MIN,
 };
 use lodwright_core::terrain::{LevelSettings, TerrainSettings};
 use serde_json::Value;
@@ -19,6 +20,8 @@ const NEXT_RELEASE: &str = "0.6.0";
 const SPECULAR_SINCE: &str = "0.7.0";
 /// The release that introduces skirts at block borders.
 const SKIRTS_SINCE: &str = "0.9.0";
+/// The release that introduces dropping terrain faces under water.
+const DROP_WATER_SINCE: &str = "0.9.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -81,6 +84,13 @@ pub fn request_defaults() -> Defaults {
         tier: 3,
         since: NEXT_RELEASE.to_owned(),
         ..option(&doc, "terrain.texture_scales", OptionKind::Map)
+    });
+    options.push(OptionInfo {
+        minimum: Some(f64::from(DROP_UNDER_WATER_RANGE.0)),
+        maximum: Some(f64::from(DROP_UNDER_WATER_RANGE.1)),
+        tier: 3,
+        since: DROP_WATER_SINCE.to_owned(),
+        ..option(&doc, "terrain.drop_under_water", OptionKind::Number)
     });
     options.push(option(&doc, "objects.enabled", OptionKind::Switch));
     // options that are off by default are not written while off: their default comes from the request type

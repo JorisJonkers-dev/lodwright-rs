@@ -45,6 +45,15 @@
       "tier": 3
     },
     {
+      "default": null,
+      "key": "terrain.drop_under_water",
+      "kind": "number",
+      "maximum": 100000.0,
+      "minimum": 0.0,
+      "since": "0.9.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

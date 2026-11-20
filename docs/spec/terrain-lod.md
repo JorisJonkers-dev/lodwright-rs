@@ -87,3 +87,12 @@ the main world: 16 small ponds where our plane covers 2 to 5 times the game's in
 game draws water from a neighbouring cell's height and we draw none, and one block where the game has none. 25
 blocks differ in block types because the game adds a second, empty segmented shape of one vertex.
 `--no-water` (request `terrain.water: false`) leaves the planes out.
+
+## 7. Faces under the water (own design)
+
+The option `terrain.drop_under_water` (off by default) leaves out terrain faces the water plane hides, so a coast block
+spends no triangles on the sea floor. Rule: a triangle goes when its three corners all lie at least `offset` world units
+below the water height of the cell its centre is in; the offset is the owner's margin against the water plane's slope at
+the edge. A heightfield mesh has no other unseen faces (no face points down and none is covered by another), so "unseen
+faces" are exactly these. Not measured against the game: its own blocks keep faces below the water; this option is an
+addition for fewer triangles, and the in-game check is the owner's (release test R2).

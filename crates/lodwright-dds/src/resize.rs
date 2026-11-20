@@ -21,7 +21,7 @@ pub enum Filter {
 ///
 /// Halving and the one-pixel floor are `dds-mip-chain`. Rounding an odd size down is this project's choice: the one
 /// odd-size example found in an allowed source (`dds-mip-odd-size`, a 5 by 1 texture whose next level is 2 by 1)
-/// agrees with it, but that row is not verified yet.
+/// agrees with it, the row is verified for the example only.
 // source: dds-mip-chain, dds-mip-odd-size
 #[must_use]
 pub fn mip_size(width: u32, height: u32, level: u32) -> (u32, u32) {

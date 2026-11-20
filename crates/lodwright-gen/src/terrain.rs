@@ -369,8 +369,9 @@ pub fn generate_terrain(
     let cancelled = cancelled.into_inner();
     if let Some(bounds) = world.bounds().filter(|_| !cancelled) {
         let clamp = |v: i32| i16::try_from(v).unwrap_or(if v < 0 { i16::MIN } else { i16::MAX });
+        let (anchor_x, anchor_y) = world.grid_anchor();
         let settings_file = LodSettings::for_bounds(
-            (clamp(bounds.min_x), clamp(bounds.min_y)),
+            (clamp(anchor_x), clamp(anchor_y)),
             (clamp(bounds.max_x), clamp(bounds.max_y)),
             highest,
         );
@@ -613,6 +614,21 @@ mod tests {
             tails,
             ["mojave.level4.x-2.y-1.nif", "mojave.level4.x2.y-1.nif"]
         );
+    }
+
+    #[test]
+    fn a_folder_on_an_anchored_grid_verifies_without_errors() {
+        let out = temp("anchor-verify");
+        generate_terrain(
+            &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
+            &TerrainSettings::default(),
+            &out,
+            &Options::default(),
+        )
+        .unwrap();
+        let verified = crate::verify::verify_folder(&out);
+        assert!(verified.errors.is_empty(), "{:?}", verified.errors);
+        assert!(verified.terrain_blocks > 0);
     }
 
     #[test]

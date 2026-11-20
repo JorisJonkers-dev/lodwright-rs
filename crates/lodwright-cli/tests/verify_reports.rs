@@ -207,3 +207,61 @@ fn a_folder_inside_a_git_working_tree_is_refused_unless_allowed_for_that_run() {
     );
     assert_eq!(go(&["verify", inside.to_str().unwrap()]).0, EXIT_USAGE);
 }
+
+#[test]
+fn terrain_heights_are_compared_and_a_tolerance_makes_a_difference() {
+    let base = generate("height-base", 0.0);
+    let twin = generate("height-twin", 0.0);
+    let shifted = generate("height-shifted", 64.0);
+    let (a, b, c) = (
+        base.to_str().unwrap(),
+        twin.to_str().unwrap(),
+        shifted.to_str().unwrap(),
+    );
+    // equal folders: no difference even with a tolerance of 0
+    let (code, text, _) = go(&[
+        "verify",
+        a,
+        "--reference",
+        b,
+        "--height-tolerance",
+        "0",
+        "--json",
+    ]);
+    assert_eq!(code, EXIT_OK, "{text}");
+    let report: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(lodwright_contract::check_verify(&report), Ok(()));
+    assert_eq!(report["terrain"]["over_tolerance"], 0);
+    assert_eq!(report["terrain"]["max"], 0.0);
+    // raised ground: every block differs by the lift, named per block and per level
+    let (code, text, _) = go(&["verify", c, "--reference", a, "--json"]);
+    assert_eq!(
+        code, EXIT_OK,
+        "without a tolerance the numbers are reported only: {text}"
+    );
+    let report: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(report["terrain"]["tolerance"], 1.0);
+    assert_eq!(report["terrain"]["max"], 64.0, "{text}");
+    assert_eq!(report["terrain"]["mean"], 64.0, "{text}");
+    assert_eq!(
+        report["terrain"]["blocks"],
+        report["terrain"]["over_tolerance"]
+    );
+    assert_eq!(report["terrain"]["per_level"][0]["level"], 4);
+    let (code, text, _) = go(&["verify", c, "--reference", a, "--height-tolerance", "10"]);
+    assert_eq!(code, EXIT_FAILED, "{text}");
+    assert!(
+        text.contains("terrain height differs by up to 64.000 units"),
+        "{text}"
+    );
+    assert!(text.contains("terrain level 4:"), "{text}");
+    // a tolerance above the lift accepts it
+    let (code, text, _) = go(&["verify", c, "--reference", a, "--height-tolerance", "64"]);
+    assert_eq!(code, EXIT_OK, "{text}");
+    // the option needs a reference and a number
+    assert_eq!(go(&["verify", a, "--height-tolerance", "1"]).0, EXIT_USAGE);
+    assert_eq!(
+        go(&["verify", a, "--reference", b, "--height-tolerance", "x"]).0,
+        EXIT_USAGE
+    );
+}

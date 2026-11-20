@@ -160,7 +160,7 @@ wrong with the folder) and `differences` (how it differs from `--reference`, emp
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
 
-With `--reference`, the report also carries two optional keys, measured per block mesh present on both sides (names
+With `--reference`, the report also carries three optional keys, measured per block mesh present on both sides (names
 compared in lower case):
 
 * `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
@@ -169,6 +169,14 @@ compared in lower case):
   The summary gives the blocks, the `threshold`, how many are `under_threshold`, the `lowest` and the `mean`; every
   measured number is rounded to three decimals. `threshold` is `--water-iou` when given, otherwise 0.95 (the G5 goal), and only
   `--water-iou` turns a block under it into a difference (and so exit 1).
+* `terrain`: for every terrain block mesh present on both sides, how far the ground heights differ. The ground of both
+  meshes (the first shape of the block) is sampled on a 33 by 33 grid over the bounds of the block's mesh, at the points
+  both meshes cover, and the absolute height difference is taken in game units: per block the `max` and the `mean`, and
+  in the summary the blocks compared, the `tolerance`, how many blocks are `over_tolerance`, the largest `max` and the
+  mean of the means, plus `per_level` like the water summary. Numbers are rounded to three decimals. `tolerance` is
+  `--height-tolerance U` when given, otherwise 1 unit, and only `--height-tolerance` turns a block over it into a
+  difference (and so exit 1). A block pair that shares no sampled point is left out. Versions of this document stay at 1:
+  the key is optional and readers ignore keys they do not know.
 * `objects`: for every object block, the vertex and triangle counts on both sides and the number of vertices with no
   vertex of the reference's block within 0.05 units, in any order; `exact` when the counts are equal and that number is
   0. A block that is not exact is reported, never a difference: the Release test lists such blocks with a reason.
@@ -208,7 +216,8 @@ Exit codes of `verify`, the same in `lodwright --help` and `docs/TESTING.md`:
 `lodwright bands <verify.json> ... [--json]` reads the `verify --json` reports of several runs of the same inputs and
 prints, per statistic, the minimum, the maximum and how many runs report it (`lodwright-bands`, schema: `lodwright
 schema bands`). The statistics are the report's counts (`terrain_blocks`, `errors`, `differences` and so on),
-`water.blocks`, `water.under_threshold`, `water.lowest`, `water.mean`, `objects.blocks`, `objects.exact`, and per
+`water.blocks`, `water.under_threshold`, `water.lowest`, `water.mean`, `terrain.blocks`, `terrain.over_tolerance`,
+`terrain.max`, `terrain.mean`, `terrain.max:<path>` per block, `objects.blocks`, `objects.exact`, and per
 block `water.iou:<path>` and `objects.unmatched_vertices:<path>`. Every value is rounded to three decimals first, so the
 order of float operations never widens a band; a band whose minimum equals its maximum is an exact match. A file that
 is not a verify report is a failure (exit 1); no file is a usage error (exit 2).

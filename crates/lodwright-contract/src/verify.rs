@@ -47,6 +47,10 @@ pub struct VerifyDoc {
     /// reference's. Omitted without a reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub water: Option<WaterReport>,
+    /// With a reference: the terrain heights of every block present on both sides, compared with the reference's.
+    /// Omitted without a reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<TerrainReport>,
     /// With a reference: every object block present on both sides, compared with the reference's. Omitted without
     /// a reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -72,6 +76,56 @@ pub struct KnownDifference {
     pub reason: String,
     /// The release expected to remove it, from the list.
     pub release: String,
+}
+
+/// The terrain heights of one level compared with the reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TerrainLevel {
+    /// Cells per block edge.
+    pub level: u32,
+    /// Blocks of this level that were compared.
+    pub blocks: u64,
+    /// Of those, the blocks whose largest difference is over the tolerance.
+    pub over_tolerance: u64,
+    /// The largest difference of the level, in game units.
+    pub max: f64,
+    /// The mean of the blocks' mean differences, in game units.
+    pub mean: f64,
+}
+
+/// The terrain heights of the blocks compared with the reference: the ground of both meshes sampled on a 33 by 33
+/// grid over the bounds of the block, at the points both cover, as the absolute difference of the heights in game
+/// units. Numbers are rounded to three decimals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TerrainReport {
+    /// Terrain blocks compared (present on both sides and sharing sampled ground).
+    pub blocks: u64,
+    /// The largest difference over which a block counts in `over_tolerance`: `--height-tolerance`, or 1 without it.
+    pub tolerance: f64,
+    /// Blocks whose largest difference is over `tolerance`.
+    pub over_tolerance: u64,
+    /// The largest difference of any block; omitted when no block was compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    /// The mean of the blocks' mean differences; omitted when no block was compared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mean: Option<f64>,
+    /// Every compared block, sorted by path.
+    pub per_block: Vec<TerrainBlock>,
+    /// The same numbers per terrain level, smallest level first. Omitted when no block was compared.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub per_level: Vec<TerrainLevel>,
+}
+
+/// The height difference of one terrain block.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TerrainBlock {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// The largest absolute height difference, in game units.
+    pub max: f64,
+    /// The mean absolute height difference, in game units.
+    pub mean: f64,
 }
 
 /// The water of one terrain level compared with the reference.
@@ -171,6 +225,7 @@ impl VerifyDoc {
             errors: Vec::new(),
             differences: Vec::new(),
             water: None,
+            terrain: None,
             objects: None,
             known: Vec::new(),
             stale: Vec::new(),

@@ -39,8 +39,8 @@ pub use schema::{
     check_verify, schema_file_name, schema_json,
 };
 pub use verify::{
-    KnownDifference, ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, WaterBlock, WaterLevel,
-    WaterReport,
+    KnownDifference, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
+    VerifyDoc, VerifyFinding, WaterBlock, WaterLevel, WaterReport,
 };
 
 /// The plan document versions this build prints and reads, newest last.

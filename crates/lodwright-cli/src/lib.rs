@@ -11,8 +11,8 @@ use std::io::Write;
 use std::path::Path;
 
 use lodwright_contract::{
-    DocumentKind, Handshake, ObjectBlock, ObjectReport, VerifyDoc, VerifyFinding, VersionInfo,
-    WaterBlock, WaterLevel, WaterReport, schema_json,
+    DocumentKind, Handshake, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
+    VerifyDoc, VerifyFinding, VersionInfo, WaterBlock, WaterLevel, WaterReport, schema_json,
 };
 
 mod commands;
@@ -43,7 +43,7 @@ Usage: lodwright [--help | --version [--json]]
                       [--world NAME] [--threads N] [--terrain-only] [--no-land-textures] [--no-water] [--no-trees] [--overwrite] [--events FILE|-]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
-       lodwright verify <folder> [--reference <folder> [--water-iou X] [--known-differences FILE]] [--allow-in-repo] [--json]
+       lodwright verify <folder> [--reference <folder> [--water-iou X] [--height-tolerance U] [--known-differences FILE]] [--allow-in-repo] [--json]
        lodwright schema <plan|result|request|manifest|verify|events|defaults|bands> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
@@ -67,7 +67,9 @@ Commands:
                         --reference also compare names and block types with another folder, and measure per
                         block the water IoU (overlap of the water seen from above) and whether each object block is
                         exact (equal counts, every vertex within 0.05 units of one of the reference's). With
-                        --water-iou X a terrain block whose water IoU is under X is a difference
+                        --water-iou X a terrain block whose water IoU is under X is a difference; the terrain
+                        height of each block is compared too (largest and mean difference in game units), and
+                        with --height-tolerance U a block whose largest difference is over U is a difference
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify, events
                         (one progress event line), defaults or bands
   contracts --json      print the contracts this build speaks and their schema versions, as
@@ -310,6 +312,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let (mut folder, mut reference, mut json, mut allow_in_repo) = (None, None, false, false);
     let mut threshold: Option<f64> = None;
     let mut known_file: Option<&str> = None;
+    let mut tolerance: Option<f64> = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match *arg {
@@ -322,6 +325,15 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
             "--water-iou" => match iter.next().map(|t| t.parse::<f64>()) {
                 Some(Ok(t)) if (0.0..=1.0).contains(&t) => threshold = Some(t),
                 _ => return usage(err, "--water-iou needs a number from 0 to 1"),
+            },
+            "--height-tolerance" => match iter.next().map(|t| t.parse::<f64>()) {
+                Some(Ok(t)) if t.is_finite() && t >= 0.0 => tolerance = Some(t),
+                _ => {
+                    return usage(
+                        err,
+                        "--height-tolerance needs a number of game units, 0 or more",
+                    );
+                }
             },
             "--reference" => match iter.next() {
                 Some(r) => reference = Some(*r),
@@ -337,6 +349,9 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     if threshold.is_some() && reference.is_none() {
         return usage(err, "--water-iou needs --reference");
     }
+    if tolerance.is_some() && reference.is_none() {
+        return usage(err, "--height-tolerance needs --reference");
+    }
     if known_file.is_some() && reference.is_none() {
         return usage(err, "--known-differences needs --reference");
     }
@@ -345,30 +360,8 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         Some(Ok(list)) => Some(list),
         Some(Err(e)) => return usage(err, &e),
     };
-    for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
-        let Some(dir) = dir else { continue };
-        if std::fs::read_dir(dir).is_err() {
-            let _ = writeln!(
-                err,
-                "lodwright: verify: the {role} {dir} cannot be read as a folder"
-            );
-            return EXIT_UNREADABLE;
-        }
-        // a folder generated from game data does not belong in a repository: refuse before reading a file of it
-        let resolved = std::fs::canonicalize(dir).unwrap_or_else(|_| Path::new(dir).to_path_buf());
-        if !allow_in_repo
-            && [Path::new(dir), resolved.as_path()]
-                .iter()
-                .any(|d| commands::inside_git_tree(&d.join("x")))
-        {
-            return usage(
-                err,
-                &format!(
-                    "the {role} {dir} is inside a git working tree; no file was read. Generated LOD comes from \
-                     game data and does not belong in a repository: move it out, or pass --allow-in-repo for this run"
-                ),
-            );
-        }
+    if let Some(code) = check_verify_folders(folder, reference, allow_in_repo, err) {
+        return code;
     }
     let mut verification = lodwright_gen::verify_folder(Path::new(folder));
     let mut blocks = None;
@@ -383,6 +376,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     let mut doc = verify_document(&verification);
     if let Some(blocks) = &blocks {
         add_block_reports(&mut doc, blocks, threshold);
+        add_terrain_report(&mut doc, blocks, tolerance);
     }
     if let Some(list) = &known_list {
         known::apply(&mut doc, list);
@@ -408,6 +402,41 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         print_block_reports(&doc, out);
     }
     if clean { EXIT_OK } else { EXIT_FAILED }
+}
+
+/// Refuse a folder or reference that cannot be read, or that lies inside a git working tree; `None` when both are fine.
+fn check_verify_folders(
+    folder: &str,
+    reference: Option<&str>,
+    allow_in_repo: bool,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    for (role, dir) in [("folder", Some(folder)), ("reference", reference)] {
+        let Some(dir) = dir else { continue };
+        if std::fs::read_dir(dir).is_err() {
+            let _ = writeln!(
+                err,
+                "lodwright: verify: the {role} {dir} cannot be read as a folder"
+            );
+            return Some(EXIT_UNREADABLE);
+        }
+        // a folder generated from game data does not belong in a repository: refuse before reading a file of it
+        let resolved = std::fs::canonicalize(dir).unwrap_or_else(|_| Path::new(dir).to_path_buf());
+        if !allow_in_repo
+            && [Path::new(dir), resolved.as_path()]
+                .iter()
+                .any(|d| commands::inside_git_tree(&d.join("x")))
+        {
+            return Some(usage(
+                err,
+                &format!(
+                    "the {role} {dir} is inside a git working tree; no file was read. Generated LOD comes from \
+                     game data and does not belong in a repository: move it out, or pass --allow-in-repo for this run"
+                ),
+            ));
+        }
+    }
+    None
 }
 
 /// The `lodwright-verify` document of a verification.
@@ -530,6 +559,86 @@ fn add_block_reports(
     });
 }
 
+/// The `level<L>` of a block mesh's file name (`<world>.level<L>.x<X>.y<Y>.nif`).
+fn level_of(path: &str) -> Option<u32> {
+    path.rsplit(['/', '\\'])
+        .next()
+        .and_then(|name| name.split('.').find_map(|part| part.strip_prefix("level")))
+        .and_then(|l| l.parse::<u32>().ok())
+}
+
+/// The largest height difference over which a terrain block counts in the summary when `--height-tolerance` is not
+/// given, in game units.
+const DEFAULT_HEIGHT_TOLERANCE: f64 = 1.0;
+
+/// Add the terrain height report, and with a tolerance a difference per block over it.
+fn add_terrain_report(
+    doc: &mut VerifyDoc,
+    blocks: &lodwright_gen::BlockComparison,
+    tolerance: Option<f64>,
+) {
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let limit = tolerance.unwrap_or(DEFAULT_HEIGHT_TOLERANCE);
+    let over = |t: &&lodwright_gen::TerrainHeightDifference| t.max > limit;
+    if let Some(t) = tolerance {
+        for b in blocks.terrain.iter().filter(over) {
+            doc.differences.push(VerifyFinding {
+                path: b.path.clone(),
+                problem: format!(
+                    "terrain height differs by up to {:.3} units (mean {:.3}), over {t}",
+                    b.max, b.mean
+                ),
+            });
+        }
+        doc.differences
+            .sort_by(|a, b| (&a.path, &a.problem).cmp(&(&b.path, &b.problem)));
+    }
+    let mut levels: std::collections::BTreeMap<u32, Vec<&lodwright_gen::TerrainHeightDifference>> =
+        std::collections::BTreeMap::new();
+    for b in &blocks.terrain {
+        if let Some(level) = level_of(&b.path) {
+            levels.entry(level).or_default().push(b);
+        }
+    }
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    let per_level: Vec<TerrainLevel> = levels
+        .into_iter()
+        .map(|(level, list)| TerrainLevel {
+            level,
+            blocks: count(list.len()),
+            over_tolerance: count(list.iter().filter(|b| b.max > limit).count()),
+            max: round3(list.iter().map(|b| b.max).fold(0.0, f64::max)),
+            mean: round3(list.iter().map(|b| b.mean).sum::<f64>() / list.len() as f64),
+        })
+        .collect();
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    let mean = (!blocks.terrain.is_empty()).then(|| {
+        round3(blocks.terrain.iter().map(|b| b.mean).sum::<f64>() / blocks.terrain.len() as f64)
+    });
+    doc.terrain = Some(TerrainReport {
+        blocks: count(blocks.terrain.len()),
+        tolerance: limit,
+        over_tolerance: count(blocks.terrain.iter().filter(over).count()),
+        max: blocks
+            .terrain
+            .iter()
+            .map(|b| b.max)
+            .reduce(f64::max)
+            .map(round3),
+        mean,
+        per_block: blocks
+            .terrain
+            .iter()
+            .map(|b| TerrainBlock {
+                path: b.path.clone(),
+                max: round3(b.max),
+                mean: round3(b.mean),
+            })
+            .collect(),
+        per_level,
+    });
+}
+
 /// The summary lines of the block reports, and one line per object block that is not exact.
 fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
     if let Some(w) = &doc.water {
@@ -548,6 +657,25 @@ fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
                 out,
                 "water level {}: {} blocks, {} under {}, lowest {:.3}, mean {:.3}",
                 l.level, l.blocks, l.under_threshold, w.threshold, l.lowest, l.mean
+            );
+        }
+    }
+    if let Some(t) = &doc.terrain {
+        let number = |v: Option<f64>| v.map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"));
+        let _ = writeln!(
+            out,
+            "terrain: {} blocks compared, {} over {}, largest {}, mean {}",
+            t.blocks,
+            t.over_tolerance,
+            t.tolerance,
+            number(t.max),
+            number(t.mean)
+        );
+        for l in &t.per_level {
+            let _ = writeln!(
+                out,
+                "terrain level {}: {} blocks, {} over {}, largest {:.3}, mean {:.3}",
+                l.level, l.blocks, l.over_tolerance, t.tolerance, l.max, l.mean
             );
         }
     }

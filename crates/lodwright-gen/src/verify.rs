@@ -509,6 +509,82 @@ fn water_triangles(nif: &NifFile) -> Vec<Flat> {
         .collect()
 }
 
+/// The triangles of a terrain block's ground (the first data block), corners with their heights.
+fn ground_triangles(nif: &NifFile) -> Vec<[[f64; 3]; 3]> {
+    let Some(d) = nif.blocks.iter().find_map(|b| match &b.body {
+        Body::TriShapeData(d) => Some(d),
+        _ => None,
+    }) else {
+        return Vec::new();
+    };
+    let v = d.geometry.vertices.as_deref().unwrap_or(&[]);
+    let point = |p: [f32; 3]| [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])];
+    d.triangles
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|t| {
+            let [a, b, c] = t.map(|i| v.get(usize::from(i)).copied());
+            Some([point(a?), point(b?), point(c?)])
+        })
+        .collect()
+}
+
+/// The height of the ground at `(x, y)`: the plane of the first triangle that covers the point.
+fn height_at(triangles: &[[[f64; 3]; 3]], x: f64, y: f64) -> Option<f64> {
+    const EDGE: f64 = 1e-9;
+    triangles.iter().find_map(|[a, b, c]| {
+        let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+        if det.abs() < f64::EPSILON {
+            return None;
+        }
+        let l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / det;
+        let l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / det;
+        let l3 = 1.0 - l1 - l2;
+        (l1 >= -EDGE && l2 >= -EDGE && l3 >= -EDGE).then(|| l1 * a[2] + l2 * b[2] + l3 * c[2])
+    })
+}
+
+/// Samples per edge of the grid over which terrain heights are compared.
+const HEIGHT_GRID: usize = 33;
+
+/// The largest and the mean absolute height difference of two terrain surfaces, sampled on a
+/// [`HEIGHT_GRID`] by [`HEIGHT_GRID`] grid over the bounds of the first, at the points both surfaces cover. `None`
+/// when they share no sampled point.
+fn height_difference(mine: &[[[f64; 3]; 3]], theirs: &[[[f64; 3]; 3]]) -> Option<(f64, f64)> {
+    let corners = || mine.iter().flatten();
+    let bound = |axis: usize, pick: fn(f64, f64) -> f64, start: f64| {
+        corners().map(|p| p[axis]).fold(start, pick)
+    };
+    let (x0, x1) = (
+        bound(0, f64::min, f64::INFINITY),
+        bound(0, f64::max, f64::NEG_INFINITY),
+    );
+    let (y0, y1) = (
+        bound(1, f64::min, f64::INFINITY),
+        bound(1, f64::max, f64::NEG_INFINITY),
+    );
+    if !(x1 > x0 && y1 > y0) {
+        return None;
+    }
+    let (mut max, mut sum, mut n) = (0.0_f64, 0.0_f64, 0_u32);
+    for i in 0..HEIGHT_GRID {
+        for j in 0..HEIGHT_GRID {
+            #[allow(clippy::cast_precision_loss, reason = "grid indices are small")]
+            let at =
+                |lo: f64, hi: f64, k: usize| lo + (hi - lo) * k as f64 / (HEIGHT_GRID - 1) as f64;
+            let (x, y) = (at(x0, x1, i), at(y0, y1, j));
+            if let (Some(a), Some(b)) = (height_at(mine, x, y), height_at(theirs, x, y)) {
+                let d = (a - b).abs();
+                max = max.max(d);
+                sum += d;
+                n += 1;
+            }
+        }
+    }
+    (n > 0).then(|| (max, sum / f64::from(n)))
+}
+
 /// The ground area a terrain block's water plane covers: the summed area of its triangles, seen from above.
 fn water_area(nif: &NifFile) -> f64 {
     water_triangles(nif)
@@ -673,9 +749,22 @@ impl ObjectAgreement {
     }
 }
 
+/// The terrain heights of one block compared with the reference's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerrainHeightDifference {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// The largest absolute height difference over the sampled points, in game units, unrounded.
+    pub max: f64,
+    /// The mean absolute height difference over the sampled points, in game units, unrounded.
+    pub mean: f64,
+}
+
 /// Per-block measurements of a folder against a reference.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BlockComparison {
+    /// Terrain blocks present on both sides whose surfaces share ground, sorted by path.
+    pub terrain: Vec<TerrainHeightDifference>,
     /// Terrain blocks present on both sides with water on either, sorted by path.
     pub water: Vec<WaterOverlap>,
     /// Object blocks present on both sides, sorted by path.
@@ -728,6 +817,15 @@ pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
                 unmatched_vertices: unmatched_vertices(&va, &vb),
             });
         } else {
+            if let Some((max, mean)) =
+                height_difference(&ground_triangles(&a), &ground_triangles(&b))
+            {
+                out.terrain.push(TerrainHeightDifference {
+                    path: name.clone(),
+                    max,
+                    mean,
+                });
+            }
             let (wa, wb) = (water_triangles(&a), water_triangles(&b));
             if !wa.is_empty() || !wb.is_empty() {
                 out.water.push(WaterOverlap {

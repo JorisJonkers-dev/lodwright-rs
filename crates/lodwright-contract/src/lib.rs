@@ -39,6 +39,7 @@ pub use schema::{
     check_verify, schema_file_name, schema_json,
 };
 pub use verify::{
+    Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
     KnownDifference, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
     VerifyDoc, VerifyFinding, WaterBlock, WaterLevel, WaterReport,
 };

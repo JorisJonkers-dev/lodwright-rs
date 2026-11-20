@@ -8,10 +8,221 @@ terrain level 4: 1 blocks, 0 over 1, largest 0.000, mean 0.000
 terrain level 8: 1 blocks, 0 over 1, largest 0.000, mean 0.000
 terrain level 16: 1 blocks, 0 over 1, largest 0.000, mean 0.000
 terrain level 32: 1 blocks, 0 over 1, largest 0.000, mean 0.000
+texture correlation: diffuse 4 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation: normals 4 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 4: diffuse 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 4: normals 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 8: diffuse 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 8: normals 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 16: diffuse 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 16: normals 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 32: diffuse 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
+texture correlation level 32: normals 1 blocks, mean r/g/b 1.000/1.000/1.000, lowest 1.000/1.000/1.000
 object blocks: 0 of 0 exact
 
 {
   "contract": "lodwright-verify",
+  "correlation": {
+    "blocks": 4,
+    "diffuse": {
+      "blocks": 4,
+      "lowest": {
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+      },
+      "mean": {
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+      }
+    },
+    "normals": {
+      "blocks": 4,
+      "lowest": {
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+      },
+      "mean": {
+        "b": 1.0,
+        "g": 1.0,
+        "r": 1.0
+      }
+    },
+    "per_block": [
+      {
+        "diffuse": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "normals": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "path": "textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds"
+      },
+      {
+        "diffuse": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "normals": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "path": "textures/landscape/lod/island/diffuse/island.n.level32.x0.y0.dds"
+      },
+      {
+        "diffuse": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "normals": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds"
+      },
+      {
+        "diffuse": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "normals": {
+          "b": 1.0,
+          "g": 1.0,
+          "r": 1.0
+        },
+        "path": "textures/landscape/lod/island/diffuse/island.n.level8.x0.y0.dds"
+      }
+    ],
+    "per_level": [
+      {
+        "diffuse": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        },
+        "level": 4,
+        "normals": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        }
+      },
+      {
+        "diffuse": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        },
+        "level": 8,
+        "normals": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        }
+      },
+      {
+        "diffuse": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        },
+        "level": 16,
+        "normals": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        }
+      },
+      {
+        "diffuse": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        },
+        "level": 32,
+        "normals": {
+          "blocks": 1,
+          "lowest": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          },
+          "mean": {
+            "b": 1.0,
+            "g": 1.0,
+            "r": 1.0
+          }
+        }
+      }
+    ]
+  },
   "differences": [],
   "errors": [
     {

@@ -4,7 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
-    Bounds, Capabilities, DocumentKind, LevelPlan, ObjectBlock, ObjectReport, Plan, PlannedBlock,
+    Bounds, Capabilities, Channels, CorrelationBlock, CorrelationLevel, CorrelationReport,
+    CorrelationSummary, DocumentKind, LevelPlan, ObjectBlock, ObjectReport, Plan, PlannedBlock,
     Request, ResultDoc, Status, ToolInfo, VerifyDoc, VerifyFinding, WaterBlock, WaterReport,
     WorldPlan, Written, check_plan, check_request, check_result, check_verify, schema_file_name,
     schema_json, sha256_digest,
@@ -152,6 +153,27 @@ fn sample_verify() -> VerifyDoc {
             reference_triangles: 1,
             unmatched_vertices: 1,
             exact: false,
+        }],
+    });
+    let channels = |r, g, b| Channels { r, g, b };
+    let summary = CorrelationSummary {
+        blocks: 1,
+        mean: channels(0.9, 0.8, 0.7),
+        lowest: channels(0.9, 0.8, 0.7),
+    };
+    doc.correlation = Some(CorrelationReport {
+        blocks: 1,
+        diffuse: Some(summary),
+        normals: None,
+        per_block: vec![CorrelationBlock {
+            path: "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds".into(),
+            diffuse: channels(0.9, 0.8, 0.7),
+            normals: None,
+        }],
+        per_level: vec![CorrelationLevel {
+            level: 4,
+            diffuse: summary,
+            normals: None,
         }],
     });
     doc

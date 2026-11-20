@@ -11,6 +11,7 @@ use std::io::Write;
 use std::path::Path;
 
 use lodwright_contract::{
+    Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
     DocumentKind, Handshake, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
     VerifyDoc, VerifyFinding, VersionInfo, WaterBlock, WaterLevel, WaterReport, schema_json,
 };
@@ -378,6 +379,12 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
         add_block_reports(&mut doc, blocks, threshold);
         add_terrain_report(&mut doc, blocks, tolerance);
     }
+    if let Some(reference) = reference {
+        add_correlation_report(
+            &mut doc,
+            &lodwright_gen::compare_textures(Path::new(folder), Path::new(reference)),
+        );
+    }
     if let Some(list) = &known_list {
         known::apply(&mut doc, list);
     }
@@ -639,6 +646,103 @@ fn add_terrain_report(
     });
 }
 
+fn channels(values: [f64; 3]) -> Channels {
+    Channels {
+        r: round3(values[0]),
+        g: round3(values[1]),
+        b: round3(values[2]),
+    }
+}
+
+/// Mean and lowest per channel of `sets`, unrounded inputs; `None` for no block.
+#[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+fn correlation_summary(sets: &[[f64; 3]]) -> Option<CorrelationSummary> {
+    if sets.is_empty() {
+        return None;
+    }
+    let per = |f: &dyn Fn(&mut dyn Iterator<Item = f64>) -> f64| {
+        channels(std::array::from_fn(|c| f(&mut sets.iter().map(|s| s[c]))))
+    };
+    Some(CorrelationSummary {
+        blocks: u64::try_from(sets.len()).unwrap_or(u64::MAX),
+        mean: per(&|i| i.sum::<f64>() / sets.len() as f64),
+        lowest: per(&|i| i.fold(f64::INFINITY, f64::min)),
+    })
+}
+
+/// The diffuse and the normal-map correlations of one level.
+type CorrelationSets = (Vec<[f64; 3]>, Vec<[f64; 3]>);
+
+/// Add the per-channel correlation of the terrain textures with the reference's.
+fn add_correlation_report(doc: &mut VerifyDoc, textures: &[lodwright_gen::TextureCorrelation]) {
+    let diffuse: Vec<[f64; 3]> = textures.iter().map(|t| t.diffuse).collect();
+    let normals: Vec<[f64; 3]> = textures.iter().filter_map(|t| t.normals).collect();
+    let mut levels: std::collections::BTreeMap<u32, CorrelationSets> =
+        std::collections::BTreeMap::new();
+    for t in textures {
+        if let Some(level) = level_of(&t.path) {
+            let entry = levels.entry(level).or_default();
+            entry.0.push(t.diffuse);
+            entry.1.extend(t.normals);
+        }
+    }
+    let per_level = levels
+        .into_iter()
+        .filter_map(|(level, (d, n))| {
+            Some(CorrelationLevel {
+                level,
+                diffuse: correlation_summary(&d)?,
+                normals: correlation_summary(&n),
+            })
+        })
+        .collect();
+    doc.correlation = Some(CorrelationReport {
+        blocks: u64::try_from(textures.len()).unwrap_or(u64::MAX),
+        diffuse: correlation_summary(&diffuse),
+        normals: correlation_summary(&normals),
+        per_block: textures
+            .iter()
+            .map(|t| CorrelationBlock {
+                path: t.path.clone(),
+                diffuse: channels(t.diffuse),
+                normals: t.normals.map(channels),
+            })
+            .collect(),
+        per_level,
+    });
+}
+
+/// `r/g/b` of a per-channel number, three decimals each.
+fn rgb(c: &Channels) -> String {
+    format!("{:.3}/{:.3}/{:.3}", c.r, c.g, c.b)
+}
+
+fn print_correlation_line(out: &mut dyn Write, label: &str, kind: &str, s: &CorrelationSummary) {
+    let _ = writeln!(
+        out,
+        "{label}: {kind} {} blocks, mean r/g/b {}, lowest {}",
+        s.blocks,
+        rgb(&s.mean),
+        rgb(&s.lowest)
+    );
+}
+
+/// The summary lines of the texture correlation: all blocks, then one per level.
+fn print_correlation(c: &CorrelationReport, out: &mut dyn Write) {
+    for (kind, summary) in [("diffuse", &c.diffuse), ("normals", &c.normals)] {
+        if let Some(s) = summary {
+            print_correlation_line(out, "texture correlation", kind, s);
+        }
+    }
+    for l in &c.per_level {
+        let label = format!("texture correlation level {}", l.level);
+        print_correlation_line(out, &label, "diffuse", &l.diffuse);
+        if let Some(n) = &l.normals {
+            print_correlation_line(out, &label, "normals", n);
+        }
+    }
+}
+
 /// The summary lines of the block reports, and one line per object block that is not exact.
 fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
     if let Some(w) = &doc.water {
@@ -678,6 +782,9 @@ fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
                 l.level, l.blocks, l.over_tolerance, t.tolerance, l.max, l.mean
             );
         }
+    }
+    if let Some(c) = &doc.correlation {
+        print_correlation(c, out);
     }
     for k in &doc.known {
         let _ = writeln!(

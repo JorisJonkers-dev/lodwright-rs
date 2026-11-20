@@ -16,6 +16,7 @@
 
 mod assets;
 mod atlas;
+mod correlation;
 mod diffuse;
 mod error;
 mod filter;
@@ -30,6 +31,7 @@ mod water;
 
 pub use assets::{Assets, FolderAssets};
 pub use atlas::{Atlas, Rect, pack};
+pub use correlation::{TextureCorrelation, channel_correlation, compare_textures};
 pub use diffuse::{LandTiles, Tile, blend};
 pub use error::GenError;
 pub use filter::{filter_instances, glob};

@@ -334,12 +334,17 @@ pub fn generate_terrain(
     let tiles = options.land.unwrap_or(&no_tiles);
     let mut files = Vec::new();
     let mut blocks = Vec::new();
+    let extent = world.lod_extent();
     let mut highest = 0;
     let stop = || options.cancel.is_some_and(|cancel| cancel());
     let cancelled = AtomicBool::new(false);
     for level in &settings.levels {
         if cancelled.load(Ordering::Relaxed) {
             break;
+        }
+        // the game writes the levels up to a quarter of the world's width and no higher (`game-lod-settings-extent`)
+        if extent.is_some_and(|e| level.level > e.highest_level) {
+            continue;
         }
         let grid = BlockGrid::anchored(level.level, world.grid_anchor())
             .map_err(|_| lodwright_core::Error::ZeroLevel)?;
@@ -396,11 +401,21 @@ pub fn generate_terrain(
     if let Some(bounds) = world.bounds().filter(|_| !cancelled) {
         let clamp = |v: i32| i16::try_from(v).unwrap_or(if v < 0 { i16::MIN } else { i16::MAX });
         let (anchor_x, anchor_y) = world.grid_anchor();
-        let settings_file = LodSettings::for_bounds(
-            (clamp(anchor_x), clamp(anchor_y)),
-            (clamp(bounds.max_x), clamp(bounds.max_y)),
-            highest,
-        );
+        let settings_file = match extent {
+            Some(e) => LodSettings {
+                lowest_level: 4,
+                highest_level: highest.min(e.highest_level),
+                width_cells: e.width,
+                south_west: (clamp(e.south_west.0), clamp(e.south_west.1)),
+                north_east: (clamp(e.north_east.0), clamp(e.north_east.1)),
+                object_level: 4,
+            },
+            None => LodSettings::for_bounds(
+                (clamp(anchor_x), clamp(anchor_y)),
+                (clamp(bounds.max_x), clamp(bounds.max_y)),
+                highest,
+            ),
+        };
         files.push(write_file(
             out,
             &layout::settings_path(world.name())?,
@@ -676,6 +691,27 @@ mod tests {
         assert_eq!(
             tails,
             ["mojave.level4.x-2.y-1.nif", "mojave.level4.x2.y-1.nif"]
+        );
+    }
+
+    #[test]
+    fn a_small_world_gets_only_the_levels_its_width_allows_and_the_settings_say_so() {
+        // corners (-6, -5) to (4, 5): width 16, highest level 4
+        let out = temp("extent");
+        let report = generate_terrain(
+            &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
+            &TerrainSettings::default(),
+            &out,
+            &Options::default(),
+        )
+        .unwrap();
+        assert!(report.files.iter().all(|f| !f.path.contains(".level8.")));
+        assert!(report.files.iter().any(|f| f.path.contains(".level4.")));
+        let bytes = std::fs::read(out.join("lodsettings/mojave.dlodsettings")).unwrap();
+        let s = lodwright_core::lod::LodSettings::parse(&bytes).unwrap();
+        assert_eq!(
+            (s.highest_level, s.width_cells, s.south_west, s.north_east),
+            (4, 16, (-6, -5), (4, 5))
         );
     }
 

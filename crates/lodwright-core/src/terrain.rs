@@ -43,6 +43,9 @@ pub struct LevelSettings {
     pub normal_size: u32,
     /// Carry specular in the alpha channel of the normal map (written as BC3). Off: opaque alpha, BC1.
     pub specular_alpha: bool,
+    /// Close the gap to a neighbouring block with a skirt: under every border vertex a second vertex at the height
+    /// the game's own blocks use, joined by two triangles. Off: no skirt.
+    pub skirts: bool,
 }
 
 impl std::fmt::Debug for LevelSettings {
@@ -57,6 +60,9 @@ impl std::fmt::Debug for LevelSettings {
             .field("normal_size", &self.normal_size);
         if self.specular_alpha {
             s.field("specular_alpha", &true);
+        }
+        if self.skirts {
+            s.field("skirts", &true);
         }
         s.finish()
     }
@@ -87,6 +93,7 @@ impl Default for TerrainSettings {
             diffuse_size: size,
             normal_size: size,
             specular_alpha: false,
+            skirts: false,
         };
         Self {
             levels: vec![
@@ -173,13 +180,70 @@ pub fn build_block_mesh(
 ) -> Option<(usize, TerrainMesh, f32)> {
     let samples = raster.block_samples(block_x, block_y)?;
     let span = usize::try_from(settings.level).ok()? * CELL_INTERVALS + 1;
-    let meshed = crate::rtin::mesh_block(
-        &samples,
-        span,
-        settings.tolerance(),
-        settings.max_vertices.min(MAX_VERTICES),
-    )?;
+    let cap = settings.max_vertices.min(MAX_VERTICES);
+    let mut meshed = crate::rtin::mesh_block(&samples, span, settings.tolerance(), cap)?;
+    if settings.skirts {
+        // The skirt vertices count against the cap: mesh the surface with the room that is left.
+        let edge = (span - 1) as f32 * VERTEX_SPACING;
+        let mut room = cap;
+        for _ in 0..4 {
+            let skirted = add_skirts(&meshed.mesh, edge);
+            let total = skirted.vertices.len();
+            if total <= cap {
+                meshed.mesh = skirted;
+                break;
+            }
+            room = room.saturating_sub(total - cap);
+            let Some(next) = crate::rtin::mesh_block(&samples, span, settings.tolerance(), room)
+            else {
+                break;
+            };
+            meshed = next;
+        }
+    }
     Some((meshed.finest_step, meshed.mesh, meshed.max_error))
+}
+
+/// Height of the lower vertex of a skirt, the same for every border vertex of every block.
+// source: game-lod-block-borders
+pub const SKIRT_HEIGHT: f32 = -14098.0;
+
+/// Add a vertical skirt along the block's border: under every border vertex that ends a border edge of a triangle a
+/// second vertex at [`SKIRT_HEIGHT`], and two triangles per border edge facing away from the block. `edge` is the
+/// block's edge length; a vertex is on the border when its x or y is 0 or `edge`.
+// source: game-lod-block-borders
+fn add_skirts(mesh: &TerrainMesh, edge: f32) -> TerrainMesh {
+    let side = |a: [f32; 3], b: [f32; 3]| {
+        (a[0] == 0.0 && b[0] == 0.0)
+            || (a[0] == edge && b[0] == edge)
+            || (a[1] == 0.0 && b[1] == 0.0)
+            || (a[1] == edge && b[1] == edge)
+    };
+    let mut out = mesh.clone();
+    let mut low: std::collections::BTreeMap<u16, u16> = std::collections::BTreeMap::new();
+    let mut lower = |out: &mut TerrainMesh, i: u16| -> Option<u16> {
+        if let Some(l) = low.get(&i) {
+            return Some(*l);
+        }
+        let [x, y, _] = out.vertices[usize::from(i)];
+        let l = u16::try_from(out.vertices.len()).ok()?;
+        out.vertices.push([x, y, SKIRT_HEIGHT]);
+        low.insert(i, l);
+        Some(l)
+    };
+    for tri in mesh.indices.chunks_exact(3) {
+        for (p, q) in [(0, 1), (1, 2), (2, 0)] {
+            let (a, b) = (tri[p], tri[q]);
+            if !side(mesh.vertices[usize::from(a)], mesh.vertices[usize::from(b)]) {
+                continue;
+            }
+            let (Some(la), Some(lb)) = (lower(&mut out, a), lower(&mut out, b)) else {
+                return mesh.clone();
+            };
+            out.indices.extend_from_slice(&[a, la, b, b, la, lb]);
+        }
+    }
+    out
 }
 
 /// Plan every level of `settings` for `world`.
@@ -265,6 +329,7 @@ mod tests {
             diffuse_size: 256,
             normal_size: 256,
             specular_alpha: false,
+            skirts: false,
         }
     }
 
@@ -337,6 +402,118 @@ mod tests {
         let mut sorted = ids.clone();
         sorted.sort();
         assert_eq!(ids, sorted);
+    }
+
+    /// Cells of different flat heights, so that the blocks have borders with something to follow.
+    fn stepped_world() -> Worldspace {
+        let cells: Vec<_> = (0..8)
+            .flat_map(|x| (0..8).map(move |y| (x, y)))
+            .map(|(x, y)| {
+                (
+                    (x, y),
+                    CellHeights::flat(60.0 + 37.0 * ((x * 3 + y * 5) % 7) as f32),
+                )
+            })
+            .collect();
+        Worldspace::from_cells(1, "W", cells)
+    }
+
+    fn mesh_of(level_cells: u32, skirts: bool, cap: usize) -> super::TerrainMesh {
+        let world = stepped_world();
+        let raster = HeightRaster::build(&world, BlockGrid::new(level_cells).unwrap())
+            .unwrap()
+            .unwrap();
+        let mut l = level(level_cells, 1.0);
+        l.skirts = skirts;
+        l.max_vertices = cap;
+        build_block_mesh(&raster, &l, 0, 0).unwrap().1
+    }
+
+    #[test]
+    fn skirts_off_leave_the_mesh_as_it_was() {
+        for cells in [4, 8, 16, 32] {
+            let plain = mesh_of(cells, false, MAX_VERTICES);
+            assert!(plain.vertices.iter().all(|v| v[2] > super::SKIRT_HEIGHT));
+        }
+    }
+
+    #[test]
+    fn every_border_vertex_has_a_skirt_below_it_at_every_level_pair() {
+        // the gap between a finer and a coarser block is closed when every border vertex of both reaches the
+        // constant skirt height, whatever vertices the neighbour has
+        for cells in [4, 8, 16, 32] {
+            let plain = mesh_of(cells, false, MAX_VERTICES);
+            let skirted = mesh_of(cells, true, MAX_VERTICES);
+            let edge = cells as f32 * 4096.0;
+            let on_border =
+                |v: &[f32; 3]| v[0] == 0.0 || v[0] == edge || v[1] == 0.0 || v[1] == edge;
+            let border: Vec<_> = plain.vertices.iter().filter(|v| on_border(v)).collect();
+            assert!(!border.is_empty());
+            for v in &border {
+                assert!(
+                    skirted
+                        .vertices
+                        .iter()
+                        .any(|s| s[0] == v[0] && s[1] == v[1] && s[2] == super::SKIRT_HEIGHT),
+                    "level {cells}: no skirt under border vertex {v:?}"
+                );
+            }
+            let low = skirted
+                .vertices
+                .iter()
+                .filter(|v| v[2] == super::SKIRT_HEIGHT)
+                .count();
+            assert_eq!(low, border.len());
+            // the border is a closed ring of edges as many as its vertices, and each adds two triangles
+            assert_eq!(
+                skirted.triangle_count() - plain.triangle_count(),
+                2 * border.len()
+            );
+        }
+    }
+
+    #[test]
+    fn skirt_triangles_face_away_from_the_block() {
+        let skirted = mesh_of(4, true, MAX_VERTICES);
+        let centre = 4.0 * 4096.0 / 2.0;
+        for tri in skirted.indices.chunks_exact(3) {
+            let v = |i: u16| skirted.vertices[usize::from(i)];
+            let (a, b, c) = (v(tri[0]), v(tri[1]), v(tri[2]));
+            if [a, b, c].iter().all(|p| p[2] > super::SKIRT_HEIGHT) {
+                continue;
+            }
+            let n = [
+                (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
+                (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
+            ];
+            let mid = [
+                (a[0] + b[0] + c[0]) / 3.0 - centre,
+                (a[1] + b[1] + c[1]) / 3.0 - centre,
+            ];
+            assert!(n[0] * mid[0] + n[1] * mid[1] > 0.0, "{tri:?} faces inwards");
+        }
+    }
+
+    #[test]
+    fn the_skirt_vertices_count_against_the_cap() {
+        let free = mesh_of(4, true, MAX_VERTICES);
+        let cap = free.vertices.len() / 2;
+        let capped = mesh_of(4, true, cap);
+        assert!(
+            capped.vertices.len() <= cap,
+            "{} > {cap}",
+            capped.vertices.len()
+        );
+        assert!(capped.vertices.iter().any(|v| v[2] == super::SKIRT_HEIGHT));
+    }
+
+    #[test]
+    fn the_skirt_flag_enters_the_settings_text_only_when_set() {
+        let mut l = level(4, 1.0);
+        let off = format!("{l:?}");
+        assert!(!off.contains("skirts"));
+        l.skirts = true;
+        assert!(format!("{l:?}").contains("skirts: true"));
     }
 
     #[test]

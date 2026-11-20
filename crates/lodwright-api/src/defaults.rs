@@ -17,6 +17,8 @@ const REQUEST_V1_SINCE: &str = "0.3.0";
 const NEXT_RELEASE: &str = "0.6.0";
 /// The release that introduces specular in the alpha of the normal maps.
 const SPECULAR_SINCE: &str = "0.7.0";
+/// The release that introduces skirts at block borders.
+const SKIRTS_SINCE: &str = "0.9.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -128,6 +130,11 @@ pub fn request_defaults() -> Defaults {
         ..per_level("specular_alpha", OptionKind::Switch, |l| {
             Value::Bool(l.specular_alpha)
         })
+    });
+    options.push(OptionInfo {
+        tier: 3,
+        since: SKIRTS_SINCE.to_owned(),
+        ..per_level("skirts", OptionKind::Switch, |l| Value::Bool(l.skirts))
     });
     for key in [
         "inclusion.exclude_plugins",
@@ -272,10 +279,8 @@ mod tests {
         let d = request_defaults();
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);
-        assert!(
-            d.options.iter().all(|o| o.since == "0.3.0"
-                || (o.tier == 3 && (o.since == "0.6.0" || o.since == "0.7.0")))
-        );
+        assert!(d.options.iter().all(|o| o.since == "0.3.0"
+            || (o.tier == 3 && (o.since == "0.6.0" || o.since == "0.7.0" || o.since == "0.9.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

@@ -108,11 +108,21 @@ opaque with one warning. This is lodwright's own design (`docs/spec/textures.md`
 is an owner check. Off, the files are byte-identical to earlier versions and the block digests do not change; on, the
 exponents enter the digest of that level's blocks only.
 
+### Skirts at block borders
+
+`terrain.levels[].skirts` (off by default, written only when on; tier 3, since 0.9.0) closes the gap to a neighbouring
+block, of the same or another level, the way the game's own blocks do: under every border vertex a second vertex at
+the constant height -14098 and two triangles per border edge, facing away from the block (`game-lod-block-borders`,
+`docs/spec/terrain-lod.md` section 5). Blocks are not coupled, so no neighbour data enters a digest; the switch enters the
+digest of that level's blocks only, and off the files and digests are as before. The skirt vertices count against the
+level's vertex cap: the surface is meshed with the room that is left. Whether the skirts remove the visible cracks in
+the game is an owner check (release test R2).
+
 ### Where the terrain block grid starts
 
 Not a request option: terrain blocks of every level are placed on a grid that starts at the cell of the world's minimum
 corner (`NAM0`) instead of cell 0, 0, as the game's own tree does (`docs/spec/terrain-lod.md`, section 3). Block names
-and manifest keys change for worlds whose minimum corner cell is not a multiple of the level (since 0.9.0): a first run
+and manifest keys change for worlds whose minimum corner cell is not a multiple of the level (since 0.8.1): a first run
 after the update rebuilds and renames those worlds' terrain blocks. Worlds that start on the grid keep their names,
 files and digests.
 

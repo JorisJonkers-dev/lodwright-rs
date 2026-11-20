@@ -254,7 +254,7 @@ fn a_changed_request_discards_the_staging_folder_of_the_interrupted_one() {
         .iter()
         .map(|f| f.path.clone())
         .collect();
-    assert!(!stale.is_empty());
+    assert_ne!(stale.len(), 0);
     job.request.terrain.water = !job.request.terrain.water;
     let (cancel, mut progress) = cancel_at_first_block();
     generate(&job, &mut progress, &cancel).unwrap();

@@ -16,8 +16,7 @@ pub(crate) const CHECKPOINT_FILE: &str = "checkpoint.json";
 pub(crate) fn sibling(out: &Path, suffix: &str) -> PathBuf {
     let mut name = out
         .file_name()
-        .map(std::ffi::OsStr::to_os_string)
-        .unwrap_or_default();
+        .map_or_default(std::ffi::OsStr::to_os_string);
     name.push(suffix);
     out.with_file_name(name)
 }
@@ -48,6 +47,7 @@ pub(crate) fn recover_swap(out: &Path) -> Result<(), Error> {
         return Ok(());
     }
     if exists(out) {
+        carry_over(&old, out);
         std::fs::remove_dir_all(&old)
             .map_err(|e| failed("cannot remove the previous output folder", &e))
     } else {
@@ -150,8 +150,7 @@ fn walk(root: &Path, dir: &Path, keep: &BTreeSet<String>, remove_unlisted: bool)
         } else if remove_unlisted {
             let rel = path
                 .strip_prefix(root)
-                .map(|p| p.to_string_lossy().replace('\\', "/"))
-                .unwrap_or_default();
+                .map_or_default(|p| p.to_string_lossy().replace('\\', "/"));
             if !keep.contains(&rel) {
                 let _ = std::fs::remove_file(&path);
             }

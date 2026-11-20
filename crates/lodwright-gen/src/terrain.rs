@@ -19,7 +19,7 @@ use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
-use crate::images::{diffuse_image, normal_image};
+use crate::images::{diffuse_image, normal_image_with_alpha, specular_alpha};
 use crate::water::water_mesh;
 
 const CELL_UNITS: f32 = 4096.0;
@@ -97,12 +97,13 @@ pub struct Report {
 
 pub(crate) use crate::output::write_output_file as write_file;
 
-fn dds(image: &Image) -> Result<Vec<u8>, GenError> {
+fn dds(image: &Image, format: Format) -> Result<Vec<u8>, GenError> {
     // source: game-lod-terrain-textures
+    // BC3 is only for a normal map that carries specular in alpha, own design (docs/spec/textures.md section 4)
     Ok(encode(
         image,
         &EncodeOptions {
-            format: Format::Bc1,
+            format,
             mips: true,
             filter: Filter::Box,
             quality: Quality::Fast,
@@ -128,6 +129,10 @@ fn block_inputs(
     let mut h = Sha256Stream::new();
     h.update(env!("CARGO_PKG_VERSION").as_bytes());
     h.update(format!("{:?} water={water}", job.level).as_bytes());
+    if job.level.specular_alpha {
+        // the alpha is scaled over the exponent range of the load order
+        h.update(format!("specular-range={:?}", tiles.specular_range()).as_bytes());
+    }
     for s in samples {
         h.update(&s.to_le_bytes());
     }
@@ -155,6 +160,13 @@ fn block_inputs(
                     #[allow(clippy::float_cmp)] // 1 is exact
                     if tile.scale() != 1.0 {
                         h.update(&tile.scale().to_le_bytes());
+                    }
+                    // the exponents enter the digest only for a level that writes them, so no other block changes
+                    if job.level.specular_alpha {
+                        h.update(&[
+                            u8::from(tile.specular().is_some()),
+                            tile.specular().unwrap_or(0),
+                        ]);
                     }
                 }
             }
@@ -224,8 +236,22 @@ fn run_job(
     })?
     .write()?;
     let span = (level.level as usize) * 32 + 1;
-    let normals = dds(&normal_image(&samples, span, units, level.normal_size))?;
-    let diffuse = dds(&diffuse_image(world, id, level.diffuse_size, tiles))?;
+    let (alpha, normal_format) = if level.specular_alpha {
+        (
+            Some(specular_alpha(world, id, level.normal_size, tiles)),
+            Format::Bc3,
+        )
+    } else {
+        (None, Format::Bc1)
+    };
+    let normals = dds(
+        &normal_image_with_alpha(&samples, span, units, level.normal_size, alpha.as_deref()),
+        normal_format,
+    )?;
+    let diffuse = dds(
+        &diffuse_image(world, id, level.diffuse_size, tiles),
+        Format::Bc1,
+    )?;
     Ok(Some(BlockRecord {
         key,
         inputs,
@@ -357,10 +383,11 @@ pub fn generate_terrain(
 
 #[cfg(test)]
 mod tests {
-    use super::{Job, Options, block_inputs, generate_terrain};
+    use super::{Job, Options, Report, block_inputs, generate_terrain};
     use crate::diffuse::{LandTiles, Tile};
     use lodwright_core::land::CellHeights;
     use lodwright_core::layers::CellLayers;
+    use lodwright_core::layout::BlockId;
     use lodwright_core::terrain::TerrainSettings;
     use lodwright_core::worldspace::Worldspace;
     use lodwright_nif::NifFile;
@@ -616,5 +643,149 @@ mod tests {
             block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true),
             plain
         );
+    }
+
+    fn specular_world() -> Worldspace {
+        let mut w = world();
+        for cell in (0..4).flat_map(|x| (0..4).map(move |y| (x, y))) {
+            w.set_cell_layers(
+                cell.0,
+                cell.1,
+                CellLayers {
+                    normals: None,
+                    colors: None,
+                    base: [Some(7); 4],
+                    alpha: Vec::new(),
+                },
+            );
+        }
+        w
+    }
+
+    fn specular_tiles(exponent: Option<u8>, range: Option<(u8, u8)>) -> LandTiles {
+        LandTiles::from_tiles(std::collections::HashMap::from([(
+            7,
+            Tile::flat([90, 80, 70]).with_specular(exponent),
+        )]))
+        .with_specular_range(range)
+    }
+
+    fn specular_level(on: bool) -> TerrainSettings {
+        let mut settings = TerrainSettings::default();
+        settings.levels.retain(|l| l.level == 4);
+        settings.levels[0].specular_alpha = on;
+        settings
+    }
+
+    fn run_specular(
+        settings: &TerrainSettings,
+        tiles: &LandTiles,
+        name: &str,
+    ) -> (std::path::PathBuf, Report) {
+        let out = temp(name);
+        let report = generate_terrain(
+            &specular_world(),
+            settings,
+            &out,
+            &Options {
+                land: Some(tiles),
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        (out, report)
+    }
+
+    fn normal_files(out: &std::path::Path, report: &Report) -> Vec<Vec<u8>> {
+        report
+            .files
+            .iter()
+            .filter(|f| f.path.contains("/normals/"))
+            .map(|f| std::fs::read(out.join(&f.path)).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn specular_off_writes_bc1_normals_and_the_same_bytes_whatever_the_exponents() {
+        let tiles_a = specular_tiles(Some(10), Some((10, 200)));
+        let tiles_b = specular_tiles(None, None);
+        let (out_a, a) = run_specular(&specular_level(false), &tiles_a, "spec-off-a");
+        let (_, b) = run_specular(&specular_level(false), &tiles_b, "spec-off-b");
+        assert_eq!(a.files, b.files, "off: exponents change nothing");
+        for n in normal_files(&out_a, &a) {
+            assert_eq!(&n[84..88], b"DXT1");
+        }
+    }
+
+    #[test]
+    fn specular_on_writes_bc3_normals_and_leaves_the_diffuse_alone() {
+        let tiles = specular_tiles(Some(100), Some((10, 200)));
+        let (out_off, off) = run_specular(&specular_level(false), &tiles, "spec-cmp-off");
+        let (out_on, on) = run_specular(&specular_level(true), &tiles, "spec-cmp-on");
+        for n in normal_files(&out_on, &on) {
+            assert_eq!(&n[84..88], b"DXT5");
+        }
+        let diffuse = |r: &Report| -> Vec<String> {
+            r.files
+                .iter()
+                .filter(|f| f.path.contains("/diffuse/") || f.path.contains(".nif"))
+                .map(|f| f.digest.clone())
+                .collect()
+        };
+        assert_eq!(diffuse(&off), diffuse(&on));
+        assert_ne!(normal_files(&out_off, &off), normal_files(&out_on, &on));
+    }
+
+    #[test]
+    fn a_missing_exponent_everywhere_gives_opaque_alpha_and_never_a_panic() {
+        let tiles = specular_tiles(None, None);
+        let w = specular_world();
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        assert!(
+            crate::images::specular_alpha(&w, id, 4, &tiles)
+                .iter()
+                .all(|a| *a == 255)
+        );
+        let (out, report) = run_specular(&specular_level(true), &tiles, "spec-missing");
+        assert_ne!(normal_files(&out, &report).len(), 0);
+    }
+
+    #[test]
+    fn a_flat_source_gives_a_uniform_alpha_scaled_over_the_range() {
+        let w = specular_world();
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        let uniform = |tiles: &LandTiles| {
+            let a = crate::images::specular_alpha(&w, id, 8, tiles);
+            assert!(a.windows(2).all(|p| p[0] == p[1]));
+            a[0]
+        };
+        assert_eq!(uniform(&specular_tiles(Some(200), Some((10, 200)))), 255);
+        assert_eq!(uniform(&specular_tiles(Some(10), Some((10, 200)))), 0);
+        assert_eq!(uniform(&specular_tiles(Some(105), Some((10, 200)))), 128);
+        // one exponent in the whole load order: no range to scale over
+        assert_eq!(uniform(&specular_tiles(Some(50), Some((50, 50)))), 255);
+    }
+
+    #[test]
+    fn the_exponents_change_the_digest_only_of_levels_that_write_them() {
+        let w = specular_world();
+        let level = |on| Job {
+            level: specular_level(on).levels[0],
+            cell: (0, 0),
+        };
+        let digest = |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, true);
+        let a = specular_tiles(Some(10), Some((10, 200)));
+        let b = specular_tiles(Some(20), Some((10, 200)));
+        assert_eq!(digest(false, &a), digest(false, &b));
+        assert_ne!(digest(true, &a), digest(true, &b));
+        assert_ne!(digest(true, &a), digest(false, &a));
     }
 }

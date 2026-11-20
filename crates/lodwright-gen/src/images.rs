@@ -4,13 +4,13 @@
 //! Orientation follows the block mesh's UVs (row `game-lod-terrain-block-nif`): image column `c` of `n` is at
 //! block-local x = `size * (1 - (c + 0.5) / n)`, image row `r` at y = `size * (r + 0.5) / n`.
 use lodwright_core::land::SIDE;
-use lodwright_core::layers::quadrant_origin;
+use lodwright_core::layers::{CellLayers, quadrant_origin};
 use lodwright_core::layout::BlockId;
 use lodwright_core::terrain::VERTEX_SPACING;
 use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::Image;
 
-use crate::diffuse::{LandTiles, blend};
+use crate::diffuse::{LandTiles, Tile, blend};
 
 const CELL_UNITS: f32 = 4096.0;
 /// Colour of ground with no vertex colours (a neutral dry earth).
@@ -49,6 +49,21 @@ fn height_at(h: &[f32], span: usize, x: f32, y: f32) -> f32 {
 /// Never for a power-of-two `size` in range; the image constructor only fails for sizes the DDS crate refuses.
 #[must_use]
 pub fn normal_image(samples: &[f32], span: usize, block_units: f32, size: u32) -> Image {
+    normal_image_with_alpha(samples, span, block_units, size, None)
+}
+
+/// [`normal_image`] with `alpha`, one byte per pixel in the pixel order of the map, in place of the opaque alpha.
+///
+/// # Panics
+/// Never for a power-of-two `size` in range; an `alpha` shorter than the map reads as opaque past its end.
+#[must_use]
+pub fn normal_image_with_alpha(
+    samples: &[f32],
+    span: usize,
+    block_units: f32,
+    size: u32,
+    alpha: Option<&[u8]>,
+) -> Image {
     let h = fill_gaps(samples);
     let n = size as usize;
     let mut rgba = Vec::with_capacity(n * n * 4);
@@ -63,7 +78,8 @@ pub fn normal_image(samples: &[f32], span: usize, block_units: f32, size: u32) -
                 / (2.0 * VERTEX_SPACING);
             let len = (slope_x * slope_x + slope_y * slope_y + 1.0).sqrt();
             let enc = |v: f32| ((v / len) * 127.5 + 127.5).round().clamp(0.0, 255.0) as u8;
-            rgba.extend_from_slice(&[enc(-slope_x), enc(-slope_y), enc(1.0), 255]);
+            let a = alpha.and_then(|a| a.get(r * n + c)).copied().unwrap_or(255);
+            rgba.extend_from_slice(&[enc(-slope_x), enc(-slope_y), enc(1.0), a]);
         }
     }
     Image::new(size, size, rgba).expect("a square power-of-two image")
@@ -88,6 +104,44 @@ fn vertex_color(world: &Worldspace, cell: (i32, i32), vx: f32, vy: f32) -> Optio
     Some(out)
 }
 
+/// The land textures at vertex position (`vx`, `vy`) of a cell's layers, as the diffuse blend and the specular alpha
+/// both read them: the base texture of the quadrant, the additional layers over it with their interpolated opacity
+/// (in layer order), and the position in the quadrant (0..1).
+struct Stack<'a> {
+    base: Option<&'a Tile>,
+    over: Vec<(&'a Tile, f32)>,
+    u: f32,
+    v: f32,
+}
+
+fn stack<'a>(layers: &CellLayers, vx: f32, vy: f32, tiles: &'a LandTiles) -> Stack<'a> {
+    let max = (SIDE - 1) as f32 - 1e-3;
+    let (vx, vy) = (vx.clamp(0.0, max), vy.clamp(0.0, max));
+    let quadrant = u8::from(vx >= 16.0) | (u8::from(vy >= 16.0) << 1);
+    let (ox, oy) = quadrant_origin(quadrant);
+    let (qx, qy) = (vx - ox as f32, vy - oy as f32);
+    let base = layers.base[usize::from(quadrant)].and_then(|id| tiles.get(id));
+    let mut over = Vec::new();
+    for layer in layers.alpha.iter().filter(|l| l.quadrant == quadrant) {
+        let Some(tile) = tiles.get(layer.texture) else {
+            continue;
+        };
+        let (c0, r0) = (qx.floor() as usize, qy.floor() as usize);
+        let (c1, r1) = ((c0 + 1).min(16), (r0 + 1).min(16));
+        let (fx, fy) = (qx - c0 as f32, qy - r0 as f32);
+        let o = |c: usize, r: usize| layer.point(c, r);
+        let opacity = (o(c0, r0) * (1.0 - fx) + o(c1, r0) * fx) * (1.0 - fy)
+            + (o(c0, r1) * (1.0 - fx) + o(c1, r1) * fx) * fy;
+        over.push((tile, opacity));
+    }
+    Stack {
+        base,
+        over,
+        u: qx / 16.0,
+        v: qy / 16.0,
+    }
+}
+
 /// The ground colour at vertex position (`vx`, `vy`) of `cell`: the base land texture of the quadrant, the
 /// additional layers blended over it, times the vertex colour.
 fn ground_color(
@@ -101,32 +155,78 @@ fn ground_color(
     let Some(layers) = world.layers(cell.0, cell.1) else {
         return tint.unwrap_or(FALLBACK);
     };
-    let max = (SIDE - 1) as f32 - 1e-3;
-    let (vx, vy) = (vx.clamp(0.0, max), vy.clamp(0.0, max));
-    let quadrant = u8::from(vx >= 16.0) | (u8::from(vy >= 16.0) << 1);
-    let (ox, oy) = quadrant_origin(quadrant);
-    let (qx, qy) = (vx - ox as f32, vy - oy as f32);
-    let (u, v) = (qx / 16.0, qy / 16.0);
-    let base = layers.base[usize::from(quadrant)]
-        .and_then(|id| tiles.get(id))
-        .map_or(FALLBACK, |t| t.sample(u, v));
-    let mut over = Vec::new();
-    for layer in layers.alpha.iter().filter(|l| l.quadrant == quadrant) {
-        let Some(tile) = tiles.get(layer.texture) else {
-            continue;
-        };
-        let (c0, r0) = (qx.floor() as usize, qy.floor() as usize);
-        let (c1, r1) = ((c0 + 1).min(16), (r0 + 1).min(16));
-        let (fx, fy) = (qx - c0 as f32, qy - r0 as f32);
-        let o = |c: usize, r: usize| layer.point(c, r);
-        let opacity = (o(c0, r0) * (1.0 - fx) + o(c1, r0) * fx) * (1.0 - fy)
-            + (o(c0, r1) * (1.0 - fx) + o(c1, r1) * fx) * fy;
-        over.push((tile.sample(u, v), opacity));
-    }
+    let s = stack(layers, vx, vy, tiles);
+    let base = s.base.map_or(FALLBACK, |t| t.sample(s.u, s.v));
+    let over: Vec<([u8; 3], f32)> = s
+        .over
+        .iter()
+        .map(|(tile, opacity)| (tile.sample(s.u, s.v), *opacity))
+        .collect();
     let ground = blend(base, &over);
     tint.map_or(ground, |t| {
         [0, 1, 2].map(|k| ((u16::from(ground[k]) * u16::from(t[k])) / 255) as u8)
     })
+}
+
+/// The specular exponent at a position, scaled to 0..255 over `range`: the base texture's, the additional layers'
+/// blended over it by the same opacities as the diffuse. A texture without an exponent, and ground without a
+/// texture, count as the lowest value. A range of one value gives 255 everywhere.
+fn ground_specular(
+    world: &Worldspace,
+    cell: (i32, i32),
+    vx: f32,
+    vy: f32,
+    tiles: &LandTiles,
+    range: (u8, u8),
+) -> u8 {
+    let scale = |tile: Option<&Tile>| {
+        let Some(e) = tile.and_then(Tile::specular) else {
+            return 0.0;
+        };
+        if range.1 == range.0 {
+            return 255.0;
+        }
+        f32::from(e.saturating_sub(range.0)) / f32::from(range.1 - range.0) * 255.0
+    };
+    let Some(layers) = world.layers(cell.0, cell.1) else {
+        return 0;
+    };
+    let s = stack(layers, vx, vy, tiles);
+    let mut value = scale(s.base);
+    for (tile, opacity) in &s.over {
+        let t = opacity.clamp(0.0, 1.0);
+        value = value * (1.0 - t) + scale(Some(tile)) * t;
+    }
+    value.round().clamp(0.0, 255.0) as u8
+}
+
+/// The alpha channel of the normal map of block `id`, `size * size` bytes in the pixel order of the maps: the
+/// specular of the land textures under each pixel (see [`ground_specular`]), over the exponent range of the load
+/// order. Opaque everywhere when no land texture of the load order has an exponent.
+#[must_use]
+pub fn specular_alpha(world: &Worldspace, id: BlockId, size: u32, tiles: &LandTiles) -> Vec<u8> {
+    let n = size as usize;
+    let Some(range) = tiles.specular_range() else {
+        return vec![255; n * n];
+    };
+    let units = id.level as f32 * CELL_UNITS;
+    let mut alpha = Vec::with_capacity(n * n);
+    for r in 0..n {
+        for c in 0..n {
+            let x = units * (1.0 - (c as f32 + 0.5) / n as f32);
+            let y = units * ((r as f32 + 0.5) / n as f32);
+            let cell = (
+                id.x + (x / CELL_UNITS).floor() as i32,
+                id.y + (y / CELL_UNITS).floor() as i32,
+            );
+            let local = (
+                (x % CELL_UNITS) / VERTEX_SPACING,
+                (y % CELL_UNITS) / VERTEX_SPACING,
+            );
+            alpha.push(ground_specular(world, cell, local.0, local.1, tiles, range));
+        }
+    }
+    alpha
 }
 
 /// The diffuse map of block `id` of `world`, `size` pixels square: the land textures of the LAND records the pixel

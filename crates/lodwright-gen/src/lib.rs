@@ -33,7 +33,7 @@ pub use atlas::{Atlas, Rect, pack};
 pub use diffuse::{LandTiles, Tile, blend};
 pub use error::GenError;
 pub use filter::{filter_instances, glob};
-pub use images::{diffuse_image, normal_image};
+pub use images::{diffuse_image, normal_image, normal_image_with_alpha, specular_alpha};
 pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{
     BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects, generate_objects_with_progress,

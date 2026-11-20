@@ -29,7 +29,7 @@ pub const UNITS_PER_QUALITY: f32 = 2.0;
 pub const VERTEX_SPACING: f32 = 128.0;
 
 /// Settings of one level.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct LevelSettings {
     /// Cells per block edge.
     pub level: u32,
@@ -41,6 +41,25 @@ pub struct LevelSettings {
     pub diffuse_size: u32,
     /// Edge length in pixels of the normal map of a block (a power of two).
     pub normal_size: u32,
+    /// Carry specular in the alpha channel of the normal map (written as BC3). Off: opaque alpha, BC1.
+    pub specular_alpha: bool,
+}
+
+impl std::fmt::Debug for LevelSettings {
+    /// `specular_alpha` is listed only when set, so the text (which block digests hash) of a level that does not
+    /// use it is the one earlier versions wrote.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("LevelSettings");
+        s.field("level", &self.level)
+            .field("quality", &self.quality)
+            .field("max_vertices", &self.max_vertices)
+            .field("diffuse_size", &self.diffuse_size)
+            .field("normal_size", &self.normal_size);
+        if self.specular_alpha {
+            s.field("specular_alpha", &true);
+        }
+        s.finish()
+    }
 }
 
 impl LevelSettings {
@@ -67,6 +86,7 @@ impl Default for TerrainSettings {
             max_vertices: DEFAULT_BLOCK_VERTICES,
             diffuse_size: size,
             normal_size: size,
+            specular_alpha: false,
         };
         Self {
             levels: vec![
@@ -244,6 +264,7 @@ mod tests {
             max_vertices: MAX_VERTICES,
             diffuse_size: 256,
             normal_size: 256,
+            specular_alpha: false,
         }
     }
 

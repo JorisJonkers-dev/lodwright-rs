@@ -549,3 +549,9 @@ and file hashes of a few records of an own v104 archive against the hash row; th
 in-game load of a plugin-named archive on the target engine (D2).
 
 Status (2026-11-19): all three rows merge as `verified = false`, marked UNVERIFIED in their notes. They are drafts by design: a human second reader checks them as described above, and nothing implements the writer or the hash from them before that.
+
+## 2026-11-20: known differences of object and tree LOD (#159)
+
+`docs/spec/object-lod.md` section 4 records the order of trees within a block (agrees only as a set) and the segment table
+of object blocks (meaning unknown) as known differences, with numbers already recorded in the rows above. No new format
+fact, no row. Neither is visible to `verify`, so neither can be on the known-differences list.

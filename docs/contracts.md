@@ -162,7 +162,7 @@ per cell, the water height, the land layers and the pixels of the land textures 
 request or input keeps a block whose digest is unchanged and whose files still have the recorded digests, builds the
 others, and the old manifest's files it neither kept nor wrote are gone after the swap (below). The result's `blocks` counts the blocks built
 (`generated`) and kept (`up_to_date`); each block event carries `up_to_date`. Object and tree LOD are rebuilt in full
-whenever the run does not end as `up_to_date`. An output folder that is not empty and has no manifest is refused
+whenever the run does not end as `up_to_date`, and the manifest records no digests for their blocks (decision `docs/decisions/2026-11-20-object-and-tree-blocks-are-rebuilt-in-full.md`). An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
 
 Nothing is written, replaced or removed outside the output folder. The folder may itself be a link: it is refused

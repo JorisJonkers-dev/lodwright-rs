@@ -29,6 +29,16 @@ case-insensitive on Windows; on Linux write exactly one case consistently (lower
 (M3). Whether `<X>`,`<Y>` name the south-west cell: the settings file is said to hold the world's south-west corner
 (`fnv-lod-settings-dlodsettings`), which suggests block coordinates are south-west cells; unconfirmed (M2).
 
+### Where the grid starts
+
+The block grid of a world does not start at cell 0, 0: it starts at the cell of the world's minimum corner (`NAM0`
+divided by 4096, rounded down) and repeats every `<L>` cells, the same start for every level (`game-lod-block-grid`,
+measured in #147). So a world whose minimum corner is cell (-6, -5) has level 4 blocks named at x of 2 modulo 4 and y
+of 3 modulo 4. Where the corner cell is a multiple of the level, the names are the old ones. A world without corners,
+or with corners that are not finite or lie beyond a million cells, starts at 0, 0. The start is part of the digest of a
+terrain block (when it is not a multiple of the level) and each block's manifest key names its cell, so a run with a
+different start rebuilds the block.
+
 ## 4. Paths
 
 ```

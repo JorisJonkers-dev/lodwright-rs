@@ -108,6 +108,14 @@ opaque with one warning. This is lodwright's own design (`docs/spec/textures.md`
 is an owner check. Off, the files are byte-identical to earlier versions and the block digests do not change; on, the
 exponents enter the digest of that level's blocks only.
 
+### Where the terrain block grid starts
+
+Not a request option: terrain blocks of every level are placed on a grid that starts at the cell of the world's minimum
+corner (`NAM0`) instead of cell 0, 0, as the game's own tree does (`docs/spec/terrain-lod.md`, section 3). Block names
+and manifest keys change for worlds whose minimum corner cell is not a multiple of the level (since 0.9.0): a first run
+after the update rebuilds and renames those worlds' terrain blocks. Worlds that start on the grid keep their names,
+files and digests.
+
 ### Object faces under the ground and the water
 
 `objects.drop_under_terrain` and `objects.drop_under_water` (both off by default, written only when on) leave out

@@ -1175,3 +1175,14 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Measured on the reference tree extracted from the game's archives, shape 0 of each block (the terrain; the water shape is the second). Positions are block-local, 0 to level times 4096. The three border positions without a skirt vertex are not explained. The constant equals the depth of the sloped water edges noted under game-lod-water-height, which suggests one underlying rule. Method: dump the vertices of each block with the repository's own NIF reader and compare edge sets. Not second-read."
+
+[[source]]
+id = "game-lod-block-grid"
+fact = "In the game's own terrain LOD tree the block grid of a worldspace starts at the cell of the world's minimum corner (NAM0 divided by 4096, rounded down) and repeats every level cells, for every level: the block coordinates are that cell plus multiples of the level, not multiples of the level from cell 0, 0."
+url = "oracle:game-lod-files"
+licence = "Block names of the owner's own game files compared with the minimum corners of the plugins as numbers; no content is recorded"
+date = 2026-11-20
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured in the full run of #147 (ten plugins of Fallout New Vegas and its DLCs, verify against the game's tree). Level 4 block coordinates modulo 4 against the minimum corner cell: BoulderCityWorld (-6, -5) gives 2, 3; FreesideWorld (-10, -8) gives 2, 0; GamorrahWorld (-9, -6) gives 3, 2; NVDLC04NukeNCR (-6, -6) gives 2, 2; NVDLC04Road01World (-3, -3) gives 1, 1. Worlds whose corner cell is a multiple of 8 (WastelandNV and the DLC main worlds) are indistinguishable from the grid at 0, 0. The child worlds follow the same rule. The unit of NAM0 (world units) is the measurement of #155 (wrld-bounds). Not second-read."

@@ -17,6 +17,9 @@ use crate::land::{CellHeights, SIDE};
 use crate::layers::CellLayers;
 use crate::plugin::{DeclaredBounds, Plugin, WorldRecord};
 
+/// World units per cell edge.
+const CELL_UNITS: f32 = 4096.0;
+
 /// One worldspace with the final heights of every exterior cell that has LAND.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Worldspace {
@@ -128,6 +131,33 @@ impl Worldspace {
     #[must_use]
     pub fn declared_bounds(&self) -> Option<DeclaredBounds> {
         self.record.bounds
+    }
+
+    /// The same world with the corners `NAM0` and `NAM9` replaced (for worlds built from cells alone).
+    #[must_use]
+    pub fn with_declared_bounds(mut self, bounds: DeclaredBounds) -> Self {
+        self.record.bounds = Some(bounds);
+        self
+    }
+
+    /// The cell where the block grid of every LOD level starts: the cell of the minimum corner `NAM0` (world units,
+    /// 4096 to a cell, rounded down), as the game's own tree places its blocks; (0, 0) when the world has no
+    /// corners or they are not finite or lie beyond 1 000 000 cells.
+    // source: game-lod-block-grid
+    #[must_use]
+    pub fn grid_anchor(&self) -> (i32, i32) {
+        let Some(b) = self.record.bounds else {
+            return (0, 0);
+        };
+        #[allow(clippy::cast_possible_truncation)] // bounded by the test before the cast
+        let cell = |v: f32| {
+            let c = (v / CELL_UNITS).floor();
+            (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
+        };
+        match (cell(b.min[0]), cell(b.min[1])) {
+            (Some(x), Some(y)) => (x, y),
+            _ => (0, 0),
+        }
     }
 
     /// The water height of cell (`x`, `y`) for the mesh stage: its `XCLW`, else the world's default water

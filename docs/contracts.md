@@ -179,7 +179,14 @@ possible).
   previous output (less what staging already holds) and refuses with `output_no_space` when it cannot fit. It does
   not apply where the platform does not report free space.
 - The two sibling names `<output>.lodwright-staging` and `<output>.lodwright-old` are reserved. `plan` reports
-  `resume_after_kill` as true. This changes no schema: `schema_version` stays 1.
+  `resume_after_kill` as true.
+
+Version note. This changes where a run writes and when the output folder appears, not a document: the capability
+flag `resume_after_kill` already existed, no manifest, request or result key was added, removed or retyped, and
+`output_no_space` is a new value of an open error code string. `schema_version` of every document stays 1 (a later
+optional manifest field would not raise it either), and no call, type or existing error code of the library changed, so
+`lodwright-api` stays at version 1. A consumer built for the earlier contract keeps working and sees a run that no longer
+touches the output folder until it has finished.
 
 Not yet in the contract (see `docs/interrupted-runs.md`): the lock that refuses two runs on one output folder, the
 swap marker and the `fsync` of files and folders.

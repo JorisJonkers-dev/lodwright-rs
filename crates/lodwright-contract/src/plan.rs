@@ -68,7 +68,7 @@ pub struct Capabilities {
 
 impl Capabilities {
     /// This build: terrain meshes, terrain textures, the settings file, object LOD and tree LOD are written; every
-    /// world is built when none is named; the bytes do not depend on the thread count; the memory budget is a
+    /// world is built when none is named; the bytes do not depend on the thread count; the memory budget is
     /// held while running; peak memory is reported on Linux; a cancelled run and a killed run both resume from the
     /// staging folder.
     #[must_use]

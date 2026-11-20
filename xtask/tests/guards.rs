@@ -354,6 +354,78 @@ fn a_row_the_log_does_not_mention_fails() {
     assert!(any_contains(&repo.check(Check::Provenance, None), "LOG.md"));
 }
 
+fn row_file(id: &str) -> String {
+    ROW.replace("dds-header", id)
+}
+
+#[test]
+fn a_row_in_its_own_file_needs_no_log_entry_and_can_be_referenced() {
+    let repo = Repo::new();
+    repo.write("provenance/rows/new-fact.toml", row_file("new-fact"));
+    repo.write(
+        "r.rs",
+        format!("{SPDX}{}fn x() {{}}\n", reference("//", "new-fact")),
+    );
+    repo.commit();
+    assert!(repo.check(Check::Provenance, None).is_empty());
+    assert!(repo.check(Check::Provenance, Some("base")).is_empty());
+}
+
+#[test]
+fn a_row_file_is_named_after_its_id_and_holds_one_row() {
+    let repo = Repo::new();
+    repo.write("provenance/rows/other-name.toml", row_file("new-fact"));
+    repo.commit();
+    assert!(any_contains(
+        &repo.check(Check::Provenance, None),
+        "named after its id"
+    ));
+    let repo = Repo::new();
+    repo.write(
+        "provenance/rows/new-fact.toml",
+        format!("{}\n{}", row_file("new-fact"), row_file("second-fact")),
+    );
+    repo.commit();
+    assert!(any_contains(
+        &repo.check(Check::Provenance, None),
+        "exactly one"
+    ));
+}
+
+#[test]
+fn an_id_may_not_repeat_between_the_table_and_a_row_file() {
+    let repo = Repo::new();
+    repo.write("provenance/rows/dds-header.toml", ROW);
+    repo.commit();
+    assert!(any_contains(
+        &repo.check(Check::Provenance, None),
+        "duplicate id"
+    ));
+}
+
+#[test]
+fn the_frozen_table_and_log_refuse_new_rows_and_entries() {
+    let repo = Repo::new();
+    repo.write(
+        "provenance/sources.toml",
+        format!("{ROW}\n{}", row_file("added-row")),
+    );
+    repo.write(
+        "provenance/LOG.md",
+        format!("{LOG}- `added-row`: recorded.\n"),
+    );
+    repo.commit();
+    let result = repo.check(Check::Provenance, Some("base"));
+    assert!(
+        any_contains(&result, "provenance/sources.toml: is frozen"),
+        "{result:?}"
+    );
+    assert!(
+        any_contains(&result, "provenance/LOG.md: is frozen"),
+        "{result:?}"
+    );
+}
+
 #[test]
 fn broken_toml_fails() {
     let repo = Repo::new();

@@ -182,6 +182,31 @@
       "tier": 2
     },
     {
+      "default": null,
+      "key": "terrain.levels.specular_alpha",
+      "kind": "switch",
+      "per_level": [
+        {
+          "level": 4,
+          "value": false
+        },
+        {
+          "level": 8,
+          "value": false
+        },
+        {
+          "level": 16,
+          "value": false
+        },
+        {
+          "level": 32,
+          "value": false
+        }
+      ],
+      "since": "0.7.0",
+      "tier": 3
+    },
+    {
       "default": [],
       "key": "inclusion.exclude_plugins",
       "kind": "list",

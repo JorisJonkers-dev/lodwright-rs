@@ -647,7 +647,7 @@ mod tests {
 
     fn specular_world() -> Worldspace {
         let mut w = world();
-        for cell in [(0, 0), (1, 0)] {
+        for cell in (0..4).flat_map(|x| (0..4).map(move |y| (x, y))) {
             w.set_cell_layers(
                 cell.0,
                 cell.1,
@@ -728,7 +728,7 @@ mod tests {
         let diffuse = |r: &Report| -> Vec<String> {
             r.files
                 .iter()
-                .filter(|f| f.path.contains("/diffuse/") || f.path.ends_with(".nif"))
+                .filter(|f| f.path.contains("/diffuse/") || f.path.contains(".nif"))
                 .map(|f| f.digest.clone())
                 .collect()
         };
@@ -751,7 +751,7 @@ mod tests {
                 .all(|a| *a == 255)
         );
         let (out, report) = run_specular(&specular_level(true), &tiles, "spec-missing");
-        assert!(!normal_files(&out, &report).is_empty());
+        assert_ne!(normal_files(&out, &report).len(), 0);
     }
 
     #[test]

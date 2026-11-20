@@ -58,3 +58,33 @@ Measured (`game-lod-object-layout`, `game-object-atlas`): the main world's objec
 `<world>.buildings_n.dds` is 1024 by 512. The textures of the selected LOD models are packed at their native size.
 Maximum atlas size and per-texture limit are generator options (`fnv-lod-texture-options`). The packing rule and the
 UV scale stay open (`docs/spec/object-lod.md`).
+
+## 4. Specular in alpha (own design, accepted, #92)
+
+Status: accepted by the owner on 2026-11-20 as lodwright's own design. No row below is verified, and the in-game
+check (item 4) is still the owner's.
+
+What is established, and what is not:
+
+- The shipped terrain textures are DXT1 and carry no 8-bit alpha (`game-lod-terrain-textures`, `bc1-block-layout`).
+  Whether the game's own LOD textures ever carry specular is not known.
+- The editor's texture sets name the normal map as the file that carries specular in its alpha channel (`txst-texture-paths`,
+  TX01). That is a statement about texture sets of the land and object records, not about LOD files.
+- A land texture record holds one specular exponent (`ltex-texture-set`, SNAM). No per-pixel specular source exists in the
+  terrain records.
+
+Own design, declared as such (no format fact is claimed):
+
+1. Carrier: the alpha channel of the normal map, not of the diffuse map. This follows the convention of the texture set
+   above, and keeps the diffuse map as it is.
+2. Value: per pixel, the specular exponent of the land textures under the pixel, weighted with the same opacities that
+   the diffuse blend uses, scaled to 0 to 255 over the range of exponents in the load order. A missing exponent counts
+   as the lowest value and a warning is written. A flat source gives a uniform alpha.
+3. Format: BC3 (DXT5) for the normal map when the option is on, same size and mip count as the diffuse map. Off, nothing
+   changes: BC1, opaque, the output is byte-identical.
+4. Open and not decided here: whether the game reads alpha of a LOD normal map as specular at all, and whether it
+   accepts BC3 in place of BC1 there. Both are in-game checks for the owner (the Release test of R1, #156). If the
+   game ignores it, the option has no use and #92 is dropped.
+
+Decided: the normal map is the carrier, the weighted exponent stands in for a specular map, and the option is tier 3
+(advanced) and off by default.

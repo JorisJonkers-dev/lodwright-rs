@@ -75,6 +75,19 @@ pub fn statistics(doc: &VerifyDoc) -> BTreeMap<String, f64> {
             put(format!("water.iou:{}", b.path), b.iou);
         }
     }
+    if let Some(t) = &doc.terrain {
+        put("terrain.blocks".into(), t.blocks as f64);
+        put("terrain.over_tolerance".into(), t.over_tolerance as f64);
+        if let Some(v) = t.max {
+            put("terrain.max".into(), v);
+        }
+        if let Some(v) = t.mean {
+            put("terrain.mean".into(), v);
+        }
+        for b in &t.per_block {
+            put(format!("terrain.max:{}", b.path), b.max);
+        }
+    }
     if let Some(o) = &doc.objects {
         put("objects.blocks".into(), o.blocks as f64);
         put("objects.exact".into(), o.exact as f64);

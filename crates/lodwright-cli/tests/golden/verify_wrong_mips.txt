@@ -3,6 +3,11 @@ exit 1
 4 terrain blocks, 0 object blocks, 0 tree blocks, 8 textures, 1 settings files: 1 errors, 0 differences
 textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds: 8 mips, a full chain has 9
 water: 0 blocks with water, 0 under 0.95, lowest -, mean -
+terrain: 4 blocks compared, 0 over 1, largest 0.000, mean 0.000
+terrain level 4: 1 blocks, 0 over 1, largest 0.000, mean 0.000
+terrain level 8: 1 blocks, 0 over 1, largest 0.000, mean 0.000
+terrain level 16: 1 blocks, 0 over 1, largest 0.000, mean 0.000
+terrain level 32: 1 blocks, 0 over 1, largest 0.000, mean 0.000
 object blocks: 0 of 0 exact
 
 {
@@ -23,6 +28,65 @@ object blocks: 0 of 0 exact
   "ok": false,
   "schema_version": 1,
   "settings": 1,
+  "terrain": {
+    "blocks": 4,
+    "max": 0.0,
+    "mean": 0.0,
+    "over_tolerance": 0,
+    "per_block": [
+      {
+        "max": 0.0,
+        "mean": 0.0,
+        "path": "meshes/landscape/lod/island/island.level16.x0.y0.nif"
+      },
+      {
+        "max": 0.0,
+        "mean": 0.0,
+        "path": "meshes/landscape/lod/island/island.level32.x0.y0.nif"
+      },
+      {
+        "max": 0.0,
+        "mean": 0.0,
+        "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif"
+      },
+      {
+        "max": 0.0,
+        "mean": 0.0,
+        "path": "meshes/landscape/lod/island/island.level8.x0.y0.nif"
+      }
+    ],
+    "per_level": [
+      {
+        "blocks": 1,
+        "level": 4,
+        "max": 0.0,
+        "mean": 0.0,
+        "over_tolerance": 0
+      },
+      {
+        "blocks": 1,
+        "level": 8,
+        "max": 0.0,
+        "mean": 0.0,
+        "over_tolerance": 0
+      },
+      {
+        "blocks": 1,
+        "level": 16,
+        "max": 0.0,
+        "mean": 0.0,
+        "over_tolerance": 0
+      },
+      {
+        "blocks": 1,
+        "level": 32,
+        "max": 0.0,
+        "mean": 0.0,
+        "over_tolerance": 0
+      }
+    ],
+    "tolerance": 1.0
+  },
   "terrain_blocks": 4,
   "textures": 8,
   "tree_blocks": 0,

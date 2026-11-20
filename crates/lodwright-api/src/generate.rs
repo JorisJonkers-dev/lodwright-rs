@@ -522,6 +522,7 @@ pub fn generate(
                         land: Some(&tiles),
                         progress: Some(&block_done),
                         water: request.terrain.water,
+                        drop_under_water: request.terrain.drop_under_water,
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },

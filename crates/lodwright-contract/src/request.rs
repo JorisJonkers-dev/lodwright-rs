@@ -19,6 +19,8 @@ pub const MAX_VERTICES_RANGE: (u32, u32) = (3, 32767);
 pub const TEXTURE_SIZE_RANGE: (u32, u32) = (4, 4096);
 /// How often a land texture may repeat across a cell quadrant: lowest and highest accepted tiling scale.
 pub const TEXTURE_SCALE_RANGE: (f32, f32) = (0.0625, 16.0);
+/// The range of `terrain.drop_under_water`, in world units.
+pub const DROP_UNDER_WATER_RANGE: (f32, f32) = (0.0, 100_000.0);
 /// The lowest accepted terrain quality.
 pub const QUALITY_MIN: f32 = 0.0;
 /// The fewest worker threads a request may ask for.
@@ -70,6 +72,11 @@ pub struct TerrainRequest {
     /// `FormID` (eight hex digits); a texture not listed repeats once. Empty by default; written only when set.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub texture_scales: BTreeMap<String, f32>,
+    /// Leave out terrain faces that cannot be seen under water: a face whose three corners all lie at least this many
+    /// world units below the water plane of the cell it is in (own design, `docs/spec/terrain-lod.md`). Absent by
+    /// default, which keeps every face; written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drop_under_water: Option<f32>,
 }
 
 impl Default for TerrainRequest {
@@ -80,6 +87,7 @@ impl Default for TerrainRequest {
             land_textures: true,
             water: true,
             texture_scales: BTreeMap::new(),
+            drop_under_water: None,
         }
     }
 }
@@ -260,6 +268,14 @@ impl Request {
             if id.len() != 8 || u32::from_str_radix(id, 16).is_err() {
                 return Err(format!(
                     "exclude_records entry {id:?} is not eight hex digits"
+                ));
+            }
+        }
+        if let Some(offset) = self.terrain.drop_under_water {
+            let (low, high) = DROP_UNDER_WATER_RANGE;
+            if !offset.is_finite() || !(low..=high).contains(&offset) {
+                return Err(format!(
+                    "drop_under_water {offset} is not a number from {low} to {high}"
                 ));
             }
         }

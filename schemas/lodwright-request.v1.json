@@ -222,6 +222,14 @@
       "description": "Terrain settings.",
       "type": "object",
       "properties": {
+        "drop_under_water": {
+          "description": "Leave out terrain faces that cannot be seen under water: a face whose three corners all lie at least this many\nworld units below the water plane of the cell it is in (own design, `docs/spec/terrain-lod.md`). Absent by\ndefault, which keeps every face; written only when set.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
         "enabled": {
           "description": "Write terrain LOD.",
           "type": "boolean",

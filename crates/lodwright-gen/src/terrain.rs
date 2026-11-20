@@ -12,7 +12,9 @@ use lodwright_contract::Sha256Stream;
 use lodwright_core::layout::{self, BlockId};
 use lodwright_core::lod::LodSettings;
 use lodwright_core::raster::{BlockGrid, HeightRaster};
-use lodwright_core::terrain::{LevelSettings, TerrainSettings, build_block_mesh};
+use lodwright_core::terrain::{
+    DropUnderWater, LevelSettings, TerrainSettings, build_block_mesh_dropping,
+};
 use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
 use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
@@ -36,6 +38,9 @@ pub struct Options<'a> {
     pub progress: Option<&'a (dyn Fn(&str, u32, u64, u64, bool) + Sync)>,
     /// Write a water plane into each block that has ground below its cells' water height.
     pub water: bool,
+    /// Leave out terrain faces that lie at least this many world units below the water plane of their cell (see
+    /// `DropUnderWater`); `None` keeps every face.
+    pub drop_under_water: Option<f32>,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -51,6 +56,7 @@ impl Default for Options<'_> {
             land: None,
             progress: None,
             water: true,
+            drop_under_water: None,
             reuse: None,
             cancel: None,
         }
@@ -125,10 +131,14 @@ fn block_inputs(
     job: &Job,
     tiles: &LandTiles,
     water: bool,
+    drop_under_water: Option<f32>,
 ) -> String {
     let mut h = Sha256Stream::new();
     h.update(env!("CARGO_PKG_VERSION").as_bytes());
     h.update(format!("{:?} water={water}", job.level).as_bytes());
+    if let Some(offset) = drop_under_water {
+        h.update(format!("drop-under-water={offset}").as_bytes());
+    }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
         h.update(format!("specular-range={:?}", tiles.specular_range()).as_bytes());
@@ -203,7 +213,14 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let inputs = block_inputs(world, &samples, job, tiles, options.water);
+    let inputs = block_inputs(
+        world,
+        &samples,
+        job,
+        tiles,
+        options.water,
+        options.drop_under_water,
+    );
     if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
         return Ok(Some(BlockRecord {
             key,
@@ -212,7 +229,16 @@ fn run_job(
             reused: true,
         }));
     }
-    let Some((_, mesh, _)) = build_block_mesh(raster, level, bx, by) else {
+    // water height at a block-local position: the cell the position lies in, counted from the block's first cell
+    let water_at = |x: f32, y: f32| {
+        let cell = |v: f32| (v / CELL_UNITS).floor() as i32;
+        world.water_height(job.cell.0 + cell(x), job.cell.1 + cell(y))
+    };
+    let drop = options.drop_under_water.map(|offset| DropUnderWater {
+        water_at: &water_at,
+        offset,
+    });
+    let Some((_, mesh, _)) = build_block_mesh_dropping(raster, level, bx, by, drop) else {
         return Ok(None);
     };
     let id = BlockId {
@@ -472,6 +498,41 @@ mod tests {
     }
 
     #[test]
+    fn faces_below_the_water_are_dropped_only_with_the_option_and_it_enters_the_digest() {
+        let mut coast = world();
+        // water over the low cell (0, 0) at 105: its ground at 100 lies below, the cells beside it at 110 above
+        coast.set_cell_water(0, 0, true, Some(105.0));
+        let run = |drop: Option<f32>, tag: &str| {
+            let out = temp(tag);
+            let report = generate_terrain(
+                &coast,
+                &TerrainSettings::default(),
+                &out,
+                &Options {
+                    drop_under_water: drop,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            let nif =
+                std::fs::read(out.join("meshes/landscape/lod/mojave/mojave.level4.x0.y0.nif"))
+                    .unwrap();
+            let v = crate::verify_folder(&out);
+            assert!(v.errors.is_empty(), "{:?}", v.errors);
+            (nif, report)
+        };
+        let (kept, kept_report) = run(None, "drop-off");
+        let (dropped, dropped_report) = run(Some(0.0), "drop-on");
+        let (deep, _) = run(Some(50.0), "drop-deep");
+        assert_ne!(kept, dropped, "the option changes the block");
+        assert_eq!(kept, deep, "faces less than 50 below the water are kept");
+        let key = |r: &Report| r.blocks[0].inputs.clone();
+        assert_ne!(key(&kept_report), key(&dropped_report));
+        let (again, _) = run(None, "drop-off-2");
+        assert_eq!(kept, again);
+    }
+
+    #[test]
     fn block_inputs_change_only_where_the_world_changes_and_a_reused_block_is_not_built() {
         let run = |w: &Worldspace, name: &str, reuse: bool| {
             let keep = |_: &str, _: &str| Some(Vec::new());
@@ -554,6 +615,7 @@ mod tests {
                 land: None,
                 progress: None,
                 water: true,
+                drop_under_water: None,
                 reuse: None,
                 cancel: None,
             },
@@ -568,6 +630,7 @@ mod tests {
                 land: None,
                 progress: None,
                 water: true,
+                drop_under_water: None,
                 reuse: None,
                 cancel: None,
             },
@@ -649,7 +712,7 @@ mod tests {
             cell,
         };
         let tiles = LandTiles::empty();
-        let digest = |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, true);
+        let digest = |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, true, None);
         assert_eq!(digest(&world()), digest(&bounded([-8.0 * 4096.0, 0.0])));
         assert_ne!(digest(&world()), digest(&bounded([-6.0 * 4096.0, 0.0])));
     }
@@ -717,18 +780,18 @@ mod tests {
             )]))
             .with_scales(&scales.iter().copied().collect())
         };
-        let plain = block_inputs(&w, &[], &job, &tiles(&[]), true);
+        let plain = block_inputs(&w, &[], &job, &tiles(&[]), true, None);
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), true),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), true, None),
             plain
         );
         assert_ne!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), true),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), true, None),
             plain
         );
         // a scale for a texture the block does not use leaves its digest alone
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true),
+            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true, None),
             plain
         );
     }
@@ -869,7 +932,7 @@ mod tests {
             level: specular_level(on).levels[0],
             cell: (0, 0),
         };
-        let digest = |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, true);
+        let digest = |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, true, None);
         let a = specular_tiles(Some(10), Some((10, 200)));
         let b = specular_tiles(Some(20), Some((10, 200)));
         assert_eq!(digest(false, &a), digest(false, &b));

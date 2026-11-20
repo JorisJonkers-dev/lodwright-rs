@@ -8,6 +8,8 @@ the machine. Nothing from the game is committed.
 The game's data is read in place and never written to. Everything generated goes to a scratch folder outside the
 data folder and outside any git working tree.
 
+How a change is judged better or worse, layer by layer, is in [`docs/ab-protocol.md`](ab-protocol.md).
+
 The pass criteria are those of gate G5 of the Toolbox (`docs/REORG.md` in rauls-trusty-toolbox):
 
 - `lodwright verify` against the reference reports no missing or extra block in the worlds generated;

@@ -184,7 +184,7 @@ pub fn build_block_mesh(
     let mut meshed = crate::rtin::mesh_block(&samples, span, settings.tolerance(), cap)?;
     if settings.skirts {
         // The skirt vertices count against the cap: mesh the surface with the room that is left.
-        let edge = (span - 1) as f32 * VERTEX_SPACING;
+        let edge = f32::from(u16::try_from(span - 1).ok()?) * VERTEX_SPACING;
         let mut room = cap;
         for _ in 0..4 {
             let skirted = add_skirts(&meshed.mesh, edge);
@@ -212,6 +212,7 @@ pub const SKIRT_HEIGHT: f32 = -14098.0;
 /// second vertex at [`SKIRT_HEIGHT`], and two triangles per border edge facing away from the block. `edge` is the
 /// block's edge length; a vertex is on the border when its x or y is 0 or `edge`.
 // source: game-lod-block-borders
+#[allow(clippy::float_cmp)] // border positions are exact multiples of the vertex spacing
 fn add_skirts(mesh: &TerrainMesh, edge: f32) -> TerrainMesh {
     let side = |a: [f32; 3], b: [f32; 3]| {
         (a[0] == 0.0 && b[0] == 0.0)
@@ -231,7 +232,7 @@ fn add_skirts(mesh: &TerrainMesh, edge: f32) -> TerrainMesh {
         low.insert(i, l);
         Some(l)
     };
-    for tri in mesh.indices.chunks_exact(3) {
+    for tri in mesh.indices.as_chunks::<3>().0 {
         for (p, q) in [(0, 1), (1, 2), (2, 0)] {
             let (a, b) = (tri[p], tri[q]);
             if !side(mesh.vertices[usize::from(a)], mesh.vertices[usize::from(b)]) {
@@ -308,6 +309,11 @@ pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<Terr
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::float_cmp,
+    clippy::cast_precision_loss,
+    clippy::many_single_char_names
+)] // exact block coordinates, geometry names
 mod tests {
     use super::{
         LEVELS, LevelSettings, MAX_VERTICES, TerrainSettings, build_block_mesh, mip_levels,
@@ -449,7 +455,7 @@ mod tests {
             let on_border =
                 |v: &[f32; 3]| v[0] == 0.0 || v[0] == edge || v[1] == 0.0 || v[1] == edge;
             let border: Vec<_> = plain.vertices.iter().filter(|v| on_border(v)).collect();
-            assert!(!border.is_empty());
+            assert_ne!(border.len(), 0);
             for v in &border {
                 assert!(
                     skirted
@@ -467,7 +473,7 @@ mod tests {
             assert_eq!(low, border.len());
             // every triangle edge along the border adds two triangles
             let mut edges = 0;
-            for t in plain.indices.chunks_exact(3) {
+            for t in plain.indices.as_chunks::<3>().0 {
                 for (p, q) in [(0, 1), (1, 2), (2, 0)] {
                     let (a, b) = (
                         plain.vertices[usize::from(t[p])],
@@ -489,7 +495,7 @@ mod tests {
     fn skirt_triangles_face_away_from_the_block() {
         let skirted = mesh_of(4, true, MAX_VERTICES);
         let centre = 4.0 * 4096.0 / 2.0;
-        for tri in skirted.indices.chunks_exact(3) {
+        for tri in skirted.indices.as_chunks::<3>().0 {
             let v = |i: u16| skirted.vertices[usize::from(i)];
             let (a, b, c) = (v(tri[0]), v(tri[1]), v(tri[2]));
             if [a, b, c].iter().all(|p| p[2] > super::SKIRT_HEIGHT) {

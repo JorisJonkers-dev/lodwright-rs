@@ -22,12 +22,16 @@ use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
 use crate::images::{diffuse_image, normal_image_with_alpha, specular_alpha};
-use crate::water::{add_walls, water_mesh};
+use crate::water::{Plane, add_walls, water_mesh};
 
 const CELL_UNITS: f32 = 4096.0;
 
 /// How to run.
 #[derive(Clone, Copy)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one switch per option of the request"
+)]
 pub struct Options<'a> {
     /// Worker threads (at least 1).
     pub threads: usize,
@@ -45,6 +49,9 @@ pub struct Options<'a> {
     pub water_walls: bool,
     /// Write a corner that two rectangles of a water plane share once, at levels 8 to 32.
     pub water_shared_vertices: bool,
+    /// Write the water planes of levels 8 to 32 as the polygons of their outlines (corners only), which takes
+    /// precedence over `water_shared_vertices`.
+    pub water_polygons: bool,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -63,6 +70,7 @@ impl Default for Options<'_> {
             drop_under_water: None,
             water_walls: false,
             water_shared_vertices: false,
+            water_polygons: false,
             reuse: None,
             cancel: None,
         }
@@ -149,6 +157,9 @@ fn block_inputs(
     }
     if options.water && options.water_shared_vertices {
         h.update(b"water-shared-vertices");
+    }
+    if options.water && options.water_polygons {
+        h.update(b"water-polygons");
     }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
@@ -265,7 +276,13 @@ fn run_job(
             &samples,
             level.level,
             job.cell,
-            options.water_shared_vertices,
+            if options.water_polygons {
+                Plane::Polygons
+            } else if options.water_shared_vertices {
+                Plane::Shared
+            } else {
+                Plane::Rectangles
+            },
         )
         .map(|mut mesh| {
             if options.water_walls {
@@ -555,6 +572,7 @@ mod tests {
                     drop_under_water: drop,
                     water_walls: false,
                     water_shared_vertices: false,
+                    water_polygons: false,
                     ..Options::default()
                 },
             )
@@ -663,6 +681,7 @@ mod tests {
                 drop_under_water: None,
                 water_walls: false,
                 water_shared_vertices: false,
+                water_polygons: false,
                 reuse: None,
                 cancel: None,
             },
@@ -680,6 +699,7 @@ mod tests {
                 drop_under_water: None,
                 water_walls: false,
                 water_shared_vertices: false,
+                water_polygons: false,
                 reuse: None,
                 cancel: None,
             },

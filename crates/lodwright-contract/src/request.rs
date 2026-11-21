@@ -89,6 +89,11 @@ pub struct TerrainRequest {
     /// the same planes). Off by default; written only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub water_shared_vertices: bool,
+    /// Write the water planes of levels 8 to 32 as the polygons of the wet area's outline, corners only (fewer
+    /// vertices, the same ground covered); takes precedence over `water_shared_vertices`. Off by default; written
+    /// only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub water_polygons: bool,
 }
 
 impl Default for TerrainRequest {
@@ -102,6 +107,7 @@ impl Default for TerrainRequest {
             drop_under_water: None,
             water_walls: false,
             water_shared_vertices: false,
+            water_polygons: false,
         }
     }
 }

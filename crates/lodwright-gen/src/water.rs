@@ -200,6 +200,17 @@ pub(crate) fn add_walls(
     Some(())
 }
 
+/// How the water plane of a block above level 4 is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Plane {
+    /// Four vertices per rectangle.
+    Rectangles,
+    /// A corner that two rectangles have in common is written once.
+    Shared,
+    /// The outline of each region is traced, reduced to its corners and triangulated.
+    Polygons,
+}
+
 /// The water plane of one block, relative to the block origin.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct WaterMesh {
@@ -257,7 +268,7 @@ pub(crate) fn water_mesh(
     samples: &[f32],
     level: u32,
     cell: (i32, i32),
-    share: bool,
+    plane: Plane,
 ) -> Option<WaterMesh> {
     let cells = usize::try_from(level).ok()?;
     let span = cells * CELL_INTERVALS + 1;
@@ -269,7 +280,7 @@ pub(crate) fn water_mesh(
     let per_cell = (CELL_INTERVALS / step).max(1);
     let square = CELL_UNITS / per_cell as f32;
     if cells > 4 {
-        return coarse_water(world, samples, cells, cell, share);
+        return coarse_water(world, samples, cells, cell, plane);
     }
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
     let mut segments = [0_u32; 16];
@@ -338,8 +349,9 @@ fn coarse_water(
     samples: &[f32],
     cells: usize,
     cell: (i32, i32),
-    share: bool,
+    plane: Plane,
 ) -> Option<WaterMesh> {
+    let share = plane != Plane::Rectangles;
     let span = cells * CELL_INTERVALS + 1;
     let step = (cells / 4).max(1);
     let per_cell = (CELL_INTERVALS / step).max(1);
@@ -374,6 +386,17 @@ fn coarse_water(
                     }
                 }
             }
+        }
+    }
+    if plane == Plane::Polygons {
+        // a region that cannot be triangulated keeps the rectangles of this block
+        if let Some((vertices, indices)) = crate::outline::plane(&keys, &heights, n, square) {
+            return Some(WaterMesh {
+                vertices,
+                indices,
+                segments: None,
+                placeholder: wants_placeholder(world, cells, cell),
+            });
         }
     }
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
@@ -412,7 +435,7 @@ fn coarse_water(
 
 #[cfg(test)]
 mod tests {
-    use super::{add_walls, rectangles, water_mesh};
+    use super::{Plane, add_walls, rectangles, water_mesh};
     use lodwright_core::land::CellHeights;
     use lodwright_core::worldspace::Worldspace;
 
@@ -443,7 +466,8 @@ mod tests {
             }
         }
         let span = 4 * 32 + 1;
-        water_mesh(&w, &vec![-200.0; span * span], 4, (0, 0), false).map(|m| m.placeholder)
+        water_mesh(&w, &vec![-200.0; span * span], 4, (0, 0), Plane::Rectangles)
+            .map(|m| m.placeholder)
     }
 
     #[test]
@@ -467,17 +491,17 @@ mod tests {
                 samples[y * span + x] = 0.0;
             }
         }
-        let mesh = water_mesh(&world(Some(100.0)), &samples, 4, (0, 0), false).unwrap();
+        let mesh = water_mesh(&world(Some(100.0)), &samples, 4, (0, 0), Plane::Rectangles).unwrap();
         assert_eq!(mesh.vertices.len(), 4);
         assert_eq!(mesh.vertices[3], [4096.0, 4096.0, 100.0]);
         assert_eq!(mesh.indices, vec![0, 1, 2, 2, 1, 3]);
         let mut want = [0; 16];
         want[0] = 2;
         assert_eq!(mesh.segments, Some(want));
-        assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0), false).is_none());
+        assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0), Plane::Rectangles).is_none());
         // ground only 10 units under the water: inside the level 4 margin, so dry
-        assert!(water_mesh(&world(Some(10.0)), &samples, 4, (0, 0), false).is_none());
-        assert!(water_mesh(&world(None), &samples, 4, (0, 0), false).is_none());
+        assert!(water_mesh(&world(Some(10.0)), &samples, 4, (0, 0), Plane::Rectangles).is_none());
+        assert!(water_mesh(&world(None), &samples, 4, (0, 0), Plane::Rectangles).is_none());
     }
 
     /// Ground at 0 over the cells `x0..x1` by `0..1` of a block of `level` cells, water at 100 over those cells.
@@ -505,7 +529,7 @@ mod tests {
         // level 8, water over the cells 2 and 3 of the south row: the west, east and north sides are inside the block
         // except the south side (block border); three runs, two triangles each
         let (w, samples) = strip(8, 2, 4);
-        let mut mesh = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         let (vertices, triangles) = (mesh.vertices.len(), mesh.indices.len() / 3);
         assert_eq!((vertices, triangles), (4, 2));
         add_walls(&mut mesh, &w, &samples, 8, (0, 0)).unwrap();
@@ -526,7 +550,7 @@ mod tests {
             assert!(flat(p[0], p[1]) || flat(p[1], p[2]) || flat(p[0], p[2]));
         }
         // the plane of an unwalled block is as before
-        let plain = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
+        let plain = water_mesh(&w, &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         assert_eq!(plain.vertices.len(), 4);
     }
 
@@ -535,7 +559,7 @@ mod tests {
         // water over cells 1 and 2 of the south row of a level 4 block: east and west and north sides of each cell,
         // the shared side between the cells gets none
         let (w, samples) = strip(4, 1, 3);
-        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), false).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), Plane::Rectangles).unwrap();
         let before = mesh.segments.unwrap();
         assert_eq!((before[4], before[8]), (2, 2));
         add_walls(&mut mesh, &w, &samples, 4, (0, 0)).unwrap();
@@ -554,7 +578,7 @@ mod tests {
     fn a_block_without_exposed_sides_gets_no_walls() {
         // the whole block wet: every side is on the block's border
         let (w, samples) = strip(4, 0, 4);
-        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), false).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), Plane::Rectangles).unwrap();
         // only row 0 has cells here, so the north sides of the four cells are exposed; wet everything instead
         let mut full = Worldspace::from_cells(
             1,
@@ -569,7 +593,8 @@ mod tests {
             }
         }
         let span = 4 * 32 + 1;
-        let mut every = water_mesh(&full, &vec![0.0; span * span], 4, (0, 0), false).unwrap();
+        let mut every =
+            water_mesh(&full, &vec![0.0; span * span], 4, (0, 0), Plane::Rectangles).unwrap();
         let (v, i) = (every.vertices.len(), every.indices.len());
         add_walls(&mut every, &full, &vec![0.0; span * span], 4, (0, 0)).unwrap();
         assert_eq!((every.vertices.len(), every.indices.len()), (v, i));
@@ -603,8 +628,8 @@ mod tests {
         for c in [(0, 0), (1, 0), (0, 1)] {
             w.set_cell_water(c.0, c.1, true, Some(10.0));
         }
-        let plain = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
-        let shared = water_mesh(&w, &samples, 8, (0, 0), true).unwrap();
+        let plain = water_mesh(&w, &samples, 8, (0, 0), Plane::Rectangles).unwrap();
+        let shared = water_mesh(&w, &samples, 8, (0, 0), Plane::Shared).unwrap();
         assert_eq!(plain.indices.len(), shared.indices.len());
         assert!(
             shared.vertices.len() < plain.vertices.len(),
@@ -650,10 +675,10 @@ mod tests {
             w.set_cell_water(1, 0, true, Some(b));
             w
         };
-        let same = water_mesh(&water(10.0, 10.0), &samples, 8, (0, 0), false).unwrap();
+        let same = water_mesh(&water(10.0, 10.0), &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         assert_eq!(same.vertices.len(), 4, "one rectangle over both cells");
         assert_eq!(same.vertices[3], [8192.0, 4096.0, 10.0]);
-        let apart = water_mesh(&water(10.0, 20.0), &samples, 8, (0, 0), false).unwrap();
+        let apart = water_mesh(&water(10.0, 20.0), &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         assert_eq!(apart.vertices.len(), 8);
     }
 
@@ -662,8 +687,65 @@ mod tests {
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         samples[0] = -5.0;
-        let mesh = water_mesh(&world(Some(0.0)), &samples, 8, (0, 0), false).unwrap();
+        let mesh = water_mesh(&world(Some(0.0)), &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         assert_eq!(mesh.vertices[3], [256.0, 256.0, 0.0]);
         assert!(mesh.segments.is_none());
+    }
+
+    /// A staircase of wet cells (3, 2 and 1 cells in three rows) in a level 8 block.
+    fn staircase() -> (Worldspace, Vec<f32>) {
+        let span = 8 * 32 + 1;
+        let mut samples = vec![f32::NAN; span * span];
+        let wet = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (0, 2)];
+        let mut w = Worldspace::from_cells(
+            1,
+            "Mojave",
+            wet.iter().map(|c| (*c, CellHeights::flat(0.0))),
+        );
+        for (cx, cy) in wet {
+            w.set_cell_water(cx, cy, true, Some(100.0));
+            for y in 0..=32 {
+                for x in 0..=32 {
+                    samples[(cy as usize * 32 + y) * span + cx as usize * 32 + x] = 0.0;
+                }
+            }
+        }
+        (w, samples)
+    }
+
+    /// Twice the area of the triangles of a plane, in square units.
+    fn area(mesh: &super::WaterMesh) -> f32 {
+        mesh.indices
+            .chunks(3)
+            .map(|t| {
+                let [a, b, c] = [t[0], t[1], t[2]].map(|i| mesh.vertices[i as usize]);
+                (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            })
+            .sum()
+    }
+
+    #[test]
+    fn polygons_cover_the_same_ground_with_only_the_corners_of_the_outline() {
+        let (w, samples) = staircase();
+        let rects = water_mesh(&w, &samples, 8, (0, 0), Plane::Shared).unwrap();
+        let polygons = water_mesh(&w, &samples, 8, (0, 0), Plane::Polygons).unwrap();
+        // 3 + 2 + 1 cells of 4096 by 4096 units
+        assert_eq!(area(&polygons), 2.0 * 6.0 * 4096.0 * 4096.0);
+        assert_eq!(area(&polygons), area(&rects));
+        // the corners of the staircase: 8; the rectangles share their corners and still need 10
+        assert_eq!((rects.vertices.len(), polygons.vertices.len()), (10, 8));
+        assert!(
+            polygons
+                .vertices
+                .iter()
+                .all(|v| (v[2] - 100.0).abs() < f32::EPSILON)
+        );
+        assert!(polygons.segments.is_none());
+        // level 4 keeps its rectangle per cell segment
+        let level4 = water_mesh(&w, &vec![0.0; 129 * 129], 4, (0, 0), Plane::Polygons);
+        assert_eq!(
+            level4.is_some(),
+            water_mesh(&w, &vec![0.0; 129 * 129], 4, (0, 0), Plane::Rectangles).is_some()
+        );
     }
 }

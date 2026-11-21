@@ -523,6 +523,7 @@ pub fn generate(
                         drop_under_water: request.terrain.drop_under_water,
                         water_walls: request.terrain.water_walls,
                         water_shared_vertices: request.terrain.water_shared_vertices,
+                        water_polygons: request.terrain.water_polygons,
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },

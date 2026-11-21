@@ -39,6 +39,7 @@ fn report(iou: f64, unmatched: u64) -> VerifyDoc {
             iou,
         }],
         per_level: Vec::new(),
+        profile: Vec::new(),
     });
     doc.objects = Some(ObjectReport {
         blocks: 1,

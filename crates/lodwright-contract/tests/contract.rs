@@ -141,6 +141,7 @@ fn sample_verify() -> VerifyDoc {
             iou: 0.333,
         }],
         per_level: Vec::new(),
+        profile: Vec::new(),
     });
     doc.objects = Some(ObjectReport {
         blocks: 1,

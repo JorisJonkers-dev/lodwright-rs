@@ -13,7 +13,8 @@ use std::path::Path;
 use lodwright_contract::{
     Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
     DocumentKind, Handshake, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
-    VerifyDoc, VerifyFinding, VersionInfo, WaterBlock, WaterLevel, WaterReport, schema_json,
+    VerifyDoc, VerifyFinding, VersionInfo, WaterBlock, WaterLevel, WaterProfileLevel, WaterReport,
+    schema_json,
 };
 
 mod commands;
@@ -532,8 +533,40 @@ fn add_block_reports(
             mean: round3(ious.iter().sum::<f64>() / ious.len() as f64),
         })
         .collect();
+    // the shape of the water per level: means over the blocks
+    let mut shapes: std::collections::BTreeMap<u32, Vec<lodwright_gen::WaterProfile>> =
+        std::collections::BTreeMap::new();
+    for w in &blocks.water {
+        if let Some(level) = level_of(&w.path) {
+            shapes.entry(level).or_default().push(w.profile);
+        }
+    }
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    let profile: Vec<WaterProfileLevel> = shapes
+        .into_iter()
+        .map(|(level, list)| {
+            let n = list.len() as f64;
+            let mean = |f: fn(&lodwright_gen::WaterProfile) -> f64| {
+                round3(list.iter().map(f).sum::<f64>() / n)
+            };
+            let agreements: Vec<f64> = list.iter().filter_map(|p| p.height_agreement).collect();
+            WaterProfileLevel {
+                level,
+                blocks: count(list.len()),
+                depth_mine: mean(|p| p.depth_mine),
+                depth_theirs: mean(|p| p.depth_theirs),
+                wall_mine: mean(|p| p.wall_mine),
+                wall_theirs: mean(|p| p.wall_theirs),
+                vertices_mine: round3(list.iter().map(|p| p.vertices_mine).sum::<f64>() / n),
+                vertices_theirs: round3(list.iter().map(|p| p.vertices_theirs).sum::<f64>() / n),
+                height_agreement: (!agreements.is_empty())
+                    .then(|| round3(agreements.iter().sum::<f64>() / agreements.len() as f64)),
+            }
+        })
+        .collect();
     doc.water = Some(WaterReport {
         per_level,
+        profile,
         blocks: count(blocks.water.len()),
         threshold: limit,
         under_threshold: count(blocks.water.iter().filter(under).count()),
@@ -763,6 +796,24 @@ fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
                 out,
                 "water level {}: {} blocks, {} under {}, lowest {:.3}, mean {:.3}",
                 l.level, l.blocks, l.under_threshold, w.threshold, l.lowest, l.mean
+            );
+        }
+        for p in &w.profile {
+            let agreement = p
+                .height_agreement
+                .map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"));
+            let _ = writeln!(
+                out,
+                "water profile level {}: {} blocks, depth {:.1} (reference {:.1}), wall area {:.0} (reference {:.0}), vertices {:.1} (reference {:.1}), height agreement {}",
+                p.level,
+                p.blocks,
+                p.depth_mine,
+                p.depth_theirs,
+                p.wall_mine,
+                p.wall_theirs,
+                p.vertices_mine,
+                p.vertices_theirs,
+                agreement
             );
         }
     }

@@ -45,5 +45,5 @@ pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees, generate_trees_with_progress};
 pub use verify::{
     BlockComparison, Finding, OBJECT_TOLERANCE, ObjectAgreement, TerrainHeightDifference,
-    Verification, WaterOverlap, compare_blocks, compare_folders, verify_folder,
+    Verification, WaterOverlap, WaterProfile, compare_blocks, compare_folders, verify_folder,
 };

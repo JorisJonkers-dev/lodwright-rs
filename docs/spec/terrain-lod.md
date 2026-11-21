@@ -111,6 +111,10 @@ ground overlaps by these intersection-over-union shares, with the same height wh
 the main world: 16 small ponds where our plane covers 2 to 5 times the game's inset outline, three blocks where the
 game draws water from a neighbouring cell's height and we draw none, and one block where the game has none. 25
 blocks differ in block types because the game adds a second, empty segmented shape of one vertex.
+At level 4 a square counts as wet only when its mean ground height lies at least 25 units below the water height
+(own design, fitted to the main world's level 4 blocks: margins of 0, 10, 25, 40 and 60 units gave 39, 37, 34, 36 and 36
+of 98 blocks under 0.95 overlap, with a mean overlap of 0.874, 0.874, 0.874, 0.873 and 0.869; the higher levels are
+unchanged).
 `--no-water` (request `terrain.water: false`) leaves the planes out.
 
 ## 7. Faces under the water (own design)

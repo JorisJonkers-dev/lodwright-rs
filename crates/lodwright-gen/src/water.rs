@@ -12,6 +12,10 @@ use lodwright_core::worldspace::Worldspace;
 
 const CELL_UNITS: f32 = 4096.0;
 const CELL_INTERVALS: usize = 32;
+/// At level 4 a square is wet only when its mean ground lies this many units below the water height. Own design,
+/// fitted to the game's level 4 blocks of the main world: of the margins tried (0 to 60 units) 25 leaves the most
+/// blocks at 0.95 overlap or better with an unchanged mean overlap.
+const LEVEL4_WET_MARGIN: f32 = 25.0;
 
 /// The water plane of one block, relative to the block origin.
 #[derive(Debug, Clone, PartialEq)]
@@ -105,7 +109,8 @@ pub(crate) fn water_mesh(
                         .flat_map(|y| (x0..=x0 + step).map(move |x| samples[y * span + x]))
                         .filter(|h| !h.is_nan())
                         .fold((0.0_f32, 0_u32), |(s, n), h| (s + h, n + 1));
-                    wet[qy * per_cell + qx] = n > 0 && sum / (n as f32) < height;
+                    wet[qy * per_cell + qx] =
+                        n > 0 && sum / (n as f32) < height - LEVEL4_WET_MARGIN;
                 }
             }
             let rects = rectangles(&wet, per_cell);
@@ -239,14 +244,16 @@ mod tests {
                 samples[y * span + x] = 0.0;
             }
         }
-        let mesh = water_mesh(&world(Some(10.0)), &samples, 4, (0, 0)).unwrap();
+        let mesh = water_mesh(&world(Some(100.0)), &samples, 4, (0, 0)).unwrap();
         assert_eq!(mesh.vertices.len(), 4);
-        assert_eq!(mesh.vertices[3], [4096.0, 4096.0, 10.0]);
+        assert_eq!(mesh.vertices[3], [4096.0, 4096.0, 100.0]);
         assert_eq!(mesh.indices, vec![0, 1, 2, 2, 1, 3]);
         let mut want = [0; 16];
         want[0] = 2;
         assert_eq!(mesh.segments, Some(want));
         assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0)).is_none());
+        // ground only 10 units under the water: inside the level 4 margin, so dry
+        assert!(water_mesh(&world(Some(10.0)), &samples, 4, (0, 0)).is_none());
         assert!(water_mesh(&world(None), &samples, 4, (0, 0)).is_none());
     }
 

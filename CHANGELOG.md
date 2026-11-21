@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.9.0...v0.10.0) (2026-11-21)
+
+
+### Features
+
+* **water:** level 4 squares count as wet only 25 units below the water height ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#239](https://github.com/JorisJonkers-dev/lodwright-rs/issues/239)) ([9b6dd63](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9b6dd63ed30cd318017d6575abd1e4f5648d4fea))
+
 ## [0.9.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.8.0...v0.9.0) (2026-11-21)
 
 

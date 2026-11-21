@@ -43,6 +43,8 @@ pub struct Options<'a> {
     pub drop_under_water: Option<f32>,
     /// Write walls under the outline of the water planes (see `water::add_walls`).
     pub water_walls: bool,
+    /// Write a corner that two rectangles of a water plane share once, at levels 8 to 32.
+    pub water_shared_vertices: bool,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -60,6 +62,7 @@ impl Default for Options<'_> {
             water: true,
             drop_under_water: None,
             water_walls: false,
+            water_shared_vertices: false,
             reuse: None,
             cancel: None,
         }
@@ -133,18 +136,19 @@ fn block_inputs(
     samples: &[f32],
     job: &Job,
     tiles: &LandTiles,
-    water: bool,
-    drop_under_water: Option<f32>,
-    water_walls: bool,
+    options: &Options<'_>,
 ) -> String {
     let mut h = Sha256Stream::new();
     h.update(env!("CARGO_PKG_VERSION").as_bytes());
-    h.update(format!("{:?} water={water}", job.level).as_bytes());
-    if let Some(offset) = drop_under_water {
+    h.update(format!("{:?} water={}", job.level, options.water).as_bytes());
+    if let Some(offset) = options.drop_under_water {
         h.update(format!("drop-under-water={offset}").as_bytes());
     }
-    if water && water_walls {
+    if options.water && options.water_walls {
         h.update(b"water-walls");
+    }
+    if options.water && options.water_shared_vertices {
+        h.update(b"water-shared-vertices");
     }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
@@ -227,15 +231,7 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let inputs = block_inputs(
-        world,
-        &samples,
-        job,
-        tiles,
-        options.water,
-        options.drop_under_water,
-        options.water_walls,
-    );
+    let inputs = block_inputs(world, &samples, job, tiles, options);
     if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
         return Ok(Some(BlockRecord {
             key,
@@ -264,7 +260,14 @@ fn run_job(
     let units = level.level as f32 * CELL_UNITS;
     let [diffuse_ref, normal_ref] = layout::nif_texture_paths(name, id)?;
     let water = if options.water {
-        water_mesh(world, &samples, level.level, job.cell).map(|mut mesh| {
+        water_mesh(
+            world,
+            &samples,
+            level.level,
+            job.cell,
+            options.water_shared_vertices,
+        )
+        .map(|mut mesh| {
             if options.water_walls {
                 // a plane that would need more than 65535 vertices with its walls keeps none
                 let plain = mesh.clone();
@@ -551,6 +554,7 @@ mod tests {
                 &Options {
                     drop_under_water: drop,
                     water_walls: false,
+                    water_shared_vertices: false,
                     ..Options::default()
                 },
             )
@@ -658,6 +662,7 @@ mod tests {
                 water: true,
                 drop_under_water: None,
                 water_walls: false,
+                water_shared_vertices: false,
                 reuse: None,
                 cancel: None,
             },
@@ -674,6 +679,7 @@ mod tests {
                 water: true,
                 drop_under_water: None,
                 water_walls: false,
+                water_shared_vertices: false,
                 reuse: None,
                 cancel: None,
             },
@@ -777,7 +783,7 @@ mod tests {
         };
         let tiles = LandTiles::empty();
         let digest =
-            |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, true, None, false);
+            |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, &Options::default());
         assert_eq!(digest(&world()), digest(&bounded([-8.0 * 4096.0, 0.0])));
         assert_ne!(digest(&world()), digest(&bounded([-6.0 * 4096.0, 0.0])));
     }
@@ -845,18 +851,18 @@ mod tests {
             )]))
             .with_scales(&scales.iter().copied().collect())
         };
-        let plain = block_inputs(&w, &[], &job, &tiles(&[]), true, None, false);
+        let plain = block_inputs(&w, &[], &job, &tiles(&[]), &Options::default());
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), true, None, false),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), &Options::default()),
             plain
         );
         assert_ne!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), true, None, false),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), &Options::default()),
             plain
         );
         // a scale for a texture the block does not use leaves its digest alone
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true, None, false),
+            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), &Options::default()),
             plain
         );
     }
@@ -998,7 +1004,7 @@ mod tests {
             cell: (0, 0),
         };
         let digest =
-            |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, true, None, false);
+            |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, &Options::default());
         let a = specular_tiles(Some(10), Some((10, 200)));
         let b = specular_tiles(Some(20), Some((10, 200)));
         assert_eq!(digest(false, &a), digest(false, &b));

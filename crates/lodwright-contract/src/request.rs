@@ -85,6 +85,10 @@ pub struct TerrainRequest {
     /// to (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub water_walls: bool,
+    /// Write a corner that two rectangles of the water plane have in common once, at levels 8 to 32 (fewer vertices,
+    /// the same planes). Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub water_shared_vertices: bool,
 }
 
 impl Default for TerrainRequest {
@@ -97,6 +101,7 @@ impl Default for TerrainRequest {
             texture_scales: BTreeMap::new(),
             drop_under_water: None,
             water_walls: false,
+            water_shared_vertices: false,
         }
     }
 }

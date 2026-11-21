@@ -120,7 +120,7 @@ are the ones written.
 
 ### Walls under the water outline
 
-`terrain.water_walls` (a switch, off by default, written only when on; tier 3, since 0.13.0) writes a vertical wall
+`terrain.water_walls` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes a vertical wall
 under every outer side of a block's water: from the water height down to -14098, the height the game's own water
 outlines drop to. Sides on the block's border get none, and a side between two squares of the same water height gets
 none; at level 4 the walls are triangles of the cell's own segment. The planes themselves do not change, so the water
@@ -128,6 +128,14 @@ overlap of `verify` is the same; the water profile of `verify --reference` (dept
 Own design fitted to measured numbers (`docs/spec/terrain-lod.md`, section 6), not yet looked at in the game: the owner
 decides whether it is worth turning on. Off, output and digests are as before; on, the switch enters the digest of
 every terrain block that has water.
+
+### Shared corners of the water planes
+
+`terrain.water_shared_vertices` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes a corner
+that two rectangles of a water plane have in common once, at levels 8 to 32 (level 4 keeps one rectangle per
+cell segment). The triangles are the same corner for corner, so the water overlap and the covered ground do not change;
+only the number of vertices in the file falls. Off, output and digests are as before; on, the switch enters the digest
+of every terrain block that has water.
 
 ### Skirts at block borders
 

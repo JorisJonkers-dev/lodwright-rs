@@ -192,7 +192,7 @@ pub struct WaterProfileLevel {
     pub wall_mine: f64,
     /// The same for the reference.
     pub wall_theirs: f64,
-    /// Mean number of distinct water vertices per block: lodwright's.
+    /// Mean number of water vertices a block carries in the file (every water shape but the empty one): lodwright's.
     pub vertices_mine: f64,
     /// The same for the reference.
     pub vertices_theirs: f64,

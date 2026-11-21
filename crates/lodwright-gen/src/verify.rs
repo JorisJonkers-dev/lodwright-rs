@@ -736,7 +736,7 @@ pub struct WaterProfile {
     /// Of the grid cells both cover, the share whose top surface heights differ by at most 1 unit; `None` when the two
     /// cover no cell in common.
     pub height_agreement: Option<f64>,
-    /// The water vertices of the block (every water shape), ours.
+    /// The water vertices the block carries in the file (every water shape but the empty one), ours.
     pub vertices_mine: f64,
     /// The same for the reference.
     pub vertices_theirs: f64,
@@ -763,13 +763,22 @@ fn wall_area(tris: &[Tri3]) -> f64 {
         .fold(0.0, |total, area| total + area)
 }
 
-fn vertex_count(tris: &[Tri3]) -> f64 {
-    // corners shared by triangles are counted once
-    let mut seen: Vec<[u64; 3]> = tris.iter().flatten().map(|p| p.map(f64::to_bits)).collect();
-    seen.sort_unstable();
-    seen.dedup();
+/// The vertices the water shapes of a block carry in the file (every data block after the terrain's, not counting the
+/// empty one-vertex shape): the number the game's blocks are counted by.
+fn water_vertex_count(nif: &NifFile) -> f64 {
+    let n: usize = nif
+        .blocks
+        .iter()
+        .filter_map(|b| match &b.body {
+            Body::TriShapeData(d) => Some(d),
+            _ => None,
+        })
+        .skip(1)
+        .map(|d| d.geometry.vertices.as_deref().map_or(0, <[_]>::len))
+        .filter(|n| *n > 1)
+        .sum();
     #[allow(clippy::cast_precision_loss, reason = "a few thousand")]
-    let n = seen.len() as f64;
+    let n = n as f64;
     n
 }
 
@@ -845,8 +854,8 @@ fn water_profile(mine: &[Tri3], theirs: &[Tri3]) -> WaterProfile {
         wall_mine: wall_area(mine),
         wall_theirs: wall_area(theirs),
         height_agreement: None,
-        vertices_mine: vertex_count(mine),
-        vertices_theirs: vertex_count(theirs),
+        vertices_mine: 0.0,
+        vertices_theirs: 0.0,
     };
     if !min[0].is_finite() {
         return out;
@@ -1031,7 +1040,11 @@ pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
                 out.water.push(WaterOverlap {
                     path: name.clone(),
                     iou: water_iou(&wa, &wb),
-                    profile: water_profile(&water_triangles3(&a), &water_triangles3(&b)),
+                    profile: WaterProfile {
+                        vertices_mine: water_vertex_count(&a),
+                        vertices_theirs: water_vertex_count(&b),
+                        ..water_profile(&water_triangles3(&a), &water_triangles3(&b))
+                    },
                 });
             }
         }
@@ -1230,14 +1243,12 @@ mod tests {
         assert_eq!(same.depth_mine.to_bits(), 0.0_f64.to_bits());
         assert_eq!(same.wall_mine.to_bits(), 0.0_f64.to_bits());
         assert_eq!(same.height_agreement, Some(1.0));
-        assert_eq!(same.vertices_mine.to_bits(), 4.0_f64.to_bits());
         let p = super::water_profile(&flat, &walled);
         assert!((p.depth_theirs - 55.0).abs() < 1e-9);
         // two triangles of 100 by 55, half each
         assert!((p.wall_theirs - 5500.0).abs() < 1e-6, "{}", p.wall_theirs);
         assert!(p.wall_mine.abs() < 1e-12);
         assert_eq!(p.height_agreement, Some(1.0));
-        assert!((p.vertices_theirs - 6.0).abs() < 1e-12);
         // a plane one unit and a half higher agrees nowhere
         let raised: Vec<super::Tri3> = flat
             .iter()

@@ -23,7 +23,7 @@ const SKIRTS_SINCE: &str = "0.9.0";
 /// The release that introduces dropping terrain faces under water.
 const DROP_WATER_SINCE: &str = "0.9.0";
 /// The release that adds `terrain.water_walls`.
-const WALLS_SINCE: &str = "0.13.0";
+const WALLS_SINCE: &str = "0.14.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -73,6 +73,7 @@ fn per_level(key: &str, kind: OptionKind, value: impl Fn(&LevelSettings) -> Valu
 /// # Panics
 /// Never: a request serialises.
 #[must_use]
+#[allow(clippy::too_many_lines, reason = "one row per request option")]
 pub fn request_defaults() -> Defaults {
     let doc = serde_json::to_value(Request::new("", &[], "")).expect("a request serialises");
     let mut options = vec![option(&doc, "worlds", OptionKind::List)];
@@ -94,12 +95,22 @@ pub fn request_defaults() -> Defaults {
         since: DROP_WATER_SINCE.to_owned(),
         ..option(&doc, "terrain.drop_under_water", OptionKind::Number)
     });
-    options.push(OptionInfo {
-        default: Value::Bool(Request::new("", &[], "").terrain.water_walls),
-        tier: 3,
-        since: WALLS_SINCE.to_owned(),
-        ..option(&doc, "terrain.water_walls", OptionKind::Switch)
-    });
+    // switches that are off by default are not written while off: their default comes from the request type
+    let terrain = Request::new("", &[], "").terrain;
+    for (key, default) in [
+        ("terrain.water_walls", terrain.water_walls),
+        (
+            "terrain.water_shared_vertices",
+            terrain.water_shared_vertices,
+        ),
+    ] {
+        options.push(OptionInfo {
+            default: Value::Bool(default),
+            tier: 3,
+            since: WALLS_SINCE.to_owned(),
+            ..option(&doc, key, OptionKind::Switch)
+        });
+    }
     options.push(option(&doc, "objects.enabled", OptionKind::Switch));
     // options that are off by default are not written while off: their default comes from the request type
     let objects = Request::new("", &[], "").objects;
@@ -302,7 +313,7 @@ mod tests {
                 && (o.since == "0.6.0"
                     || o.since == "0.7.0"
                     || o.since == "0.9.0"
-                    || o.since == "0.13.0"))));
+                    || o.since == "0.14.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

@@ -41,11 +41,44 @@ The `lodwright` program is published on each release as an OCI package on ghcr.i
 `ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu`
 
 where `<version>` is the release tag without the leading `v`. The package is a `tar.gz` archive with the binary and
-`LICENSE`. Verify it with:
+`LICENSE`. The package is an OCI artifact with one layer; the layer is that archive, and its digest equals the
+"Archive SHA-256" in the release notes.
+
+Verify it with:
 
 ```sh
 gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
 ```
+
+This needs `gh` 2.49 or newer (older versions, such as the 2.46 of Debian 13, have no `attestation` command) and
+a GitHub token: run `gh auth login` or set `GH_TOKEN`, even though the package and its attestation are public.
+
+### Pulling and verifying without a login or docker
+
+The package is public, so an anonymous token is enough. With `curl`, `python3` and `sha256sum` (replace `<version>`):
+
+```sh
+TAG=<version>-x86_64-unknown-linux-gnu
+TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:jorisjonkers-dev/lodwright-rs:pull" | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+# the manifest (keep the digest header: it is the manifest digest) and the layer it names
+curl -s -D headers.txt -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+  -o manifest.json "https://ghcr.io/v2/jorisjonkers-dev/lodwright-rs/manifests/$TAG"
+LAYER=$(python3 -c 'import json;print(json.load(open("manifest.json"))["layers"][0]["digest"])')
+curl -sL -H "Authorization: Bearer $TOKEN" -o lodwright.tar.gz "https://ghcr.io/v2/jorisjonkers-dev/lodwright-rs/blobs/$LAYER"
+sha256sum lodwright.tar.gz    # equals the Archive SHA-256 of the release notes and the layer digest
+```
+
+To verify the attestation without a login, fetch its bundle from the public API (the digest is the manifest digest
+from `headers.txt`, `docker-content-digest`) and give it to `gh`, which then needs no token:
+
+```sh
+DIGEST=$(grep -i '^docker-content-digest:' headers.txt | tr -d '\r' | cut -d' ' -f2)
+curl -s "https://api.github.com/repos/JorisJonkers-dev/lodwright-rs/attestations/$DIGEST" \
+  | python3 -c 'import sys,json;[print(json.dumps(a["bundle"])) for a in json.load(sys.stdin)["attestations"]]' > bundle.jsonl
+gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:$TAG --bundle bundle.jsonl --repo JorisJonkers-dev/lodwright-rs
+```
+
+`gh` exits 0 when the bundle verifies. The unauthenticated GitHub API allows 60 requests an hour per address.
 
 To republish an existing tag, for example after the package was renamed, run the release workflow by hand on `main` with the tag and `publish` set: `gh workflow run release.yml -R JorisJonkers-dev/lodwright-rs --ref main -f tag=vX.Y.Z -f publish=true`. The run builds the assets of that tag, uploads them to its GitHub release and pushes the package again. Without `publish=true` it is a dry run that pushes nothing.
 

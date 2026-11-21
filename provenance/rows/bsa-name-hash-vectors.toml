@@ -1,0 +1,10 @@
+[[source]]
+id = "bsa-name-hash-vectors"
+fact = "Name and hash pairs of v104 archives of the owner's own Fallout New Vegas install, which the hash of bsa-name-hash reproduces: folder 'meshes\\landscape\\lod\\wastelandnvmini\\blocks' = 0x1c1895466d2b6b73; file names 'wastelandnvmini.level4.x-4.y-4.nif' = 0x19faf20a771ead34, 'wastelandnvmini.level4.x-4.y-8.nif' = 0x19faf20a771ead38, 'nv_deathclawsign.nif' = 0xbaea89bd6e10e76e, 'snowglobenelisafb_d.dds' = 0x039ecb9a7313dfe4, 'snowglobenelisafb_n.dds' = 0x039ecb9a7313dfee, 'mtfastforward.kf' = 0x0ef98d0c6d0d72e4, 'npc_mirelurkking_sonic_equip.wav' = 0x345c7d09ee1c6970, 'falloutdict.txt' = 0x04f85d54660b6374. In those archives the folder records ascend by folder hash and the file records of every folder ascend by file hash, as unsigned 64-bit values."
+url = "oracle:game-bsa-records"
+licence = "Own measurement: names and numbers of the owner's own game archives, no content recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured 2026-11-21 with a throwaway script (not in the repository) that wrote the hash of bsa-name-hash independently of the Rust code and compared it with every folder and file record of Fallout - Meshes.bsa, Fallout - Textures.bsa, Fallout - Textures2.bsa, Fallout - Misc.bsa and Update.bsa: 20665, 11993, 10863, 152 and 108 records, 0 differences. Ascending order held in all five (folders, and files within each folder). This is the public-test-vector evidence the hash row waited for (issue 124); the writer's tests use the pairs above. Not second-read."

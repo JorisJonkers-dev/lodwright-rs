@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.12.0...v0.13.0) (2026-11-21)
+
+
+### Features
+
+* **verify:** water profile per level, to see walls, depth and height of the water outline ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#255](https://github.com/JorisJonkers-dev/lodwright-rs/issues/255)) ([85af450](https://github.com/JorisJonkers-dev/lodwright-rs/commit/85af450634c218fb4ad2aadd35de8b2a3c649435))
+
+
+### Performance Improvements
+
+* **terrain:** scan each triangle row by row when scoring greedy insertion ([#256](https://github.com/JorisJonkers-dev/lodwright-rs/issues/256)) ([#257](https://github.com/JorisJonkers-dev/lodwright-rs/issues/257)) ([2ea915f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/2ea915f440d7a5c13d57144a6d34675a440d1780))
+
 ## [0.12.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.11.0...v0.12.0) (2026-11-21)
 
 

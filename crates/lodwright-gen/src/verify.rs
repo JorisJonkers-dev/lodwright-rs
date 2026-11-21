@@ -90,8 +90,9 @@ impl Ctx {
     }
 
     fn check_geometry(&mut self, path: &str, nif: &NifFile, size: Option<f32>, object: bool) {
-        // a terrain block with a water plane has two more (`game-lod-water-shape`)
-        let expected: &[usize] = if object { &[7] } else { &[8, 10] };
+        // a terrain block with a water plane has two more (`game-lod-water-shape`), and two more again with the empty
+        // shape of `game-lod-water-placeholder`
+        let expected: &[usize] = if object { &[7] } else { &[8, 10, 12] };
         if !expected.contains(&nif.blocks.len()) {
             self.err(
                 path,
@@ -366,7 +367,9 @@ pub fn verify_folder(root: &Path) -> Verification {
                         .strip_prefix("meshes/landscape/lod/")
                         .and_then(|r| r.split('/').next())
                         .unwrap_or("");
-                    let (ax, ay) = anchors.get(world).copied().unwrap_or((0, 0));
+                    // a world without a settings file has no start to check against (a world with no terrain
+                    // still gets object blocks on its own grid, #245)
+                    let (ax, ay) = anchors.get(world).copied().unwrap_or((x, y));
                     let step = i32::try_from(level).unwrap_or(1);
                     if (x - ax).rem_euclid(step) != 0 || (y - ay).rem_euclid(step) != 0 {
                         ctx.err(
@@ -404,14 +407,19 @@ pub fn verify_folder(root: &Path) -> Verification {
             match LodSettings::parse(&bytes) {
                 Err(e) => ctx.err(rel, e.to_string()),
                 Ok(s) => {
-                    if s.width_cells
-                        != u32::try_from(i32::from(s.north_east.0) - i32::from(s.south_west.0) + 1)
-                            .unwrap_or(0)
+                    // the width is the corner span plus one (a world without declared corners), or the span rounded up
+                    // to a power of two (`game-lod-settings-extent`)
+                    let dx = i32::from(s.north_east.0) - i32::from(s.south_west.0);
+                    let dy = i32::from(s.north_east.1) - i32::from(s.south_west.1);
+                    let span = u32::try_from(dx.max(dy)).unwrap_or(0);
+                    let plain = u32::try_from(dx + 1).unwrap_or(0);
+                    if s.width_cells != plain
+                        && !(s.width_cells.is_power_of_two() && s.width_cells >= span)
                     {
                         ctx.err(rel, "the width disagrees with the corners");
                     }
-                    if s.lowest_level != 4 || ![8, 16, 32].contains(&s.highest_level) {
-                        ctx.err(rel, "the level range is not 4 to 8, 16 or 32");
+                    if s.lowest_level != 4 || ![4, 8, 16, 32].contains(&s.highest_level) {
+                        ctx.err(rel, "the level range is not 4 to 4, 8, 16 or 32");
                     }
                 }
             }
@@ -511,8 +519,11 @@ pub fn compare_folders(folder: &Path, reference: &Path) -> Vec<Finding> {
 /// A triangle seen from above: three corners, x and y.
 type Flat = [[f64; 2]; 3];
 
-/// The triangles of a terrain block's water plane, seen from above: those of every data block after the terrain's.
-fn water_triangles(nif: &NifFile) -> Vec<Flat> {
+/// A triangle with its heights.
+type Tri3 = [[f64; 3]; 3];
+
+/// The triangles of a terrain block's water plane with their heights: those of every data block after the terrain's.
+fn water_triangles3(nif: &NifFile) -> Vec<Tri3> {
     nif.blocks
         .iter()
         .filter_map(|b| match &b.body {
@@ -528,10 +539,18 @@ fn water_triangles(nif: &NifFile) -> Vec<Flat> {
                 .iter()
                 .filter_map(move |t| {
                     let [a, b, c] = t.map(|i| v.get(usize::from(i)).copied());
-                    let flat = |p: [f32; 3]| [f64::from(p[0]), f64::from(p[1])];
-                    Some([flat(a?), flat(b?), flat(c?)])
+                    let point = |p: [f32; 3]| [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])];
+                    Some([point(a?), point(b?), point(c?)])
                 })
         })
+        .collect()
+}
+
+/// The triangles of a terrain block's water plane, seen from above: those of every data block after the terrain's.
+fn water_triangles(nif: &NifFile) -> Vec<Flat> {
+    water_triangles3(nif)
+        .iter()
+        .map(|t| t.map(|p| [p[0], p[1]]))
         .collect()
 }
 
@@ -701,6 +720,168 @@ fn water_iou(mine: &[Flat], theirs: &[Flat]) -> f64 {
     iou
 }
 
+/// How the water of one block is shaped beyond the ground it covers: how far down it reaches, how much of it is
+/// sloped, and whether the two surfaces agree in height where both cover the ground.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WaterProfile {
+    /// The highest minus the lowest vertex of the block's water, in world units (0 for a flat plane), ours.
+    pub depth_mine: f64,
+    /// The same for the reference.
+    pub depth_theirs: f64,
+    /// The area of the steep triangles (seen from above they cover less than a thousandth of their own area: the
+    /// walls and slopes at the edge of the water), in square world units, ours.
+    pub wall_mine: f64,
+    /// The same for the reference.
+    pub wall_theirs: f64,
+    /// Of the grid cells both cover, the share whose top surface heights differ by at most 1 unit; `None` when the two
+    /// cover no cell in common.
+    pub height_agreement: Option<f64>,
+    /// The water vertices the block carries in the file (every water shape but the empty one), ours.
+    pub vertices_mine: f64,
+    /// The same for the reference.
+    pub vertices_theirs: f64,
+}
+
+fn wall_area(tris: &[Tri3]) -> f64 {
+    tris.iter()
+        .map(|t| {
+            let u = [t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]];
+            let v = [t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]];
+            let n = [
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            ];
+            let full = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt() / 2.0;
+            let plan = n[2].abs() / 2.0;
+            if full > 0.0 && plan < full * 1.0e-3 {
+                full
+            } else {
+                0.0
+            }
+        })
+        .fold(0.0, |total, area| total + area)
+}
+
+/// The vertices the water shapes of a block carry in the file (every data block after the terrain's, not counting the
+/// empty one-vertex shape): the number the game's blocks are counted by.
+fn water_vertex_count(nif: &NifFile) -> f64 {
+    let n: usize = nif
+        .blocks
+        .iter()
+        .filter_map(|b| match &b.body {
+            Body::TriShapeData(d) => Some(d),
+            _ => None,
+        })
+        .skip(1)
+        .map(|d| d.geometry.vertices.as_deref().map_or(0, <[_]>::len))
+        .filter(|n| *n > 1)
+        .sum();
+    #[allow(clippy::cast_precision_loss, reason = "a few thousand")]
+    let n = n as f64;
+    n
+}
+
+fn depth_of(tris: &[Tri3]) -> f64 {
+    let heights = tris.iter().flatten().map(|p| p[2]);
+    let (low, high) = heights.fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), z| {
+        (l.min(z), h.max(z))
+    });
+    if low.is_finite() { high - low } else { 0.0 }
+}
+
+/// Mark the grid cells whose centre lies in a triangle with the top surface height of each (the highest triangle).
+fn rasterise_heights(triangles: &[Tri3], min: [f64; 2], cell: [f64; 2], top: &mut [f64]) {
+    let n = IOU_GRID;
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss,
+        reason = "grid indices are clamped to 0..400"
+    )]
+    let index = |value: f64, axis: usize| -> usize {
+        (((value - min[axis]) / cell[axis]).floor().max(0.0) as usize).min(n - 1)
+    };
+    for t in triangles {
+        let area =
+            (t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0]);
+        if area == 0.0 {
+            continue;
+        }
+        let zs = t.map(|p| p[2]);
+        let xs = t.map(|p| p[0]);
+        let ys = t.map(|p| p[1]);
+        let lo = |v: [f64; 3]| v.into_iter().fold(f64::INFINITY, f64::min);
+        let hi = |v: [f64; 3]| v.into_iter().fold(f64::NEG_INFINITY, f64::max);
+        for row in index(lo(ys), 1)..=index(hi(ys), 1) {
+            for col in index(lo(xs), 0)..=index(hi(xs), 0) {
+                #[allow(clippy::cast_precision_loss, reason = "at most 400")]
+                let p = [
+                    min[0] + (col as f64 + 0.5) * cell[0],
+                    min[1] + (row as f64 + 0.5) * cell[1],
+                ];
+                let w0 = (t[1][0] - p[0]) * (t[2][1] - p[1]) - (t[1][1] - p[1]) * (t[2][0] - p[0]);
+                let w1 = (t[2][0] - p[0]) * (t[0][1] - p[1]) - (t[2][1] - p[1]) * (t[0][0] - p[0]);
+                let w2 = (t[0][0] - p[0]) * (t[1][1] - p[1]) - (t[0][1] - p[1]) * (t[1][0] - p[0]);
+                let inside = [w0, w1, w2].iter().all(|w| *w * area >= 0.0);
+                if !inside {
+                    continue;
+                }
+                let z = (w0 * zs[0] + w1 * zs[1] + w2 * zs[2]) / area;
+                let at = row * n + col;
+                if top[at].is_nan() || z > top[at] {
+                    top[at] = z;
+                }
+            }
+        }
+    }
+}
+
+/// The [`WaterProfile`] of one block's two water planes.
+#[must_use]
+fn water_profile(mine: &[Tri3], theirs: &[Tri3]) -> WaterProfile {
+    let mut min = [f64::INFINITY; 2];
+    let mut max = [f64::NEG_INFINITY; 2];
+    for p in mine.iter().chain(theirs).flatten() {
+        for axis in 0..2 {
+            min[axis] = min[axis].min(p[axis]);
+            max[axis] = max[axis].max(p[axis]);
+        }
+    }
+    let mut out = WaterProfile {
+        depth_mine: depth_of(mine),
+        depth_theirs: depth_of(theirs),
+        wall_mine: wall_area(mine),
+        wall_theirs: wall_area(theirs),
+        height_agreement: None,
+        vertices_mine: 0.0,
+        vertices_theirs: 0.0,
+    };
+    if !min[0].is_finite() {
+        return out;
+    }
+    #[allow(clippy::cast_precision_loss, reason = "400")]
+    let cell =
+        [0, 1].map(|axis| ((max[axis] - min[axis]) / IOU_GRID as f64).max(f64::MIN_POSITIVE));
+    let size = IOU_GRID * IOU_GRID;
+    let (mut top_a, mut top_b) = (vec![f64::NAN; size], vec![f64::NAN; size]);
+    rasterise_heights(mine, min, cell, &mut top_a);
+    rasterise_heights(theirs, min, cell, &mut top_b);
+    let both: Vec<(f64, f64)> = top_a
+        .iter()
+        .zip(&top_b)
+        .filter(|(a, b)| !a.is_nan() && !b.is_nan())
+        .map(|(a, b)| (*a, *b))
+        .collect();
+    if !both.is_empty() {
+        #[allow(clippy::cast_precision_loss, reason = "at most 160000")]
+        let agree =
+            both.iter().filter(|(a, b)| (a - b).abs() <= 1.0).count() as f64 / both.len() as f64;
+        out.height_agreement = Some(agree);
+    }
+    out
+}
+
 /// How far a vertex may lie from the reference's nearest one and still count as matched.
 pub const OBJECT_TOLERANCE: f32 = 0.05;
 
@@ -746,6 +927,8 @@ pub struct WaterOverlap {
     pub path: String,
     /// The `IoU` of the covered ground, unrounded.
     pub iou: f64,
+    /// The shape of the water beyond the ground it covers.
+    pub profile: WaterProfile,
 }
 
 /// One object block compared with the reference's.
@@ -857,6 +1040,11 @@ pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
                 out.water.push(WaterOverlap {
                     path: name.clone(),
                     iou: water_iou(&wa, &wb),
+                    profile: WaterProfile {
+                        vertices_mine: water_vertex_count(&a),
+                        vertices_theirs: water_vertex_count(&b),
+                        ..water_profile(&water_triangles3(&a), &water_triangles3(&b))
+                    },
                 });
             }
         }
@@ -1041,6 +1229,73 @@ mod tests {
         assert_eq!(unmatched_vertices(&a, &far), 1);
     }
 
+    #[test]
+    fn the_water_profile_sees_walls_depth_vertices_and_height_differences() {
+        let flat: Vec<super::Tri3> = vec![
+            [[0.0, 0.0, 5.0], [100.0, 0.0, 5.0], [0.0, 100.0, 5.0]],
+            [[100.0, 0.0, 5.0], [100.0, 100.0, 5.0], [0.0, 100.0, 5.0]],
+        ];
+        // the same plane with a vertical wall under its south edge, down to -50
+        let mut walled = flat.clone();
+        walled.push([[0.0, 0.0, 5.0], [100.0, 0.0, 5.0], [0.0, 0.0, -50.0]]);
+        walled.push([[100.0, 0.0, 5.0], [100.0, 0.0, -50.0], [0.0, 0.0, -50.0]]);
+        let same = super::water_profile(&flat, &flat);
+        assert_eq!(same.depth_mine.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(same.wall_mine.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(same.height_agreement, Some(1.0));
+        let p = super::water_profile(&flat, &walled);
+        assert!((p.depth_theirs - 55.0).abs() < 1e-9);
+        // two triangles of 100 by 55, half each
+        assert!((p.wall_theirs - 5500.0).abs() < 1e-6, "{}", p.wall_theirs);
+        assert!(p.wall_mine.abs() < 1e-12);
+        assert_eq!(p.height_agreement, Some(1.0));
+        // a plane one unit and a half higher agrees nowhere
+        let raised: Vec<super::Tri3> = flat
+            .iter()
+            .map(|t| t.map(|v| [v[0], v[1], v[2] + 1.5]))
+            .collect();
+        assert_eq!(
+            super::water_profile(&flat, &raised).height_agreement,
+            Some(0.0)
+        );
+        // one side without water
+        let none = super::water_profile(&flat, &[]);
+        assert_eq!(none.height_agreement, None);
+        assert!(none.depth_theirs.abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_block_with_the_placeholder_shape_has_twelve_blocks_and_passes_the_geometry_check() {
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [16384.0, 0.0, 0.0],
+            [16384.0, 16384.0, 0.0],
+            [0.0, 16384.0, 0.0],
+        ];
+        let indices = [0, 1, 2, 0, 2, 3];
+        let water = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
+        let nif = lodwright_nif::terrain_block(&lodwright_nif::TerrainBlock {
+            origin: (0.0, 0.0),
+            size: 16384.0,
+            vertices: &vertices,
+            indices: &indices,
+            textures: ["a.dds", "b.dds"],
+            water: Some(lodwright_nif::WaterShape {
+                vertices: &water,
+                indices: &[0, 1, 2],
+                segments: None,
+                placeholder: true,
+            }),
+        })
+        .unwrap();
+        assert_eq!(nif.blocks.len(), 12);
+        let mut ctx = super::Ctx {
+            out: super::Verification::default(),
+        };
+        ctx.check_geometry("a.nif", &nif, Some(16384.0), false);
+        assert!(ctx.out.errors.is_empty(), "{:?}", ctx.out.errors);
+    }
+
     fn write_terrain(root: &std::path::Path, name: &str, water: Option<(f32, f32)>) {
         let vertices = [
             [0.0, 0.0, 0.0],
@@ -1067,6 +1322,7 @@ mod tests {
                 vertices: v,
                 indices: &indices,
                 segments: None,
+                placeholder: false,
             }),
         })
         .unwrap();
@@ -1096,6 +1352,63 @@ mod tests {
         let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x0.y0.nif");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    fn grid_errors(world_dir: &str, settings_start: Option<(i16, i16)>, name: &str) -> usize {
+        let root = temp(&format!("grid-{world_dir}-{}", settings_start.is_some()));
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [16384.0, 0.0, 0.0],
+            [16384.0, 16384.0, 0.0],
+            [0.0, 16384.0, 0.0],
+        ];
+        let nif = lodwright_nif::terrain_block(&lodwright_nif::TerrainBlock {
+            origin: (0.0, 0.0),
+            size: 16384.0,
+            vertices: &vertices,
+            indices: &[0, 1, 2, 0, 2, 3],
+            textures: ["a.dds", "b.dds"],
+            water: None,
+        })
+        .unwrap();
+        let path = root.join(format!("meshes/landscape/lod/{world_dir}/blocks/{name}"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, nif.write().unwrap()).unwrap();
+        if let Some(start) = settings_start {
+            let dir = root.join("lodsettings");
+            std::fs::create_dir_all(&dir).unwrap();
+            let settings =
+                lodwright_core::lod::LodSettings::for_bounds(start, (start.0 + 7, start.1 + 7), 4);
+            std::fs::write(
+                dir.join(format!("{world_dir}.dlodsettings")),
+                settings.to_bytes(),
+            )
+            .unwrap();
+        }
+        verify_folder(&root)
+            .errors
+            .iter()
+            .filter(|e| e.problem.contains("not on the world's grid"))
+            .count()
+    }
+
+    #[test]
+    fn an_object_block_of_a_world_without_a_settings_file_is_not_checked_against_a_grid() {
+        // a world with no terrain: object blocks and no settings file (#245)
+        assert_eq!(grid_errors("oasis", None, "oasis.level4.x-5.y27.nif"), 0);
+    }
+
+    #[test]
+    fn a_block_off_the_grid_of_its_settings_file_is_still_an_error() {
+        // start (-5, 27): x-5 y27 is on the grid, x-4 is not
+        assert_eq!(
+            grid_errors("oasis", Some((-5, 27)), "oasis.level4.x-5.y27.nif"),
+            0
+        );
+        assert_eq!(
+            grid_errors("oasis", Some((-5, 27)), "oasis.level4.x-4.y27.nif"),
+            1
+        );
     }
 
     #[test]

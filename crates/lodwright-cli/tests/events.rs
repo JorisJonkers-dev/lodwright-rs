@@ -273,6 +273,114 @@ fn object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_worl
 }
 
 #[test]
+fn a_recorded_run_with_terrain_objects_and_trees_has_a_run_number_that_never_goes_back() {
+    use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, ProgressEvent, Step};
+    let d = data("run");
+    let out = temp("run-out");
+    let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
+    request.limits.threads = Some(1);
+    let mut events: Vec<ProgressEvent> = Vec::new();
+    let mut record = |e: &ProgressEvent| events.push(e.clone());
+    let outcome = lodwright_api::generate(
+        &GenerateRequest::new(request),
+        &mut record,
+        &CancelToken::new(),
+    )
+    .unwrap();
+    assert!(matches!(outcome, GenerateOutcome::Done { .. }));
+    let steps: Vec<Step> = {
+        let mut s: Vec<Step> = events.iter().map(|e| e.step).collect();
+        s.dedup();
+        s
+    };
+    assert_eq!(
+        steps,
+        [
+            Step::ReadPlugins,
+            Step::Terrain,
+            Step::Objects,
+            Step::Trees,
+            Step::Manifest
+        ]
+    );
+    let done: Vec<u64> = events.iter().map(|e| e.run_done.unwrap()).collect();
+    assert!(done.windows(2).all(|w| w[0] <= w[1]), "{done:?}");
+    assert!(events.iter().all(|e| e.run_total == Some(10_000)));
+    // every phase has a stable total and its own index: read, terrain, objects, trees, manifest
+    for (step, index) in steps.iter().zip(1_u32..) {
+        let of_step: Vec<&ProgressEvent> = events.iter().filter(|e| e.step == *step).collect();
+        assert!(of_step.iter().all(|e| e.phase_index == Some(index)));
+        let totals: Vec<_> = of_step.iter().map(|e| e.phase_total).collect();
+        assert!(totals.windows(2).all(|w| w[0] == w[1]));
+    }
+    assert!(events[1..].iter().all(|e| e.phase_count == Some(5)));
+    // the last block of each phase fills the phase: the next phase starts where it ended
+    for step in [Step::Terrain, Step::Objects, Step::Trees] {
+        let last = events
+            .iter()
+            .rfind(|e| e.step == step && e.done.is_some())
+            .unwrap();
+        if step != Step::Terrain {
+            assert_eq!(last.phase_done, last.phase_total);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&out);
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn the_events_file_lines_carry_the_same_run_numbers_as_the_callback() {
+    let d = data("filerun");
+    let out = temp("filerun-out");
+    let events = temp("filerun.ndjson");
+    let code = go(&[
+        "generate",
+        "--data",
+        d.to_str().unwrap(),
+        "--plugin",
+        "Island.esm",
+        "--out",
+        out.to_str().unwrap(),
+        "--threads",
+        "1",
+        "--events",
+        events.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0);
+    let mut last = 0;
+    let mut phases = Vec::new();
+    for l in std::fs::read_to_string(&events).unwrap().lines() {
+        let Event::Block {
+            phase,
+            phase_index,
+            phase_count,
+            phase_done,
+            phase_total,
+            run_done,
+            run_total,
+            ..
+        } = serde_json::from_str::<Event>(l).unwrap();
+        assert_eq!((phase_count, run_total), (Some(5), Some(10_000)));
+        assert!(phase_done <= phase_total);
+        let run = run_done.unwrap();
+        assert!(run >= last);
+        last = run;
+        phases.push((phase.unwrap(), phase_index.unwrap()));
+    }
+    phases.dedup();
+    assert_eq!(
+        phases,
+        [
+            ("terrain".to_owned(), 2),
+            ("objects".to_owned(), 3),
+            ("trees".to_owned(), 4)
+        ]
+    );
+    let _ = std::fs::remove_dir_all(&out);
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
 fn the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lines() {
     let d = data("request");
     let out = temp("request-out");

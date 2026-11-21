@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-settings-extent"
+fact = "In the game's own LOD trees the settings file of a world ends at the cell of the maximum corner NAM9 (floor of NAM9 divided by 4096), starts at the grid start (the NAM0 cell), has as width the larger of the two extents rounded up to a power of two, and the terrain levels in the tree go up to a quarter of that width and no higher (4 to 32): width 16 and highest level 4 for BoulderCityWorld (corners (-6, -5) and (6, 8)), width 32 and highest 8 for FreesideWorld ((-10, -8) to (7, 12)), width 64 and highest 16 for the 64 by 64 worlds, width 128 and highest 32 for WastelandNV."
+url = "oracle:game-lod-files"
+licence = "Settings fields and block names of the owner's own game files compared with the corners of the plugins as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on the 26 worlds that have a reference tree (ten plugins of Fallout New Vegas and its DLCs): the rule fits every one. Exception: WastelandNV, whose declared extent exceeds 128 cells (NAM9 up to cell 272) and whose settings end at the end of its land (63, 63) with width 128; lodwright takes the end of the land when the declared extent exceeds 128 cells. Which levels exist follows the settings file, not the data: the levels above width / 4 have no block files in the game's tree. Not second-read."

@@ -1,14 +1,11 @@
 world Testland (form 00000A00): 3 cells, x -5..1 y 0..3, max seam error 216.00
-  level 4: 2 blocks, 543 vertices, 891 triangles, max error 140.00
-  level 8: 2 blocks, 662 vertices, 1079 triangles, max error 150.00
-  level 16: 2 blocks, 648 vertices, 1048 triangles, max error 155.00
-  level 32: 2 blocks, 422 vertices, 637 triangles, max error 253.50
+  level 4: 2 blocks, 229 vertices, 260 triangles, max error 0.00
+  level 8: 1 blocks, 267 vertices, 304 triangles, max error 20.63
+  level 16: 1 blocks, 275 vertices, 320 triangles, max error 32.00
+  level 32: 1 blocks, 274 vertices, 318 triangles, max error 48.43
   settings: lodsettings/testland.dlodsettings
-  block L4 (-8,0) step 1 vertices 152 triangles 226 error 0.00 meshes/landscape/lod/testland/testland.level4.x-8.y0.nif
-  block L4 (0,0) step 1 vertices 391 triangles 665 error 140.00 meshes/landscape/lod/testland/testland.level4.x0.y0.nif
-  block L8 (-8,0) step 1 vertices 277 triangles 424 error 0.00 meshes/landscape/lod/testland/testland.level8.x-8.y0.nif
-  block L8 (0,0) step 1 vertices 385 triangles 655 error 150.00 meshes/landscape/lod/testland/testland.level8.x0.y0.nif
-  block L16 (-16,0) step 1 vertices 277 triangles 424 error 0.00 meshes/landscape/lod/testland/testland.level16.x-16.y0.nif
-  block L16 (0,0) step 1 vertices 371 triangles 624 error 155.00 meshes/landscape/lod/testland/testland.level16.x0.y0.nif
-  block L32 (-32,0) step 1 vertices 277 triangles 424 error 0.00 meshes/landscape/lod/testland/testland.level32.x-32.y0.nif
-  block L32 (0,0) step 1 vertices 145 triangles 213 error 253.50 meshes/landscape/lod/testland/testland.level32.x0.y0.nif
+  block L4 (-5,0) step 1 vertices 64 triangles 62 error 0.00 meshes/landscape/lod/testland/testland.level4.x-5.y0.nif
+  block L4 (-1,0) step 1 vertices 165 triangles 198 error 0.00 meshes/landscape/lod/testland/testland.level4.x-1.y0.nif
+  block L8 (-5,0) step 1 vertices 267 triangles 304 error 20.63 meshes/landscape/lod/testland/testland.level8.x-5.y0.nif
+  block L16 (-5,0) step 1 vertices 275 triangles 320 error 32.00 meshes/landscape/lod/testland/testland.level16.x-5.y0.nif
+  block L32 (-5,0) step 1 vertices 274 triangles 318 error 48.43 meshes/landscape/lod/testland/testland.level32.x-5.y0.nif

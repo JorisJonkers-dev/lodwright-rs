@@ -170,6 +170,36 @@ pub struct WaterReport {
     /// block has water.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub per_level: Vec<WaterLevel>,
+    /// The shape of the water beyond the covered ground, per terrain level (sloped edges, how far down the water
+    /// reaches, agreement of heights), smallest level first. Omitted when no block has water.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub profile: Vec<WaterProfileLevel>,
+}
+
+/// The shape of the water of one terrain level compared with the reference: means over the blocks with water.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WaterProfileLevel {
+    /// Cells per block edge.
+    pub level: u32,
+    /// Blocks of this level with water on either side.
+    pub blocks: u64,
+    /// Mean of the highest minus the lowest water vertex of a block, in world units (0 for flat planes): lodwright's.
+    pub depth_mine: f64,
+    /// The same for the reference.
+    pub depth_theirs: f64,
+    /// Mean area of the steep triangles of a block (the walls and slopes at the edge of the water; seen from above they
+    /// cover less than a thousandth of their own area), in square world units: lodwright's.
+    pub wall_mine: f64,
+    /// The same for the reference.
+    pub wall_theirs: f64,
+    /// Mean number of water vertices a block carries in the file (every water shape but the empty one): lodwright's.
+    pub vertices_mine: f64,
+    /// The same for the reference.
+    pub vertices_theirs: f64,
+    /// Mean, over the blocks where the two cover ground in common, of the share of those cells whose top surface
+    /// heights differ by at most 1 unit; omitted when no block has cells in common.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_agreement: Option<f64>,
 }
 
 /// The water `IoU` of one terrain block.

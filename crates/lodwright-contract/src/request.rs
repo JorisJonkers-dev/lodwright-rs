@@ -55,6 +55,10 @@ pub struct LevelRequest {
 
 /// Terrain settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the request document has one switch per kind of terrain output"
+)]
 pub struct TerrainRequest {
     /// Write terrain LOD.
     #[serde(default = "yes")]
@@ -77,6 +81,14 @@ pub struct TerrainRequest {
     /// default, which keeps every face; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drop_under_water: Option<f32>,
+    /// Write walls under the outline of the water planes, from the water down to the height the game's outlines drop
+    /// to (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub water_walls: bool,
+    /// Write a corner that two rectangles of the water plane have in common once, at levels 8 to 32 (fewer vertices,
+    /// the same planes). Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub water_shared_vertices: bool,
 }
 
 impl Default for TerrainRequest {
@@ -88,6 +100,8 @@ impl Default for TerrainRequest {
             water: true,
             texture_scales: BTreeMap::new(),
             drop_under_water: None,
+            water_walls: false,
+            water_shared_vertices: false,
         }
     }
 }

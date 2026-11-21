@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.13.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.12.0...v0.13.0) (2026-11-21)
+
+
+### Features
+
+* **verify:** water profile per level, to see walls, depth and height of the water outline ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#255](https://github.com/JorisJonkers-dev/lodwright-rs/issues/255)) ([85af450](https://github.com/JorisJonkers-dev/lodwright-rs/commit/85af450634c218fb4ad2aadd35de8b2a3c649435))
+
+
+### Performance Improvements
+
+* **terrain:** scan each triangle row by row when scoring greedy insertion ([#256](https://github.com/JorisJonkers-dev/lodwright-rs/issues/256)) ([#257](https://github.com/JorisJonkers-dev/lodwright-rs/issues/257)) ([2ea915f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/2ea915f440d7a5c13d57144a6d34675a440d1780))
+
+## [0.12.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.11.0...v0.12.0) (2026-11-21)
+
+
+### Features
+
+* **terrain:** choose block vertices by the true deviation inside each triangle ([#248](https://github.com/JorisJonkers-dev/lodwright-rs/issues/248)) ([#250](https://github.com/JorisJonkers-dev/lodwright-rs/issues/250)) ([bee1cb1](https://github.com/JorisJonkers-dev/lodwright-rs/commit/bee1cb157da0a5dab2896f1d0d689bdf4fa89354))
+* **terrain:** greedy insertion with edge vertices chosen along each edge ([#248](https://github.com/JorisJonkers-dev/lodwright-rs/issues/248)) ([#253](https://github.com/JorisJonkers-dev/lodwright-rs/issues/253)) ([711c322](https://github.com/JorisJonkers-dev/lodwright-rs/commit/711c322018247651de4a5dcfe8f12306af2aea3d))
+
+## [0.11.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.10.0...v0.11.0) (2026-11-21)
+
+
+### Features
+
+* **water:** write the game's empty segmented shape in blocks whose cells all have default water ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#244](https://github.com/JorisJonkers-dev/lodwright-rs/issues/244)) ([a262e12](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a262e122ea1bf3f8e924e184d23a996f1ee489c3))
+
+
+### Bug Fixes
+
+* **verify:** do not check object blocks against a grid when the world has no settings file ([#245](https://github.com/JorisJonkers-dev/lodwright-rs/issues/245)) ([#247](https://github.com/JorisJonkers-dev/lodwright-rs/issues/247)) ([39bedb7](https://github.com/JorisJonkers-dev/lodwright-rs/commit/39bedb707ddcec12c63862517fac7ce1fa773b60))
+
+## [0.10.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.9.0...v0.10.0) (2026-11-21)
+
+
+### Features
+
+* **water:** level 4 squares count as wet only 25 units below the water height ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#239](https://github.com/JorisJonkers-dev/lodwright-rs/issues/239)) ([9b6dd63](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9b6dd63ed30cd318017d6575abd1e4f5648d4fea))
+
+## [0.9.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.8.0...v0.9.0) (2026-11-21)
+
+
+### Features
+
+* **terrain:** complete the block set over the settings extent for worlds the game builds terrain LOD for ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#237](https://github.com/JorisJonkers-dev/lodwright-rs/issues/237)) ([c735903](https://github.com/JorisJonkers-dev/lodwright-rs/commit/c73590341f4c6757525f790327229ce7c549f43a))
+* **terrain:** option to leave out terrain faces under the water, off by default ([#151](https://github.com/JorisJonkers-dev/lodwright-rs/issues/151)) ([#226](https://github.com/JorisJonkers-dev/lodwright-rs/issues/226)) ([9a79d23](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9a79d23a9303d6d143645da1718598c6eea46183))
+* **terrain:** skirts at block borders, off by default ([#90](https://github.com/JorisJonkers-dev/lodwright-rs/issues/90)) ([#223](https://github.com/JorisJonkers-dev/lodwright-rs/issues/223)) ([342fc5c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/342fc5cb56531e20b2e0428694780e880f82ce7a))
+* **water:** merge wet squares of one water height across cells above level 4 ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#228](https://github.com/JorisJonkers-dev/lodwright-rs/issues/228)) ([046b3b7](https://github.com/JorisJonkers-dev/lodwright-rs/commit/046b3b739b078a3bcc77c35a1c497e05a557df9e))
+
+
+### Bug Fixes
+
+* **assets:** count the embedded path in the stored size and refuse a path longer than its block ([#138](https://github.com/JorisJonkers-dev/lodwright-rs/issues/138)) ([#218](https://github.com/JorisJonkers-dev/lodwright-rs/issues/218)) ([1316038](https://github.com/JorisJonkers-dev/lodwright-rs/commit/1316038aea3895724865a5d7977acfea35de8eec))
+* **terrain:** anchor the LOD block grid at the world's minimum corner cell, as the game's own tree does ([#219](https://github.com/JorisJonkers-dev/lodwright-rs/issues/219)) ([#220](https://github.com/JorisJonkers-dev/lodwright-rs/issues/220)) ([d6c25f8](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d6c25f895c1b4dc797760c96fbb76144ca1e5067))
+* **terrain:** start object blocks, tree blocks and the settings file at the same grid cell as the terrain blocks ([#219](https://github.com/JorisJonkers-dev/lodwright-rs/issues/219)) ([#225](https://github.com/JorisJonkers-dev/lodwright-rs/issues/225)) ([d268509](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d26850979bcea1d195dc9c08104b61b49428b445))
+* **terrain:** the block grid starts at the smallest CELL record of the world ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#236](https://github.com/JorisJonkers-dev/lodwright-rs/issues/236)) ([6d8926a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/6d8926a9dec8a325c94f721b38a9d56c05cdcce1))
+* **terrain:** write only the levels the world's width allows and the game's settings extent ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#231](https://github.com/JorisJonkers-dev/lodwright-rs/issues/231)) ([e627fed](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e627fed8b211d63af5100b4c0fb040c94a11b2d5))
+
 ## [0.8.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.7.0...v0.8.0) (2026-11-20)
 
 

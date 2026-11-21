@@ -22,7 +22,7 @@ use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
 use crate::images::{diffuse_image, normal_image_with_alpha, specular_alpha};
-use crate::water::water_mesh;
+use crate::water::{add_walls, water_mesh};
 
 const CELL_UNITS: f32 = 4096.0;
 
@@ -41,6 +41,10 @@ pub struct Options<'a> {
     /// Leave out terrain faces that lie at least this many world units below the water plane of their cell (see
     /// `DropUnderWater`); `None` keeps every face.
     pub drop_under_water: Option<f32>,
+    /// Write walls under the outline of the water planes (see `water::add_walls`).
+    pub water_walls: bool,
+    /// Write a corner that two rectangles of a water plane share once, at levels 8 to 32.
+    pub water_shared_vertices: bool,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -57,6 +61,8 @@ impl Default for Options<'_> {
             progress: None,
             water: true,
             drop_under_water: None,
+            water_walls: false,
+            water_shared_vertices: false,
             reuse: None,
             cancel: None,
         }
@@ -130,14 +136,19 @@ fn block_inputs(
     samples: &[f32],
     job: &Job,
     tiles: &LandTiles,
-    water: bool,
-    drop_under_water: Option<f32>,
+    options: &Options<'_>,
 ) -> String {
     let mut h = Sha256Stream::new();
     h.update(env!("CARGO_PKG_VERSION").as_bytes());
-    h.update(format!("{:?} water={water}", job.level).as_bytes());
-    if let Some(offset) = drop_under_water {
+    h.update(format!("{:?} water={}", job.level, options.water).as_bytes());
+    if let Some(offset) = options.drop_under_water {
         h.update(format!("drop-under-water={offset}").as_bytes());
+    }
+    if options.water && options.water_walls {
+        h.update(b"water-walls");
+    }
+    if options.water && options.water_shared_vertices {
+        h.update(b"water-shared-vertices");
     }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
@@ -157,7 +168,14 @@ fn block_inputs(
     let cells = i32::try_from(job.level.level).unwrap_or(0);
     for x in job.cell.0..job.cell.0 + cells {
         for y in job.cell.1..job.cell.1 + cells {
-            h.update(format!("{x},{y}:{:?}", world.water_height(x, y)).as_bytes());
+            h.update(
+                format!(
+                    "{x},{y}:{:?}:{}",
+                    world.water_height(x, y),
+                    world.water_is_default(x, y)
+                )
+                .as_bytes(),
+            );
             let Some(layers) = world.layers(x, y) else {
                 continue;
             };
@@ -213,14 +231,7 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let inputs = block_inputs(
-        world,
-        &samples,
-        job,
-        tiles,
-        options.water,
-        options.drop_under_water,
-    );
+    let inputs = block_inputs(world, &samples, job, tiles, options);
     if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
         return Ok(Some(BlockRecord {
             key,
@@ -249,7 +260,23 @@ fn run_job(
     let units = level.level as f32 * CELL_UNITS;
     let [diffuse_ref, normal_ref] = layout::nif_texture_paths(name, id)?;
     let water = if options.water {
-        water_mesh(world, &samples, level.level, job.cell)
+        water_mesh(
+            world,
+            &samples,
+            level.level,
+            job.cell,
+            options.water_shared_vertices,
+        )
+        .map(|mut mesh| {
+            if options.water_walls {
+                // a plane that would need more than 65535 vertices with its walls keeps none
+                let plain = mesh.clone();
+                if add_walls(&mut mesh, world, &samples, level.level, job.cell).is_none() {
+                    mesh = plain;
+                }
+            }
+            mesh
+        })
     } else {
         None
     };
@@ -266,6 +293,7 @@ fn run_job(
             vertices: &w.vertices,
             indices: &w.indices,
             segments: w.segments,
+            placeholder: w.placeholder,
         }),
     })?
     .write()?;
@@ -329,17 +357,22 @@ pub fn generate_terrain(
     options: &Options,
 ) -> Result<Report, GenError> {
     layout::check_world_name(world.name())?;
-    let world = &world.without_outliers();
+    let world = &world.without_outliers().filled_over_extent();
     let no_tiles = LandTiles::empty();
     let tiles = options.land.unwrap_or(&no_tiles);
     let mut files = Vec::new();
     let mut blocks = Vec::new();
+    let extent = world.lod_extent();
     let mut highest = 0;
     let stop = || options.cancel.is_some_and(|cancel| cancel());
     let cancelled = AtomicBool::new(false);
     for level in &settings.levels {
         if cancelled.load(Ordering::Relaxed) {
             break;
+        }
+        // the game writes the levels up to a quarter of the world's width and no higher (`game-lod-settings-extent`)
+        if extent.is_some_and(|e| level.level > e.highest_level) {
+            continue;
         }
         let grid = BlockGrid::anchored(level.level, world.grid_anchor())
             .map_err(|_| lodwright_core::Error::ZeroLevel)?;
@@ -396,11 +429,21 @@ pub fn generate_terrain(
     if let Some(bounds) = world.bounds().filter(|_| !cancelled) {
         let clamp = |v: i32| i16::try_from(v).unwrap_or(if v < 0 { i16::MIN } else { i16::MAX });
         let (anchor_x, anchor_y) = world.grid_anchor();
-        let settings_file = LodSettings::for_bounds(
-            (clamp(anchor_x), clamp(anchor_y)),
-            (clamp(bounds.max_x), clamp(bounds.max_y)),
-            highest,
-        );
+        let settings_file = match extent {
+            Some(e) => LodSettings {
+                lowest_level: 4,
+                highest_level: highest.min(e.highest_level),
+                width_cells: e.width,
+                south_west: (clamp(e.south_west.0), clamp(e.south_west.1)),
+                north_east: (clamp(e.north_east.0), clamp(e.north_east.1)),
+                object_level: 4,
+            },
+            None => LodSettings::for_bounds(
+                (clamp(anchor_x), clamp(anchor_y)),
+                (clamp(bounds.max_x), clamp(bounds.max_y)),
+                highest,
+            ),
+        };
         files.push(write_file(
             out,
             &layout::settings_path(world.name())?,
@@ -510,6 +553,8 @@ mod tests {
                 &out,
                 &Options {
                     drop_under_water: drop,
+                    water_walls: false,
+                    water_shared_vertices: false,
                     ..Options::default()
                 },
             )
@@ -616,6 +661,8 @@ mod tests {
                 progress: None,
                 water: true,
                 drop_under_water: None,
+                water_walls: false,
+                water_shared_vertices: false,
                 reuse: None,
                 cancel: None,
             },
@@ -631,6 +678,8 @@ mod tests {
                 progress: None,
                 water: true,
                 drop_under_water: None,
+                water_walls: false,
+                water_shared_vertices: false,
                 reuse: None,
                 cancel: None,
             },
@@ -680,6 +729,27 @@ mod tests {
     }
 
     #[test]
+    fn a_small_world_gets_only_the_levels_its_width_allows_and_the_settings_say_so() {
+        // corners (-6, -5) to (4, 5): width 16, highest level 4
+        let out = temp("extent");
+        let report = generate_terrain(
+            &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
+            &TerrainSettings::default(),
+            &out,
+            &Options::default(),
+        )
+        .unwrap();
+        assert!(report.files.iter().all(|f| !f.path.contains(".level8.")));
+        assert!(report.files.iter().any(|f| f.path.contains(".level4.")));
+        let bytes = std::fs::read(out.join("lodsettings/mojave.dlodsettings")).unwrap();
+        let s = lodwright_core::lod::LodSettings::parse(&bytes).unwrap();
+        assert_eq!(
+            (s.highest_level, s.width_cells, s.south_west, s.north_east),
+            (4, 16, (-6, -5), (4, 5))
+        );
+    }
+
+    #[test]
     fn a_folder_on_an_anchored_grid_verifies_without_errors() {
         let out = temp("anchor-verify");
         generate_terrain(
@@ -712,7 +782,8 @@ mod tests {
             cell,
         };
         let tiles = LandTiles::empty();
-        let digest = |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, true, None);
+        let digest =
+            |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, &Options::default());
         assert_eq!(digest(&world()), digest(&bounded([-8.0 * 4096.0, 0.0])));
         assert_ne!(digest(&world()), digest(&bounded([-6.0 * 4096.0, 0.0])));
     }
@@ -780,18 +851,18 @@ mod tests {
             )]))
             .with_scales(&scales.iter().copied().collect())
         };
-        let plain = block_inputs(&w, &[], &job, &tiles(&[]), true, None);
+        let plain = block_inputs(&w, &[], &job, &tiles(&[]), &Options::default());
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), true, None),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), &Options::default()),
             plain
         );
         assert_ne!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), true, None),
+            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), &Options::default()),
             plain
         );
         // a scale for a texture the block does not use leaves its digest alone
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), true, None),
+            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), &Options::default()),
             plain
         );
     }
@@ -932,7 +1003,8 @@ mod tests {
             level: specular_level(on).levels[0],
             cell: (0, 0),
         };
-        let digest = |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, true, None);
+        let digest =
+            |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, &Options::default());
         let a = specular_tiles(Some(10), Some((10, 200)));
         let b = specular_tiles(Some(20), Some((10, 200)));
         assert_eq!(digest(false, &a), digest(false, &b));

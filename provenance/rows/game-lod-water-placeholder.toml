@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-water-placeholder"
+fact = "A terrain block of the game's own tree that has a water plane also carries an empty segmented shape between the terrain and the water (a BSSegmentedTriShape with three empty segments, no properties, translation zero, whose data is one vertex at the origin and one triangle of three zero indices; the root lists the terrain, this shape and the water) when every cell of the block states water with no height of its own (the has-water flag and an XCLW of the largest float) and the world's default water height is 0 or lower; the shape is identical at every level."
+url = "oracle:game-lod-files"
+licence = "Block structure, vertex counts and cell water fields of the owner's own game files and plugins compared as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on the reference tree extracted from the game's archives and the ten plugins FalloutNV, its four story DLCs and the four small packs. WastelandNV (default water -2300) and TheStripWorldNew (default 0): 212 of 212 blocks with the shape (71 and 141; levels 4 to 32) have every cell on the default; 3 further WastelandNV blocks have every cell on the default and no shape (one each at levels 4, 8 and 16, the level 4 one a small pond of 15 water vertices at block -28, 20; the rule predicts the shape there and is wrong), and 79 + 11 blocks with cells of their own heights have none. NVDLC02ZionCanyon (default 5000, 32 blocks) and NVDLC04NukeLegion (default 550, one block) have every cell on the default and no shape: the 'default 0 or lower' clause is a fit to these two worlds, not a statement of the game's rule, and the real condition may be a different property of the world or of the cells (the CELL flags and XCLW were read as the repository's reader resolves them). Of the 98, 39, 19 and 8 water blocks of WastelandNV at levels 4, 8, 16 and 32, 47, 16, 6 and 2 have the shape. Shape layout read with the repository's NIF reader (block types, segment table, data block). Not second-read."

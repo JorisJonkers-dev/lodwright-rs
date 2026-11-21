@@ -1,8 +1,8 @@
 exit 1
 
 4 terrain blocks, 0 object blocks, 0 tree blocks, 7 textures, 1 settings files: 1 errors, 1 differences
-meshes/landscape/lod/island/island.level16.x0.y0.nif: missing texture textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds
-textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds: missing from the folder
+meshes/landscape/lod/island/island.level16.x2.y2.nif: missing texture textures/landscape/lod/island/diffuse/island.n.level16.x2.y2.dds
+textures/landscape/lod/island/diffuse/island.n.level16.x2.y2.dds: missing from the folder
 water: 0 blocks with water, 0 under 0.95, lowest -, mean -
 terrain: 4 blocks compared, 0 over 1, largest 0.000, mean 0.000
 terrain level 4: 1 blocks, 0 over 1, largest 0.000, mean 0.000
@@ -61,7 +61,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level32.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level32.x2.y2.dds"
       },
       {
         "diffuse": {
@@ -74,7 +74,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x2.y2.dds"
       },
       {
         "diffuse": {
@@ -87,7 +87,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level8.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level8.x2.y2.dds"
       }
     ],
     "per_level": [
@@ -182,14 +182,14 @@ object blocks: 0 of 0 exact
   },
   "differences": [
     {
-      "path": "textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds",
+      "path": "textures/landscape/lod/island/diffuse/island.n.level16.x2.y2.dds",
       "problem": "missing from the folder"
     }
   ],
   "errors": [
     {
-      "path": "meshes/landscape/lod/island/island.level16.x0.y0.nif",
-      "problem": "missing texture textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds"
+      "path": "meshes/landscape/lod/island/island.level16.x2.y2.nif",
+      "problem": "missing texture textures/landscape/lod/island/diffuse/island.n.level16.x2.y2.dds"
     }
   ],
   "object_blocks": 0,
@@ -210,22 +210,22 @@ object blocks: 0 of 0 exact
       {
         "max": 0.0,
         "mean": 0.0,
-        "path": "meshes/landscape/lod/island/island.level16.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level16.x2.y2.nif"
       },
       {
         "max": 0.0,
         "mean": 0.0,
-        "path": "meshes/landscape/lod/island/island.level32.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level32.x2.y2.nif"
       },
       {
         "max": 0.0,
         "mean": 0.0,
-        "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level4.x2.y2.nif"
       },
       {
         "max": 0.0,
         "mean": 0.0,
-        "path": "meshes/landscape/lod/island/island.level8.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level8.x2.y2.nif"
       }
     ],
     "per_level": [

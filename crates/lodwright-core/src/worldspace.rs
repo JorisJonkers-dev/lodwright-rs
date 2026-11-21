@@ -10,12 +10,25 @@
 //! (`provenance/sources.toml`: `plugin-formid-masters`, `plugin-record-override`, `wrld-parent`, `wrld-land-data`,
 //! `wrld-bounds`, `cell-water`, `wrld-child-inherits`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::Error;
 use crate::land::{CellHeights, SIDE};
 use crate::layers::CellLayers;
 use crate::plugin::{DeclaredBounds, Plugin, WorldRecord};
+
+/// The extent the game's settings file and level set follow (`game-lod-settings-extent`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LodExtent {
+    /// First cell of the grid.
+    pub south_west: (i32, i32),
+    /// Last cell, the maximum corner cell of the world.
+    pub north_east: (i32, i32),
+    /// Cells across: the larger extent rounded up to a power of two.
+    pub width: u32,
+    /// Highest terrain level: a quarter of the width, from 4 to 32.
+    pub highest_level: u32,
+}
 
 /// World units per cell edge.
 const CELL_UNITS: f32 = 4096.0;
@@ -29,6 +42,11 @@ pub struct Worldspace {
     layers: BTreeMap<(i32, i32), CellLayers>,
     water: BTreeMap<(i32, i32), CellWater>,
     record: ResolvedRecord,
+    /// The smallest x and the smallest y over the grids of all exterior `CELL` records, with or without LAND.
+    cell_min: Option<(i32, i32)>,
+    /// The cells that have a `LAND` record, with or without heights (a superset of the keys of `cells` for a world
+    /// read from plugins).
+    land_records: BTreeSet<(i32, i32)>,
 }
 
 /// The water of a cell as its CELL record states it.
@@ -46,6 +64,7 @@ struct ResolvedRecord {
     default_land_height: Option<f32>,
     default_water_height: Option<f32>,
     bounds: Option<DeclaredBounds>,
+    unnamed: bool,
 }
 
 /// What a child worldspace takes from its parent. The public sources do not say that LAND cells are inherited
@@ -133,6 +152,84 @@ impl Worldspace {
         self.record.bounds
     }
 
+    /// The extent of the world for the settings file and the set of levels, from the declared corners: the grid start
+    /// ([`Worldspace::grid_anchor`]) to the cell of the maximum corner `NAM9`, the width the larger extent rounded up
+    /// to a power of two, the highest level a quarter of it (4 to 32). A world whose declared extent exceeds 128 cells
+    /// takes the end of its land instead of `NAM9` (the main world). `None` without corners.
+    // source: game-lod-settings-extent
+    #[must_use]
+    pub fn lod_extent(&self) -> Option<LodExtent> {
+        let b = self.record.bounds?;
+        let sw = self.grid_anchor();
+        #[allow(clippy::cast_possible_truncation)] // bounded by the clamp
+        let cell = |v: f32| (v / CELL_UNITS).floor().clamp(-1_000_000.0, 1_000_000.0) as i32;
+        let declared = (cell(b.max[0]), cell(b.max[1]));
+        let data = self.bounds().map(|d| (d.max_x, d.max_y));
+        let too_wide = declared.0 - sw.0 > 128 || declared.1 - sw.1 > 128;
+        let ne = match data {
+            Some(d) if too_wide => d,
+            _ => declared,
+        };
+        let across = (ne.0 - sw.0).max(ne.1 - sw.1).max(1);
+        let width = u32::try_from(across).ok()?.next_power_of_two().max(4);
+        Some(LodExtent {
+            south_west: sw,
+            north_east: ne,
+            width,
+            highest_level: (width / 4).clamp(4, 32),
+        })
+    }
+
+    /// The fewest cells with LAND a world needs before the game's own tool is known to write terrain LOD for it, as
+    /// far as the measurement goes (`game-lod-terrain-worlds`): the smallest world with terrain LOD has 17.
+    pub const MIN_LAND_CELLS_FOR_TERRAIN_LOD: usize = 17;
+
+    /// Whether the game's tool is likely to have written terrain LOD for this world. The plugin data holds no flag
+    /// that says which worlds the game has terrain LOD for; this is the project's own rule, the best single predictor
+    /// found (29 of the 30 measured worlds with LAND): at least [`Self::MIN_LAND_CELLS_FOR_TERRAIN_LOD`] cells with
+    /// LAND and a `FULL` name on the `WRLD` record. It decides whether the block set is completed over the declared extent
+    /// ([`Worldspace::filled_over_extent`]); no world is left out of a run because of it.
+    // source: game-lod-terrain-worlds
+    #[must_use]
+    pub fn has_terrain_lod(&self) -> bool {
+        let land = self.land_records.len().max(self.cells.len());
+        land >= Self::MIN_LAND_CELLS_FOR_TERRAIN_LOD && !self.record.unnamed
+    }
+
+    /// A copy whose cells without LAND, between the grid start and the end of the settings extent
+    /// ([`Worldspace::lod_extent`], clipped to its width), are flat at the world's default land height, as the game's
+    /// blocks over such cells are (`game-lod-block-extent`). Unchanged without a default land height or an extent, and
+    /// for a world that fails [`Worldspace::has_terrain_lod`] (the game's tool probably wrote nothing for it, so
+    /// inventing blocks over its empty extent would only add files).
+    #[must_use]
+    pub fn filled_over_extent(&self) -> Self {
+        let (Some(extent), Some(height)) = (self.lod_extent(), self.record.default_land_height)
+        else {
+            return self.clone();
+        };
+        if !self.has_terrain_lod() {
+            return self.clone();
+        }
+        if !height.is_finite() {
+            return self.clone();
+        }
+        let across = i64::from(extent.width) - 1;
+        let end = |start: i32, last: i32| {
+            i32::try_from((i64::from(start) + across).min(i64::from(last))).unwrap_or(last)
+        };
+        let (sw, ne) = (extent.south_west, extent.north_east);
+        let (last_x, last_y) = (end(sw.0, ne.0), end(sw.1, ne.1));
+        let mut out = self.clone();
+        for y in sw.1..=last_y {
+            for x in sw.0..=last_x {
+                out.cells
+                    .entry((x, y))
+                    .or_insert_with(|| CellHeights::flat(height));
+            }
+        }
+        out
+    }
+
     /// The same world with the corners `NAM0` and `NAM9` replaced (for worlds built from cells alone).
     #[must_use]
     pub fn with_declared_bounds(mut self, bounds: DeclaredBounds) -> Self {
@@ -140,24 +237,26 @@ impl Worldspace {
         self
     }
 
-    /// The cell where the block grid of every LOD level starts: the cell of the minimum corner `NAM0` (world units,
-    /// 4096 to a cell, rounded down), as the game's own tree places its blocks; (0, 0) when the world has no
-    /// corners or they are not finite or lie beyond 1 000 000 cells.
+    /// The cell where the block grid of every LOD level starts: the smallest grid coordinate of the world's `CELL`
+    /// records (cells without LAND count), as the game's own tree places its blocks; without any `CELL` record the
+    /// cell of the minimum corner `NAM0` (world units, 4096 to a cell, rounded down). (0, 0) when neither is known
+    /// or the corner is not finite or lies beyond 1 000 000 cells.
     // source: game-lod-block-grid
     #[must_use]
     pub fn grid_anchor(&self) -> (i32, i32) {
-        let Some(b) = self.record.bounds else {
+        let start = self.cell_min.or_else(|| {
+            let b = self.record.bounds?;
+            #[allow(clippy::cast_possible_truncation)] // bounded by the test before the cast
+            let cell = |v: f32| {
+                let c = (v / CELL_UNITS).floor();
+                (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
+            };
+            Some((cell(b.min[0])?, cell(b.min[1])?))
+        });
+        let Some((mut x, mut y)) = start else {
             return (0, 0);
         };
-        #[allow(clippy::cast_possible_truncation)] // bounded by the test before the cast
-        let cell = |v: f32| {
-            let c = (v / CELL_UNITS).floor();
-            (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
-        };
-        let (Some(mut x), Some(mut y)) = (cell(b.min[0]), cell(b.min[1])) else {
-            return (0, 0);
-        };
-        // The game's tree of WastelandNV starts at (-64, -64) where NAM0 says (-65, -65): a corner
+        // The game's tree of WastelandNV starts at (-64, -64) where its smallest CELL is (-65, -65): a start
         // exactly one cell below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
         if let Some(data) = self.bounds() {
             if data.min_x == x + 1 && data.min_x.rem_euclid(32) == 0 {
@@ -184,6 +283,16 @@ impl Worldspace {
                 .then_some(self.record.default_water_height)
                 .flatten()
         })
+    }
+
+    /// Whether cell (`x`, `y`) has water at the world's default height: the has-water flag with no `XCLW` of its own
+    /// (an `XCLW` of the largest float counts as none).
+    #[must_use]
+    pub fn water_is_default(&self, x: i32, y: i32) -> bool {
+        // source: game-lod-water-height
+        self.water
+            .get(&(x, y))
+            .is_some_and(|w| w.has_water && w.height.is_none_or(|h| h >= f32::MAX))
     }
 
     /// The ground height at world position (`x`, `y`) in world units, interpolated between the four height samples
@@ -302,6 +411,11 @@ impl Worldspace {
         self.water.insert((x, y), CellWater { has_water, height });
     }
 
+    /// Set the world's default water height as its `DNAM` would (for tests and tools).
+    pub fn set_default_water_height(&mut self, height: Option<f32>) {
+        self.record.default_water_height = height;
+    }
+
     /// Set the texture layers of cell (`x`, `y`) as a LAND record would (for tests and tools).
     pub fn set_cell_layers(&mut self, x: i32, y: i32, layers: CellLayers) {
         self.layers.insert((x, y), layers);
@@ -321,6 +435,8 @@ impl Worldspace {
             layers: BTreeMap::new(),
             water: BTreeMap::new(),
             record: ResolvedRecord::default(),
+            cell_min: None,
+            land_records: BTreeSet::new(),
         }
     }
 
@@ -408,6 +524,8 @@ impl WorldIndex {
             layers: BTreeMap::new(),
             water: BTreeMap::new(),
             record: entry.record.clone(),
+            cell_min: None,
+            land_records: BTreeSet::new(),
         };
         if inheritance == Inheritance::FlaggedDefaults {
             self.inherit_defaults(&mut world);
@@ -420,8 +538,16 @@ impl WorldIndex {
                 .iter()
                 .filter(|w| absolute(w.form_id, table, own) == id)
             {
+                for &(x, y) in &source.cell_coords {
+                    let (mx, my) = world.cell_min.unwrap_or((x, y));
+                    world.cell_min = Some((mx.min(x), my.min(y)));
+                }
+                world
+                    .land_records
+                    .extend(source.land_coords.iter().copied());
                 for cell in &source.cells {
                     let key = (cell.x, cell.y);
+                    world.land_records.insert(key);
                     world.cells.insert(key, cell.heights.clone());
                     // a later LAND record replaces the earlier one as a whole, layers included
                     // source: plugin-record-override
@@ -484,6 +610,7 @@ fn resolve_record(record: &WorldRecord, table: &[u32], own: u32) -> ResolvedReco
         default_land_height: record.default_land_height,
         default_water_height: record.default_water_height,
         bounds: record.bounds,
+        unnamed: record.unnamed,
     }
 }
 
@@ -582,6 +709,23 @@ mod tests {
     }
 
     #[test]
+    fn the_grid_starts_at_the_smallest_cell_record_even_without_land() {
+        // NAM0 says (-5, -5); the smallest CELL record is (-4, -4) and has no LAND; the land starts at (-2, -2)
+        let world = SyntheticWorld::new(0x10, "W")
+            .bounds([-5.0 * 4096.0, -5.0 * 4096.0], [3.0 * 4096.0, 3.0 * 4096.0])
+            .cell_without_land(-4, -4)
+            .cell_without_land(1, -3)
+            .cell(-2, -2, Heights::flat(8.0))
+            .cell(2, 2, Heights::flat(8.0));
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        let worlds = Worldspace::from_load_order(&plugins).unwrap();
+        assert_eq!(worlds[0].grid_anchor(), (-4, -4));
+        // a world made without CELL records falls back on the declared corner
+        let flat = Worldspace::from_cells(1, "W", [((-2, -2), CellHeights::flat(0.0))]);
+        assert_eq!(flat.grid_anchor(), (0, 0));
+    }
+
+    #[test]
     fn a_later_plugin_overrides_cells_through_its_master_index() {
         // plugin 1 refers to world 0xA00 of plugin 0 through master index 0
         let base = SyntheticWorld::new(0x0000_0A00, "Mojave")
@@ -657,6 +801,119 @@ mod tests {
         );
         // not finite: the origin
         assert_eq!(flat(&cells, [f32::NAN, 0.0]).grid_anchor(), (0, 0));
+    }
+
+    #[test]
+    fn terrain_lod_needs_seventeen_cells_with_land_and_a_display_name() {
+        let cells = |n: i32| (0..n).map(|x| ((x, 0), CellHeights::flat(1.0)));
+        assert!(!Worldspace::from_cells(1, "W", cells(16)).has_terrain_lod());
+        assert!(Worldspace::from_cells(1, "W", cells(17)).has_terrain_lod());
+        assert!(!Worldspace::from_cells(1, "W", []).has_terrain_lod());
+        // read from a plugin: the record without FULL is a test map
+        let world = |name: &str| {
+            let mut w = SyntheticWorld::new(0x10, name);
+            for x in 0..17 {
+                w = w.cell(x, 0, Heights::flat(8.0));
+            }
+            w
+        };
+        let load = |w: SyntheticWorld| {
+            let plugins = vec![(
+                "A.esm".to_owned(),
+                read(&world_plugin(&[], &w, false)).unwrap(),
+            )];
+            Worldspace::from_load_order(&plugins).unwrap().remove(0)
+        };
+        assert!(!load(world("Test")).has_terrain_lod());
+        assert!(load(world("Shown").named()).has_terrain_lod());
+    }
+
+    #[test]
+    fn cells_without_land_inside_the_extent_are_flat_at_the_default_land_height() {
+        let u = 4096.0;
+        // 17 cells with land in the bottom row, the last one beyond the width of the extent
+        let land = (-1..16).map(|x| ((x, -1), CellHeights::flat(5.0)));
+        let mut world = Worldspace::from_cells(1, "W", land).with_declared_bounds(
+            crate::plugin::DeclaredBounds {
+                min: [-u, -u],
+                max: [15.0 * u, 2.0 * u],
+            },
+        );
+        world.record.default_land_height = Some(1000.0);
+        // corners (-1, -1) to (15, 2): width 16, so cells -1 to 14 across and -1 to 2 up: 64 cells, plus (15, -1)
+        let filled = world.filled_over_extent();
+        assert_eq!(filled.cell_count(), 65);
+        assert_eq!(filled.cell(-1, -1).unwrap().get(0, 0), 5.0);
+        assert_eq!(filled.cell(3, 2).unwrap().get(0, 0), 1000.0);
+        assert!(filled.cell(15, 2).is_none());
+        // without a default land height nothing is added
+        world.record.default_land_height = None;
+        assert_eq!(world.filled_over_extent().cell_count(), 17);
+        // a world with fewer than 17 cells with land is left as it is
+        let few =
+            Worldspace::from_cells(1, "W", (-1..15).map(|x| ((x, -1), CellHeights::flat(5.0))))
+                .with_declared_bounds(crate::plugin::DeclaredBounds {
+                    min: [-u, -u],
+                    max: [15.0 * u, 2.0 * u],
+                });
+        assert_eq!(few.filled_over_extent().cell_count(), 16);
+    }
+
+    #[test]
+    fn the_extent_follows_the_declared_corners_as_the_game_s_settings_do() {
+        let world = |min: [f32; 2], max: [f32; 2], cells: &[(i32, i32)]| {
+            Worldspace::from_cells(1, "W", cells.iter().map(|c| (*c, CellHeights::flat(1.0))))
+                .with_declared_bounds(crate::plugin::DeclaredBounds { min, max })
+        };
+        let u = 4096.0;
+        // BoulderCityWorld: corners (-6, -5) and (6, 8): width 16, highest level 4
+        let boulder = world(
+            [-6.0 * u, -5.0 * u],
+            [6.0 * u, 8.0 * u],
+            &[(-6, -4), (5, 7)],
+        )
+        .lod_extent()
+        .unwrap();
+        assert_eq!(
+            (
+                boulder.south_west,
+                boulder.north_east,
+                boulder.width,
+                boulder.highest_level
+            ),
+            ((-6, -5), (6, 8), 16, 4)
+        );
+        // FreesideWorld: (-10, -8) to (7, 12): width 32, highest level 8
+        let freeside = world([-10.0 * u, -8.0 * u], [7.0 * u, 12.0 * u], &[(-5, -6)])
+            .lod_extent()
+            .unwrap();
+        assert_eq!((freeside.width, freeside.highest_level), (32, 8));
+        // a 64 by 64 world: width 64, highest level 16
+        let big = world([-32.0 * u, -32.0 * u], [32.0 * u, 32.0 * u], &[(-32, -32)])
+            .lod_extent()
+            .unwrap();
+        assert_eq!((big.width, big.highest_level), (64, 16));
+        // a declared extent beyond 128 cells (the main world) ends at its land: width 128, highest 32
+        let main = world(
+            [-65.0 * u, -65.0 * u],
+            [65.0 * u, 272.0 * u],
+            &[(-64, -64), (63, 63)],
+        )
+        .lod_extent()
+        .unwrap();
+        assert_eq!(
+            (
+                main.south_west,
+                main.north_east,
+                main.width,
+                main.highest_level
+            ),
+            ((-64, -64), (63, 63), 128, 32)
+        );
+        assert_eq!(
+            Worldspace::from_cells(1, "W", [((0, 0), CellHeights::flat(1.0))]).lod_extent(),
+            None
+        );
     }
 
     #[test]

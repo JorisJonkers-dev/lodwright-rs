@@ -16,3 +16,7 @@ lodwright-testkit = { workspace = true }
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "tin"
+harness = false

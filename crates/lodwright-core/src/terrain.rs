@@ -2,9 +2,9 @@
 //! Terrain LOD planning: which blocks exist at each level, how coarse each block's mesh can be, and what files
 //! and texture sizes the block needs.
 //!
-//! Meshes are adaptive ([`crate::rtin`]): triangles are split where the largest vertical error against the height
-//! raster exceeds the level's tolerance, the vertex count stays under the cap (16-bit indices) by raising the
-//! tolerance when needed, and triangles exist only over ground with data. This is our own measure of quality, not a copy of another tool's: the `quality` number is converted to a tolerance in world units
+//! Meshes are adaptive ([`crate::tin`]): the height sample the mesh misses by most is inserted as a vertex until the
+//! largest vertical error against the height raster is within the level's tolerance or the vertex cap (16-bit indices)
+//! is reached, and triangles exist only over ground with data. This is our own measure of quality, not a copy of another tool's: the `quality` number is converted to a tolerance in world units
 //! ([`UNITS_PER_QUALITY`]), so quality numbers of other tools do not map onto it.
 //!
 //! No file is written here: the block NIF writer lives in `lodwright-nif` and the generator in the CLI.
@@ -203,7 +203,7 @@ pub fn build_block_mesh_dropping(
     let samples = raster.block_samples(block_x, block_y)?;
     let span = usize::try_from(settings.level).ok()? * CELL_INTERVALS + 1;
     let cap = settings.max_vertices.min(MAX_VERTICES);
-    let mut meshed = crate::rtin::mesh_block(&samples, span, settings.tolerance(), cap)?;
+    let mut meshed = crate::tin::mesh_block(&samples, span, settings.tolerance(), cap)?;
     if let Some(kept) = drop.and_then(|d| drop_under_water(&meshed.mesh, &d)) {
         meshed.mesh = kept;
     }
@@ -219,7 +219,7 @@ pub fn build_block_mesh_dropping(
                 break;
             }
             room = room.saturating_sub(total - cap);
-            let Some(next) = crate::rtin::mesh_block(&samples, span, settings.tolerance(), room)
+            let Some(next) = crate::tin::mesh_block(&samples, span, settings.tolerance(), room)
             else {
                 break;
             };
@@ -328,9 +328,13 @@ fn add_skirts(mesh: &TerrainMesh, edge: f32) -> TerrainMesh {
 /// [`Error::RasterTooLarge`] when a level's raster would be too big.
 pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<TerrainPlan, Error> {
     layout::check_world_name(world.name())?;
-    let world = &world.without_outliers();
+    let world = &world.without_outliers().filled_over_extent();
     let mut blocks = Vec::new();
+    let extent = world.lod_extent();
     for level in &settings.levels {
+        if extent.is_some_and(|e| level.level > e.highest_level) {
+            continue;
+        }
         let grid =
             BlockGrid::anchored(level.level, world.grid_anchor()).map_err(|_| Error::ZeroLevel)?;
         let Some(raster) = HeightRaster::build(world, grid)? else {

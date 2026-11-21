@@ -72,6 +72,8 @@ pub struct WorldRecord {
     pub default_water_height: Option<f32>,
     /// `NAM0` and `NAM9`, when both are present.
     pub bounds: Option<DeclaredBounds>,
+    /// The record has no `FULL` (display name): a world nobody sees by name, such as a test map.
+    pub unnamed: bool,
 }
 
 /// A position, rotation (radians) and uniform scale.
@@ -133,6 +135,12 @@ pub struct World {
     pub record: Option<WorldRecord>,
     /// Exterior cells with LAND, in file order.
     pub cells: Vec<LandCell>,
+    /// The grid of every exterior `CELL` record of the world (with or without LAND), in file order
+    /// (`game-lod-block-grid`).
+    pub cell_coords: Vec<(i32, i32)>,
+    /// The grid of every exterior cell that has a `LAND` record, whether or not the record holds heights, in file
+    /// order (`game-lod-terrain-worlds`).
+    pub land_coords: Vec<(i32, i32)>,
     /// Placed references of the world's cells; only when read with [`ReadOptions::objects`].
     pub refs: Vec<PlacedRef>,
 }
@@ -348,8 +356,10 @@ fn world_record(data: &[u8]) -> Result<(Option<String>, WorldRecord), Error> {
     let mut editor_id = None;
     let mut record = WorldRecord::default();
     let (mut min, mut max) = (None, None);
+    record.unnamed = true;
     for (signature, payload) in subrecords(data)? {
         match &signature {
+            b"FULL" => record.unnamed = false,
             // source: wrld-edid
             b"EDID" => editor_id = Some(zstring(payload)),
             // source: wrld-parent
@@ -392,6 +402,8 @@ impl Walker {
             editor_id: None,
             record: None,
             cells: Vec::new(),
+            cell_coords: Vec::new(),
+            land_coords: Vec::new(),
             refs: Vec::new(),
         });
         self.worlds.len() - 1
@@ -479,6 +491,9 @@ impl Walker {
                         _ => {}
                     }
                 }
+                if let (Some(world), Some(coords)) = (self.world, grid) {
+                    self.worlds[world].cell_coords.push(coords);
+                }
                 self.cell = grid.map(|(x, y)| CellInfo {
                     x,
                     y,
@@ -490,6 +505,7 @@ impl Walker {
                 let (Some(world), Some(cell)) = (self.world, self.cell) else {
                     return Ok(());
                 };
+                self.worlds[world].land_coords.push((cell.x, cell.y));
                 let data = record.data()?;
                 let mut heights = None;
                 let mut layers = self.options.land_layers.then(LayerReader::default);
@@ -824,6 +840,7 @@ mod tests {
         let plugin = read(&world_plugin(&[], &world, false)).unwrap();
         assert_eq!(plugin.worlds[0].cells.len(), 1);
         assert_eq!(plugin.worlds[0].cells[0].x, 2);
+        assert_eq!(plugin.worlds[0].cell_coords, vec![(1, 1), (2, 2)]);
     }
 
     #[test]

@@ -118,6 +118,25 @@ no kept face uses are left out too. If that would leave a block no face, the blo
 before; set, the offset enters the digest of every terrain block. The result's vertex and triangle counts of a block
 are the ones written.
 
+### Walls under the water outline
+
+`terrain.water_walls` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes a vertical wall
+under every outer side of a block's water: from the water height down to -14098, the height the game's own water
+outlines drop to. Sides on the block's border get none, and a side between two squares of the same water height gets
+none; at level 4 the walls are triangles of the cell's own segment. The planes themselves do not change, so the water
+overlap of `verify` is the same; the water profile of `verify --reference` (depth, wall area) moves toward the game's.
+Own design fitted to measured numbers (`docs/spec/terrain-lod.md`, section 6), not yet looked at in the game: the owner
+decides whether it is worth turning on. Off, output and digests are as before; on, the switch enters the digest of
+every terrain block that has water.
+
+### Shared corners of the water planes
+
+`terrain.water_shared_vertices` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes a corner
+that two rectangles of a water plane have in common once, at levels 8 to 32 (level 4 keeps one rectangle per
+cell segment). The triangles are the same corner for corner, so the water overlap and the covered ground do not change;
+only the number of vertices in the file falls. Off, output and digests are as before; on, the switch enters the digest
+of every terrain block that has water.
+
 ### Skirts at block borders
 
 `terrain.levels[].skirts` (off by default, written only when on; tier 3, since 0.9.0) closes the gap to a neighbouring
@@ -330,6 +349,31 @@ block, in the order the blocks finish:
   it as `BlockKind::Other`).
 * `up_to_date` is true for a terrain block kept from an earlier run; object and tree blocks are always rebuilt, so
   it is false for them.
+
+### Run-wide progress (since 0.14.0)
+
+`done` and `of` restart for every kind, level and world, so a bar built from them goes up and down. Every event
+(the library's and the file's lines) therefore also carries the run's own numbers, all additive and all optional for
+a reader:
+
+* `phase` (file lines; the library event names it `step`): the phase name, `terrain`, `objects` or `trees` for a block
+  line. `read_plugins` and `manifest` have no block lines; their library events carry the same numbers.
+* `phase_index`, `phase_count`: the phase of the run, from 1, and how many there are. A phase is one step of one
+  world; the run is `read_plugins`, then each enabled step of each world in order, then `manifest`. A run on one world
+  with all three steps has five phases. The very first event (reading the plugins) has no `phase_count`: the worlds are
+  not known before the plugins are read.
+* `phase_done`, `phase_total`: progress inside the phase. The total of a phase never changes during the run; the
+  unit is a share of the run (see below), not a block.
+* `run_done`, `run_total`: run-wide progress. `run_total` is 10000 on every event of a run and `run_done` never
+  decreases, also when terrain blocks finish out of order. Show `run_done / run_total`.
+
+The shares are fixed: reading the plugins 3 percent, the manifest 2 percent, the rest split across the phases by the
+weights terrain 3, objects 4, trees 3 (estimates from a run of ten plugins; they decide the shape of the bar, never
+its direction). Inside a terrain phase the levels share the phase by the area of their blocks (a level of 4 cells
+has sixty-four times the blocks of a level of 32), so the bar does not stall at the first level. A level the world
+is too small for is skipped and its share is added when the next one starts. The numbers carry no time estimate.
+`run_done` reaches `run_total` only with the result (a run that finds its output up to date emits the read event
+only): a reader treats the result as 100 percent.
 
 Per world, the terrain lines come first (level by level), then the object lines, then the tree lines. The terrain
 blocks of a level finish on several workers, so with more than one worker their lines may arrive with `done` out of

@@ -129,6 +129,42 @@ fn checkpoint(out: &std::path::Path) -> Manifest {
     serde_json::from_slice(&std::fs::read(staging(out).join("checkpoint.json")).unwrap()).unwrap()
 }
 
+#[test]
+fn every_event_of_a_run_carries_the_run_numbers_and_the_run_total_never_goes_back() {
+    let (job, _) = job("run-progress");
+    let mut events: Vec<ProgressEvent> = Vec::new();
+    let mut progress = |e: &ProgressEvent| events.push(e.clone());
+    generate(&job, &mut progress, &CancelToken::new()).unwrap();
+    // read plugins, terrain (start + blocks), manifest
+    assert!(events.len() >= 4);
+    let totals: Vec<_> = events.iter().map(|e| e.run_total).collect();
+    assert!(totals.iter().all(|t| *t == Some(10_000)));
+    let done: Vec<u64> = events.iter().map(|e| e.run_done.unwrap()).collect();
+    assert!(done.windows(2).all(|w| w[0] <= w[1]), "{done:?}");
+    assert_eq!(done[0], 0);
+    assert!(done.last().unwrap() < &10_000 && *done.last().unwrap() > done[1]);
+    // the first event does not know the phase count yet; every later one does: read, terrain, manifest
+    assert_eq!(events[0].phase_index, Some(1));
+    assert_eq!(events[0].phase_count, None);
+    assert!(events[1..].iter().all(|e| e.phase_count == Some(3)));
+    let index: Vec<u32> = events.iter().map(|e| e.phase_index.unwrap()).collect();
+    assert!(index.windows(2).all(|w| w[0] <= w[1]));
+    assert_eq!(index.last(), Some(&3));
+    // inside a phase the number is never above its total, and the last terrain block ends the terrain slice
+    for e in &events {
+        assert!(e.phase_done <= e.phase_total);
+    }
+    let last_block = events.iter().rfind(|e| e.done.is_some()).unwrap();
+    assert!(last_block.phase_done > Some(0));
+    // the manifest phase starts exactly where the terrain slice ends
+    let terrain_end = events
+        .iter()
+        .find(|e| e.step == Step::Terrain)
+        .map(|e| e.run_done.unwrap() + e.phase_total.unwrap())
+        .unwrap();
+    assert_eq!(*done.last().unwrap(), terrain_end);
+}
+
 /// Cancel the call at the first finished terrain block.
 fn cancel_at_first_block() -> (CancelToken, impl FnMut(&ProgressEvent)) {
     let cancel = CancelToken::new();

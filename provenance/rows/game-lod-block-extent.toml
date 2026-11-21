@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-block-extent"
+fact = "The game's level blocks of a worldspace cover the whole settings extent (grid start to the declared maximum corner cell, clipped to the settings width), including cells without LAND; a block over cells without LAND holds constant terrain at the world's default land height (DNAM) plus the skirt vertices at the skirt height."
+url = "oracle:game-lod-files"
+licence = "Vertex counts and heights of the owner's own game blocks as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Block counts equal ceil(width / 4) times ceil(height / 4) over the declared bounds from the grid start in the worlds measured (FreesideWorld bounds 17 by 20 cells: 30 blocks against 6 with LAND; Road02 19 by 27: 35 against 16; the 64 by 64 worlds 256 each once clipped by the width). Two FreesideWorld level 4 blocks wholly outside the land have 1523 vertices, terrain height one constant 1000 (the world's default land height) and the skirt vertices at -14098; a block with land has 1514 vertices. Filling the cells without LAND with the default land height removes the reference files missing from the output (746 before, 68 with the fill on ten plugins). Not second-read."

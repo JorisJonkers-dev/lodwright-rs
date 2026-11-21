@@ -109,7 +109,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
     ]);
     assert_eq!(code, EXIT_OK);
     assert!(out.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\","));
-    assert!(out.contains("\"mesh\":\"meshes/landscape/lod/island/island.level4.x0.y0.nif\""));
+    assert!(out.contains("\"mesh\":\"meshes/landscape/lod/island/island.level4.x2.y2.nif\""));
     assert!(out.contains("\"texture_size\":[256,256]"));
 }
 
@@ -494,10 +494,10 @@ fn a_known_differences_list_accepts_its_blocks_reports_stale_entries_and_prints_
         .iter()
         .map(|l| l["level"].as_u64().unwrap())
         .collect();
-    assert_eq!(levels, [4, 8, 16]);
-    assert_eq!(report["known"].as_array().unwrap().len(), 7);
-    assert_eq!(report["stale"].as_array().unwrap().len(), 2);
-    // the lake has water blocks at levels 4, 8 and 16; without the level 16 entry, that block is a difference again
+    assert_eq!(levels, [4, 8, 16, 32]);
+    assert_eq!(report["known"].as_array().unwrap().len(), 9);
+    assert_eq!(report["stale"].as_array().unwrap().len(), 1);
+    // the lake has water blocks at levels 4, 8, 16 and 32; without the level 16 entry, that block is a difference again
     let short = list.with_extension("short.txt");
     std::fs::write(
         &short,

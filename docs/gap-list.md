@@ -8,7 +8,7 @@ pipeline the community generators provide for this game. Each row is one work it
 | 1 | Plugin reading, load order, master order | Done (own reader, header checks through the `esplugin` crate) | Compressed `CELL` coverage on real files is checked by the real-data run |
 | 2 | Archives, loose-over-archive lookup | Done (`lodwright-assets`), wired into object LOD | Textures for the terrain diffuse |
 | 3 | Worldspace assembly, height raster | Done | Parent-world inheritance is decoded; its use in LOD is untested on real data |
-| 4 | Terrain mesh planning | Done: adaptive (RTIN) meshes, fixed edge vertices, vertex cap, no triangles over missing ground | Hiding unseen faces, water offset, per-block quality tuning against the game's own blocks |
+| 4 | Terrain mesh planning | Done: adaptive meshes by greedy insertion (#248), edge vertices chosen along each shared edge, vertex cap, no triangles over missing ground | Hiding unseen faces, water offset, per-block quality tuning against the game's own blocks |
 | 5 | Terrain block NIF | Done (`lodwright-nif`), structure matches the game's blocks | In-game load check (owner) |
 | 6 | Terrain textures | Done: normal maps correlate 0.95 to 0.97 with the game's own, diffuse (land texture layers, opacity points, vertex colour) correlates 0.85 to 0.95 | Per-texture tiling scale, specular alpha option |
 | 7 | Settings file | Done; byte-identical to the game's own file for the main world | Check against the game's loading |

@@ -15,7 +15,8 @@ use lodwright_gen::FileRecord;
 use serde::{Deserialize, Serialize};
 
 use crate::load::{load_plugins_with, select_worlds};
-use crate::{CancelToken, Error, Progress, ProgressEvent, Step};
+use crate::progress::RunTracker;
+use crate::{CancelToken, Error, Progress, Step};
 
 /// What [`generate`] is asked to do: a `lodwright-request` document and the two switches that are not part of it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,16 +61,6 @@ pub enum GenerateOutcome {
 /// Cells per edge of an object block and of a tree block: the `level` of their progress events.
 const OBJECT_BLOCK_CELLS: u32 = lodwright_gen::BLOCK_CELLS.unsigned_abs();
 const TREE_BLOCK_CELLS: u32 = lodwright_core::trees::TREE_BLOCK_CELLS.unsigned_abs();
-
-/// A finished object or tree block of `world`. Neither is kept from an earlier run, so `up_to_date` is false.
-fn block_event(step: Step, world: &str, level: u32, done: u64, total: u64) -> ProgressEvent {
-    ProgressEvent {
-        level: Some(level),
-        done: Some(done),
-        total: Some(total),
-        ..ProgressEvent::start(step, Some(world))
-    }
-}
 
 /// What a run that writes specular in the alpha channel has to say about the exponents of the land textures: that
 /// none exists (the alpha stays opaque), or which textures have none (their specular counts as the lowest value).
@@ -340,7 +331,8 @@ pub fn generate(
     if cancel.is_cancelled() {
         return Ok(GenerateOutcome::Cancelled);
     }
-    progress.report(&ProgressEvent::start(Step::ReadPlugins, None));
+    let mut run = RunTracker::new();
+    progress.report(&run.start(Step::ReadPlugins, None));
     let loaded = load_plugins_with(data, &request.plugins, read)?;
     let digest = request.digest();
     // an output folder that is a link is replaced where it points: the swap renames the folder, never the link
@@ -390,6 +382,17 @@ pub fn generate(
             }
         }
     }
+    let terrain_levels: Vec<u32> = terrain_settings(request)
+        .levels
+        .iter()
+        .map(|l| l.level)
+        .collect();
+    run.plan(
+        &chosen.iter().map(|w| w.name()).collect::<Vec<_>>(),
+        request.terrain.enabled.then_some(terrain_levels.as_slice()),
+        request.objects.enabled,
+        request.trees.enabled,
+    );
     let threads = request.limits.threads.map_or_else(
         || std::thread::available_parallelism().map_or(1, |n| n.get().min(4)),
         |n| n as usize,
@@ -469,7 +472,7 @@ pub fn generate(
                 cancelled = true;
                 break 'worlds;
             }
-            progress.report(&ProgressEvent::start(Step::Terrain, Some(world.name())));
+            progress.report(&run.start(Step::Terrain, Some(world.name())));
             let mut warnings = Vec::new();
             let tiles = match (&assets, request.terrain.land_textures) {
                 (Some(assets), true) => {
@@ -500,17 +503,12 @@ pub fn generate(
                 );
             }
             let report = {
-                let shared = Mutex::new(&mut *progress);
+                let shared = Mutex::new((&mut *progress, &mut run));
                 let block_done = |world: &str, level: u32, done: u64, of: u64, up_to_date: bool| {
-                    if let Ok(mut p) = shared.lock() {
-                        p.report(&ProgressEvent {
-                            step: Step::Terrain,
-                            world: Some(world.to_owned()),
-                            level: Some(level),
-                            done: Some(done),
-                            total: Some(of),
-                            up_to_date,
-                        });
+                    if let Ok(mut guard) = shared.lock() {
+                        let (p, run) = &mut *guard;
+                        let event = run.block(Step::Terrain, world, level, done, of, up_to_date);
+                        p.report(&event);
                     }
                 };
                 lodwright_gen::generate_terrain(
@@ -523,6 +521,8 @@ pub fn generate(
                         progress: Some(&block_done),
                         water: request.terrain.water,
                         drop_under_water: request.terrain.drop_under_water,
+                        water_walls: request.terrain.water_walls,
+                        water_shared_vertices: request.terrain.water_shared_vertices,
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },
@@ -555,7 +555,7 @@ pub fn generate(
                 cancelled = true;
                 break 'worlds;
             }
-            progress.report(&ProgressEvent::start(Step::Objects, Some(world.name())));
+            progress.report(&run.start(Step::Objects, Some(world.name())));
             let instances =
                 lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
                     .map_err(|e| load_order_error(&e))?;
@@ -593,12 +593,13 @@ pub fn generate(
                 &stage,
                 surfaces,
                 &mut |done, total| {
-                    progress.report(&block_event(
+                    progress.report(&run.block(
                         Step::Objects,
                         world.name(),
                         OBJECT_BLOCK_CELLS,
                         done,
                         total,
+                        false,
                     ));
                 },
             )
@@ -617,7 +618,7 @@ pub fn generate(
                 cancelled = true;
                 break 'worlds;
             }
-            progress.report(&ProgressEvent::start(Step::Trees, Some(world.name())));
+            progress.report(&run.start(Step::Trees, Some(world.name())));
             let bases = lodwright_core::trees::tree_bases(&loaded.plugins)
                 .map_err(|e| load_order_error(&e))?;
             let refs =
@@ -633,12 +634,13 @@ pub fn generate(
                 assets,
                 &stage,
                 &mut |done, total| {
-                    progress.report(&block_event(
+                    progress.report(&run.block(
                         Step::Trees,
                         world.name(),
                         TREE_BLOCK_CELLS,
                         done,
                         total,
+                        false,
                     ));
                 },
             )
@@ -660,7 +662,7 @@ pub fn generate(
         checkpoint(&all, &blocks)?;
         return Ok(GenerateOutcome::Cancelled);
     }
-    progress.report(&ProgressEvent::start(Step::Manifest, None));
+    progress.report(&run.start(Step::Manifest, None));
     doc.blocks = counts;
     let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
     // staging holds exactly the manifest's files: whatever else a killed run left in it is dropped

@@ -54,6 +54,20 @@
       "tier": 3
     },
     {
+      "default": false,
+      "key": "terrain.water_walls",
+      "kind": "switch",
+      "since": "0.14.0",
+      "tier": 3
+    },
+    {
+      "default": false,
+      "key": "terrain.water_shared_vertices",
+      "kind": "switch",
+      "since": "0.14.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

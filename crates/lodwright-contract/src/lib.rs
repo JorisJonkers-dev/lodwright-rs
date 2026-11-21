@@ -41,7 +41,7 @@ pub use schema::{
 pub use verify::{
     Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
     KnownDifference, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
-    VerifyDoc, VerifyFinding, WaterBlock, WaterLevel, WaterReport,
+    VerifyDoc, VerifyFinding, WaterBlock, WaterLevel, WaterProfileLevel, WaterReport,
 };
 
 /// The plan document versions this build prints and reads, newest last.

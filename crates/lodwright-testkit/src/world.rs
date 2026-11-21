@@ -43,6 +43,8 @@ pub struct SyntheticWorld {
     pub land_data: Option<(f32, f32)>,
     /// Bottom-left (`NAM0`) and top-right (`NAM9`) corner as two float pairs, when written.
     pub bounds: Option<([f32; 2], [f32; 2])>,
+    /// Write a display name (`FULL`) too, as the game's own worlds have.
+    pub full_name: bool,
 }
 
 impl SyntheticWorld {
@@ -56,7 +58,15 @@ impl SyntheticWorld {
             parent: None,
             land_data: None,
             bounds: None,
+            full_name: false,
         }
+    }
+
+    /// Write a display name (`FULL`).
+    #[must_use]
+    pub fn named(mut self) -> Self {
+        self.full_name = true;
+        self
     }
 
     /// Write a parent worldspace (`WNAM`) and its flags (`PNAM`).
@@ -157,6 +167,9 @@ fn i16_pair(a: i32, b: i32) -> [u8; 4] {
 fn world_record(world: &SyntheticWorld) -> Record {
     let mut record =
         Record::new(*b"WRLD", world.form_id).with_subrecord(*b"EDID", zstring(&world.editor_id));
+    if world.full_name {
+        record = record.with_subrecord(*b"FULL", zstring(&world.editor_id));
+    }
     if let Some((parent, flags)) = world.parent {
         record = record
             .with_subrecord(*b"WNAM", parent.to_le_bytes().to_vec())

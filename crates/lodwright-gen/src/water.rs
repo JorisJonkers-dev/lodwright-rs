@@ -17,6 +17,22 @@ const CELL_INTERVALS: usize = 32;
 /// blocks at 0.95 overlap or better with an unchanged mean overlap.
 const LEVEL4_WET_MARGIN: f32 = 25.0;
 
+/// Whether a block with water gets the game's empty one-vertex segmented shape between the terrain and the water:
+/// every cell of the block has water at the world's default height and that height is not above 0. Measured on the
+/// game's blocks (`game-lod-water-placeholder`): all 212 blocks that have it satisfy the rule, 3 blocks that satisfy it
+/// do not have it, and where the default is above 0 (two small worlds, 33 blocks) the game writes none. Own fit, not a statement of the game's rule.
+fn wants_placeholder(world: &Worldspace, cells: usize, cell: (i32, i32)) -> bool {
+    // source: game-lod-water-placeholder
+    let Some(default) = world.default_water_height() else {
+        return false;
+    };
+    let Ok(n) = i32::try_from(cells) else {
+        return false;
+    };
+    default <= 0.0
+        && (cell.0..cell.0 + n).all(|x| (cell.1..cell.1 + n).all(|y| world.water_is_default(x, y)))
+}
+
 /// The water plane of one block, relative to the block origin.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct WaterMesh {
@@ -24,6 +40,8 @@ pub(crate) struct WaterMesh {
     pub indices: Vec<u16>,
     /// For a level 4 block, the triangle count of each cell in the order x * 4 + y.
     pub segments: Option<[u32; 16]>,
+    /// The block gets the game's empty one-vertex shape between the terrain and the water (see [`wants_placeholder`]).
+    pub placeholder: bool,
 }
 
 /// Greedy rectangles over a square boolean grid: (x, y, width, height) in squares, row by row.
@@ -140,6 +158,7 @@ pub(crate) fn water_mesh(
         vertices,
         indices,
         segments: (cells == 4).then_some(segments),
+        placeholder: wants_placeholder(world, cells, cell),
     })
 }
 
@@ -210,6 +229,7 @@ fn coarse_water(
         vertices,
         indices,
         segments: None,
+        placeholder: wants_placeholder(world, cells, cell),
     })
 }
 
@@ -233,6 +253,32 @@ mod tests {
             w.set_cell_water(0, 0, true, Some(h));
         }
         w
+    }
+
+    fn placeholder_of(default: f32, own: Option<(i32, i32)>) -> Option<bool> {
+        let cells = (0..4).flat_map(|x| (0..4).map(move |y| ((x, y), CellHeights::flat(-200.0))));
+        let mut w = Worldspace::from_cells(1, "Mojave", cells);
+        w.set_default_water_height(Some(default));
+        for x in 0..4 {
+            for y in 0..4 {
+                let height = if own == Some((x, y)) { -50.0 } else { f32::MAX };
+                w.set_cell_water(x, y, true, Some(height));
+            }
+        }
+        let span = 4 * 32 + 1;
+        water_mesh(&w, &vec![-200.0; span * span], 4, (0, 0)).map(|m| m.placeholder)
+    }
+
+    #[test]
+    fn a_block_of_default_water_at_or_below_zero_gets_the_placeholder_shape() {
+        // every cell on the world's default (an XCLW of the largest float), default height -100
+        assert_eq!(placeholder_of(-100.0, None), Some(true));
+        assert_eq!(placeholder_of(0.0, None), Some(true));
+        // one cell with a height of its own, or a default above 0 (small worlds in the measurement): none
+        assert_eq!(placeholder_of(-100.0, Some((2, 1))), Some(false));
+        assert_eq!(placeholder_of(5.0, None), Some(false));
+        // a block with no water gets no plane, so no placeholder either
+        assert_eq!(placeholder_of(-300.0, None), None);
     }
 
     #[test]

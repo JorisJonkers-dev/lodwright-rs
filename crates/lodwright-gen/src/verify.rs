@@ -90,8 +90,9 @@ impl Ctx {
     }
 
     fn check_geometry(&mut self, path: &str, nif: &NifFile, size: Option<f32>, object: bool) {
-        // a terrain block with a water plane has two more (`game-lod-water-shape`)
-        let expected: &[usize] = if object { &[7] } else { &[8, 10] };
+        // a terrain block with a water plane has two more (`game-lod-water-shape`), and two more again with the empty
+        // shape of `game-lod-water-placeholder`
+        let expected: &[usize] = if object { &[7] } else { &[8, 10, 12] };
         if !expected.contains(&nif.blocks.len()) {
             self.err(
                 path,
@@ -1046,6 +1047,38 @@ mod tests {
         assert_eq!(unmatched_vertices(&a, &far), 1);
     }
 
+    #[test]
+    fn a_block_with_the_placeholder_shape_has_twelve_blocks_and_passes_the_geometry_check() {
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [16384.0, 0.0, 0.0],
+            [16384.0, 16384.0, 0.0],
+            [0.0, 16384.0, 0.0],
+        ];
+        let indices = [0, 1, 2, 0, 2, 3];
+        let water = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
+        let nif = lodwright_nif::terrain_block(&lodwright_nif::TerrainBlock {
+            origin: (0.0, 0.0),
+            size: 16384.0,
+            vertices: &vertices,
+            indices: &indices,
+            textures: ["a.dds", "b.dds"],
+            water: Some(lodwright_nif::WaterShape {
+                vertices: &water,
+                indices: &[0, 1, 2],
+                segments: None,
+                placeholder: true,
+            }),
+        })
+        .unwrap();
+        assert_eq!(nif.blocks.len(), 12);
+        let mut ctx = super::Ctx {
+            out: super::Verification::default(),
+        };
+        ctx.check_geometry("a.nif", &nif, Some(16384.0), false);
+        assert!(ctx.out.errors.is_empty(), "{:?}", ctx.out.errors);
+    }
+
     fn write_terrain(root: &std::path::Path, name: &str, water: Option<(f32, f32)>) {
         let vertices = [
             [0.0, 0.0, 0.0],
@@ -1072,6 +1105,7 @@ mod tests {
                 vertices: v,
                 indices: &indices,
                 segments: None,
+                placeholder: false,
             }),
         })
         .unwrap();

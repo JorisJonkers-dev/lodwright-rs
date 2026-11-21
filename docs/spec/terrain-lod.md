@@ -115,6 +115,13 @@ At level 4 a square counts as wet only when its mean ground height lies at least
 (own design, fitted to the main world's level 4 blocks: margins of 0, 10, 25, 40 and 60 units gave 39, 37, 34, 36 and 36
 of 98 blocks under 0.95 overlap, with a mean overlap of 0.874, 0.874, 0.874, 0.873 and 0.869; the higher levels are
 unchanged).
+The game also writes, in some blocks with water, an empty segmented shape between the terrain and the water
+(`game-lod-water-placeholder`): three empty segments, translation zero, one vertex at the origin and one triangle of zero
+indices, the same at every level. In the main world and the Strip it is there when every cell of the block has water at
+the world's default height (the flag with no height of its own): 212 of 212 such blocks have it, 3 blocks that satisfy the
+rule do not (a small pond in each of levels 4, 8 and 16), and two small worlds whose default is above 0 (33 blocks) never
+have it. lodwright writes it for a block with water whose cells are all at the default, in a world whose default is 0 or lower
+(own fit to those numbers, not the game's rule); the block types of those blocks then equal the reference's.
 `--no-water` (request `terrain.water: false`) leaves the planes out.
 
 ## 7. Faces under the water (own design)

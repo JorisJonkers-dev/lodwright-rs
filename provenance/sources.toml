@@ -948,8 +948,8 @@ licence = "Structure and counts of the owner's own game files; no file content i
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Measured on three blocks (levels 4, 8, 32) with lodwright's NIF reader and a throwaway dumper. Vertex counts were 807 to 857 for blocks of 3600 to 3700 triangles."
+verified = true
+note = "Measured on three blocks (levels 4, 8, 32) with lodwright's NIF reader and a throwaway dumper. Vertex counts were 807 to 857 for blocks of 3600 to 3700 triangles. Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): all 1360 terrain NIFs of WastelandNV: user version 11, user version 2 34, the eight blocks in the stated order when the block has no water shape (1196; the 164 with water have the water shape and its data block after the additional data); one data block with one UV set, no normals, no vertex colours; vertices span exactly 0 to level times 4096 on x and y; u = 1 - x/size and v = y/size to 0 deviation on every vertex; the root translation equals the block's south-west cell times 4096 and z 0 in all 1360; the texture set paths are Data\\Textures\\Landscape\\LOD\\WastelandNV\\Diffuse and \\Normals \\WastelandNV.n.Level<L>.X<X>.Y<Y>.dds in all 1360; the additional data block is 4 bytes per vertex plus 56 bytes in all 1360 (one float per vertex). Level 4 blocks hold 818 to 1773 vertices (the three blocks first measured, 807 to 857, were not singled out)."
 
 [[source]]
 id = "game-lod-terrain-textures"
@@ -1003,8 +1003,8 @@ licence = "Structure and counts of one of the owner's own game files; no file co
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "One block measured. The meaning of the segment table is not established (a segment count of four with one triangle range each is what the bytes show). The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells."
+verified = true
+note = "One block measured. The meaning of the segment table is not established (a segment count of four with one triangle range each is what the bytes show). The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells. Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): all 295 object NIFs of WastelandNV have user version 11, user version 2 34 and exactly the seven blocks in the stated order; each data block has positions, normals, one UV set, vertex colours none and keep flags 51; block wastelandnv.level4.x24.y-12 has 1715 vertices and 2071 triangles with positions spanning x 1508 to 8269 (6761) and y -944 to 16367 (17311), which is the measured block of the fact; positions beyond the 16384 unit edge exist as stated. The segment table meaning stays open as the note says."
 
 [[source]]
 id = "fnv-object-records"
@@ -1112,7 +1112,7 @@ date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "These are the water planes of the block. Further measured: the shape is a BSSegmentedTriShape at level 4 with 16 segments (a flag byte, the first triangle point, zero for an empty segment, and the triangle count) for the cells in the order x * 4 + y, a plain NiTriShape at levels 8 to 32; it has no properties, its translation repeats the block origin, and its data has positions only (vector flags 0, no additional data) with a bounding sphere around the box centre. The outline rule is not established; generate writes its own design (docs/spec/terrain-lod.md, section 6)."
+note = "These are the water planes of the block. Further measured: the shape is a BSSegmentedTriShape at level 4 with 16 segments (a flag byte, the first triangle point, zero for an empty segment, and the triangle count) for the cells in the order x * 4 + y, a plain NiTriShape at levels 8 to 32; it has no properties, its translation repeats the block origin, and its data has positions only (vector flags 0, no additional data) with a bounding sphere around the box centre. The outline rule is not established; generate writes its own design (docs/spec/terrain-lod.md, section 6). Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): the count part is reproduced: 164 of 1360 terrain NIFs have water (86 with ten blocks, 78 with twelve; by level 98, 39, 19, 8 for levels 4, 8, 16, 32), the water data blocks have no UV set and no normals, and at level 4 every water shape is a BSSegmentedTriShape. Not re-derived: the 16-segment table, the translation, vector flags and the bounding sphere. At levels 8 to 32, 24 of the 30 twelve-block files carry a BSSegmentedTriShape (the empty one-vertex shape of game-lod-water-placeholder) before a plain NiTriShape, so the plain shape claim holds for the water plane itself. Row stays unverified for the parts not re-derived."
 
 [[source]]
 id = "xedit-tree-lod-files"
@@ -1178,7 +1178,7 @@ date = 2026-11-20
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Measured on the reference tree extracted from the game's archives, shape 0 of each block (the terrain; the water shape is the second). Positions are block-local, 0 to level times 4096. The three border positions without a skirt vertex are not explained. The constant equals the depth of the sloped water edges noted under game-lod-water-height, which suggests one underlying rule. Method: dump the vertices of each block with the repository's own NIF reader and compare edge sets. Not second-read."
+note = "Measured on the reference tree extracted from the game's archives, shape 0 of each block (the terrain; the water shape is the second). Positions are block-local, 0 to level times 4096. The three border positions without a skirt vertex are not explained. The constant equals the depth of the sloped water edges noted under game-lod-water-height, which suggests one underlying rule. Method: dump the vertices of each block with the repository's own NIF reader and compare edge sets. Not second-read. Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): the skirt counts are reproduced exactly for the 1360 blocks: border positions with a skirt vertex 175259 of 175262 (level 4), 18762 of 18763 (8), 3555 of 3556 (16), 634 of 634 (32). Not re-derived: the neighbour comparisons (43 of 2600 pairs, 83 and 71 percent of the coarse border). Row stays unverified for those."
 
 [[source]]
 id = "game-lod-block-grid"

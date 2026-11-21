@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.11.0...v0.12.0) (2026-11-21)
+
+
+### Features
+
+* **terrain:** choose block vertices by the true deviation inside each triangle ([#248](https://github.com/JorisJonkers-dev/lodwright-rs/issues/248)) ([#250](https://github.com/JorisJonkers-dev/lodwright-rs/issues/250)) ([bee1cb1](https://github.com/JorisJonkers-dev/lodwright-rs/commit/bee1cb157da0a5dab2896f1d0d689bdf4fa89354))
+* **terrain:** greedy insertion with edge vertices chosen along each edge ([#248](https://github.com/JorisJonkers-dev/lodwright-rs/issues/248)) ([#253](https://github.com/JorisJonkers-dev/lodwright-rs/issues/253)) ([711c322](https://github.com/JorisJonkers-dev/lodwright-rs/commit/711c322018247651de4a5dcfe8f12306af2aea3d))
+
 ## [0.11.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.10.0...v0.11.0) (2026-11-21)
 
 

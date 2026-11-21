@@ -123,7 +123,18 @@ fn the_archive_holds_what_a_loose_run_writes_and_the_stub_reads_as_an_empty_plug
         &std::fs::read(packed_out.join("Lodwright LOD.esp")).unwrap(),
     )
     .unwrap();
-    assert_eq!((header.masters.len(), header.is_master), (0, false));
+    // the game opens a plugin's archives only when the plugin has a master: the stub names the first plugin
+    assert_eq!(header.masters, ["Island.esm"]);
+    assert!(!header.is_master);
+    let stub = std::fs::read(packed_out.join("Lodwright LOD.esp")).unwrap();
+    let size = std::fs::metadata(Path::new(&packed_job.request.data_folder).join("Island.esm"))
+        .unwrap()
+        .len();
+    assert_eq!(
+        stub[stub.len() - 8..],
+        size.to_le_bytes(),
+        "the stored master size"
+    );
     assert!(Archive::open(&mut std::io::Cursor::new(&bytes)).is_ok());
 }
 

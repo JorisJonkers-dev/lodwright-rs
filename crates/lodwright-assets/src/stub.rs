@@ -5,7 +5,8 @@
 //! `fnv-archive-loading`, `bsa-archive-registration`); the plugin holds no record and changes nothing in the game.
 //! Layout: the TES4 header record (`plugin-record-header`) with a HEDR subrecord (`plugin-subrecord-layout`),
 //! the values measured as numbers on the game's own plugin headers (`plugin-stub-header-values`), an author and a
-//! description so a tool can tell what the plugin is for.
+//! description so a tool can tell what the plugin is for, and one master: the game opens the archives of a plugin
+//! only when its master list is not empty.
 //!
 //! Whether the game then loads the archive on the target engine is measured, not assumed (issue 132).
 
@@ -89,11 +90,17 @@ fn zstring(text: &str) -> Vec<u8> {
     bytes
 }
 
-/// The bytes of the stub plugin: a TES4 record, not a master, no masters, a record count of 0.
+/// The bytes of the stub plugin: a TES4 record, not a master, one master (`master`, whose file is `master_size`
+/// bytes), a record count of 0.
 ///
-/// Deterministic: the same bytes every time, on every system.
+/// The master is not optional: the game opens the archives of a plugin only when its master list is not empty
+/// (measured in the engine, issue 132; `plugin-stub-header-values`). Pass the first plugin of the load order,
+/// normally `FalloutNV.esm`, and its size in bytes (the game warns when a master's size differs from the one
+/// stored).
+///
+/// Deterministic: the same bytes for the same arguments, on every system.
 #[must_use]
-pub fn stub_plugin() -> Vec<u8> {
+pub fn stub_plugin(master: &str, master_size: u64) -> Vec<u8> {
     // source: plugin-subrecord-layout
     let mut data = Vec::new();
     let mut hedr = Vec::with_capacity(12);
@@ -103,6 +110,8 @@ pub fn stub_plugin() -> Vec<u8> {
     subrecord(&mut data, *b"HEDR", &hedr);
     subrecord(&mut data, *b"CNAM", &zstring(AUTHOR));
     subrecord(&mut data, *b"SNAM", &zstring(DESCRIPTION));
+    subrecord(&mut data, *b"MAST", &zstring(master));
+    subrecord(&mut data, *b"DATA", &master_size.to_le_bytes());
     // source: plugin-record-header
     let mut out = Vec::with_capacity(24 + data.len());
     out.extend_from_slice(SIGNATURE);
@@ -121,12 +130,19 @@ mod tests {
 
     #[test]
     fn the_stub_is_the_same_bytes_every_time() {
-        assert_eq!(stub_plugin(), stub_plugin());
+        assert_eq!(
+            stub_plugin("FalloutNV.esm", 7),
+            stub_plugin("FalloutNV.esm", 7)
+        );
+        assert_ne!(
+            stub_plugin("FalloutNV.esm", 7),
+            stub_plugin("FalloutNV.esm", 8)
+        );
     }
 
     #[test]
     fn the_header_size_counts_exactly_the_subrecords() {
-        let bytes = stub_plugin();
+        let bytes = stub_plugin("FalloutNV.esm", 7);
         let size = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
         assert_eq!(bytes.len(), 24 + size);
         assert_eq!(&bytes[..4], b"TES4");
@@ -164,7 +180,7 @@ mod tests {
 
     #[test]
     fn the_author_marks_the_stub() {
-        let bytes = stub_plugin();
+        let bytes = stub_plugin("FalloutNV.esm", 7);
         let needle = format!("{AUTHOR}\0");
         assert!(bytes.windows(needle.len()).any(|w| w == needle.as_bytes()));
     }

@@ -193,9 +193,21 @@ pub(crate) fn free_bytes(out: &Path) -> Option<u64> {
 }
 
 /// Move the top-level entries of `old` that `new` does not have (a file the user keeps in the output folder) into `new`.
+/// What the previous manifest lists is generated output, not the user's: its top-level folders and files are left
+/// behind, so a loose output swapped for a packed one (or the other way round) does not keep the old form.
 fn carry_over(old: &Path, new: &Path) {
+    let generated: BTreeSet<String> = read_manifest_file(old, MANIFEST_FILE).map_or_default(|m| {
+        m.files
+            .iter()
+            .filter_map(|f| f.path.split('/').next().map(str::to_owned))
+            .chain([MANIFEST_FILE.to_owned()])
+            .collect()
+    });
     if let Ok(entries) = std::fs::read_dir(old) {
         for entry in entries.flatten() {
+            if generated.contains(entry.file_name().to_string_lossy().as_ref()) {
+                continue;
+            }
             let target = new.join(entry.file_name());
             if !exists(&target) {
                 let _ = std::fs::rename(entry.path(), target);
@@ -286,6 +298,26 @@ mod tests {
         assert_eq!(std::fs::read(out.join("notes.txt")).unwrap(), b"mine");
         assert!(!out.join(CHECKPOINT_FILE).exists());
         assert!(!stage.exists() && !root.join("out.lodwright-old").exists());
+    }
+
+    #[test]
+    fn a_swap_leaves_the_generated_files_of_the_previous_form_behind_and_keeps_the_users() {
+        let root = temp("swap-form");
+        let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
+        std::fs::create_dir_all(out.join("meshes")).unwrap();
+        std::fs::write(out.join("meshes/old.nif"), b"old").unwrap();
+        std::fs::write(out.join("notes.txt"), b"mine").unwrap();
+        let old = lodwright_contract::Manifest::new("1", "d", "i", vec![file("meshes/old.nif")]);
+        std::fs::write(out.join("manifest.json"), serde_json::to_vec(&old).unwrap()).unwrap();
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::write(stage.join("Lodwright LOD.bsa"), b"packed").unwrap();
+        swap(&out, &stage).unwrap();
+        assert!(out.join("Lodwright LOD.bsa").is_file());
+        assert!(
+            !out.join("meshes").exists(),
+            "the loose form of the previous run is gone"
+        );
+        assert_eq!(std::fs::read(out.join("notes.txt")).unwrap(), b"mine");
     }
 
     #[test]

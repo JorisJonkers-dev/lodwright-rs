@@ -182,6 +182,22 @@ pub struct Limits {
     pub memory_mib: Option<u64>,
 }
 
+/// What the output folder holds when the run is done.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct OutputRequest {
+    /// Pack the generated files into one BSA archive with a stub plugin of the same name instead of leaving them
+    /// loose. A step after the generation: it is not part of the request digest, so switching it rebuilds no
+    /// block. Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pack: bool,
+}
+
+impl OutputRequest {
+    fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 /// Request v1.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Request {
@@ -215,6 +231,9 @@ pub struct Request {
     /// Limits.
     #[serde(default)]
     pub limits: Limits,
+    /// Output form. Left out of the digest.
+    #[serde(default, skip_serializing_if = "OutputRequest::is_default")]
+    pub output: OutputRequest,
 }
 
 impl Request {
@@ -233,6 +252,7 @@ impl Request {
             trees: TreesRequest::default(),
             inclusion: Inclusion::default(),
             limits: Limits::default(),
+            output: OutputRequest::default(),
         }
     }
 
@@ -316,13 +336,16 @@ impl Request {
         Ok(())
     }
 
-    /// `sha256:` of the request in its canonical JSON form (fixed field order).
+    /// `sha256:` of the request in its canonical JSON form (fixed field order). The `output` section is left out:
+    /// it decides how the generated files are stored, not what they are, so it changes no block.
     ///
     /// # Panics
     /// Never: a request serialises.
     #[must_use]
     pub fn digest(&self) -> String {
-        let json = serde_json::to_string(self).expect("a request serialises");
+        let mut digested = self.clone();
+        digested.output = OutputRequest::default();
+        let json = serde_json::to_string(&digested).expect("a request serialises");
         sha256_digest(format!("lodwright-request-v1\n{json}").as_bytes())
     }
 }
@@ -416,5 +439,28 @@ mod tests {
         let mut r = base();
         r.terrain.texture_scales.insert("oak".into(), 2.0);
         assert!(r.validate().unwrap_err().contains("hex"));
+    }
+
+    #[test]
+    fn the_pack_switch_is_off_by_default_written_only_when_on_and_left_out_of_the_digest() {
+        let off = base();
+        let mut on = base();
+        on.output.pack = true;
+        assert!(
+            !serde_json::to_string(&off)
+                .unwrap()
+                .contains(r#""output":"#)
+        );
+        assert!(
+            serde_json::to_string(&on)
+                .unwrap()
+                .contains(r#""output":{"pack":true}"#)
+        );
+        assert_eq!(on.digest(), off.digest());
+        let back: Request = serde_json::from_str(&serde_json::to_string(&on).unwrap()).unwrap();
+        assert!(back.output.pack);
+        // a request document from before the key existed has no output section and means loose files
+        let old: Request = serde_json::from_str(&serde_json::to_string(&off).unwrap()).unwrap();
+        assert!(!old.output.pack);
     }
 }

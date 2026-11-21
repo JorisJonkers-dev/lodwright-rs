@@ -222,6 +222,35 @@ refused (`output_link`, nothing is written through it). A temporary file is alwa
 its path is removed, never followed. A manifest that lists an absolute path or one with `..` is not trusted and is
 treated as no manifest.
 
+### Packing the output into an archive
+
+`output.pack` (a switch, off by default, written only when on; tier 3, since 0.15.0) packs the generated files into
+one BSA archive with a stub plugin of the same name, instead of leaving them loose. Off, output and digests are as
+before. The switch is read when the run is made and is a step after the generation, so it is **not** part of the
+request digest (`arguments_digest` is the same with it on and off) and changes no block digest: a run that switches it
+on over a loose output keeps every block (`blocks.up_to_date` counts them) and only packs.
+
+* The output folder then holds `Lodwright LOD.bsa`, `Lodwright LOD.esp` and `manifest.json`, and nothing loose; it
+  never holds both forms. Switching the switch off applies at the next generate, which builds the loose files again.
+  A file in the output folder that the previous manifest did not list is the user's and stays.
+* The manifest lists the files on disk: the archive and the stub, each with its size and digest. It lists no block, so
+  a run after a packed one builds every block again (the loose files the blocks were kept from are gone). `up_to_date`
+  holds for a packed output when the request digest and the inputs are unchanged, the archive and the stub are intact,
+  and the form matches the request: a packed manifest (an archive at the top of the folder) against `output.pack` off,
+  or the other way round, is not up to date.
+* The archive is a v104 BSA written by `lodwright_assets::pack` (names lower case with backslashes, records in
+  hash order, no embedded names), the stub a plugin with no master and no record (`lodwright_assets::stub`). Object
+  and tree textures are stored compressed, everything else stored (a performance choice, not a format fact). No
+  `.override` marker is written (it would need the JIP LN plugin). `manifest.json` is never in the archive. The
+  archive base name is fixed, `Lodwright LOD`.
+* Packing runs last, in the staging folder, and the staging folder replaces the output only when the run succeeds: a
+  run killed or failing during packing leaves the previous output exactly as it was (`pack_failed`, `pack_too_large`
+  when the files do not fit one archive of 4 GiB or hold a file over 1 GiB, or `output_failed`).
+* Progress: a `pack` phase sits between the last world and `manifest` (library step `pack`, label `lod.pack`) with
+  a 5 percent share of the run; it has a start event and then one event per file read (`done` and `total`, no `level`
+  or `world`). Like `read_plugins` and `manifest` it has no line in the events file.
+* Not yet the default: the engine load check of the archive on the target engine decides that (issue 132).
+
 ### Staging, cancel and kill
 
 A run builds into a staging folder next to the output folder, `<output>.lodwright-staging`, and replaces the output
@@ -379,7 +408,7 @@ a reader:
 * `run_done`, `run_total`: run-wide progress. `run_total` is 10000 on every event of a run and `run_done` never
   decreases, also when terrain blocks finish out of order. Show `run_done / run_total`.
 
-The shares are fixed: reading the plugins 3 percent, the manifest 2 percent, the rest split across the phases by the
+The shares are fixed: reading the plugins 3 percent, the manifest 2 percent, packing 5 percent when `output.pack` is on (a `pack` phase before the manifest), the rest split across the phases by the
 weights terrain 3, objects 4, trees 3 (estimates from a run of ten plugins; they decide the shape of the bar, never
 its direction). Inside a terrain phase the levels share the phase by the area of their blocks (a level of 4 cells
 has sixty-four times the blocks of a level of 32), so the bar does not stall at the first level. A level the world

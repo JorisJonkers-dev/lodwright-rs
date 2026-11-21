@@ -350,6 +350,31 @@ block, in the order the blocks finish:
 * `up_to_date` is true for a terrain block kept from an earlier run; object and tree blocks are always rebuilt, so
   it is false for them.
 
+### Run-wide progress (since 0.14.0)
+
+`done` and `of` restart for every kind, level and world, so a bar built from them goes up and down. Every event
+(the library's and the file's lines) therefore also carries the run's own numbers, all additive and all optional for
+a reader:
+
+* `phase` (file lines; the library event names it `step`): the phase name, `terrain`, `objects` or `trees` for a block
+  line. `read_plugins` and `manifest` have no block lines; their library events carry the same numbers.
+* `phase_index`, `phase_count`: the phase of the run, from 1, and how many there are. A phase is one step of one
+  world; the run is `read_plugins`, then each enabled step of each world in order, then `manifest`. A run on one world
+  with all three steps has five phases. The very first event (reading the plugins) has no `phase_count`: the worlds are
+  not known before the plugins are read.
+* `phase_done`, `phase_total`: progress inside the phase. The total of a phase never changes during the run; the
+  unit is a share of the run (see below), not a block.
+* `run_done`, `run_total`: run-wide progress. `run_total` is 10000 on every event of a run and `run_done` never
+  decreases, also when terrain blocks finish out of order. Show `run_done / run_total`.
+
+The shares are fixed: reading the plugins 3 percent, the manifest 2 percent, the rest split across the phases by the
+weights terrain 3, objects 4, trees 3 (estimates from a run of ten plugins; they decide the shape of the bar, never
+its direction). Inside a terrain phase the levels share the phase by the area of their blocks (a level of 4 cells
+has sixty-four times the blocks of a level of 32), so the bar does not stall at the first level. A level the world
+is too small for is skipped and its share is added when the next one starts. The numbers carry no time estimate.
+`run_done` reaches `run_total` only with the result (a run that finds its output up to date emits the read event
+only): a reader treats the result as 100 percent.
+
 Per world, the terrain lines come first (level by level), then the object lines, then the tree lines. The terrain
 blocks of a level finish on several workers, so with more than one worker their lines may arrive with `done` out of
 order; a reader that shows progress keeps the highest `done` it has seen. Object and tree lines come in order.

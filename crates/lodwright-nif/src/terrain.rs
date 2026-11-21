@@ -422,7 +422,12 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         push_water(&mut blocks, &mut types, block.origin, water, placeholder)?;
     }
     let tail = u16::try_from(types.len() - 2).unwrap_or(0);
-    blocks.push((tail, Body::Opaque(7_u32.to_le_bytes().to_vec())));
+    // The multibound holds the index of the box block that follows it: 7 without water, 9 with one water shape,
+    // 11 with the placeholder too (measured on the game's blocks, `game-lod-multibound-aabb-ref`).
+    // source: game-lod-multibound-aabb-ref
+    let aabb_index =
+        u32::try_from(blocks.len() + 1).map_err(|_| NifError::Inconsistent("too many blocks"))?;
+    blocks.push((tail, Body::Opaque(aabb_index.to_le_bytes().to_vec())));
     blocks.push((tail + 1, Body::Opaque(aabb)));
     Ok(NifFile {
         header: file_header(&types),
@@ -451,6 +456,18 @@ mod tests {
         )
     }
 
+    /// The multibound block `at` holds the index of the box block `aabb`, and that block is the box.
+    fn assert_multibound_names_the_box(file: &NifFile, at: usize, aabb: u32) {
+        let kind =
+            |n: usize| file.header.block_types[usize::from(file.blocks[n].type_index)].clone();
+        assert_eq!(kind(at), b"BSMultiBound");
+        assert_eq!(kind(aabb as usize), b"BSMultiBoundAABB");
+        let crate::Body::Opaque(bytes) = &file.blocks[at].body else {
+            panic!("opaque multibound");
+        };
+        assert_eq!(bytes.as_slice(), &aabb.to_le_bytes());
+    }
+
     fn block<'a>(v: &'a [[f32; 3]], i: &'a [u16]) -> TerrainBlock<'a> {
         TerrainBlock {
             origin: (-16384.0, 0.0),
@@ -468,6 +485,7 @@ mod tests {
         let bytes = terrain_block(&block(&v, &i)).unwrap().write().unwrap();
         let back = NifFile::read(&bytes).unwrap();
         assert_eq!(back.blocks.len(), 8);
+        assert_multibound_names_the_box(&back, 6, 7);
         assert_eq!(back.roots, [0]);
         assert_eq!(back.header.user_version, 11);
         assert_eq!(back.header.bethesda.as_ref().unwrap().0, 34);
@@ -544,9 +562,10 @@ mod tests {
             let crate::Body::Opaque(root) = &back.blocks[0].body else {
                 panic!("opaque root");
             };
-            // two children, then the multibound at 8
+            // two children, then the multibound at 8, which names the box at 9
             assert_eq!(&root[76..80], &2_u32.to_le_bytes());
             assert_eq!(&root[92..96], &8_u32.to_le_bytes());
+            assert_multibound_names_the_box(&back, 8, 9);
         }
         let mut plain = block(&v, &i);
         plain.water = Some(super::WaterShape {
@@ -600,7 +619,8 @@ mod tests {
             let crate::Body::Opaque(root) = &back.blocks[0].body else {
                 panic!("opaque root");
             };
-            // three children (1, 6, 8), then the multibound at 10
+            // three children (1, 6, 8), then the multibound at 10, which names the box at 11
+            assert_multibound_names_the_box(&back, 10, 11);
             assert_eq!(&root[76..80], &3_u32.to_le_bytes());
             assert_eq!(&root[80..84], &1_u32.to_le_bytes());
             assert_eq!(&root[84..88], &6_u32.to_le_bytes());

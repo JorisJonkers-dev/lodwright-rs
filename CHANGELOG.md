@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.10.0...v0.11.0) (2026-11-21)
+
+
+### Features
+
+* **water:** write the game's empty segmented shape in blocks whose cells all have default water ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#244](https://github.com/JorisJonkers-dev/lodwright-rs/issues/244)) ([a262e12](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a262e122ea1bf3f8e924e184d23a996f1ee489c3))
+
+
+### Bug Fixes
+
+* **verify:** do not check object blocks against a grid when the world has no settings file ([#245](https://github.com/JorisJonkers-dev/lodwright-rs/issues/245)) ([#247](https://github.com/JorisJonkers-dev/lodwright-rs/issues/247)) ([39bedb7](https://github.com/JorisJonkers-dev/lodwright-rs/commit/39bedb707ddcec12c63862517fac7ce1fa773b60))
+
 ## [0.10.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.9.0...v0.10.0) (2026-11-21)
 
 

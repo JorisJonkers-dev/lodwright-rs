@@ -533,37 +533,7 @@ fn add_block_reports(
             mean: round3(ious.iter().sum::<f64>() / ious.len() as f64),
         })
         .collect();
-    // the shape of the water per level: means over the blocks
-    let mut shapes: std::collections::BTreeMap<u32, Vec<lodwright_gen::WaterProfile>> =
-        std::collections::BTreeMap::new();
-    for w in &blocks.water {
-        if let Some(level) = level_of(&w.path) {
-            shapes.entry(level).or_default().push(w.profile);
-        }
-    }
-    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
-    let profile: Vec<WaterProfileLevel> = shapes
-        .into_iter()
-        .map(|(level, list)| {
-            let n = list.len() as f64;
-            let mean = |f: fn(&lodwright_gen::WaterProfile) -> f64| {
-                round3(list.iter().map(f).sum::<f64>() / n)
-            };
-            let agreements: Vec<f64> = list.iter().filter_map(|p| p.height_agreement).collect();
-            WaterProfileLevel {
-                level,
-                blocks: count(list.len()),
-                depth_mine: mean(|p| p.depth_mine),
-                depth_theirs: mean(|p| p.depth_theirs),
-                wall_mine: mean(|p| p.wall_mine),
-                wall_theirs: mean(|p| p.wall_theirs),
-                vertices_mine: round3(list.iter().map(|p| p.vertices_mine).sum::<f64>() / n),
-                vertices_theirs: round3(list.iter().map(|p| p.vertices_theirs).sum::<f64>() / n),
-                height_agreement: (!agreements.is_empty())
-                    .then(|| round3(agreements.iter().sum::<f64>() / agreements.len() as f64)),
-            }
-        })
-        .collect();
+    let profile = water_profile_levels(blocks);
     doc.water = Some(WaterReport {
         per_level,
         profile,
@@ -605,6 +575,41 @@ fn level_of(path: &str) -> Option<u32> {
         .next()
         .and_then(|name| name.split('.').find_map(|part| part.strip_prefix("level")))
         .and_then(|l| l.parse::<u32>().ok())
+}
+
+/// The shape of the water per level: means over the blocks with water.
+fn water_profile_levels(blocks: &lodwright_gen::BlockComparison) -> Vec<WaterProfileLevel> {
+    let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let mut shapes: std::collections::BTreeMap<u32, Vec<lodwright_gen::WaterProfile>> =
+        std::collections::BTreeMap::new();
+    for w in &blocks.water {
+        if let Some(level) = level_of(&w.path) {
+            shapes.entry(level).or_default().push(w.profile);
+        }
+    }
+    #[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+    shapes
+        .into_iter()
+        .map(|(level, list)| {
+            let n = list.len() as f64;
+            let mean = |f: fn(&lodwright_gen::WaterProfile) -> f64| {
+                round3(list.iter().map(f).sum::<f64>() / n)
+            };
+            let agreements: Vec<f64> = list.iter().filter_map(|p| p.height_agreement).collect();
+            WaterProfileLevel {
+                level,
+                blocks: count(list.len()),
+                depth_mine: mean(|p| p.depth_mine),
+                depth_theirs: mean(|p| p.depth_theirs),
+                wall_mine: mean(|p| p.wall_mine),
+                wall_theirs: mean(|p| p.wall_theirs),
+                vertices_mine: round3(list.iter().map(|p| p.vertices_mine).sum::<f64>() / n),
+                vertices_theirs: round3(list.iter().map(|p| p.vertices_theirs).sum::<f64>() / n),
+                height_agreement: (!agreements.is_empty())
+                    .then(|| round3(agreements.iter().sum::<f64>() / agreements.len() as f64)),
+            }
+        })
+        .collect()
 }
 
 /// The largest height difference over which a terrain block counts in the summary when `--height-tolerance` is not

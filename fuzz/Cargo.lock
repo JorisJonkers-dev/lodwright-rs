@@ -124,21 +124,21 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "lodwright-assets"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "miniz_oxide",
 ]
 
 [[package]]
 name = "lodwright-core"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "miniz_oxide",
 ]
 
 [[package]]
 name = "lodwright-dds"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "ddsfile",
  "texpresso",
@@ -158,11 +158,11 @@ dependencies = [
 
 [[package]]
 name = "lodwright-nif"
-version = "0.15.0"
+version = "0.15.1"
 
 [[package]]
 name = "lodwright-testkit"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "miniz_oxide",
 ]

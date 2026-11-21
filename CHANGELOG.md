@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.13.0...v0.14.0) (2026-11-21)
+
+
+### Features
+
+* **assets:** BSA v104 writer with name hashes, record order and refusals ([#130](https://github.com/JorisJonkers-dev/lodwright-rs/issues/130)) ([#270](https://github.com/JorisJonkers-dev/lodwright-rs/issues/270)) ([39a91bf](https://github.com/JorisJonkers-dev/lodwright-rs/commit/39a91bfda67c0d09200a515384a815b5a7533d73))
+* **assets:** stub plugin that registers a packed archive by name ([#131](https://github.com/JorisJonkers-dev/lodwright-rs/issues/131)) ([#273](https://github.com/JorisJonkers-dev/lodwright-rs/issues/273)) ([78f7152](https://github.com/JorisJonkers-dev/lodwright-rs/commit/78f7152d90db0e4b7e2fa8068115dfbc0b94318a))
+* **events:** run-wide progress that only moves forward, with phase index and phase totals ([#263](https://github.com/JorisJonkers-dev/lodwright-rs/issues/263)) ([#264](https://github.com/JorisJonkers-dev/lodwright-rs/issues/264)) ([11d800a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/11d800a7cb5b3d5d957694373fe7125abc619eee))
+* **water:** option terrain.water_polygons writes the water planes of levels 8 to 32 as outline polygons, off by default ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#265](https://github.com/JorisJonkers-dev/lodwright-rs/issues/265)) ([5c8fddf](https://github.com/JorisJonkers-dev/lodwright-rs/commit/5c8fddfa8d9891f9506abafab4463bfd5c9bdb64))
+* **water:** option terrain.water_shared_vertices writes shared plane corners once, off by default ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#261](https://github.com/JorisJonkers-dev/lodwright-rs/issues/261)) ([7a48072](https://github.com/JorisJonkers-dev/lodwright-rs/commit/7a48072b36705ae723793ab972de0238e6c4e33b))
+* **water:** option terrain.water_walls writes walls under the water outline, off by default ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#259](https://github.com/JorisJonkers-dev/lodwright-rs/issues/259)) ([5b5d41e](https://github.com/JorisJonkers-dev/lodwright-rs/commit/5b5d41e7d0cc6ee5074b1ab5f46acb03f16fbef4))
+
+
+### Bug Fixes
+
+* **water:** terrain.water_polygons ships in 0.14.0 ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#266](https://github.com/JorisJonkers-dev/lodwright-rs/issues/266)) ([f944d49](https://github.com/JorisJonkers-dev/lodwright-rs/commit/f944d49db60b5fa52dc90402200a3092fa030e12))
+
 ## [0.13.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.12.0...v0.13.0) (2026-11-21)
 
 

@@ -214,7 +214,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "lodwright-api"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "fs4",
  "lodwright-assets",
@@ -230,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-assets"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-testkit",
  "miniz_oxide",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-cli"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-api",
  "lodwright-contract",
@@ -253,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-contract"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-testkit",
  "schemars",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-core"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-testkit",
  "miniz_oxide",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-dds"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "ddsfile",
  "lodwright-testkit",
@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-gen"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-assets",
  "lodwright-contract",
@@ -293,14 +293,14 @@ dependencies = [
 
 [[package]]
 name = "lodwright-nif"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "lodwright-testkit",
 ]
 
 [[package]]
 name = "lodwright-plugin-meta"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "esplugin",
  "lodwright-assets",
@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "lodwright-testkit"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "miniz_oxide",
 ]
@@ -638,7 +638,7 @@ checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
 
 [[package]]
 name = "xtask"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "serde_json",
  "sha2",

@@ -367,7 +367,9 @@ pub fn verify_folder(root: &Path) -> Verification {
                         .strip_prefix("meshes/landscape/lod/")
                         .and_then(|r| r.split('/').next())
                         .unwrap_or("");
-                    let (ax, ay) = anchors.get(world).copied().unwrap_or((0, 0));
+                    // a world without a settings file has no start to check against (a world with no terrain
+                    // still gets object blocks on its own grid, #245)
+                    let (ax, ay) = anchors.get(world).copied().unwrap_or((x, y));
                     let step = i32::try_from(level).unwrap_or(1);
                     if (x - ax).rem_euclid(step) != 0 || (y - ay).rem_euclid(step) != 0 {
                         ctx.err(
@@ -1135,6 +1137,63 @@ mod tests {
         let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x0.y0.nif");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    fn grid_errors(world_dir: &str, settings_start: Option<(i16, i16)>, name: &str) -> usize {
+        let root = temp(&format!("grid-{world_dir}-{}", settings_start.is_some()));
+        let vertices = [
+            [0.0, 0.0, 0.0],
+            [16384.0, 0.0, 0.0],
+            [16384.0, 16384.0, 0.0],
+            [0.0, 16384.0, 0.0],
+        ];
+        let nif = lodwright_nif::terrain_block(&lodwright_nif::TerrainBlock {
+            origin: (0.0, 0.0),
+            size: 16384.0,
+            vertices: &vertices,
+            indices: &[0, 1, 2, 0, 2, 3],
+            textures: ["a.dds", "b.dds"],
+            water: None,
+        })
+        .unwrap();
+        let path = root.join(format!("meshes/landscape/lod/{world_dir}/blocks/{name}"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, nif.write().unwrap()).unwrap();
+        if let Some(start) = settings_start {
+            let dir = root.join("lodsettings");
+            std::fs::create_dir_all(&dir).unwrap();
+            let settings =
+                lodwright_core::lod::LodSettings::for_bounds(start, (start.0 + 7, start.1 + 7), 4);
+            std::fs::write(
+                dir.join(format!("{world_dir}.dlodsettings")),
+                settings.to_bytes(),
+            )
+            .unwrap();
+        }
+        verify_folder(&root)
+            .errors
+            .iter()
+            .filter(|e| e.problem.contains("not on the world's grid"))
+            .count()
+    }
+
+    #[test]
+    fn an_object_block_of_a_world_without_a_settings_file_is_not_checked_against_a_grid() {
+        // a world with no terrain: object blocks and no settings file (#245)
+        assert_eq!(grid_errors("oasis", None, "oasis.level4.x-5.y27.nif"), 0);
+    }
+
+    #[test]
+    fn a_block_off_the_grid_of_its_settings_file_is_still_an_error() {
+        // start (-5, 27): x-5 y27 is on the grid, x-4 is not
+        assert_eq!(
+            grid_errors("oasis", Some((-5, 27)), "oasis.level4.x-5.y27.nif"),
+            0
+        );
+        assert_eq!(
+            grid_errors("oasis", Some((-5, 27)), "oasis.level4.x-4.y27.nif"),
+            1
+        );
     }
 
     #[test]

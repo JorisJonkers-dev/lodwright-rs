@@ -71,3 +71,39 @@ fn the_tiny_archive_reads_back_with_its_names_and_bytes() {
         vec![0xAB; 64]
     );
 }
+
+#[test]
+fn damaged_writer_output_never_panics_the_reader_nor_exceeds_the_cap() {
+    // A seeded pseudo-random walk over what the fuzz target `bsa_writer` explores: byte overwrites of an
+    // archive the writer made (stored and compressed files), then open and extract everything.
+    let clean = pack::write(&tiny()).unwrap();
+    let mut state = 0x9E37_79B9_7F4A_7C15_u64;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let cap = 1_u64 << 16;
+    let mut opened = 0;
+    for _ in 0..4000 {
+        let mut bytes = clean.clone();
+        for _ in 0..=(next() % 4) {
+            let at = usize::try_from(next() % bytes.len() as u64).unwrap();
+            bytes[at] = u8::try_from(next() & 0xFF).unwrap();
+        }
+        let mut cursor = Cursor::new(&bytes);
+        if let Ok(archive) = Archive::open(&mut cursor) {
+            opened += 1;
+            for entry in archive.entries() {
+                if let Ok(out) = archive.extract(&mut cursor, entry, cap) {
+                    assert!(out.len() as u64 <= cap);
+                }
+            }
+        }
+    }
+    assert!(
+        opened > 0,
+        "some damaged archives still open, so the extract path ran"
+    );
+}

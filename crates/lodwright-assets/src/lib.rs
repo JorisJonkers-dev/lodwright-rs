@@ -8,11 +8,13 @@
 
 pub mod bsa;
 pub mod error;
+pub mod extract;
 pub mod pack;
 pub mod path;
 pub mod resolve;
 
 pub use bsa::{Archive, Entry};
 pub use error::Error;
+pub use extract::{ExtractError, Extracted, extract_all, extract_to_temp};
 pub use pack::{PackEntry, PackError};
 pub use resolve::{ArchiveListing, ConflictRule, Listing, Location, Resolver};

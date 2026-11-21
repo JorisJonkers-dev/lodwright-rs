@@ -40,6 +40,28 @@ pub enum Event {
         /// The block's files were kept from an earlier run (its inputs did not change).
         #[serde(default)]
         up_to_date: bool,
+        /// The run's phase this block belongs to: `terrain`, `objects` or `trees` (an open set).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        phase: Option<String>,
+        /// Which phase of the run this is, from 1. A phase is one step of one world, with the reading of the
+        /// plugins first and the manifest last.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        phase_index: Option<u32>,
+        /// How many phases the run has.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        phase_count: Option<u32>,
+        /// Progress inside the phase; the phase's total never changes during the run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        phase_done: Option<u64>,
+        /// The phase's total, in the units of `phase_done`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        phase_total: Option<u64>,
+        /// Run-wide progress; never decreases during a run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        run_done: Option<u64>,
+        /// The run's total, in the units of `run_done`; the same on every line of a run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        run_total: Option<u64>,
     },
 }
 
@@ -67,6 +89,13 @@ mod tests {
             done: 1,
             of: 9,
             up_to_date: false,
+            phase: None,
+            phase_index: None,
+            phase_count: None,
+            phase_done: None,
+            phase_total: None,
+            run_done: None,
+            run_total: None,
         }
         .to_line();
         assert_eq!(
@@ -103,7 +132,14 @@ mod tests {
                 level: 8,
                 done: 2,
                 of: 3,
-                up_to_date: false
+                up_to_date: false,
+                phase: None,
+                phase_index: None,
+                phase_count: None,
+                phase_done: None,
+                phase_total: None,
+                run_done: None,
+                run_total: None,
             }
         );
     }
@@ -137,7 +173,14 @@ mod tests {
                 level: 4,
                 done: 1,
                 of: 9,
-                up_to_date: false
+                up_to_date: false,
+                phase: None,
+                phase_index: None,
+                phase_count: None,
+                phase_done: None,
+                phase_total: None,
+                run_done: None,
+                run_total: None,
             }
         );
     }

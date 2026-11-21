@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.8.0...v0.9.0) (2026-11-21)
+
+
+### Features
+
+* **terrain:** complete the block set over the settings extent for worlds the game builds terrain LOD for ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#237](https://github.com/JorisJonkers-dev/lodwright-rs/issues/237)) ([c735903](https://github.com/JorisJonkers-dev/lodwright-rs/commit/c73590341f4c6757525f790327229ce7c549f43a))
+* **terrain:** option to leave out terrain faces under the water, off by default ([#151](https://github.com/JorisJonkers-dev/lodwright-rs/issues/151)) ([#226](https://github.com/JorisJonkers-dev/lodwright-rs/issues/226)) ([9a79d23](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9a79d23a9303d6d143645da1718598c6eea46183))
+* **terrain:** skirts at block borders, off by default ([#90](https://github.com/JorisJonkers-dev/lodwright-rs/issues/90)) ([#223](https://github.com/JorisJonkers-dev/lodwright-rs/issues/223)) ([342fc5c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/342fc5cb56531e20b2e0428694780e880f82ce7a))
+* **water:** merge wet squares of one water height across cells above level 4 ([#149](https://github.com/JorisJonkers-dev/lodwright-rs/issues/149)) ([#228](https://github.com/JorisJonkers-dev/lodwright-rs/issues/228)) ([046b3b7](https://github.com/JorisJonkers-dev/lodwright-rs/commit/046b3b739b078a3bcc77c35a1c497e05a557df9e))
+
+
+### Bug Fixes
+
+* **assets:** count the embedded path in the stored size and refuse a path longer than its block ([#138](https://github.com/JorisJonkers-dev/lodwright-rs/issues/138)) ([#218](https://github.com/JorisJonkers-dev/lodwright-rs/issues/218)) ([1316038](https://github.com/JorisJonkers-dev/lodwright-rs/commit/1316038aea3895724865a5d7977acfea35de8eec))
+* **terrain:** anchor the LOD block grid at the world's minimum corner cell, as the game's own tree does ([#219](https://github.com/JorisJonkers-dev/lodwright-rs/issues/219)) ([#220](https://github.com/JorisJonkers-dev/lodwright-rs/issues/220)) ([d6c25f8](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d6c25f895c1b4dc797760c96fbb76144ca1e5067))
+* **terrain:** start object blocks, tree blocks and the settings file at the same grid cell as the terrain blocks ([#219](https://github.com/JorisJonkers-dev/lodwright-rs/issues/219)) ([#225](https://github.com/JorisJonkers-dev/lodwright-rs/issues/225)) ([d268509](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d26850979bcea1d195dc9c08104b61b49428b445))
+* **terrain:** the block grid starts at the smallest CELL record of the world ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#236](https://github.com/JorisJonkers-dev/lodwright-rs/issues/236)) ([6d8926a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/6d8926a9dec8a325c94f721b38a9d56c05cdcce1))
+* **terrain:** write only the levels the world's width allows and the game's settings extent ([#229](https://github.com/JorisJonkers-dev/lodwright-rs/issues/229)) ([#231](https://github.com/JorisJonkers-dev/lodwright-rs/issues/231)) ([e627fed](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e627fed8b211d63af5100b4c0fb040c94a11b2d5))
+
 ## [0.8.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.7.0...v0.8.0) (2026-11-20)
 
 

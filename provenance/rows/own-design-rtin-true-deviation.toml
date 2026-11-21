@@ -1,0 +1,10 @@
+[[source]]
+id = "own-design-rtin-true-deviation"
+fact = "Terrain block meshes pick their vertices with an error that is the true largest deviation of the height samples inside each triangle of the right-triangle tree from the plane through its corners; this is lodwright's own design from the published idea of right-triangulated irregular networks and is not the game's, whose vertex selection is a different irregular triangulation."
+url = "oracle:game-lod-files"
+licence = "Own design; heights and vertex counts of the owner's own game files compared as numbers, no content recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Fitted to the measurement of issue 241 (WastelandNV, 1020, 256, 64 and 16 blocks at levels 4 to 32, mean absolute error against the land heights at every 128 unit grid point). Before, with the estimate at the middle of each long edge and a threshold of half the tolerance: 13.54, 35.96, 84.05 and 162.36 units; after: 13.13, 34.71, 81.08 and 157.08. The game's blocks: 16.63, 44.32, 119.52 and 263.58. The largest error of a block does not change (median of the block maxima 308, 798, 1600 and 2797 before and after); the cause of that is in issue 248. Not second-read."

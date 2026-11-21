@@ -22,9 +22,10 @@ use crate::terrain::{TerrainMesh, VERTEX_SPACING};
 
 /// Border vertices per block edge are placed every `(side) / BORDER_SEGMENTS` samples.
 const BORDER_SEGMENTS: usize = 16;
-/// Split threshold as a fraction of the requested tolerance: the tree's own error estimate only looks at the middle
-/// of each long edge, so the true error can exceed it; the result reports the true one.
-const SPLIT_FRACTION: f32 = 0.5;
+/// Split threshold as a fraction of the requested tolerance. The tree's error is the true largest deviation of the
+/// samples inside each triangle (see `deviation`), so a triangle that is not split is within the tolerance and the
+/// whole tolerance is used.
+const SPLIT_FRACTION: f32 = 1.0;
 
 /// A finished mesh and the numbers the planner reports.
 #[derive(Debug, Clone, PartialEq)]
@@ -118,8 +119,7 @@ fn errors(h: &[f32], original: &[f32], span: usize) -> Vec<f32> {
         if cover[mid] == 3 {
             err[mid] = f32::INFINITY;
         }
-        let interpolated = (h[ay * span + ax] + h[by * span + bx]) / 2.0;
-        err[mid] = err[mid].max((interpolated - h[mid]).abs());
+        err[mid] = err[mid].max(deviation(h, span, [ax, ay, bx, by, cx, cy]));
         if i < parents {
             let left = ((ay + cy) / 2) * span + (ax + cx) / 2;
             let right = ((by + cy) / 2) * span + (bx + cx) / 2;
@@ -134,6 +134,45 @@ fn errors(h: &[f32], original: &[f32], span: usize) -> Vec<f32> {
         }
     }
     err
+}
+
+/// The largest deviation of the samples inside a triangle (edges included) from the plane through its three corners:
+/// the true error of the triangle, not the estimate at the middle of its long edge. The right angle is at the third
+/// corner and both legs run along an axis.
+fn deviation(h: &[f32], span: usize, [ax, ay, bx, by, cx, cy]: [usize; 6]) -> f32 {
+    let (ax, ay, bx, by, cx, cy) = (
+        ax.cast_signed(),
+        ay.cast_signed(),
+        bx.cast_signed(),
+        by.cast_signed(),
+        cx.cast_signed(),
+        cy.cast_signed(),
+    );
+    let (ux, uy) = (ax - cx, ay - cy);
+    let (vx, vy) = (bx - cx, by - cy);
+    let len2 = ux * ux + uy * uy;
+    if len2 <= 1 {
+        return 0.0;
+    }
+    let at = |x: isize, y: isize| h[y.cast_unsigned() * span + x.cast_unsigned()];
+    let (za, zb, zc) = (at(ax, ay), at(bx, by), at(cx, cy));
+    let (x0, x1) = (ax.min(bx).min(cx), ax.max(bx).max(cx));
+    let (y0, y1) = (ay.min(by).min(cy), ay.max(by).max(cy));
+    let mut worst = 0.0_f32;
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            let (dx, dy) = (x - cx, y - cy);
+            let s = dx * ux + dy * uy;
+            let t = dx * vx + dy * vy;
+            if s < 0 || t < 0 || s + t > len2 {
+                continue;
+            }
+            let plane =
+                zc + (za - zc) * s as f32 / len2 as f32 + (zb - zc) * t as f32 / len2 as f32;
+            worst = worst.max((at(x, y) - plane).abs());
+        }
+    }
+    worst
 }
 
 /// Corners of triangle `i` of the tree: the two ends of the long edge, then the right-angle corner.
@@ -416,7 +455,7 @@ mod tests {
         for tolerance in [2.0, 4.0, 8.0] {
             let m = mesh_block(&h, 65, tolerance, 32767).unwrap();
             assert!(
-                m.max_error <= tolerance * 1.25,
+                m.max_error <= tolerance * 1.001,
                 "{} > {tolerance}",
                 m.max_error
             );

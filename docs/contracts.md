@@ -139,7 +139,7 @@ of every terrain block that has water.
 
 ### Water planes as polygons
 
-`terrain.water_polygons` (a switch, off by default, written only when on; tier 3, since 0.15.0) writes the water plane
+`terrain.water_polygons` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes the water plane
 of a block at levels 8 to 32 as polygons: the squares of equal water height that touch along an edge are one region,
 its outline is traced (holes included), reduced to its corners and triangulated, so a vertex that only lies on a straight
 run is not written and the plane covers exactly the same squares at the same heights. The water overlap and depth of

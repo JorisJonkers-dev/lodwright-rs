@@ -25,7 +25,7 @@ const DROP_WATER_SINCE: &str = "0.9.0";
 /// The release that adds `terrain.water_walls`.
 const WALLS_SINCE: &str = "0.14.0";
 /// The release that adds `terrain.water_polygons`.
-const POLYGONS_SINCE: &str = "0.15.0";
+const POLYGONS_SINCE: &str = "0.14.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -321,8 +321,7 @@ mod tests {
                 && (o.since == "0.6.0"
                     || o.since == "0.7.0"
                     || o.since == "0.9.0"
-                    || o.since == "0.14.0"
-                    || o.since == "0.15.0"))));
+                    || o.since == "0.14.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

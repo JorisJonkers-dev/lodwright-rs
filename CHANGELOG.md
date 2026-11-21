@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.14.0...v0.15.0) (2026-11-21)
+
+
+### Features
+
+* **generate:** option output.pack packs the generated files into a BSA with a stub plugin, off by default ([#136](https://github.com/JorisJonkers-dev/lodwright-rs/issues/136)) ([#274](https://github.com/JorisJonkers-dev/lodwright-rs/issues/274)) ([0a04e38](https://github.com/JorisJonkers-dev/lodwright-rs/commit/0a04e3807202526e3bd1d868fe8fbb88f24a58f9))
+
+
+### Bug Fixes
+
+* **assets:** the stub plugin names a master, because the game opens a plugin's archives only when it has one ([#132](https://github.com/JorisJonkers-dev/lodwright-rs/issues/132)) ([#278](https://github.com/JorisJonkers-dev/lodwright-rs/issues/278)) ([fbc08e1](https://github.com/JorisJonkers-dev/lodwright-rs/commit/fbc08e1516a8f1419c4847b1699e744235a79152))
+
 ## [0.14.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.13.0...v0.14.0) (2026-11-21)
 
 

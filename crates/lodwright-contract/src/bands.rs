@@ -149,6 +149,7 @@ mod tests {
                 iou,
             }],
             per_level: Vec::new(),
+            profile: Vec::new(),
         });
         doc
     }

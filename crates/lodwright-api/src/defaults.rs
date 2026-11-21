@@ -22,6 +22,8 @@ const SPECULAR_SINCE: &str = "0.7.0";
 const SKIRTS_SINCE: &str = "0.9.0";
 /// The release that introduces dropping terrain faces under water.
 const DROP_WATER_SINCE: &str = "0.9.0";
+/// The release that adds `terrain.water_walls`.
+const WALLS_SINCE: &str = "0.13.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -91,6 +93,12 @@ pub fn request_defaults() -> Defaults {
         tier: 3,
         since: DROP_WATER_SINCE.to_owned(),
         ..option(&doc, "terrain.drop_under_water", OptionKind::Number)
+    });
+    options.push(OptionInfo {
+        default: Value::Bool(Request::new("", &[], "").terrain.water_walls),
+        tier: 3,
+        since: WALLS_SINCE.to_owned(),
+        ..option(&doc, "terrain.water_walls", OptionKind::Switch)
     });
     options.push(option(&doc, "objects.enabled", OptionKind::Switch));
     // options that are off by default are not written while off: their default comes from the request type
@@ -290,7 +298,11 @@ mod tests {
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);
         assert!(d.options.iter().all(|o| o.since == "0.3.0"
-            || (o.tier == 3 && (o.since == "0.6.0" || o.since == "0.7.0" || o.since == "0.9.0"))));
+            || (o.tier == 3
+                && (o.since == "0.6.0"
+                    || o.since == "0.7.0"
+                    || o.since == "0.9.0"
+                    || o.since == "0.13.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

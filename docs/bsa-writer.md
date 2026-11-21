@@ -1,4 +1,4 @@
-# BSA writer and stub plugin (writer built, stub plugin and packing step not yet)
+# BSA writer, stub plugin and packing step (built; off by default)
 
 Status: the writer core (#130) is built in `crates/lodwright-assets/src/pack.rs`; sections 1 to 7 describe it, with these
 differences from the first proposal: the entry point is `pack::write(&[PackEntry])` (no options; the compressed-by-default
@@ -6,7 +6,10 @@ flag is derived from the entries), the file flags are written from the file exte
 0x1 for .nif, .btr and .bto, 0x2 for .dds, 0x100 otherwise; section 4's open value is closed by that row, the game's
 acceptance is #132), the hash vectors are numbers measured on game archives (row `bsa-name-hash-vectors`), names must
 be ASCII, and the writer proved byte-equal across threads by writing from eight threads and from permuted input.
-The stub plugin (#131) and the packing step (#136) are proposals. Owner decisions: packing is opt-in and gated (D1), the archive is registered by a stub plugin of the
+The stub plugin (#131, `lodwright_assets::stub`) and the packing step (#136, request key `output.pack`, documented in
+`docs/contracts.md`) are built too; sections 8 and 9 below are the original proposal, and where they differ the
+contract text wins: the manifest lists the archive and the stub (no blocks), no `.override` is written, and packing
+was not switched on by default. Owner decisions: packing is opt-in and gated (D1), the archive is registered by a stub plugin of the
 same name once an in-game test confirms it (D2, #132), packing is a step at the end of a generate (D3), and the Mod
 never holds loose and packed output at the same time (G2).
 

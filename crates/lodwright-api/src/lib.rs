@@ -27,6 +27,7 @@ mod defaults;
 mod error;
 mod generate;
 pub mod load;
+mod pack;
 mod progress;
 mod staging;
 

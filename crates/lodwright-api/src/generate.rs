@@ -287,7 +287,7 @@ fn load_order_error(e: &impl std::fmt::Display) -> Error {
 /// # Errors
 /// An [`Error`] whose `code` says why: `request_invalid`, `output_in_repo`, `output_in_data`, `output_not_empty`,
 /// `memory_limit`, `plugin_not_found`, `plugin_invalid`, `master_order`, `world_not_found`, `no_worlds`,
-/// `load_order_invalid`, `assets_unreadable`, `generate_failed` or `output_failed`.
+/// `load_order_invalid`, `assets_unreadable`, `generate_failed`, `pack_failed`, `pack_too_large` or `output_failed`.
 #[allow(clippy::too_many_lines)] // one pass: refuse, load, check manifest, generate, write manifest
 pub fn generate(
     job: &GenerateRequest,
@@ -345,6 +345,7 @@ pub fn generate(
     if let Some(old) = &old
         && old.request_digest == digest
         && old.inputs_digest == loaded.inputs_digest
+        && crate::pack::is_packed(&old.files) == request.output.pack
         && up_to_date(out, old)
     {
         "up_to_date".clone_into(&mut doc.code);
@@ -392,6 +393,7 @@ pub fn generate(
         request.terrain.enabled.then_some(terrain_levels.as_slice()),
         request.objects.enabled,
         request.trees.enabled,
+        request.output.pack,
     );
     let threads = request.limits.threads.map_or_else(
         || std::thread::available_parallelism().map_or(1, |n| n.get().min(4)),
@@ -662,6 +664,20 @@ pub fn generate(
         // no manifest step event: the checkpoint is written, not generated; the output folder is not touched
         checkpoint(&all, &blocks)?;
         return Ok(GenerateOutcome::Cancelled);
+    }
+    if request.output.pack {
+        if stop() {
+            checkpoint(&all, &blocks)?;
+            return Ok(GenerateOutcome::Cancelled);
+        }
+        progress.report(&run.start(Step::Pack, None));
+        let packed = crate::pack::pack_staging(&stage, &all, |done, of| {
+            progress.report(&run.files(Step::Pack, done, of));
+        })?;
+        // the loose files are gone from staging: the manifest lists the archive and its stub, and no block (a block's
+        // files are the loose ones), so a later run builds every block again
+        all = packed;
+        blocks.clear();
     }
     progress.report(&run.start(Step::Manifest, None));
     doc.blocks = counts;

@@ -103,6 +103,13 @@
       "tier": 1
     },
     {
+      "default": false,
+      "key": "output.pack",
+      "kind": "switch",
+      "since": "0.15.0",
+      "tier": 3
+    },
+    {
       "default": null,
       "key": "terrain.levels.quality",
       "kind": "number",

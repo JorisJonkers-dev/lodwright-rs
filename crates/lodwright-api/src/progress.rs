@@ -19,6 +19,9 @@ pub enum Step {
     Objects,
     /// Building the tree LOD of a world.
     Trees,
+    /// Packing the generated files into an archive, when the request asks for it. After the last world, before the
+    /// manifest.
+    Pack,
     /// Writing the manifest.
     Manifest,
 }
@@ -32,6 +35,7 @@ impl Step {
             Self::Terrain => "terrain",
             Self::Objects => "objects",
             Self::Trees => "trees",
+            Self::Pack => "pack",
             Self::Manifest => "manifest",
         }
     }
@@ -44,13 +48,14 @@ impl Step {
             Self::Terrain => "lod.terrain",
             Self::Objects => "lod.objects",
             Self::Trees => "lod.trees",
+            Self::Pack => "lod.pack",
             Self::Manifest => "lod.manifest",
         }
     }
 }
 
 /// One progress event. A step starts with an event without counts; terrain, objects and trees then report each
-/// finished block with `level`, `done` and `total`.
+/// finished block with `level`, `done` and `total`; the pack step reports the files it has read with `done` and `total`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressEvent {
     /// The step.
@@ -120,7 +125,7 @@ impl ProgressEvent {
             Step::Terrain => BlockKind::Terrain,
             Step::Objects => BlockKind::Objects,
             Step::Trees => BlockKind::Trees,
-            Step::ReadPlugins | Step::Manifest => return None,
+            Step::ReadPlugins | Step::Pack | Step::Manifest => return None,
         };
         Some(lodwright_contract::Event::Block {
             kind: Some(kind),
@@ -151,6 +156,8 @@ pub const RUN_TOTAL: u64 = 10_000;
 /// Share of the run given to reading the plugins and to writing the manifest.
 const READ_SHARE: u64 = 300;
 const MANIFEST_SHARE: u64 = 200;
+/// Share of the run given to packing, when the request asks for it.
+const PACK_SHARE: u64 = 500;
 /// Relative weight of a terrain, object and tree phase of one world. An estimate from a run of ten plugins; only
 /// the shape of the bar depends on it, never its direction.
 const TERRAIN_WEIGHT: u64 = 3;
@@ -206,6 +213,7 @@ impl RunTracker {
         terrain_levels: Option<&[u32]>,
         objects: bool,
         trees: bool,
+        pack: bool,
     ) {
         self.levels = terrain_levels.map_or_else(Vec::new, <[u32]>::to_vec);
         let mut wanted: Vec<(Step, Option<String>, u64)> = Vec::new();
@@ -221,7 +229,8 @@ impl RunTracker {
             }
         }
         let sum: u64 = wanted.iter().map(|w| w.2).sum();
-        let room = RUN_TOTAL - READ_SHARE - MANIFEST_SHARE;
+        let pack_share = if pack { PACK_SHARE } else { 0 };
+        let room = RUN_TOTAL - READ_SHARE - MANIFEST_SHARE - pack_share;
         let mut phases = vec![self.phases[0].clone()];
         let mut cumulative = 0;
         let mut start = READ_SHARE;
@@ -235,6 +244,15 @@ impl RunTracker {
                 width: end - start,
             });
             start = end;
+        }
+        if pack {
+            phases.push(Phase {
+                step: Step::Pack,
+                world: None,
+                start,
+                width: PACK_SHARE,
+            });
+            start += PACK_SHARE;
         }
         phases.push(Phase {
             step: Step::Manifest,
@@ -305,6 +323,18 @@ impl RunTracker {
             ..ProgressEvent::start(step, Some(world))
         };
         self.fill(event, within)
+    }
+
+    /// The event of the pack step with `done` of `total` files read, with the run's numbers.
+    pub(crate) fn files(&mut self, step: Step, done: u64, total: u64) -> ProgressEvent {
+        self.enter(step, None);
+        let width = self.phases[self.current].width;
+        let event = ProgressEvent {
+            done: Some(done),
+            total: Some(total),
+            ..ProgressEvent::start(step, None)
+        };
+        self.fill(event, scaled(width, done, total))
     }
 
     fn terrain_within(&self, level: u32, done: u64, total: u64, width: u64) -> u64 {

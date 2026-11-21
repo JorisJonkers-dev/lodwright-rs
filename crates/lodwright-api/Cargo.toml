@@ -9,6 +9,7 @@ publish.workspace = true
 description = "Library API of lodwright: LOD generation called in process, with progress, cancel and copyable errors."
 
 [dependencies]
+lodwright-assets = { workspace = true }
 lodwright-core = { workspace = true }
 lodwright-gen = { workspace = true }
 lodwright-contract = { workspace = true }
@@ -18,7 +19,6 @@ serde_json = "1.0.154"
 fs4 = "1.1.0"
 
 [dev-dependencies]
-lodwright-assets = { workspace = true }
 lodwright-nif = { workspace = true }
 lodwright-testkit = { workspace = true }
 

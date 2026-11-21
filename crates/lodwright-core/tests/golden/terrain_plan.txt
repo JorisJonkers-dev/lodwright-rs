@@ -1,7 +1,7 @@
 world Testland settings lodsettings/testland.dlodsettings
-L4 (-3,0) step 1 vertices 177 triangles 264 error 86.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x-3.y0.nif
-L4 (-3,4) step 1 vertices 217 triangles 328 error 16.50 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x-3.y4.nif
-L4 (1,0) step 1 vertices 152 triangles 226 error 0.00 heights 0..0 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x1.y0.nif
-L8 (-3,0) step 1 vertices 586 triangles 921 error 58.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level8.x-3.y0.nif
-L16 (-3,0) step 1 vertices 574 triangles 896 error 91.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level16.x-3.y0.nif
-L32 (-3,0) step 1 vertices 361 triangles 563 error 48.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level32.x-3.y0.nif
+L4 (-3,0) step 1 vertices 82 triangles 83 error 19.37 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x-3.y0.nif
+L4 (-3,4) step 1 vertices 101 triangles 103 error 15.20 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x-3.y4.nif
+L4 (1,0) step 1 vertices 64 triangles 62 error 0.00 heights 0..0 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level4.x1.y0.nif
+L8 (-3,0) step 1 vertices 259 triangles 274 error 28.41 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level8.x-3.y0.nif
+L16 (-3,0) step 1 vertices 268 triangles 292 error 32.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level16.x-3.y0.nif
+L32 (-3,0) step 1 vertices 264 triangles 284 error 44.00 heights 0..240 textures 256/256 mips 9 meshes/landscape/lod/testland/testland.level32.x-3.y0.nif

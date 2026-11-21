@@ -586,7 +586,9 @@ fn add_terrain_report(
 ) {
     let count = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
     let limit = tolerance.unwrap_or(DEFAULT_HEIGHT_TOLERANCE);
-    let over = |t: &&lodwright_gen::TerrainHeightDifference| t.max > limit;
+    // compared as reported (three decimals): a difference of exactly the tolerance is not over it, whatever the last bits of the
+    // interpolation say
+    let over = |t: &&lodwright_gen::TerrainHeightDifference| round3(t.max) > limit;
     if let Some(t) = tolerance {
         for b in blocks.terrain.iter().filter(over) {
             doc.differences.push(VerifyFinding {
@@ -613,7 +615,7 @@ fn add_terrain_report(
         .map(|(level, list)| TerrainLevel {
             level,
             blocks: count(list.len()),
-            over_tolerance: count(list.iter().filter(|b| b.max > limit).count()),
+            over_tolerance: count(list.iter().filter(|b| round3(b.max) > limit).count()),
             max: round3(list.iter().map(|b| b.max).fold(0.0, f64::max)),
             mean: round3(list.iter().map(|b| b.mean).sum::<f64>() / list.len() as f64),
         })

@@ -931,14 +931,14 @@ note = "Read in the MicrosoftDocs/win32 repository at revision bc82a65f74ef2c4f2
 
 [[source]]
 id = "game-lod-terrain-layout"
-fact = "In the game's own archives a terrain LOD block is meshes/landscape/lod/<world>/<world>.level<L>.x<X>.y<Y>.nif, with the world folder and file name in lower case; L is 4, 8, 16 or 32 and X, Y are the signed cell coordinates of the block's south-west cell, always multiples of L. Terrain blocks sit directly in the world folder; object LOD blocks sit in a blocks subfolder of it. The diffuse texture is textures/landscape/lod/<world>/diffuse/<world>.n.level<L>.x<X>.y<Y>.dds and the normal map the same name in a normals folder."
+fact = "In the game's own archives a terrain LOD block is meshes/landscape/lod/<world>/<world>.level<L>.x<X>.y<Y>.nif, with the world folder and file name in lower case; L is 4, 8, 16 or 32 and X, Y are the signed cell coordinates of the block's south-west cell, multiples of L in the worlds whose minimum corner cell is a multiple of 8 and offset by the minimum corner cell in the others (game-lod-block-grid). Terrain blocks sit directly in the world folder; object LOD blocks sit in a blocks subfolder of it. The diffuse texture is textures/landscape/lod/<world>/diffuse/<world>.n.level<L>.x<X>.y<Y>.dds and the normal map the same name in a normals folder."
 url = "oracle:game-lod-files"
 licence = "Facts about file names and counts in the owner's own game archives; no file content is recorded"
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "Read from the archive listings of the owner's install (names only). Supersedes lod-block-naming, lod-terrain-paths and the block-folder statement of the public rows."
+verified = true
+note = "Read from the archive listings of the owner's install (names only). Supersedes lod-block-naming, lod-terrain-paths and the block-folder statement of the public rows. Re-derived 2026-11-21 by an agent that did not write the row, on the reference tree extracted from the game's archives (~/.cache/lodwright-release-test/reference, read in place, numbers only): 4122 NIF files under meshes/landscape/lod, all named <world>.level<L>.[high.]x<X>.y<Y>.nif with L 4 (3250), 8 (696), 16 (160) or 32 (16); the 3567 terrain blocks sit directly in the world folder and the 555 object blocks (530 standard, 25 high) in its blocks subfolder; the textures are textures/landscape/lod/<world>/diffuse/ and /normals/ with the same <world>.n.level<L>.x<X>.y<Y>.dds name. Corrected: the fact said X and Y are always multiples of L; that holds for 3648 of the 3567 + 555 = 4122 files only, the rest (17 worlds: DLC and city worlds) start their grid at the world's minimum corner cell (row game-lod-block-grid)."
 
 [[source]]
 id = "game-lod-terrain-block-nif"
@@ -959,7 +959,8 @@ licence = "Header fields and channel statistics of the owner's own game files; n
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
+note = "Re-derived 2026-11-21 by an agent that did not write the row, on the reference tree extracted from the game's archives (~/.cache/lodwright-release-test/reference, read in place, numbers only): all 3728 diffuse and 3760 normal maps are 256 by 256, DXT1, 9 mip levels (header fields); decoding level 0 of 40 random normal maps gives mean red 126.6, green 126.8, blue 243.4 (per-map range 84 to 175, 106 to 180, 202 to 255), which is mostly blue with red and green near 128 and blue near 245 as stated."
 
 [[source]]
 id = "game-dlodsettings-layout"
@@ -969,8 +970,8 @@ licence = "Numbers read from two of the owner's own game files; the files are no
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
-note = "The meaning of the last field is not known; it equals the object LOD level in both files."
+verified = true
+note = "The meaning of the last field is not known; it equals the object LOD level in both files. Re-derived 2026-11-21 by an agent that did not write the row, on the reference tree extracted from the game's archives (~/.cache/lodwright-release-test/reference, read in place, numbers only): all 25 .dlodsettings files are 24 bytes; read as u32 u32 u32 i16 i16 i16 i16 u32 the first field is 4 in all, the second 4, 8, 16 or 32, the width field 16, 32 or 64 (four times the second), and the last field is 4 in all 25 (the two worlds of the fact read (4, 32, 128, -64, -64, 63, 63, 4) for WastelandNV and (4, 16, 64, -32, -32, 31, 31, 4) for WastelandNVmini). The corner fields are not always width-1 apart (Lucky38World -32..32), so they are the cell bounds of the world, not derived from the width."
 
 [[source]]
 id = "game-lod-object-layout"
@@ -980,7 +981,8 @@ licence = "File names and header fields of the owner's own game files; no file c
 date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
-verified = false
+verified = true
+note = "Re-derived 2026-11-21 by an agent that did not write the row, on the reference tree extracted from the game's archives (~/.cache/lodwright-release-test/reference, read in place, numbers only): 555 object block files, all under <world>/blocks/ and all level 4 (530 standard and 25 with .high.); wastelandnv.buildings.dds is DXT3 2048 by 1024 with 12 mips and wastelandnv.buildings_n.dds exists beside it (DXT5, 1024 by 512, 11 mips)."
 
 [[source]]
 id = "game-plugin-zlib-checksum"

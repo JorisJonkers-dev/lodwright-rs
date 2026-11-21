@@ -330,7 +330,11 @@ pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<Terr
     layout::check_world_name(world.name())?;
     let world = &world.without_outliers();
     let mut blocks = Vec::new();
+    let extent = world.lod_extent();
     for level in &settings.levels {
+        if extent.is_some_and(|e| level.level > e.highest_level) {
+            continue;
+        }
         let grid =
             BlockGrid::anchored(level.level, world.grid_anchor()).map_err(|_| Error::ZeroLevel)?;
         let Some(raster) = HeightRaster::build(world, grid)? else {

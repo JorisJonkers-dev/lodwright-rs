@@ -43,6 +43,14 @@ or with corners that are not finite or lie beyond a million cells, starts at 0, 
 terrain block (when it is not a multiple of the level) and each block's manifest key names its cell, so a run with a
 different start rebuilds the block.
 
+### Which levels a world gets
+
+The settings file of a world ends at the cell of the maximum corner `NAM9`, its width is the larger extent rounded up to
+a power of two, and the levels written go up to a quarter of that width, from 4 to 32 (`game-lod-settings-extent`): a
+world 12 by 13 cells wide has level 4 only, 17 by 20 has 4 and 8, 64 by 64 has 4, 8 and 16, the main world all four. A
+world whose declared extent exceeds 128 cells ends at its land. A world without corners keeps all requested levels and a
+file ending at its land.
+
 ## 4. Paths
 
 ```

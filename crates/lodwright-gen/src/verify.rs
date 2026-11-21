@@ -404,14 +404,19 @@ pub fn verify_folder(root: &Path) -> Verification {
             match LodSettings::parse(&bytes) {
                 Err(e) => ctx.err(rel, e.to_string()),
                 Ok(s) => {
-                    if s.width_cells
-                        != u32::try_from(i32::from(s.north_east.0) - i32::from(s.south_west.0) + 1)
-                            .unwrap_or(0)
+                    // the width is the corner span plus one (a world without declared corners), or the span rounded up
+                    // to a power of two (`game-lod-settings-extent`)
+                    let dx = i32::from(s.north_east.0) - i32::from(s.south_west.0);
+                    let dy = i32::from(s.north_east.1) - i32::from(s.south_west.1);
+                    let span = u32::try_from(dx.max(dy)).unwrap_or(0);
+                    let plain = u32::try_from(dx + 1).unwrap_or(0);
+                    if s.width_cells != plain
+                        && !(s.width_cells.is_power_of_two() && s.width_cells >= span)
                     {
                         ctx.err(rel, "the width disagrees with the corners");
                     }
-                    if s.lowest_level != 4 || ![8, 16, 32].contains(&s.highest_level) {
-                        ctx.err(rel, "the level range is not 4 to 8, 16 or 32");
+                    if s.lowest_level != 4 || ![4, 8, 16, 32].contains(&s.highest_level) {
+                        ctx.err(rel, "the level range is not 4 to 4, 8, 16 or 32");
                     }
                 }
             }

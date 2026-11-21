@@ -17,6 +17,19 @@ use crate::land::{CellHeights, SIDE};
 use crate::layers::CellLayers;
 use crate::plugin::{DeclaredBounds, Plugin, WorldRecord};
 
+/// The extent the game's settings file and level set follow (`game-lod-settings-extent`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LodExtent {
+    /// First cell of the grid.
+    pub south_west: (i32, i32),
+    /// Last cell, the maximum corner cell of the world.
+    pub north_east: (i32, i32),
+    /// Cells across: the larger extent rounded up to a power of two.
+    pub width: u32,
+    /// Highest terrain level: a quarter of the width, from 4 to 32.
+    pub highest_level: u32,
+}
+
 /// World units per cell edge.
 const CELL_UNITS: f32 = 4096.0;
 
@@ -133,6 +146,34 @@ impl Worldspace {
     #[must_use]
     pub fn declared_bounds(&self) -> Option<DeclaredBounds> {
         self.record.bounds
+    }
+
+    /// The extent of the world for the settings file and the set of levels, from the declared corners: the grid start
+    /// ([`Worldspace::grid_anchor`]) to the cell of the maximum corner `NAM9`, the width the larger extent rounded up
+    /// to a power of two, the highest level a quarter of it (4 to 32). A world whose declared extent exceeds 128 cells
+    /// takes the end of its land instead of `NAM9` (the main world). `None` without corners.
+    // source: game-lod-settings-extent
+    #[must_use]
+    pub fn lod_extent(&self) -> Option<LodExtent> {
+        let b = self.record.bounds?;
+        let sw = self.grid_anchor();
+        #[allow(clippy::cast_possible_truncation)] // bounded by the clamp
+        let cell = |v: f32| (v / CELL_UNITS).floor().clamp(-1_000_000.0, 1_000_000.0) as i32;
+        let declared = (cell(b.max[0]), cell(b.max[1]));
+        let data = self.bounds().map(|d| (d.max_x, d.max_y));
+        let too_wide = declared.0 - sw.0 > 128 || declared.1 - sw.1 > 128;
+        let ne = match data {
+            Some(d) if too_wide => d,
+            _ => declared,
+        };
+        let across = (ne.0 - sw.0).max(ne.1 - sw.1).max(1);
+        let width = u32::try_from(across).ok()?.next_power_of_two().max(4);
+        Some(LodExtent {
+            south_west: sw,
+            north_east: ne,
+            width,
+            highest_level: (width / 4).clamp(4, 32),
+        })
     }
 
     /// The same world with the corners `NAM0` and `NAM9` replaced (for worlds built from cells alone).
@@ -684,6 +725,63 @@ mod tests {
         );
         // not finite: the origin
         assert_eq!(flat(&cells, [f32::NAN, 0.0]).grid_anchor(), (0, 0));
+    }
+
+    #[test]
+    fn the_extent_follows_the_declared_corners_as_the_game_s_settings_do() {
+        let world = |min: [f32; 2], max: [f32; 2], cells: &[(i32, i32)]| {
+            Worldspace::from_cells(1, "W", cells.iter().map(|c| (*c, CellHeights::flat(1.0))))
+                .with_declared_bounds(crate::plugin::DeclaredBounds { min, max })
+        };
+        let u = 4096.0;
+        // BoulderCityWorld: corners (-6, -5) and (6, 8): width 16, highest level 4
+        let boulder = world(
+            [-6.0 * u, -5.0 * u],
+            [6.0 * u, 8.0 * u],
+            &[(-6, -4), (5, 7)],
+        )
+        .lod_extent()
+        .unwrap();
+        assert_eq!(
+            (
+                boulder.south_west,
+                boulder.north_east,
+                boulder.width,
+                boulder.highest_level
+            ),
+            ((-6, -5), (6, 8), 16, 4)
+        );
+        // FreesideWorld: (-10, -8) to (7, 12): width 32, highest level 8
+        let freeside = world([-10.0 * u, -8.0 * u], [7.0 * u, 12.0 * u], &[(-5, -6)])
+            .lod_extent()
+            .unwrap();
+        assert_eq!((freeside.width, freeside.highest_level), (32, 8));
+        // a 64 by 64 world: width 64, highest level 16
+        let big = world([-32.0 * u, -32.0 * u], [32.0 * u, 32.0 * u], &[(-32, -32)])
+            .lod_extent()
+            .unwrap();
+        assert_eq!((big.width, big.highest_level), (64, 16));
+        // a declared extent beyond 128 cells (the main world) ends at its land: width 128, highest 32
+        let main = world(
+            [-65.0 * u, -65.0 * u],
+            [65.0 * u, 272.0 * u],
+            &[(-64, -64), (63, 63)],
+        )
+        .lod_extent()
+        .unwrap();
+        assert_eq!(
+            (
+                main.south_west,
+                main.north_east,
+                main.width,
+                main.highest_level
+            ),
+            ((-64, -64), (63, 63), 128, 32)
+        );
+        assert_eq!(
+            Worldspace::from_cells(1, "W", [((0, 0), CellHeights::flat(1.0))]).lod_extent(),
+            None
+        );
     }
 
     #[test]

@@ -133,6 +133,9 @@ pub struct World {
     pub record: Option<WorldRecord>,
     /// Exterior cells with LAND, in file order.
     pub cells: Vec<LandCell>,
+    /// The grid of every exterior `CELL` record of the world (with or without LAND), in file order
+    /// (`game-lod-block-grid`).
+    pub cell_coords: Vec<(i32, i32)>,
     /// Placed references of the world's cells; only when read with [`ReadOptions::objects`].
     pub refs: Vec<PlacedRef>,
 }
@@ -392,6 +395,7 @@ impl Walker {
             editor_id: None,
             record: None,
             cells: Vec::new(),
+            cell_coords: Vec::new(),
             refs: Vec::new(),
         });
         self.worlds.len() - 1
@@ -478,6 +482,9 @@ impl Walker {
                         b"XCLW" => water_height = le_f32(payload, 0),
                         _ => {}
                     }
+                }
+                if let (Some(world), Some(coords)) = (self.world, grid) {
+                    self.worlds[world].cell_coords.push(coords);
                 }
                 self.cell = grid.map(|(x, y)| CellInfo {
                     x,
@@ -824,6 +831,7 @@ mod tests {
         let plugin = read(&world_plugin(&[], &world, false)).unwrap();
         assert_eq!(plugin.worlds[0].cells.len(), 1);
         assert_eq!(plugin.worlds[0].cells[0].x, 2);
+        assert_eq!(plugin.worlds[0].cell_coords, vec![(1, 1), (2, 2)]);
     }
 
     #[test]

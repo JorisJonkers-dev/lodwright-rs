@@ -61,7 +61,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level16.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level16.x2.y2.dds"
       },
       {
         "diffuse": {
@@ -74,7 +74,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level32.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level32.x2.y2.dds"
       },
       {
         "diffuse": {
@@ -87,7 +87,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level4.x2.y2.dds"
       },
       {
         "diffuse": {
@@ -100,7 +100,7 @@ object blocks: 0 of 0 exact
           "g": 1.0,
           "r": 1.0
         },
-        "path": "textures/landscape/lod/island/diffuse/island.n.level8.x0.y0.dds"
+        "path": "textures/landscape/lod/island/diffuse/island.n.level8.x2.y2.dds"
       }
     ],
     "per_level": [
@@ -242,22 +242,22 @@ object blocks: 0 of 0 exact
       {
         "max": 64.0,
         "mean": 64.0,
-        "path": "meshes/landscape/lod/island/island.level16.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level16.x2.y2.nif"
       },
       {
         "max": 64.0,
         "mean": 64.0,
-        "path": "meshes/landscape/lod/island/island.level32.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level32.x2.y2.nif"
       },
       {
         "max": 64.0,
         "mean": 64.0,
-        "path": "meshes/landscape/lod/island/island.level4.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level4.x2.y2.nif"
       },
       {
         "max": 64.0,
         "mean": 64.0,
-        "path": "meshes/landscape/lod/island/island.level8.x0.y0.nif"
+        "path": "meshes/landscape/lod/island/island.level8.x2.y2.nif"
       }
     ],
     "per_level": [

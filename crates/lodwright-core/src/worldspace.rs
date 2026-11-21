@@ -42,6 +42,8 @@ pub struct Worldspace {
     layers: BTreeMap<(i32, i32), CellLayers>,
     water: BTreeMap<(i32, i32), CellWater>,
     record: ResolvedRecord,
+    /// The smallest x and the smallest y over the grids of all exterior `CELL` records, with or without LAND.
+    cell_min: Option<(i32, i32)>,
 }
 
 /// The water of a cell as its CELL record states it.
@@ -181,24 +183,26 @@ impl Worldspace {
         self
     }
 
-    /// The cell where the block grid of every LOD level starts: the cell of the minimum corner `NAM0` (world units,
-    /// 4096 to a cell, rounded down), as the game's own tree places its blocks; (0, 0) when the world has no
-    /// corners or they are not finite or lie beyond 1 000 000 cells.
+    /// The cell where the block grid of every LOD level starts: the smallest grid coordinate of the world's `CELL`
+    /// records (cells without LAND count), as the game's own tree places its blocks; without any `CELL` record the
+    /// cell of the minimum corner `NAM0` (world units, 4096 to a cell, rounded down). (0, 0) when neither is known
+    /// or the corner is not finite or lies beyond 1 000 000 cells.
     // source: game-lod-block-grid
     #[must_use]
     pub fn grid_anchor(&self) -> (i32, i32) {
-        let Some(b) = self.record.bounds else {
+        let start = self.cell_min.or_else(|| {
+            let b = self.record.bounds?;
+            #[allow(clippy::cast_possible_truncation)] // bounded by the test before the cast
+            let cell = |v: f32| {
+                let c = (v / CELL_UNITS).floor();
+                (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
+            };
+            Some((cell(b.min[0])?, cell(b.min[1])?))
+        });
+        let Some((mut x, mut y)) = start else {
             return (0, 0);
         };
-        #[allow(clippy::cast_possible_truncation)] // bounded by the test before the cast
-        let cell = |v: f32| {
-            let c = (v / CELL_UNITS).floor();
-            (c.is_finite() && c.abs() <= 1_000_000.0).then_some(c as i32)
-        };
-        let (Some(mut x), Some(mut y)) = (cell(b.min[0]), cell(b.min[1])) else {
-            return (0, 0);
-        };
-        // The game's tree of WastelandNV starts at (-64, -64) where NAM0 says (-65, -65): a corner
+        // The game's tree of WastelandNV starts at (-64, -64) where its smallest CELL is (-65, -65): a start
         // exactly one cell below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
         if let Some(data) = self.bounds() {
             if data.min_x == x + 1 && data.min_x.rem_euclid(32) == 0 {
@@ -362,6 +366,7 @@ impl Worldspace {
             layers: BTreeMap::new(),
             water: BTreeMap::new(),
             record: ResolvedRecord::default(),
+            cell_min: None,
         }
     }
 
@@ -449,6 +454,7 @@ impl WorldIndex {
             layers: BTreeMap::new(),
             water: BTreeMap::new(),
             record: entry.record.clone(),
+            cell_min: None,
         };
         if inheritance == Inheritance::FlaggedDefaults {
             self.inherit_defaults(&mut world);
@@ -461,6 +467,10 @@ impl WorldIndex {
                 .iter()
                 .filter(|w| absolute(w.form_id, table, own) == id)
             {
+                for &(x, y) in &source.cell_coords {
+                    let (mx, my) = world.cell_min.unwrap_or((x, y));
+                    world.cell_min = Some((mx.min(x), my.min(y)));
+                }
                 for cell in &source.cells {
                     let key = (cell.x, cell.y);
                     world.cells.insert(key, cell.heights.clone());
@@ -620,6 +630,23 @@ mod tests {
         assert_eq!(worlds[0].cell_count(), 1);
         assert_eq!(worlds[0].cell(0, 0).unwrap().get(1, 1), 8.0);
         assert!(worlds[0].cell(1, 0).is_none());
+    }
+
+    #[test]
+    fn the_grid_starts_at_the_smallest_cell_record_even_without_land() {
+        // NAM0 says (-5, -5); the smallest CELL record is (-4, -4) and has no LAND; the land starts at (-2, -2)
+        let world = SyntheticWorld::new(0x10, "W")
+            .bounds([-5.0 * 4096.0, -5.0 * 4096.0], [3.0 * 4096.0, 3.0 * 4096.0])
+            .cell_without_land(-4, -4)
+            .cell_without_land(1, -3)
+            .cell(-2, -2, Heights::flat(8.0))
+            .cell(2, 2, Heights::flat(8.0));
+        let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
+        let worlds = Worldspace::from_load_order(&plugins).unwrap();
+        assert_eq!(worlds[0].grid_anchor(), (-4, -4));
+        // a world made without CELL records falls back on the declared corner
+        let flat = Worldspace::from_cells(1, "W", [((-2, -2), CellHeights::flat(0.0))]);
+        assert_eq!(flat.grid_anchor(), (0, 0));
     }
 
     #[test]

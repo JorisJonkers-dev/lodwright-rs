@@ -648,7 +648,7 @@
           "minimum": 0
         },
         "vertices_mine": {
-          "description": "Mean number of distinct water vertices per block: lodwright's.",
+          "description": "Mean number of water vertices a block carries in the file (every water shape but the empty one): lodwright's.",
           "type": "number",
           "format": "double"
         },

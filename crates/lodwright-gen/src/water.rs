@@ -257,6 +257,7 @@ pub(crate) fn water_mesh(
     samples: &[f32],
     level: u32,
     cell: (i32, i32),
+    share: bool,
 ) -> Option<WaterMesh> {
     let cells = usize::try_from(level).ok()?;
     let span = cells * CELL_INTERVALS + 1;
@@ -268,7 +269,7 @@ pub(crate) fn water_mesh(
     let per_cell = (CELL_INTERVALS / step).max(1);
     let square = CELL_UNITS / per_cell as f32;
     if cells > 4 {
-        return coarse_water(world, samples, cells, cell);
+        return coarse_water(world, samples, cells, cell, share);
     }
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
     let mut segments = [0_u32; 16];
@@ -337,6 +338,7 @@ fn coarse_water(
     samples: &[f32],
     cells: usize,
     cell: (i32, i32),
+    share: bool,
 ) -> Option<WaterMesh> {
     let span = cells * CELL_INTERVALS + 1;
     let step = (cells / 4).max(1);
@@ -375,19 +377,27 @@ fn coarse_water(
         }
     }
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
+    // with `share`, a corner that two rectangles have in common is written once
+    let mut known: std::collections::HashMap<[u32; 3], u16> = std::collections::HashMap::new();
     for (x, y, w, h) in rectangles_by_key(&keys, n) {
         let height = heights[y * n + x];
-        let first = u16::try_from(vertices.len()).ok()?;
         let (x0, y0) = (x as f32 * square, y as f32 * square);
         let (x1, y1) = (x0 + w as f32 * square, y0 + h as f32 * square);
-        vertices.extend([
-            [x0, y0, height],
-            [x1, y0, height],
-            [x0, y1, height],
-            [x1, y1, height],
-        ]);
-        u16::try_from(vertices.len() - 1).ok()?;
-        indices.extend([0, 1, 2, 2, 1, 3].map(|i| first + i));
+        let mut corner = |p: [f32; 3]| -> Option<u16> {
+            let key = p.map(f32::to_bits);
+            if share && let Some(i) = known.get(&key) {
+                return Some(*i);
+            }
+            let i = u16::try_from(vertices.len()).ok()?;
+            vertices.push(p);
+            known.insert(key, i);
+            Some(i)
+        };
+        let sw = corner([x0, y0, height])?;
+        let se = corner([x1, y0, height])?;
+        let nw = corner([x0, y1, height])?;
+        let ne = corner([x1, y1, height])?;
+        indices.extend([sw, se, nw, nw, se, ne]);
     }
     if vertices.is_empty() {
         return None;
@@ -433,7 +443,7 @@ mod tests {
             }
         }
         let span = 4 * 32 + 1;
-        water_mesh(&w, &vec![-200.0; span * span], 4, (0, 0)).map(|m| m.placeholder)
+        water_mesh(&w, &vec![-200.0; span * span], 4, (0, 0), false).map(|m| m.placeholder)
     }
 
     #[test]
@@ -457,17 +467,17 @@ mod tests {
                 samples[y * span + x] = 0.0;
             }
         }
-        let mesh = water_mesh(&world(Some(100.0)), &samples, 4, (0, 0)).unwrap();
+        let mesh = water_mesh(&world(Some(100.0)), &samples, 4, (0, 0), false).unwrap();
         assert_eq!(mesh.vertices.len(), 4);
         assert_eq!(mesh.vertices[3], [4096.0, 4096.0, 100.0]);
         assert_eq!(mesh.indices, vec![0, 1, 2, 2, 1, 3]);
         let mut want = [0; 16];
         want[0] = 2;
         assert_eq!(mesh.segments, Some(want));
-        assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0)).is_none());
+        assert!(water_mesh(&world(Some(-10.0)), &samples, 4, (0, 0), false).is_none());
         // ground only 10 units under the water: inside the level 4 margin, so dry
-        assert!(water_mesh(&world(Some(10.0)), &samples, 4, (0, 0)).is_none());
-        assert!(water_mesh(&world(None), &samples, 4, (0, 0)).is_none());
+        assert!(water_mesh(&world(Some(10.0)), &samples, 4, (0, 0), false).is_none());
+        assert!(water_mesh(&world(None), &samples, 4, (0, 0), false).is_none());
     }
 
     /// Ground at 0 over the cells `x0..x1` by `0..1` of a block of `level` cells, water at 100 over those cells.
@@ -495,7 +505,7 @@ mod tests {
         // level 8, water over the cells 2 and 3 of the south row: the west, east and north sides are inside the block
         // except the south side (block border); three runs, two triangles each
         let (w, samples) = strip(8, 2, 4);
-        let mut mesh = water_mesh(&w, &samples, 8, (0, 0)).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
         let (vertices, triangles) = (mesh.vertices.len(), mesh.indices.len() / 3);
         assert_eq!((vertices, triangles), (4, 2));
         add_walls(&mut mesh, &w, &samples, 8, (0, 0)).unwrap();
@@ -516,7 +526,7 @@ mod tests {
             assert!(flat(p[0], p[1]) || flat(p[1], p[2]) || flat(p[0], p[2]));
         }
         // the plane of an unwalled block is as before
-        let plain = water_mesh(&w, &samples, 8, (0, 0)).unwrap();
+        let plain = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
         assert_eq!(plain.vertices.len(), 4);
     }
 
@@ -525,7 +535,7 @@ mod tests {
         // water over cells 1 and 2 of the south row of a level 4 block: east and west and north sides of each cell,
         // the shared side between the cells gets none
         let (w, samples) = strip(4, 1, 3);
-        let mut mesh = water_mesh(&w, &samples, 4, (0, 0)).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), false).unwrap();
         let before = mesh.segments.unwrap();
         assert_eq!((before[4], before[8]), (2, 2));
         add_walls(&mut mesh, &w, &samples, 4, (0, 0)).unwrap();
@@ -544,7 +554,7 @@ mod tests {
     fn a_block_without_exposed_sides_gets_no_walls() {
         // the whole block wet: every side is on the block's border
         let (w, samples) = strip(4, 0, 4);
-        let mut mesh = water_mesh(&w, &samples, 4, (0, 0)).unwrap();
+        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), false).unwrap();
         // only row 0 has cells here, so the north sides of the four cells are exposed; wet everything instead
         let mut full = Worldspace::from_cells(
             1,
@@ -559,7 +569,7 @@ mod tests {
             }
         }
         let span = 4 * 32 + 1;
-        let mut every = water_mesh(&full, &vec![0.0; span * span], 4, (0, 0)).unwrap();
+        let mut every = water_mesh(&full, &vec![0.0; span * span], 4, (0, 0), false).unwrap();
         let (v, i) = (every.vertices.len(), every.indices.len());
         add_walls(&mut every, &full, &vec![0.0; span * span], 4, (0, 0)).unwrap();
         assert_eq!((every.vertices.len(), every.indices.len()), (v, i));
@@ -567,6 +577,54 @@ mod tests {
         let before = mesh.vertices.len();
         add_walls(&mut mesh, &w, &samples, 4, (0, 0)).unwrap();
         assert!(mesh.vertices.len() > before);
+    }
+
+    #[test]
+    fn shared_corners_are_written_once_and_the_planes_stay_the_same() {
+        // water over cells (0,0), (1,0) and (0,1) at one height, an L: two rectangles that meet along an edge
+        let span = 8 * 32 + 1;
+        let mut samples = vec![f32::NAN; span * span];
+        for y in 0..=64 {
+            for x in 0..=64 {
+                if y <= 32 || x <= 32 {
+                    samples[y * span + x] = 0.0;
+                }
+            }
+        }
+        let mut w = Worldspace::from_cells(
+            1,
+            "Mojave",
+            vec![
+                ((0, 0), CellHeights::flat(0.0)),
+                ((1, 0), CellHeights::flat(0.0)),
+                ((0, 1), CellHeights::flat(0.0)),
+            ],
+        );
+        for c in [(0, 0), (1, 0), (0, 1)] {
+            w.set_cell_water(c.0, c.1, true, Some(10.0));
+        }
+        let plain = water_mesh(&w, &samples, 8, (0, 0), false).unwrap();
+        let shared = water_mesh(&w, &samples, 8, (0, 0), true).unwrap();
+        assert_eq!(plain.indices.len(), shared.indices.len());
+        assert!(
+            shared.vertices.len() < plain.vertices.len(),
+            "{} {}",
+            shared.vertices.len(),
+            plain.vertices.len()
+        );
+        // the same triangles, corner by corner
+        let corners = |m: &super::WaterMesh| -> Vec<[[u32; 3]; 3]> {
+            m.indices
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .map(|t| t.map(|i| m.vertices[usize::from(i)].map(f32::to_bits)))
+                .collect()
+        };
+        assert_eq!(corners(&plain), corners(&shared));
+        // every vertex of the shared mesh is used
+        let used: std::collections::BTreeSet<u16> = shared.indices.iter().copied().collect();
+        assert_eq!(used.len(), shared.vertices.len());
     }
 
     #[test]
@@ -592,10 +650,10 @@ mod tests {
             w.set_cell_water(1, 0, true, Some(b));
             w
         };
-        let same = water_mesh(&water(10.0, 10.0), &samples, 8, (0, 0)).unwrap();
+        let same = water_mesh(&water(10.0, 10.0), &samples, 8, (0, 0), false).unwrap();
         assert_eq!(same.vertices.len(), 4, "one rectangle over both cells");
         assert_eq!(same.vertices[3], [8192.0, 4096.0, 10.0]);
-        let apart = water_mesh(&water(10.0, 20.0), &samples, 8, (0, 0)).unwrap();
+        let apart = water_mesh(&water(10.0, 20.0), &samples, 8, (0, 0), false).unwrap();
         assert_eq!(apart.vertices.len(), 8);
     }
 
@@ -604,7 +662,7 @@ mod tests {
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         samples[0] = -5.0;
-        let mesh = water_mesh(&world(Some(0.0)), &samples, 8, (0, 0)).unwrap();
+        let mesh = water_mesh(&world(Some(0.0)), &samples, 8, (0, 0), false).unwrap();
         assert_eq!(mesh.vertices[3], [256.0, 256.0, 0.0]);
         assert!(mesh.segments.is_none());
     }

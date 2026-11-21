@@ -524,6 +524,7 @@ pub fn generate(
                         water: request.terrain.water,
                         drop_under_water: request.terrain.drop_under_water,
                         water_walls: request.terrain.water_walls,
+                        water_shared_vertices: request.terrain.water_shared_vertices,
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },

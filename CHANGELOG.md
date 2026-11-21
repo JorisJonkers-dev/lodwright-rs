@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.15.0...v0.15.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **nif:** the terrain block's multibound names its box block, so blocks with water draw their ground ([#285](https://github.com/JorisJonkers-dev/lodwright-rs/issues/285)) ([#287](https://github.com/JorisJonkers-dev/lodwright-rs/issues/287)) ([df38006](https://github.com/JorisJonkers-dev/lodwright-rs/commit/df38006bd37e976a6b3bfb5d05c2ac985e9ce253))
+
 ## [0.15.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.14.0...v0.15.0) (2026-11-21)
 
 

@@ -125,3 +125,24 @@ below the water height of the cell its centre is in; the offset is the owner's m
 the edge. A heightfield mesh has no other unseen faces (no face points down and none is covered by another), so "unseen
 faces" are exactly these. Not measured against the game: its own blocks keep faces below the water; this option is an
 addition for fewer triangles, and the in-game check is the owner's (release test R2).
+
+## 8. Terrain heights against the game's blocks
+
+Measured on the main world's blocks of the game's own tree and the ten-plugin run of 0.9.0 (`game-lod-terrain-heights`, issue
+241). `verify --reference` compares the ground of each block on a 33 by 33 grid and, at the default tolerance of 1 unit,
+3050 of 3529 compared blocks differ (mean 29.3 units; level 4: 2241 of 2666, mean 16.9; level 8: 633 of 687, 47.9;
+level 16: 160 of 160, 130.8; level 32: 16 of 16, 273.4).
+
+The cause is not an offset, a sampling position, a rounding rule or the water: the game's ground vertices lie on the land
+heights of the plugins (98.7 percent within the quantisation of the comparison), the signed difference is about zero
+(level 4 -0.7, level 8 -2.8 units) and shifting the sampling position only raises the difference. Both sides are exact at
+their own vertices; between vertices each is a different triangulation of a different vertex subset. The game uses about 860
+ground vertices per block at every level in an irregular triangulation (not a right-triangle tree) plus the skirt at
+-14098; lodwright's tree uses 1850 to 2000 by default.
+
+Against the land heights at every 128 unit grid point of the main world's blocks, the mean absolute error of the game's
+blocks is 16.6, 44.3, 119.5 and 263.6 units at levels 4, 8, 16 and 32, ours 13.5, 36.0, 84.1 and 162.4: the pairwise
+difference (18.8, 49.0, 126.0, 273.4) is almost the game's own error, so no output that follows the land more closely
+comes under it. Our largest error is 2 to 3 times the game's (median of the block maxima at level 4: 308 against 111).
+A pairwise tolerance of 1 unit is therefore not a usable verdict on terrain heights; the known-differences list states the
+cause once and `verify` still reports the numbers.

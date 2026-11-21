@@ -329,7 +329,7 @@ pub fn generate_terrain(
     options: &Options,
 ) -> Result<Report, GenError> {
     layout::check_world_name(world.name())?;
-    let world = &world.without_outliers();
+    let world = &world.without_outliers().filled_over_extent();
     let no_tiles = LandTiles::empty();
     let tiles = options.land.unwrap_or(&no_tiles);
     let mut files = Vec::new();

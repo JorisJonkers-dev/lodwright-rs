@@ -328,7 +328,7 @@ fn add_skirts(mesh: &TerrainMesh, edge: f32) -> TerrainMesh {
 /// [`Error::RasterTooLarge`] when a level's raster would be too big.
 pub fn plan_world(world: &Worldspace, settings: &TerrainSettings) -> Result<TerrainPlan, Error> {
     layout::check_world_name(world.name())?;
-    let world = &world.without_outliers();
+    let world = &world.without_outliers().filled_over_extent();
     let mut blocks = Vec::new();
     let extent = world.lod_extent();
     for level in &settings.levels {

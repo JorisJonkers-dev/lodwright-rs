@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-terrain-heights"
+fact = "The ground vertices of the game's own terrain blocks lie on the land heights of the plugins' LAND records at their positions (98.7 percent within the 0.18 unit quantisation of the comparison raster; the rest are cells without LAND data), at every level; the blocks use about 860 ground vertices each at every level (800 to 1100) plus skirt vertices at -14098, in an irregular triangulation (58 of 3685 triangles of one level 4 block are right isosceles with axis-aligned legs), so the difference of a generated block from the game's is the difference between two vertex selections: no constant offset, sampling shift or rounding rule."
+url = "oracle:game-lod-files"
+licence = "Vertex positions and heights of the owner's own game files compared as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on the reference tree extracted from the game's archives and the ten-plugin run of lodwright 0.9.0 (issue 241). WastelandNV, 1356 blocks: mean absolute error against the height raster at every 128 unit grid point, game and ours, 16.63 and 13.54 (level 4), 44.32 and 35.96 (8), 119.52 and 84.05 (16), 263.58 and 162.36 (32); the pairwise mean absolute difference as verify computes it is 18.80, 49.04, 125.96 and 273.36. Mean signed difference over all blocks at level 4 -0.73, at level 8 -2.84; sampling the game's surface shifted by 0 to 256 units gave its minimum at no shift (level 4, 333 blocks: 19.65 at zero, 19.15 at (8, 8), 33.5 at 64, 42.9 at 128). Median of the block maxima of the error against the raster, game and ours: 111 and 308 (level 4), 346 and 798 (8), 921 and 1600 (16), 1936 and 2846 (32). Comparison raster quantised to 16 bits over the height range. Not second-read."

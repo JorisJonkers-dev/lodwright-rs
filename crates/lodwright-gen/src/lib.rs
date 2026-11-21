@@ -23,6 +23,7 @@ mod filter;
 mod images;
 mod lodmodel;
 mod objects;
+mod outline;
 mod output;
 mod terrain;
 mod trees;

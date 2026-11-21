@@ -68,6 +68,13 @@
       "tier": 3
     },
     {
+      "default": false,
+      "key": "terrain.water_polygons",
+      "kind": "switch",
+      "since": "0.15.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

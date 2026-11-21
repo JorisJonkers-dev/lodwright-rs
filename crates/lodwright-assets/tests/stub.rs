@@ -10,7 +10,7 @@ use lodwright_testkit::golden::assert_golden;
 #[test]
 fn the_stub_plugin_matches_its_hex_golden() {
     let mut text = String::new();
-    for line in stub_plugin().chunks(16) {
+    for line in stub_plugin("FalloutNV.esm", 14_000_000).chunks(16) {
         for byte in line {
             write!(text, "{byte:02x}").unwrap();
         }

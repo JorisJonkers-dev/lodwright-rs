@@ -9,9 +9,13 @@ use lodwright_assets::stub::{AUTHOR, PackedNames, stub_plugin};
 use lodwright_plugin_meta::read_header;
 
 #[test]
-fn the_stub_has_no_masters_and_is_not_a_master() {
-    let header = read_header("Lodwright LOD.esp", &stub_plugin()).unwrap();
-    assert_eq!(header.masters.len(), 0);
+fn the_stub_has_the_one_master_it_was_given_and_is_not_a_master() {
+    let header = read_header(
+        "Lodwright LOD.esp",
+        &stub_plugin("FalloutNV.esm", 14_000_000),
+    )
+    .unwrap();
+    assert_eq!(header.masters, ["FalloutNV.esm"]);
     assert!(!header.is_master);
 }
 
@@ -19,7 +23,10 @@ fn the_stub_has_no_masters_and_is_not_a_master() {
 fn the_stub_holds_no_record_and_names_its_author() {
     let mut plugin = Plugin::new(GameId::FalloutNV, Path::new("Lodwright LOD.esp"));
     plugin
-        .parse_reader(Cursor::new(stub_plugin()), ParseOptions::whole_plugin())
+        .parse_reader(
+            Cursor::new(stub_plugin("FalloutNV.esm", 14_000_000)),
+            ParseOptions::whole_plugin(),
+        )
         .unwrap();
     assert_eq!(plugin.record_and_group_count(), Some(0));
     assert_eq!(plugin.header_version(), Some(1.34));

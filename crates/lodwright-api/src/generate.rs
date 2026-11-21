@@ -671,7 +671,13 @@ pub fn generate(
             return Ok(GenerateOutcome::Cancelled);
         }
         progress.report(&run.start(Step::Pack, None));
-        let packed = crate::pack::pack_staging(&stage, &all, |done, of| {
+        // the stub's master: the first plugin of the load order and its size (the game warns on a different size)
+        let master = request.plugins.first().map_or("", String::as_str);
+        let master_size = crate::load::find_plugin(data, master)
+            .ok()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .map_or(0, |m| m.len());
+        let packed = crate::pack::pack_staging(&stage, &all, (master, master_size), |done, of| {
             progress.report(&run.files(Step::Pack, done, of));
         })?;
         // the loose files are gone from staging: the manifest lists the archive and its stub, and no block (a block's

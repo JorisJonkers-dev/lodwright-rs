@@ -56,7 +56,9 @@ fn pack_error(e: &PackError) -> Error {
 }
 
 /// Pack `files` (paths relative to `stage`) into `<ARCHIVE_BASE>.bsa` with a stub plugin beside it, remove the loose
-/// files and return the manifest entries of the archive and the stub. `progress` gets the number of files read.
+/// files and return the manifest entries of the archive and the stub. The stub names `master` (the first plugin of the
+/// load order) with the size of its file, because the game opens a plugin's archives only when it has a master.
+/// `progress` gets the number of files read.
 ///
 /// # Errors
 /// `output_failed` when a file cannot be read, written or removed; `pack_too_large` when the files do not fit one
@@ -64,6 +66,7 @@ fn pack_error(e: &PackError) -> Error {
 pub(crate) fn pack_staging(
     stage: &Path,
     files: &[ManifestFile],
+    master: (&str, u64),
     mut progress: impl FnMut(u64, u64),
 ) -> Result<Vec<ManifestFile>, Error> {
     let names = PackedNames::new(ARCHIVE_BASE).map_err(|e| failed("bad archive name", e))?;
@@ -92,7 +95,7 @@ pub(crate) fn pack_staging(
     };
     let packed = vec![
         write(&names.archive, &archive)?,
-        write(&names.plugin, &stub_plugin())?,
+        write(&names.plugin, &stub_plugin(master.0, master.1))?,
     ];
     // only now, with the archive on disk, do the loose files go
     for file in files {
@@ -161,7 +164,10 @@ mod tests {
         std::fs::write(dir.join("lodsettings/w.dlodsettings"), b"s").unwrap();
         let files = vec![file("meshes/a/x.nif"), file("lodsettings/w.dlodsettings")];
         let mut seen = Vec::new();
-        let packed = pack_staging(&dir, &files, |done, of| seen.push((done, of))).unwrap();
+        let packed = pack_staging(&dir, &files, ("Island.esm", 5), |done, of| {
+            seen.push((done, of));
+        })
+        .unwrap();
         assert_eq!(seen, [(1, 2), (2, 2)]);
         let names: Vec<&str> = packed.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
@@ -183,7 +189,13 @@ mod tests {
             std::env::temp_dir().join(format!("lodwright-pack-unit-gone-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let err = pack_staging(&dir, &[file("meshes/gone.nif")], |_, _| {}).unwrap_err();
+        let err = pack_staging(
+            &dir,
+            &[file("meshes/gone.nif")],
+            ("Island.esm", 5),
+            |_, _| {},
+        )
+        .unwrap_err();
         assert_eq!(err.code, "output_failed");
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
         std::fs::remove_dir_all(&dir).unwrap();

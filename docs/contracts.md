@@ -239,7 +239,9 @@ on over a loose output keeps every block (`blocks.up_to_date` counts them) and o
   and the form matches the request: a packed manifest (an archive at the top of the folder) against `output.pack` off,
   or the other way round, is not up to date.
 * The archive is a v104 BSA written by `lodwright_assets::pack` (names lower case with backslashes, records in
-  hash order, no embedded names), the stub a plugin with no master and no record (`lodwright_assets::stub`). Object
+  hash order, no embedded names), the stub a plugin with no record and one master, the first plugin of the load order with the size of its file
+  (`lodwright_assets::stub`; the game opens the archives of a plugin only when its master list is not empty, so a
+  stub without a master would never load its archive). Object
   and tree textures are stored compressed, everything else stored (a performance choice, not a format fact). No
   `.override` marker is written (it would need the JIP LN plugin). `manifest.json` is never in the archive. The
   archive base name is fixed, `Lodwright LOD`.

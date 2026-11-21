@@ -64,6 +64,8 @@ pub struct WaterShape<'a> {
     /// For a level 4 block, the triangle count of each of its 16 cells in the order x * 4 + y (the triangles
     /// must come in that order); the shape is then a `BSSegmentedTriShape`. `None` writes a plain `NiTriShape`.
     pub segments: Option<[u32; 16]>,
+    /// Write the game's empty one-vertex segmented shape between the terrain and the water.
+    pub placeholder: bool,
 }
 
 pub(crate) fn put_f32(out: &mut Vec<u8>, v: f32) {
@@ -244,13 +246,13 @@ fn water_blocks(water: &WaterShape<'_>) -> Result<(Option<[u32; 16]>, NiTriShape
 
 /// A `BSSegmentedTriShape`: the shape, then 16 segments of a flag byte, the first triangle point and the triangle
 /// count; an empty segment starts at 0 as in the measured blocks.
-fn segmented(shape: &NiTriShape, segments: &[u32; 16]) -> Result<Vec<u8>> {
+fn segmented(shape: &NiTriShape, segments: &[u32]) -> Result<Vec<u8>> {
     // source: game-lod-water-shape
     let mut b = Body::TriShape(shape.clone()).write(crate::block::Profile {
         user_version: 11,
         user_version2: 34,
     })?;
-    put_u32(&mut b, 16);
+    put_u32(&mut b, u32::try_from(segments.len()).unwrap_or(0));
     let mut start = 0_u32;
     for n in segments {
         b.push(0);
@@ -261,23 +263,63 @@ fn segmented(shape: &NiTriShape, segments: &[u32; 16]) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-/// Append the water shape and its data (blocks 6 and 7), adding the segmented shape type when it is one.
+/// The data of the game's empty shape: one vertex at the origin and one triangle of three zero indices.
+fn placeholder_data() -> NiTriShapeData {
+    NiTriShapeData {
+        geometry: GeometryData {
+            group_id: 0,
+            num_vertices: 1,
+            keep_flags: 0,
+            compress_flags: 0,
+            vertices: Some(vec![[0.0; 3]]),
+            vector_flags: 0,
+            material_crc: 0,
+            normals: None,
+            tangents: None,
+            center: [0.0; 3],
+            radius: 0.0,
+            vertex_colors: None,
+            uv_sets: Vec::new(),
+            consistency: 0,
+            additional_data: -1,
+        },
+        num_triangles: 1,
+        num_triangle_points: 3,
+        triangles: Some(vec![[0, 0, 0]]),
+        match_groups: Vec::new(),
+    }
+}
+
+/// Append the water shape and its data, adding the segmented shape type when one is written. With `placeholder` the
+/// game's empty segmented shape (three empty segments, translation zero, one zero vertex) comes first, as blocks 6
+/// and 7, and the water follows as blocks 8 and 9.
 fn push_water(
     blocks: &mut Vec<(u16, Body)>,
     types: &mut Vec<&[u8]>,
     origin: (f32, f32),
     (water_shape, water_data): (Option<[u32; 16]>, NiTriShapeData),
+    placeholder: bool,
 ) -> Result<()> {
     // source: game-lod-water-shape
+    if water_shape.is_some() || placeholder {
+        types.insert(6, SEGMENTED);
+    }
+    let mut data_index = 7;
+    if placeholder {
+        // source: game-lod-water-placeholder
+        let mut empty = tri_shape();
+        empty.av.properties = Vec::new();
+        empty.data = 7;
+        blocks.push((6, Body::Opaque(segmented(&empty, &[0; 3])?)));
+        blocks.push((4, Body::TriShapeData(placeholder_data())));
+        data_index = 9;
+    }
     let mut shape = tri_shape();
     shape.av.translation = [origin.0, origin.1, 0.0];
     shape.av.properties = Vec::new();
-    shape.data = 7;
+    shape.data = data_index;
     let shape = match water_shape {
-        Some(segments) => {
-            types.insert(6, SEGMENTED);
-            (6, Body::Opaque(segmented(&shape, &segments)?))
-        }
+        Some(segments) => (6, Body::Opaque(segmented(&shape, &segments)?)),
         None => (1, Body::TriShape(shape)),
     };
     blocks.push(shape);
@@ -358,10 +400,11 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
         put_f32(&mut aabb, v);
     }
     let water = block.water.as_ref().map(water_blocks).transpose()?;
-    let (children, multibound): (&[u32], u32) = if water.is_some() {
-        (&[1, 6], 8)
-    } else {
-        (&[1], 6)
+    let placeholder = block.water.as_ref().is_some_and(|w| w.placeholder);
+    let (children, multibound): (&[u32], u32) = match (water.is_some(), placeholder) {
+        (true, true) => (&[1, 6, 8], 10),
+        (true, false) => (&[1, 6], 8),
+        _ => (&[1], 6),
     };
     let mut blocks = vec![
         (
@@ -376,7 +419,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
     ];
     let mut types: Vec<&[u8]> = TYPES.to_vec();
     if let Some(water) = water {
-        push_water(&mut blocks, &mut types, block.origin, water)?;
+        push_water(&mut blocks, &mut types, block.origin, water, placeholder)?;
     }
     let tail = u16::try_from(types.len() - 2).unwrap_or(0);
     blocks.push((tail, Body::Opaque(7_u32.to_le_bytes().to_vec())));
@@ -484,6 +527,7 @@ mod tests {
                 vertices: &water_v,
                 indices: &[0, 1, 2],
                 segments,
+                placeholder: false,
             });
             let bytes = terrain_block(&plain).unwrap().write().unwrap();
             let back = NifFile::read(&bytes).unwrap();
@@ -509,8 +553,68 @@ mod tests {
             vertices: &water_v,
             indices: &[0, 1, 2],
             segments: Some([0; 16]),
+            placeholder: false,
         });
         assert!(terrain_block(&plain).is_err());
+    }
+
+    #[test]
+    fn the_placeholder_shape_comes_between_the_terrain_and_the_water() {
+        let (v, i) = quad([0.0; 4]);
+        let water_v = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
+        let mut one = [0_u32; 16];
+        one[1] = 1;
+        for segments in [None, Some(one)] {
+            let mut plain = block(&v, &i);
+            plain.water = Some(super::WaterShape {
+                vertices: &water_v,
+                indices: &[0, 1, 2],
+                segments,
+                placeholder: true,
+            });
+            let bytes = terrain_block(&plain).unwrap().write().unwrap();
+            let back = NifFile::read(&bytes).unwrap();
+            assert_eq!(back.blocks.len(), 12);
+            assert_eq!(back.write().unwrap(), bytes);
+            let kind =
+                |n: usize| back.header.block_types[usize::from(back.blocks[n].type_index)].clone();
+            assert_eq!(kind(6), b"BSSegmentedTriShape");
+            let crate::Body::TriShapeData(empty) = &back.blocks[7].body else {
+                panic!("block 7 is the placeholder data");
+            };
+            assert_eq!(empty.geometry.vertices.as_deref(), Some(&[[0.0; 3]][..]));
+            assert_eq!(empty.triangles.as_deref(), Some(&[[0_u16, 0, 0]][..]));
+            // the water follows, its data at 9
+            assert_eq!(
+                kind(8),
+                if segments.is_some() {
+                    &b"BSSegmentedTriShape"[..]
+                } else {
+                    b"NiTriShape"
+                }
+            );
+            let crate::Body::TriShapeData(data) = &back.blocks[9].body else {
+                panic!("block 9 is the water data");
+            };
+            assert_eq!(data.geometry.vertices.as_deref(), Some(&water_v[..]));
+            let crate::Body::Opaque(root) = &back.blocks[0].body else {
+                panic!("opaque root");
+            };
+            // three children (1, 6, 8), then the multibound at 10
+            assert_eq!(&root[76..80], &3_u32.to_le_bytes());
+            assert_eq!(&root[80..84], &1_u32.to_le_bytes());
+            assert_eq!(&root[84..88], &6_u32.to_le_bytes());
+            assert_eq!(&root[88..92], &8_u32.to_le_bytes());
+            assert_eq!(&root[96..100], &10_u32.to_le_bytes());
+            // the placeholder shape: no properties, translation zero, data block 7, three empty segments
+            let crate::Body::Opaque(shape) = &back.blocks[6].body else {
+                panic!("opaque shape");
+            };
+            assert_eq!(&shape[16..28], &[0_u8; 12]);
+            let tail = &shape[shape.len() - (4 + 3 * 9)..];
+            assert_eq!(&tail[..4], &3_u32.to_le_bytes());
+            assert!(tail[4..].iter().all(|b| *b == 0));
+        }
     }
 
     #[test]

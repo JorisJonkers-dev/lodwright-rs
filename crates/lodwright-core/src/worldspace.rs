@@ -285,6 +285,16 @@ impl Worldspace {
         })
     }
 
+    /// Whether cell (`x`, `y`) has water at the world's default height: the has-water flag with no `XCLW` of its own
+    /// (an `XCLW` of the largest float counts as none).
+    #[must_use]
+    pub fn water_is_default(&self, x: i32, y: i32) -> bool {
+        // source: game-lod-water-height
+        self.water
+            .get(&(x, y))
+            .is_some_and(|w| w.has_water && w.height.is_none_or(|h| h >= f32::MAX))
+    }
+
     /// The ground height at world position (`x`, `y`) in world units, interpolated between the four height samples
     /// around it; `None` outside the cells that have LAND.
     #[must_use]
@@ -399,6 +409,11 @@ impl Worldspace {
     /// tests and tools).
     pub fn set_cell_water(&mut self, x: i32, y: i32, has_water: bool, height: Option<f32>) {
         self.water.insert((x, y), CellWater { has_water, height });
+    }
+
+    /// Set the world's default water height as its `DNAM` would (for tests and tools).
+    pub fn set_default_water_height(&mut self, height: Option<f32>) {
+        self.record.default_water_height = height;
     }
 
     /// Set the texture layers of cell (`x`, `y`) as a LAND record would (for tests and tools).

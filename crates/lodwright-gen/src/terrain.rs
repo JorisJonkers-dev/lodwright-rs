@@ -157,7 +157,14 @@ fn block_inputs(
     let cells = i32::try_from(job.level.level).unwrap_or(0);
     for x in job.cell.0..job.cell.0 + cells {
         for y in job.cell.1..job.cell.1 + cells {
-            h.update(format!("{x},{y}:{:?}", world.water_height(x, y)).as_bytes());
+            h.update(
+                format!(
+                    "{x},{y}:{:?}:{}",
+                    world.water_height(x, y),
+                    world.water_is_default(x, y)
+                )
+                .as_bytes(),
+            );
             let Some(layers) = world.layers(x, y) else {
                 continue;
             };
@@ -266,6 +273,7 @@ fn run_job(
             vertices: &w.vertices,
             indices: &w.indices,
             segments: w.segments,
+            placeholder: w.placeholder,
         }),
     })?
     .write()?;

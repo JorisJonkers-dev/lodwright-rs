@@ -166,36 +166,36 @@ verified = false
 
 [[source]]
 id = "lod-block-naming"
-fact = "A terrain LOD block of level L covers L x L cells and is named by the world's editor id, the level and the cell coordinates of its south-west cell (a multiple of L, negative values allowed): <World>.<level>.<x>.<y>."
-url = "oracle:lod-output-tree"
-licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
-date = 2026-11-14
+fact = "In the game's own archives a LOD block mesh is named <world>.level<L>.[high.]x<X>.y<Y>.nif (lower case; L is 4, 8, 16 or 32; X and Y are the signed cell coordinates of the block's south-west cell, multiples of L in 3648 of the 4122 files and offset by the world's minimum corner cell in the rest)."
+url = "oracle:game-lod-files"
+licence = "Facts about file names and counts in the owner's own game archives; no file content is recorded"
+date = 2026-11-21
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Recorded from the owner's research notes; to be checked against the owner's output tree with the planned verify command. Public sources (fnv-lod-object-block-names, fnv-lod-terrain-names) give <World>.level<L>.x<X>.y<Y>.nif instead: treat this row as superseded until the owner's tree decides."
+note = "Corrected 2026-11-21 (issue 281) from the earlier text '<World>.<level>.<x>.<y>, south-west cell a multiple of L', which the reference tree contradicts. Measured on the reference tree extracted from the game's archives (names and counts only, read in place): 4122 of 4122 NIF names match the form in the fact and none matches the earlier form; levels 4 (3250 files, 555 of them object blocks), 8 (696), 16 (160), 32 (16); 25 files are the high variant; all 1655 files of wastelandnv have X and Y multiples of L. Measured by the agent that corrected the row, not read by the owner: verified stays false. The verified row game-lod-terrain-layout carries the same layout."
 
 [[source]]
 id = "lod-terrain-paths"
-fact = "Terrain LOD meshes are <World>.<level>.<x>.<y>.btr in meshes/landscape/lod/<World>/blocks/; terrain LOD textures are the same name with .dds (diffuse) and _n.dds before the extension (normal) in textures/landscape/lod/<World>/blocks/."
-url = "oracle:lod-output-tree"
-licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
-date = 2026-11-14
+fact = "In the game's own archives the terrain LOD meshes are .nif files directly in meshes/landscape/lod/<world>/ (the object blocks in its blocks subfolder), and the terrain textures are textures/landscape/lod/<world>/diffuse/<world>.n.level<L>.x<X>.y<Y>.dds and the same name under normals/; there is no .btr file and no _n.dds suffix for terrain blocks."
+url = "oracle:game-lod-files"
+licence = "Facts about file names and counts in the owner's own game archives; no file content is recorded"
+date = 2026-11-21
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Same origin and the same open check as lod-block-naming. The exact suffix of the normal map is the least certain part. Public sources contradict it: the extension is .nif, not .btr, and the normal map is <World>.n.level<L>... (fnv-lod-terrain-names, fnv-lod-block-container-nif); superseded until the owner's tree decides."
+note = "Corrected 2026-11-21 (issue 282) from the earlier text '.btr in <World>/blocks/ with _n.dds normals', which the reference tree contradicts. Measured on the reference tree extracted from the game's archives (names and counts only, read in place): 0 .btr or .bto files, 4122 .nif; 3567 terrain blocks directly in the world folder, 555 object blocks in blocks/; 7488 of 7536 DDS match the texture form in the fact (3728 diffuse, 3760 normals; levels 4: 2859 and 2891, 8: 693 and 693, 16: 160 and 160, 32: 16 and 16); the other 48 are 24 object atlases <world>.buildings.dds with <world>.buildings_n.dds in blocks/ (the only _n.dds names). Measured by the agent that corrected the row, not read by the owner: verified stays false."
 
 [[source]]
 id = "lod-settings-path"
-fact = "The per-world LOD settings file is LODSettings/<World>.lod under the data folder."
-url = "oracle:lod-output-tree"
-licence = "Facts about file names in the owner's own xLODGen output; no file content is recorded"
-date = 2026-11-14
+fact = "In the game's own archives the per-world LOD settings file is lodsettings/<world>.dlodsettings (lower case) under the data folder; there is no .lod settings file."
+url = "oracle:game-lod-files"
+licence = "Facts about file names and counts in the owner's own game archives; no file content is recorded"
+date = 2026-11-21
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Same origin and the same open check as lod-block-naming; the design notes also mention a .lod next to the meshes. Public sources say the Fallout file is LODSettings/<World>.dlodsettings (fnv-lod-settings-dlodsettings); superseded until the owner's tree decides."
+note = "Corrected 2026-11-21 (issue 283) from the earlier text 'LODSettings/<World>.lod', which the reference tree contradicts. Measured on the reference tree extracted from the game's archives (names and counts only, read in place): 25 settings files, all lodsettings/<world>.dlodsettings, one for each of the 26 worlds with block meshes except testmap02; 0 files with extension .lod. Measured by the agent that corrected the row, not read by the owner: verified stays false. The verified row game-dlodsettings-layout carries the file layout."
 
 [[source]]
 id = "fnv-lod-block-container-nif"

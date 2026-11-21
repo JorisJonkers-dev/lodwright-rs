@@ -217,6 +217,7 @@ name = "lodwright-api"
 version = "0.13.0"
 dependencies = [
  "fs4",
+ "lodwright-assets",
  "lodwright-contract",
  "lodwright-core",
  "lodwright-gen",

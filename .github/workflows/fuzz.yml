@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [plugin_records, land_vhgt, lod_settings, dds_header, btr_mesh, bto_mesh]
+        target: [plugin_records, land_vhgt, lod_settings, dds_header, btr_mesh, bto_mesh, bsa_archive, bsa_writer]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

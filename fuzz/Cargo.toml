@@ -115,3 +115,10 @@ path = "fuzz_targets/tree_lod.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "bsa_writer"
+path = "fuzz_targets/bsa_writer.rs"
+test = false
+doc = false
+bench = false

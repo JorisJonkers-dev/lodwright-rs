@@ -20,9 +20,9 @@ pub mod objects;
 pub mod plugin;
 pub mod probe;
 pub mod raster;
-pub mod rtin;
 pub mod terrain;
 pub mod texture;
+pub mod tin;
 pub mod trees;
 pub mod worldspace;
 

@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-multibound-aabb-ref"
+fact = "In the game's own terrain block NIFs the BSMultiBound block, the last but one block of the file, holds one 32-bit value: the index of the BSMultiBoundAABB block that follows it, so 7 in a block without water, 9 with one water shape, 11 with the placeholder shape and the water shape (it is not a constant). The root node's multibound field names the BSMultiBound block."
+url = "oracle:game-lod-files"
+licence = "Block indices and one 32-bit field of the owner's own game files compared as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured 2026-11-21 with a throwaway reader over the reference tree extracted from the game's archives (WastelandNV, 1655 block files under the world folder and its blocks folder, read in place): the value equals the index of the BSMultiBoundAABB block in all 1655 files (295 files with 7 blocks, 1196 with 8, 86 with 10 and 78 with 12 blocks). lodwright 0.15.0 wrote the constant 7: right in the 1495 files without water, wrong (it named the water data block) in the 160 files with water. Single-change engine check on nv-rs v0.19.0, views lake-mead and colorado-river: the generated LOD with only this value corrected draws the ground and the water where the game's own LOD does; every other combination tried (the game's terrain shape with lodwright's water, no water, a larger bounding sphere on the water) kept the missing ground. Not measured: what the game does with the value when it names another block. Not second-read."

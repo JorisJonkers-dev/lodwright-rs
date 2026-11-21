@@ -122,6 +122,15 @@ the world's default height (the flag with no height of its own): 212 of 212 such
 rule do not (a small pond in each of levels 4, 8 and 16), and two small worlds whose default is above 0 (33 blocks) never
 have it. lodwright writes it for a block with water whose cells are all at the default, in a world whose default is 0 or lower
 (own fit to those numbers, not the game's rule); the block types of those blocks then equal the reference's.
+The game's outlines end in vertical walls, not slopes seen from above: the wall's corners share x and y with the top
+ones, and its lower corners are at -14098 (`game-lod-water-walls`). The water profile of `verify --reference` measures
+it per level (depth of a block's water, area of its steep triangles, water vertices): lodwright 523, 589, 788 and 2326
+units deep against the game's 14152, 13395, 12605 and 11556 at levels 4, 8, 16 and 32, wall area 0 against 3.4e8, 4.6e8,
+6.3e8 and 4.1e8 square units. The option `terrain.water_walls` (off by default) writes walls under the outer sides of the
+wet squares inside the block (none on the block border, none between squares of one height); own design, not looked at
+in the game. With it on (ten plugins), depth 14687, 15140, 15648 and 17362 and wall area 3.7e8, 9.0e8, 2.0e9 and 3.4e9 against
+the game's 14152, 13395, 12605, 11556 and 3.4e8, 4.6e8, 6.3e8, 4.1e8: close at level 4, too much at the coarser levels
+(our outline has more perimeter than the game's); the water overlap is unchanged.
 `--no-water` (request `terrain.water: false`) leaves the planes out.
 
 ## 7. Faces under the water (own design)

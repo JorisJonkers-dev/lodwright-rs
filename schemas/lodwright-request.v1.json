@@ -260,6 +260,10 @@
           "description": "Write water planes into the terrain blocks that have ground below water.",
           "type": "boolean",
           "default": true
+        },
+        "water_walls": {
+          "description": "Write walls under the outline of the water planes, from the water down to the height the game's outlines drop\nto (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.",
+          "type": "boolean"
         }
       }
     },

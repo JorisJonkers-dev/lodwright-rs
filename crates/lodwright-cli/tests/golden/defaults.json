@@ -54,6 +54,13 @@
       "tier": 3
     },
     {
+      "default": false,
+      "key": "terrain.water_walls",
+      "kind": "switch",
+      "since": "0.13.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

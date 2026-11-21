@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-water-walls"
+fact = "The outline of the water of the game's own terrain blocks ends in vertical walls: triangles whose corners share x and y with the top vertices of the outline and whose lower corners lie at the constant height -14098; the walls are about 1.7e8 to 6e8 square units of area per block with water and the water of a block reaches 11556 to 14152 units deep on average (levels 32 to 4)."
+url = "oracle:game-lod-files"
+licence = "Vertex positions of the owner's own game files compared as numbers; no content is recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured with the water profile of verify --reference on the ten plugins (reference tree extracted from the game's archives; triangles whose plan area is under a thousandth of their own area count as walls): mean depth of a block's water 14152, 13395, 12605 and 11556 units, mean wall area 3.36e8, 4.62e8, 6.31e8 and 4.14e8 square units at levels 4, 8, 16 and 32 over 216, 87, 36 and 8 blocks with water; the lowest vertex sits at -14098 (game-lod-water-outline). The wall dump of one level 4 block showed corner pairs with equal x and y at the top height and at -14098. Not measured: whether walls stand on the block border, how they join between neighbouring blocks, and whether the game draws them. lodwright's option writes walls only under outer sides inside the block. Not second-read."

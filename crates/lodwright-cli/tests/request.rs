@@ -138,7 +138,7 @@ fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
     let file = write_request(&out, &request);
     let (_, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
     assert_eq!(doc["blocks"]["generated"], 2, "{doc}");
-    let kept = out.join("meshes/landscape/lod/island/island.level4.x0.y0.nif");
+    let kept = out.join("meshes/landscape/lod/island/island.level4.x2.y2.nif");
     let stamp = std::fs::metadata(&kept).unwrap().modified().unwrap();
     // level 8 changes and level 16 is new: level 4 is kept untouched
     request.terrain.levels = vec![level(4, 10.0), level(8, 20.0), level(16, 10.0)];
@@ -159,7 +159,7 @@ fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
     assert_eq!(doc["blocks"]["generated"], 1, "{doc}");
     assert!(std::fs::read(&kept).unwrap().len() > 100);
     assert!(
-        !out.join("meshes/landscape/lod/island/island.level16.x0.y0.nif")
+        !out.join("meshes/landscape/lod/island/island.level16.x2.y2.nif")
             .exists()
     );
 }

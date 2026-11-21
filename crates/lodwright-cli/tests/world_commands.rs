@@ -109,7 +109,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
     ]);
     assert_eq!(code, EXIT_OK);
     assert!(out.starts_with("{\"schema_version\":1,\"contract\":\"lodwright-plan\","));
-    assert!(out.contains("\"mesh\":\"meshes/landscape/lod/island/island.level4.x0.y0.nif\""));
+    assert!(out.contains("\"mesh\":\"meshes/landscape/lod/island/island.level4.x2.y2.nif\""));
     assert!(out.contains("\"texture_size\":[256,256]"));
 }
 

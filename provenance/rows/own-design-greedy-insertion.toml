@@ -1,0 +1,10 @@
+[[source]]
+id = "own-design-greedy-insertion"
+fact = "Terrain block meshes pick their vertices by greedy insertion: from the block's corners and edge vertices, the height sample that the current Delaunay triangulation misses by most is inserted until the tolerance or the vertex cap is reached; the vertices on a block edge are chosen along that edge's heights alone (the same greedy rule in one dimension, at most 15 interior vertices per edge), so two neighbouring blocks agree. This is lodwright's own design from the published idea of greedy insertion into a triangulated irregular network and is not the game's selection."
+url = "oracle:game-lod-files"
+licence = "Own design; heights and vertex counts of the owner's own game files compared as numbers, no content recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Fitted to the measurements of issues 241 and 248 (WastelandNV, 1020, 256, 64 and 16 blocks at levels 4, 8, 16, 32; error against the land heights at every 128 unit grid point). The worst error of a block sat on the block border in every block measured (85 of 85 sampled level 4 blocks): the old border vertices were at a fixed stride. Mean error before and after (game in brackets): 13.54 -> 8.02 (16.63), 35.96 -> 22.07 (44.32), 84.05 -> 60.28 (119.52), 162.36 -> 138.19 (263.58); median of the block maxima: 308 -> 86 (110), 798 -> 223 (346), 1600 -> 491 (906), 2797 -> 807 (1885); mean mesh file 55220 -> 52447, 62281 -> 61453, 70532 -> 70914, 73481 -> 72480 bytes. Not second-read."

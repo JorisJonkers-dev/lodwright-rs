@@ -29,6 +29,19 @@ case-insensitive on Windows; on Linux write exactly one case consistently (lower
 (M3). Whether `<X>`,`<Y>` name the south-west cell: the settings file is said to hold the world's south-west corner
 (`fnv-lod-settings-dlodsettings`), which suggests block coordinates are south-west cells; unconfirmed (M2).
 
+### Which worlds, and the block set
+
+The game's tree has terrain LOD for 24 of the 30 measured worlds with LAND. No plugin field separates them from the
+others (`game-lod-terrain-worlds`); at least 17 cells with a `LAND` record (with or without heights) and a `FULL` name
+on the `WRLD` record fits 29 of 30 (only GamorrahWorld is wrong; the cell count alone gets TestMap01 wrong too, which has
+no name) and is the project's own rule, not a source statement. The rule decides one thing: a world that passes gets its
+block set completed; a world that fails keeps blocks only where it has LAND. No world is left out of a run.
+
+The game's blocks cover the whole settings extent, the cells without LAND included (`game-lod-block-extent`): lodwright
+fills the cells without LAND between the grid start and the end of the extent (clipped to the settings width) with the
+world's default land height before it builds the raster. Not explained and not implemented: Lucky38World's level 4
+blocks are only 55 of 256, as one blob in the middle.
+
 ### Where the grid starts
 
 The block grid of a world does not start at cell 0, 0: it starts at the smallest grid coordinate of the world's `CELL`

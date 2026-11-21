@@ -12,6 +12,7 @@ description = "Plugin header summaries (masters, master and light flags) read wi
 esplugin = "6.1.4"
 
 [dev-dependencies]
+lodwright-assets = { workspace = true }
 lodwright-testkit = { workspace = true }
 
 [lints]

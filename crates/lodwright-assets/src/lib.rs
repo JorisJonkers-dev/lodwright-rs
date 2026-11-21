@@ -12,6 +12,7 @@ pub mod extract;
 pub mod pack;
 pub mod path;
 pub mod resolve;
+pub mod stub;
 
 pub use bsa::{Archive, Entry};
 pub use error::Error;

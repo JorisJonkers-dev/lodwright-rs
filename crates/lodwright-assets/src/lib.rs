@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Game assets for lodwright: a reader for BSA v104 archives and the resolver that finds a path the way the game
+//! Game assets for lodwright: a reader and writer for BSA v104 archives and the resolver that finds a path the way the game
 //! does (loose files first, then archives).
 //!
 //! Clean-room: the archive layout comes from the public UESP pages recorded in `provenance/sources.toml`
@@ -8,9 +8,11 @@
 
 pub mod bsa;
 pub mod error;
+pub mod pack;
 pub mod path;
 pub mod resolve;
 
 pub use bsa::{Archive, Entry};
 pub use error::Error;
+pub use pack::{PackEntry, PackError};
 pub use resolve::{ArchiveListing, ConflictRule, Listing, Location, Resolver};

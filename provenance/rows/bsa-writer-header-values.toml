@@ -1,0 +1,10 @@
+[[source]]
+id = "bsa-writer-header-values"
+fact = "Header values of the game's own v104 archives, read as numbers. Archive flags: Fallout - Meshes.bsa 0x87, Fallout - Textures.bsa and Fallout - Textures2.bsa 0x107, Fallout - Misc.bsa 0x7, Update.bsa 0x83 (all have 0x3 for folder and file names; 0x4 compressed by default is set in all but Update.bsa; 0x100 embedded names only in the texture archives; 0x80 in the meshes archive and Update.bsa). File flags (the u16 after the file-name length, the content type of the UESP page 'BSA File Format' for Oblivion: 0x1 meshes, 0x2 textures, 0x100 miscellaneous): meshes archive 0x41 (meshes and trees), both texture archives 0x2, Misc.bsa 0x100, Update.bsa 0x11b. The writer sets archive flags 0x3 plus 0x4 when most files are compressed, never 0x100, and file flags 0x1 for .nif, .btr and .bto, 0x2 for .dds and 0x100 for any other extension; whether the game needs more (0x80, 0x40) is not known."
+url = "oracle:game-bsa-headers"
+licence = "Own measurement: header numbers of the owner's own game archives, no content recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured 2026-11-21 (numbers only). The writer's choice of which bit goes with which extension is its own (the page names the bits, not the extensions; .btr and .bto are the LOD terrain and object files that live in the meshes archive), and is checked in the game by issue 132. Not second-read."

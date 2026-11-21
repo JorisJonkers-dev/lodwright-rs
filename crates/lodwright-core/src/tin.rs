@@ -146,6 +146,11 @@ struct Tin<'a> {
     heap: BinaryHeap<(u32, std::cmp::Reverse<usize>)>,
 }
 
+/// Division of `n` by a positive `d`, rounded up.
+fn ceil_div(n: i64, d: i64) -> i64 {
+    -(-n).div_euclid(d)
+}
+
 fn cross(a: Point, b: Point, c: Point) -> i64 {
     i64::from(b.0 - a.0) * i64::from(c.1 - a.1) - i64::from(b.1 - a.1) * i64::from(c.0 - a.0)
 }
@@ -208,14 +213,38 @@ impl Tin<'_> {
             f64::from(a.1 + b.1 + c.1) / 3.0,
         );
         let mut nearest = (f64::INFINITY, (0, 0));
+        // the doubled-area weights are linear in the sample position: weight = k + dx * x + dy * y, with the edge
+        // opposite each corner; each row's range of samples inside the triangle follows from them exactly
+        let edge = |q: Point, r: Point| {
+            (
+                i64::from(q.0) * i64::from(r.1) - i64::from(q.1) * i64::from(r.0),
+                i64::from(q.1 - r.1),
+                i64::from(r.0 - q.0),
+            )
+        };
+        let (ea, eb, ec) = (edge(b, c), edge(c, a), edge(a, b));
         for y in y0..=y1 {
-            for x in x0..=x1 {
-                let p = (x, y);
-                // barycentric weights times the doubled area, all exact
-                let (wa, wb, wc) = (cross(p, b, c), cross(a, p, c), cross(a, b, p));
-                if wa < 0 || wb < 0 || wc < 0 {
-                    continue;
+            let (mut lo, mut hi) = (i64::from(x0), i64::from(x1));
+            for (k, dx, dy) in [ea, eb, ec] {
+                let rest = k + dy * i64::from(y);
+                match dx.cmp(&0) {
+                    std::cmp::Ordering::Greater => lo = lo.max(ceil_div(-rest, dx)),
+                    std::cmp::Ordering::Less => hi = hi.min(rest.div_euclid(-dx)),
+                    std::cmp::Ordering::Equal => {
+                        if rest < 0 {
+                            lo = hi + 1;
+                        }
+                    }
                 }
+            }
+            for x in lo..=hi {
+                let x = x as i32;
+                let p = (x, y);
+                let (wa, wb, wc) = (
+                    ea.0 + ea.1 * i64::from(x) + ea.2 * i64::from(y),
+                    eb.0 + eb.1 * i64::from(x) + eb.2 * i64::from(y),
+                    ec.0 + ec.1 * i64::from(x) + ec.2 * i64::from(y),
+                );
                 if p == a || p == b || p == c || self.on_border(p) {
                     continue;
                 }

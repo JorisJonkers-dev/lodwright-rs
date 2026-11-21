@@ -303,6 +303,7 @@ name = "lodwright-plugin-meta"
 version = "0.13.0"
 dependencies = [
  "esplugin",
+ "lodwright-assets",
  "lodwright-testkit",
 ]
 

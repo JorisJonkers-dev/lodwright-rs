@@ -1,0 +1,10 @@
+[[source]]
+id = "plugin-stub-header-values"
+fact = "TES4 header values of the game's own master files, read as numbers (names of the files and numbers only, no content): the record flags are 0x1 (master) in every one of ten files; the form id is 0; the second word of the version-control field is 0x2 in FalloutNV.esm and 0xf in the nine others; HEDR holds an f32 version of 1.34 (FalloutNV.esm, GunRunnersArsenal.esm, LonesomeRoad.esm, OldWorldBlues.esm), 1.33 (HonestHearts.esm) or 1.32 (the other five), a record count (14 to 542016) and a next object id with 0x800 in its low 24 bits (the top byte 0xff in all ten); CNAM is a zero-terminated author; MAST with a DATA of 8 bytes follows for the files that have a master; a master-less file (FalloutNV.esm) has HEDR and CNAM only. The stub plugin writes flags 0 (a plugin, not a master), form id 0, version-control words 0 and 0xf, HEDR 1.34 with a record count of 0 and next object id 0x800, CNAM and SNAM, and no master."
+url = "oracle:game-plugin-headers"
+licence = "Own measurement: header numbers of the owner's own game plugins, no content recorded"
+date = 2026-11-21
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured 2026-11-21 by reading the first record of each .esm file in the install's Data folder (no .esp is installed there). No plugin of the install has zero records or a plugin (non-master) flag, so the stub's flags 0, count 0 and next id 0x800 (without the 0xff top byte) are the writer's choice, not a measured value; the load of the stub in the game is issue 132. The SNAM description subrecord is the writer's addition, read by esplugin as the description. Not second-read."

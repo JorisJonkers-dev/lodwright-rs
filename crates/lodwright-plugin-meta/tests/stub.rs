@@ -11,7 +11,7 @@ use lodwright_plugin_meta::read_header;
 #[test]
 fn the_stub_has_no_masters_and_is_not_a_master() {
     let header = read_header("Lodwright LOD.esp", &stub_plugin()).unwrap();
-    assert!(header.masters.is_empty());
+    assert_eq!(header.masters.len(), 0);
     assert!(!header.is_master);
 }
 

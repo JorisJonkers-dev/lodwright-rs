@@ -581,7 +581,7 @@ fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
     let said: Vec<&String> = report
         .warnings
         .iter()
-        .filter(|w| w.starts_with("model "))
+        .filter(|w| w.contains("LOD models are missing"))
         .collect();
     assert_eq!(said.len(), 1, "{:?}", report.warnings);
     assert!(

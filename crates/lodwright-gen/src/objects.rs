@@ -417,18 +417,27 @@ pub fn generate_objects_with_progress(
                 .map(|parts| Model { parts })
         });
     }
-    // a model that cannot be read or has a shape without a diffuse texture is said once, by its path: its objects are
-    // left out or drawn in a flat colour, and a user must not get pale shapes silently
+    // a model with a shape that has no diffuse texture is said by its path (its objects are drawn in a flat colour, and a
+    // user must not get pale shapes silently); the models that are missing or cannot be read are said in one line with
+    // their count and the first paths (many flagged bases have no LOD model in the game's own data, which is how the
+    // game's own blocks are made too)
+    let mut missing: Vec<&str> = Vec::new();
     for (path, model) in &models {
         match model {
-            None => report.warnings.push(format!(
-                "model {path} is missing or cannot be read, its objects are left out"
-            )),
+            None => missing.push(path),
             Some(m) if m.parts.iter().any(|p| p.diffuse.is_none()) => report.warnings.push(
                 format!("model {path} has a shape with no diffuse texture, a flat colour is used"),
             ),
             Some(_) => {}
         }
+    }
+    if !missing.is_empty() {
+        let shown: Vec<&str> = missing.iter().take(3).copied().collect();
+        report.warnings.push(format!(
+            "{} LOD models are missing or cannot be read, their objects are left out (for example {})",
+            missing.len(),
+            shown.join(", ")
+        ));
     }
     if models.values().all(Option::is_none) {
         report.skipped = instances.len();

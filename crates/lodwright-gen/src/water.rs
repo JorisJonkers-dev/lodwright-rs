@@ -89,71 +89,100 @@ struct Wall {
     group: usize,
 }
 
-/// The walls of the water of one block: under every side of a wet square whose neighbour inside the block is dry
-/// or has another water height, from the water down to [`WALL_FOOT`]. Sides on the block's own border get none (the
-/// neighbouring block may carry on the water). Runs of equal height along a side are one wall; at level 4 a run stops
-/// at the cell's border, as the segments are per cell.
+/// How far a level 4 plane and its walls reach beyond the block's south and west borders and past its north border:
+/// the game's blocks overlap their neighbours there (`game-lod-water-border`), so no crack opens between planes.
+const BORDER_OVERLAP: f32 = 32.0;
+
+/// The walls of the water of one block: under every side of a wet square that lies on the block's own border, from
+/// the water down to [`WALL_FOOT`]. The sides inside the block get none. Runs of equal height along a side are one
+/// wall; at level 4 a run stops at the cell's border, as the segments are per cell, and the wall stands where the
+/// extended plane ends: [`BORDER_OVERLAP`] beyond the south, west and north borders, on the east border itself.
 fn walls_of(grid: &[Option<u32>], n: usize, square: f32, per_cell: Option<usize>) -> Vec<Wall> {
-    let at = |x: isize, y: isize| -> Option<Option<u32>> {
-        (x >= 0 && y >= 0 && (x as usize) < n && (y as usize) < n)
-            .then(|| grid[y as usize * n + x as usize])
-    };
     let exposed = |x: usize, y: usize, side: usize| -> bool {
-        let Some(bits) = grid[y * n + x] else {
+        let Some(_) = grid[y * n + x] else {
             return false;
         };
-        let (dx, dy) = [(0, -1), (1, 0), (0, 1), (-1, 0)][side];
-        match at(x as isize + dx, y as isize + dy) {
-            None => false,
-            Some(other) => other != Some(bits),
+        match side {
+            0 => y == 0,
+            1 => x + 1 == n,
+            2 => y + 1 == n,
+            _ => x == 0,
         }
+    };
+    let overlap = if per_cell.is_some() {
+        BORDER_OVERLAP
+    } else {
+        0.0
     };
     let group_of = |x: usize, y: usize| per_cell.map_or(0, |p| (x / p) * 4 + y / p);
     let mut out = Vec::new();
     for side in 0..4 {
-        // lines run along x for the south and north sides, along y for east and west
-        for line in 0..n {
-            // an open run: where it starts, its water height and its group
-            let mut run: Option<(usize, u32, usize)> = None;
-            for k in 0..=n {
-                let (x, y) = if side % 2 == 0 { (k, line) } else { (line, k) };
-                let here = (k < n && exposed(x, y, side))
-                    .then(|| (grid[y * n + x].unwrap_or(0), group_of(x, y)));
-                // a run goes on while the water height and the group (the cell, at level 4) stay the same
-                let continues = match (run, here) {
-                    (Some((_, bits, group)), Some((hb, hg))) => bits == hb && group == hg,
-                    _ => false,
+        // only the border line of each side can carry a wall: line 0 or line n - 1
+        let line = match side {
+            0 | 3 => 0,
+            _ => n - 1,
+        };
+        // an open run: where it starts, its water height and its group
+        let mut run: Option<(usize, u32, usize)> = None;
+        for k in 0..=n {
+            let (x, y) = if side % 2 == 0 { (k, line) } else { (line, k) };
+            let here = (k < n && exposed(x, y, side))
+                .then(|| (grid[y * n + x].unwrap_or(0), group_of(x, y)));
+            // a run goes on while the water height and the group (the cell, at level 4) stay the same
+            let continues = match (run, here) {
+                (Some((_, bits, group)), Some((hb, hg))) => bits == hb && group == hg,
+                _ => false,
+            };
+            if continues {
+                continue;
+            }
+            if let Some((start, bits, group)) = run.take() {
+                let (a, b) = (start as f32 * square, k as f32 * square);
+                let (south, west) = (-overlap, -overlap);
+                let (north, east) = (n as f32 * square + overlap, n as f32 * square);
+                let (from, to) = match side {
+                    0 => ([a, south], [b, south]),
+                    1 => ([east, a], [east, b]),
+                    2 => ([b, north], [a, north]),
+                    _ => ([west, b], [west, a]),
                 };
-                if continues {
-                    continue;
-                }
-                if let Some((start, bits, group)) = run.take() {
-                    let (a, b) = (start as f32 * square, k as f32 * square);
-                    let l = line as f32 * square;
-                    let m = (line + 1) as f32 * square;
-                    let (from, to) = match side {
-                        0 => ([a, l], [b, l]),
-                        1 => ([m, a], [m, b]),
-                        2 => ([b, m], [a, m]),
-                        _ => ([l, b], [l, a]),
-                    };
-                    out.push(Wall {
-                        from,
-                        to,
-                        height: f32::from_bits(bits),
-                        group,
-                    });
-                }
-                if let Some((bits, group)) = here {
-                    run = Some((k, bits, group));
-                }
+                out.push(Wall {
+                    from,
+                    to,
+                    height: f32::from_bits(bits),
+                    group,
+                });
+            }
+            if let Some((bits, group)) = here {
+                run = Some((k, bits, group));
             }
         }
     }
     out
 }
 
-/// Add the walls under the outline of the water to `mesh` (the option `terrain.water_walls`).
+/// Let a level 4 plane overlap its neighbours as the game's do: the rectangles on the south and west borders reach
+/// [`BORDER_OVERLAP`] beyond them and those on the north border beyond that one, so the seam between two planes is
+/// covered and not a hairline of rasterisation gaps.
+fn overlap_borders(mesh: &mut WaterMesh, level: u32) {
+    if level != 4 {
+        return;
+    }
+    let far = 4.0 * CELL_UNITS;
+    for v in &mut mesh.vertices {
+        if v[0] == 0.0 {
+            v[0] = -BORDER_OVERLAP;
+        }
+        if v[1] == 0.0 {
+            v[1] = -BORDER_OVERLAP;
+        } else if v[1] == far {
+            v[1] = far + BORDER_OVERLAP;
+        }
+    }
+}
+
+/// Add the walls on the block's borders and the plane's overlap across them to `mesh` (the option
+/// `terrain.water_walls`; `game-lod-water-border`).
 pub(crate) fn add_walls(
     mesh: &mut WaterMesh,
     world: &Worldspace,
@@ -164,6 +193,7 @@ pub(crate) fn add_walls(
     let cells = usize::try_from(level).ok()?;
     let (n, grid, square) = wet_grid(world, samples, cells, cell)?;
     let per_cell = (cells == 4).then_some(n / 4);
+    overlap_borders(mesh, level);
     let walls = walls_of(&grid, n, square, per_cell);
     if walls.is_empty() {
         return Some(());
@@ -525,22 +555,25 @@ mod tests {
     }
 
     #[test]
-    fn walls_stand_under_the_outline_inside_the_block_and_not_on_its_border() {
-        // level 8, water over the cells 2 and 3 of the south row: the west, east and north sides are inside the block
-        // except the south side (block border); three runs, two triangles each
+    fn walls_stand_on_the_block_border_and_not_inside_it() {
+        // level 8, water over the cells 2 and 3 of the south row: only the south side is on the block's border; its
+        // wall is one run of two triangles, the sides inside the block (west, east, north of the water) get none
         let (w, samples) = strip(8, 2, 4);
         let mut mesh = water_mesh(&w, &samples, 8, (0, 0), Plane::Rectangles).unwrap();
         let (vertices, triangles) = (mesh.vertices.len(), mesh.indices.len() / 3);
         assert_eq!((vertices, triangles), (4, 2));
         add_walls(&mut mesh, &w, &samples, 8, (0, 0)).unwrap();
-        assert_eq!(mesh.vertices.len(), vertices + 12);
-        assert_eq!(mesh.indices.len() / 3, triangles + 6);
+        assert_eq!(mesh.vertices.len(), vertices + 4);
+        assert_eq!(mesh.indices.len() / 3, triangles + 2);
         let feet = mesh
             .vertices
             .iter()
             .filter(|v| v[2] == super::WALL_FOOT)
             .count();
-        assert_eq!(feet, 6);
+        assert_eq!(feet, 2);
+        // above level 4 the wall stands on the border itself, and the plane does not overlap
+        assert!(mesh.vertices[vertices..].iter().all(|v| v[1] == 0.0));
+        assert!(mesh.vertices[..vertices].iter().all(|v| v[1] >= 0.0));
         // every wall is vertical: its corners share x and y in pairs
         for t in mesh.indices[6..].as_chunks::<3>().0 {
             let p = t.map(|i| mesh.vertices[usize::from(i)]);
@@ -555,18 +588,26 @@ mod tests {
     }
 
     #[test]
-    fn walls_at_level_4_stay_in_their_cells_segment() {
-        // water over cells 1 and 2 of the south row of a level 4 block: east and west and north sides of each cell,
-        // the shared side between the cells gets none
+    fn level_4_planes_overlap_their_neighbours_and_the_walls_stand_in_their_cells_segment() {
+        // water over cells 1 and 2 of the south row of a level 4 block: the south side of each cell is on the border;
+        // the plane reaches 32 units past it and each wall is a run of its own cell's segment
         let (w, samples) = strip(4, 1, 3);
         let mut mesh = water_mesh(&w, &samples, 4, (0, 0), Plane::Rectangles).unwrap();
         let before = mesh.segments.unwrap();
         assert_eq!((before[4], before[8]), (2, 2));
+        assert!(mesh.vertices.iter().any(|v| v[1] == 0.0));
         add_walls(&mut mesh, &w, &samples, 4, (0, 0)).unwrap();
         let after = mesh.segments.unwrap();
-        // cell x1: west and north walls; cell x2: east and north walls: two walls of two triangles each plus the plane
-        assert_eq!((after[4], after[8]), (2 + 4, 2 + 4));
+        // one wall of two triangles per cell on top of the plane
+        assert_eq!((after[4], after[8]), (2 + 2, 2 + 2));
         assert_eq!(after.iter().sum::<u32>() as usize, mesh.indices.len() / 3);
+        assert!(mesh.vertices.iter().all(|v| v[1] != 0.0));
+        assert!(
+            mesh.vertices
+                .iter()
+                .filter(|v| v[2] != super::WALL_FOOT)
+                .any(|v| v[1] == -32.0)
+        );
         assert!(
             mesh.indices
                 .iter()
@@ -575,33 +616,50 @@ mod tests {
     }
 
     #[test]
-    fn a_block_without_exposed_sides_gets_no_walls() {
-        // the whole block wet: every side is on the block's border
-        let (w, samples) = strip(4, 0, 4);
-        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), Plane::Rectangles).unwrap();
-        // only row 0 has cells here, so the north sides of the four cells are exposed; wet everything instead
-        let mut full = Worldspace::from_cells(
-            1,
-            "Mojave",
-            (0..4)
-                .flat_map(|x| (0..4).map(move |y| ((x, y), CellHeights::flat(0.0))))
-                .collect::<Vec<_>>(),
-        );
-        for x in 0..4 {
-            for y in 0..4 {
-                full.set_cell_water(x, y, true, Some(100.0));
+    fn a_whole_block_of_water_has_a_wall_on_each_of_its_four_borders() {
+        let full = |level: i32| {
+            let mut w = Worldspace::from_cells(
+                1,
+                "Mojave",
+                (0..level)
+                    .flat_map(|x| (0..level).map(move |y| ((x, y), CellHeights::flat(0.0))))
+                    .collect::<Vec<_>>(),
+            );
+            for x in 0..level {
+                for y in 0..level {
+                    w.set_cell_water(x, y, true, Some(100.0));
+                }
             }
-        }
+            w
+        };
+        // level 8: one wall per side, two triangles each, on the border itself
+        let w = full(8);
+        let span = 8 * 32 + 1;
+        let samples = vec![0.0; span * span];
+        let mut mesh = water_mesh(&w, &samples, 8, (0, 0), Plane::Rectangles).unwrap();
+        let (v, i) = (mesh.vertices.len(), mesh.indices.len());
+        add_walls(&mut mesh, &w, &samples, 8, (0, 0)).unwrap();
+        assert_eq!((mesh.vertices.len(), mesh.indices.len()), (v + 16, i + 24));
+        // level 4: a wall per cell on the border, and the plane overlaps on the south, west and north
+        let w = full(4);
         let span = 4 * 32 + 1;
-        let mut every =
-            water_mesh(&full, &vec![0.0; span * span], 4, (0, 0), Plane::Rectangles).unwrap();
-        let (v, i) = (every.vertices.len(), every.indices.len());
-        add_walls(&mut every, &full, &vec![0.0; span * span], 4, (0, 0)).unwrap();
-        assert_eq!((every.vertices.len(), every.indices.len()), (v, i));
-        // and the strip does get walls
-        let before = mesh.vertices.len();
+        let samples = vec![0.0; span * span];
+        let mut mesh = water_mesh(&w, &samples, 4, (0, 0), Plane::Rectangles).unwrap();
+        let (v, i) = (mesh.vertices.len(), mesh.indices.len());
         add_walls(&mut mesh, &w, &samples, 4, (0, 0)).unwrap();
-        assert!(mesh.vertices.len() > before);
+        // 12 border cells, one wall each, a cell in a corner has two
+        assert_eq!(
+            (mesh.vertices.len(), mesh.indices.len()),
+            (v + 16 * 4, i + 16 * 6)
+        );
+        let plane: Vec<_> = mesh.vertices[..v].iter().collect();
+        let (xmin, xmax) = plane
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p[0]), b.max(p[0])));
+        let (ymin, ymax) = plane
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p[1]), b.max(p[1])));
+        assert_eq!((xmin, xmax, ymin, ymax), (-32.0, 16384.0, -32.0, 16416.0));
     }
 
     #[test]

@@ -653,3 +653,103 @@ fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
         "{said:?}"
     );
 }
+
+/// An uncompressed 32 bit DDS with a legacy header and the usual BGRA-free (RGBA mask) layout, as LOD resource mods ship.
+fn uncompressed_texture(size: u32, shade: u8) -> Vec<u8> {
+    let mut b = vec![0_u8; 128];
+    b[0..4].copy_from_slice(b"DDS ");
+    b[4..8].copy_from_slice(&124_u32.to_le_bytes());
+    b[8..12].copy_from_slice(&0x0002_100F_u32.to_le_bytes());
+    b[12..16].copy_from_slice(&size.to_le_bytes());
+    b[16..20].copy_from_slice(&size.to_le_bytes());
+    b[20..24].copy_from_slice(&(size * 4).to_le_bytes());
+    b[28..32].copy_from_slice(&1_u32.to_le_bytes());
+    b[76..80].copy_from_slice(&32_u32.to_le_bytes());
+    b[80..84].copy_from_slice(&0x41_u32.to_le_bytes());
+    b[88..92].copy_from_slice(&32_u32.to_le_bytes());
+    b[92..96].copy_from_slice(&0x0000_00FF_u32.to_le_bytes());
+    b[96..100].copy_from_slice(&0x0000_FF00_u32.to_le_bytes());
+    b[100..104].copy_from_slice(&0x00FF_0000_u32.to_le_bytes());
+    b[104..108].copy_from_slice(&0xFF00_0000_u32.to_le_bytes());
+    b[108..112].copy_from_slice(&0x1000_u32.to_le_bytes());
+    for _ in 0..size * size {
+        b.extend_from_slice(&[shade, shade, shade, 255]);
+    }
+    b
+}
+
+#[test]
+fn an_uncompressed_32_bit_texture_is_used_not_replaced_by_a_flat_colour() {
+    let out = temp("uncompressed");
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model("Data\\Textures\\a\\wall.dds"),
+    );
+    m.insert(
+        "textures/a/wall.dds".to_owned(),
+        uncompressed_texture(64, 40),
+    );
+    let report = generate_objects(
+        "Mojave",
+        &[instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)],
+        &Memory(m),
+        &out,
+    )
+    .unwrap();
+    assert!(
+        !report.warnings.iter().any(|w| w.contains("texture")),
+        "{:?}",
+        report.warnings
+    );
+    let atlas =
+        std::fs::read(out.join("textures/landscape/lod/mojave/blocks/mojave.buildings.dds"))
+            .unwrap();
+    let image = lodwright_dds::decode_image(&atlas).unwrap();
+    let p = image.pixel(2, 2).unwrap();
+    assert!(
+        p[0].abs_diff(40) < 8,
+        "the texture's shade is kept, got {p:?}"
+    );
+}
+
+#[test]
+fn a_texture_that_is_absent_and_one_that_cannot_be_decoded_get_different_warnings() {
+    let out = temp("texture-faults");
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model("Data\\Textures\\a\\wall.dds"),
+    );
+    m.insert(
+        "meshes/a/gone_lod.nif".to_owned(),
+        lod_model("Data\\Textures\\a\\gone.dds"),
+    );
+    m.insert("textures/a/wall.dds".to_owned(), b"not a dds".to_vec());
+    let report = generate_objects(
+        "Mojave",
+        &[
+            instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+            instance("a\\Gone.nif", 200.0, 200.0, 0.0, 2, false),
+        ],
+        &Memory(m),
+        &out,
+    )
+    .unwrap();
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|w| w.contains("textures/a/gone.dds not found")),
+        "{:?}",
+        report.warnings
+    );
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|w| w.contains("textures/a/wall.dds found but not readable")),
+        "{:?}",
+        report.warnings
+    );
+}

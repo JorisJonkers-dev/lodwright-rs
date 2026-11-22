@@ -121,6 +121,24 @@ fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
     (it.next().flatten(), it.next().flatten())
 }
 
+/// Where a `BSLightingShaderProperty` of a Skyrim-stream model (user version 12, stream 83: the shader's type, the
+/// name, the extra data links, the controller, two flag words and the UV offset and scale come first) links its texture
+/// set. Some Fallout models that mods ship (the `DynDOLOD` rock models of Tale of Two Wastelands) are written this way.
+fn skyrim_lighting_texture_set(bytes: &[u8]) -> Option<usize> {
+    let word = |at: usize| -> Option<u32> {
+        bytes
+            .get(at..at + 4)
+            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    };
+    let extra = usize::try_from(word(8)?).ok()?;
+    if extra > 64 {
+        return None;
+    }
+    // type, name, extra count, extra links, controller, flags 1 and 2, UV offset and scale
+    let at = 12 + 4 * extra + 4 + 8 + 16;
+    usize::try_from(word(at)?).ok()
+}
+
 /// Where a `BSShaderPPLightingProperty` links its texture set (see `game-lod-terrain-block-nif`).
 fn lighting_texture_set(bytes: &[u8]) -> Option<usize> {
     let b = bytes.get(34..38)?;
@@ -168,6 +186,16 @@ impl Ctx<'_> {
             {
                 (diffuse, normal) = texture_set(set_bytes);
             }
+        }
+        if diffuse.is_none()
+            && let Ok(p) = usize::try_from(shape.shader_property)
+            && self.name(p) == b"BSLightingShaderProperty"
+            && let Some(Body::Opaque(bytes)) = self.file.blocks.get(p).map(|b| &b.body)
+            && let Some(set) = skyrim_lighting_texture_set(bytes)
+            && self.name(set) == b"BSShaderTextureSet"
+            && let Some(Body::Opaque(set_bytes)) = self.file.blocks.get(set).map(|b| &b.body)
+        {
+            (diffuse, normal) = texture_set(set_bytes);
         }
         (diffuse, normal, alpha)
     }
@@ -253,4 +281,43 @@ pub fn parse_lod_model(bytes: &[u8]) -> Result<Vec<Part>, String> {
         return Err("the model has no triangle geometry".to_owned());
     }
     Ok(ctx.parts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::skyrim_lighting_texture_set;
+
+    /// The block layout measured on the `DynDOLOD` rock models of Tale of Two Wastelands (numbers only): shader type,
+    /// name, extra data count and links, controller, two flag words, UV offset and scale, then the texture set link.
+    fn block(extra: &[u32], set: u32) -> Vec<u8> {
+        let mut b = Vec::new();
+        for w in [1_u32, u32::MAX, u32::try_from(extra.len()).unwrap()] {
+            b.extend_from_slice(&w.to_le_bytes());
+        }
+        for e in extra {
+            b.extend_from_slice(&e.to_le_bytes());
+        }
+        for w in [u32::MAX, 0x8000_0000, 0x0000_0001] {
+            b.extend_from_slice(&w.to_le_bytes());
+        }
+        for f in [0.0_f32, 0.0, 1.0, 1.0] {
+            b.extend_from_slice(&f.to_le_bytes());
+        }
+        b.extend_from_slice(&set.to_le_bytes());
+        b
+    }
+
+    #[test]
+    fn a_skyrim_stream_lighting_property_names_its_texture_set() {
+        assert_eq!(skyrim_lighting_texture_set(&block(&[], 2)), Some(2));
+        assert_eq!(skyrim_lighting_texture_set(&block(&[7, 8], 3)), Some(3));
+    }
+
+    #[test]
+    fn a_short_or_absurd_block_names_none() {
+        assert_eq!(skyrim_lighting_texture_set(&block(&[], 2)[..20]), None);
+        let mut absurd = block(&[], 2);
+        absurd[8..12].copy_from_slice(&1000_u32.to_le_bytes());
+        assert_eq!(skyrim_lighting_texture_set(&absurd), None);
+    }
 }

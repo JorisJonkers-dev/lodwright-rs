@@ -57,6 +57,8 @@ fn names_in(out: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(out)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        // the warnings file (when the run had a warning) is beside the files of the LOD, not one of them
+        .filter(|n| n != lodwright_contract::WARNINGS_FILE)
         .collect();
     names.sort();
     names

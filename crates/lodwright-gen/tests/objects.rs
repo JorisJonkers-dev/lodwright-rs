@@ -210,6 +210,7 @@ fn instance(model: &str, x: f32, y: f32, rot_z: f32, reference: u32, high: bool)
         reference,
         reference_plugin: 0,
         base_plugin: 0,
+        flagged_by: 0,
         part: false,
         cell: None,
     }
@@ -659,11 +660,11 @@ fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
     let said: Vec<&String> = report
         .warnings
         .iter()
-        .filter(|w| w.contains("LOD models are missing"))
+        .filter(|w| w.contains("visible from far"))
         .collect();
     assert_eq!(said.len(), 1, "{:?}", report.warnings);
     assert!(
-        said[0].contains("zzz_lod.nif") && said[0].contains("left out"),
+        said[0].contains("zzz.nif") && said[0].contains("left out"),
         "{said:?}"
     );
 }
@@ -989,4 +990,151 @@ fn a_lod_shape_without_a_texture_takes_the_full_models_texture_and_says_so() {
         .collect();
     assert!(shades.iter().any(|&s| s.abs_diff(30) <= 4), "{shades:?}");
     assert!(shades.iter().any(|&s| s.abs_diff(128) <= 4), "{shades:?}");
+}
+
+fn flagged(model: &str, reference: u32, plugin: usize) -> Instance {
+    let mut i = instance(model, 100.0, 100.0, 0.0, reference, false);
+    i.flagged_by = plugin;
+    i
+}
+
+#[test]
+fn far_models_with_no_lod_model_are_one_record_per_plugin_with_every_model_and_no_line_per_object()
+{
+    let out = temp("far-gaps");
+    let mut files = assets();
+    // the full models of two of the three exist; one LOD model is a file that is not a model
+    files
+        .0
+        .insert("meshes/b/full.nif".to_owned(), vec![1, 2, 3]);
+    files
+        .0
+        .insert("meshes/b/full2.nif".to_owned(), vec![1, 2, 3]);
+    files
+        .0
+        .insert("meshes/b/broken_lod.nif".to_owned(), vec![1, 2, 3]);
+    let mut surfaces = Surfaces::default();
+    let names = ["Base.esm".to_owned(), "Far.esp".to_owned()];
+    surfaces.plugins = &names;
+    let list = [
+        instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+        flagged("b\\Full.nif", 2, 1),
+        flagged("b\\Full.nif", 3, 1),
+        flagged("b\\Full2.nif", 4, 1),
+        flagged("b\\Full2.nif", 5, 0),
+        flagged("b\\Nowhere.nif", 6, 0),
+        flagged("b\\Broken.nif", 7, 0),
+    ];
+    let report = lodwright_gen::generate_objects_with_progress(
+        "Mojave",
+        &list,
+        &files,
+        &out,
+        surfaces,
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let far: Vec<_> = report
+        .records
+        .iter()
+        .filter(|r| r.kind.starts_with("far_model"))
+        .map(|r| {
+            (
+                r.kind.as_str(),
+                r.plugin.as_deref().unwrap(),
+                r.count,
+                r.subjects.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        far,
+        [
+            (
+                "far_model_not_found",
+                "Base.esm",
+                1,
+                vec!["meshes/b/nowhere.nif".to_owned()]
+            ),
+            (
+                "far_model_unreadable",
+                "Base.esm",
+                1,
+                vec!["meshes/b/broken.nif".to_owned()]
+            ),
+            (
+                "far_model_without_lod_model",
+                "Base.esm",
+                1,
+                vec!["meshes/b/full2.nif".to_owned()]
+            ),
+            (
+                "far_model_without_lod_model",
+                "Far.esp",
+                3,
+                vec![
+                    "meshes/b/full.nif".to_owned(),
+                    "meshes/b/full2.nif".to_owned()
+                ]
+            ),
+        ]
+        .map(|(k, p, c, s)| (k, p, c, s)),
+        "{:#?}",
+        report.records
+    );
+    // four lines, not one per object; the object of the model that has a LOD model is placed
+    let lines = report
+        .warnings
+        .iter()
+        .filter(|w| w.contains("visible from far"))
+        .count();
+    assert_eq!(lines, 4, "{:?}", report.warnings);
+    assert_eq!(report.instances, 1);
+    assert_eq!(report.skipped, 6);
+    assert!(report.records.iter().all(|r| !r.advice.is_empty()));
+}
+
+#[test]
+fn a_part_of_a_collection_that_draws_its_own_lod_model_is_not_a_far_model_gap() {
+    let out = temp("far-gaps-part");
+    let mut parent = instance("a\\Wall.nif", 100.0, 100.0, 0.0, 9, false);
+    parent.part = false;
+    let mut part = instance("b\\Part.nif", 100.0, 100.0, 0.0, 9, false);
+    part.part = true;
+    let report = generate_objects("Mojave", &[parent, part], &assets(), &out).unwrap();
+    assert!(
+        report
+            .records
+            .iter()
+            .all(|r| !r.kind.starts_with("far_model")),
+        "{:?}",
+        report.records
+    );
+}
+
+/// Regression: a LOD model with bytes after its footer (a stale tail of an earlier export, as some mods ship; the game
+/// reads such a file) was reported "cannot be read" and its objects were left out of the far view.
+#[test]
+fn a_lod_model_with_bytes_after_its_footer_is_read_and_its_objects_are_drawn() {
+    let out = temp("trailing");
+    let mut files = assets();
+    let mut tailed = lod_model("Data\\Textures\\a\\wall.dds");
+    tailed.extend_from_slice(&[0xAB; 2696]);
+    files.0.insert("meshes/a/wall_lod.nif".to_owned(), tailed);
+    let report = generate_objects(
+        "Mojave",
+        &[instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)],
+        &files,
+        &out,
+    )
+    .unwrap();
+    assert_eq!((report.instances, report.skipped), (1, 0));
+    assert!(
+        report
+            .records
+            .iter()
+            .all(|r| r.kind != "far_model_unreadable"),
+        "{:?}",
+        report.records
+    );
 }

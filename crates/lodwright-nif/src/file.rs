@@ -92,7 +92,19 @@ impl NifFile {
     pub fn read(bytes: &[u8]) -> Result<Self> {
         let mut r = Reader::new(bytes);
         let (header, type_indices, sizes) = read_header(&mut r)?;
-        read_blocks(&mut r, header, &type_indices, &sizes)
+        read_blocks(&mut r, header, &type_indices, &sizes, false)
+    }
+
+    /// [`NifFile::read`], but bytes after the footer are ignored, as the game's own reader ignores them (some mods
+    /// ship models with the tail of an earlier, longer export after the footer). For reading, not for a rewrite:
+    /// the bytes are dropped.
+    ///
+    /// # Errors
+    /// See [`NifError`]; never [`NifError::TrailingBytes`].
+    pub fn read_ignoring_trailing_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut r = Reader::new(bytes);
+        let (header, type_indices, sizes) = read_header(&mut r)?;
+        read_blocks(&mut r, header, &type_indices, &sizes, true)
     }
 
     /// Write the file.
@@ -262,6 +274,7 @@ fn read_blocks(
     header: Header,
     type_indices: &[u16],
     sizes: &[u32],
+    ignore_trailing: bool,
 ) -> Result<NifFile> {
     let profile = header.profile();
     let mut blocks = Vec::with_capacity(type_indices.len());
@@ -284,7 +297,7 @@ fn read_blocks(
     }
     let n_roots = r.count32("roots", 4)?;
     let roots = r.i32s(n_roots)?;
-    if r.remaining() != 0 {
+    if r.remaining() != 0 && !ignore_trailing {
         return Err(NifError::TrailingBytes(r.remaining()));
     }
     Ok(NifFile {

@@ -457,3 +457,151 @@ fn the_request_round_trips_through_json() {
     let back: GenerateRequest = serde_json::from_str(&text).unwrap();
     assert_eq!(back, job);
 }
+
+// ---- far models without a LOD model: one warning per plugin, the full list in a file (#345, #346) ----
+
+const VISIBLE_WHEN_DISTANT: u32 = 0x8000;
+
+fn stat(id: u32, model: &str, flags: u32) -> lodwright_testkit::plugin::Record {
+    let mut r = lodwright_testkit::plugin::Record::new(*b"STAT", id)
+        .with_subrecord(*b"MODL", format!("{model}\0").into_bytes());
+    r.flags = flags;
+    r
+}
+
+fn refr(id: u32, base: u32, x: f32) -> lodwright_testkit::plugin::Record {
+    let mut data = Vec::new();
+    for v in [x, 0.0, 0.0, 0.0, 0.0, 0.0] {
+        data.extend_from_slice(&v.to_le_bytes());
+    }
+    lodwright_testkit::plugin::Record::new(*b"REFR", id)
+        .with_subrecord(*b"NAME", base.to_le_bytes().to_vec())
+        .with_subrecord(*b"DATA", data)
+}
+
+/// Two plugins: `Base.esm` (the world, one base flagged visible from far whose full model exists and has no LOD model)
+/// and `Mod.esp` (flags two more bases, one with a full model and one with none, and places references to all).
+fn far_model_job(name: &str) -> (GenerateRequest, PathBuf) {
+    use lodwright_testkit::plugin::{Group, PluginBuilder};
+    use lodwright_testkit::world::{record_group, world_group};
+    let data = temp(&format!("{name}-data"));
+    std::fs::create_dir_all(data.join("meshes/arch")).unwrap();
+    // the full models exist, as files whose content is never read (no LOD model exists for any of them)
+    for m in ["parking.nif", "kit.nif"] {
+        std::fs::write(data.join("meshes/arch").join(m), b"not a model").unwrap();
+    }
+    let world = SyntheticWorld::new(0xB00, "Island").cell(0, 0, Heights::flat(16.0));
+    let base_refs = Group::new(1, 0xB00_u32.to_le_bytes())
+        .with(refr(0xC00, 0x100, 10.0))
+        .with(refr(0xC01, 0x100, 20.0));
+    let base = PluginBuilder::new()
+        .group(record_group(
+            *b"STAT",
+            vec![stat(0x100, "arch\\parking.nif", VISIBLE_WHEN_DISTANT)],
+        ))
+        .group(world_group(&world, false))
+        .group(base_refs)
+        .build();
+    std::fs::write(data.join("Base.esm"), base).unwrap();
+    let mod_refs = Group::new(1, 0xB00_u32.to_le_bytes())
+        .with(refr(0x0100_0C00, 0x0100_0100, 30.0))
+        .with(refr(0x0100_0C01, 0x0100_0101, 40.0))
+        .with(refr(0x0100_0C02, 0x0100_0101, 50.0));
+    let modded = PluginBuilder::new()
+        .master("Base.esm")
+        .group(record_group(
+            *b"STAT",
+            vec![
+                stat(0x0100_0100, "arch\\kit.nif", VISIBLE_WHEN_DISTANT),
+                stat(0x0100_0101, "arch\\gone.nif", VISIBLE_WHEN_DISTANT),
+            ],
+        ))
+        .group(mod_refs)
+        .build();
+    std::fs::write(data.join("Mod.esp"), modded).unwrap();
+    let out = temp(&format!("{name}-out"));
+    let mut request = Request::new(
+        data.to_str().unwrap(),
+        &["Base.esm", "Mod.esp"],
+        out.to_str().unwrap(),
+    );
+    request.terrain.enabled = false;
+    request.trees.enabled = false;
+    request.objects.enabled = true;
+    request.limits.threads = Some(1);
+    (GenerateRequest::new(request), out)
+}
+
+fn warnings_file(out: &std::path::Path) -> lodwright_contract::WarningsFile {
+    serde_json::from_slice(&std::fs::read(out.join(lodwright_contract::WARNINGS_FILE)).unwrap())
+        .unwrap()
+}
+
+#[test]
+fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_in_the_file() {
+    let (job, out) = far_model_job("far-warn");
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    // one line for Base.esm (1 model, 2 objects) and two for Mod.esp (kit: found full model; gone: no model at all)
+    let lines: Vec<&String> = result
+        .warnings
+        .iter()
+        .filter(|w| w.contains("visible from far"))
+        .collect();
+    assert_eq!(lines.len(), 3, "{:?}", result.warnings);
+    assert!(
+        lines
+            .iter()
+            .any(|w| w.starts_with("Base.esm marks 2 objects of 1 models")
+                && w.contains("parking.nif")),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|w| w.starts_with("Mod.esp marks 1 objects") && w.contains("kit.nif")),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|w| w.starts_with("Mod.esp marks 2 objects") && w.contains("gone.nif")),
+        "{lines:?}"
+    );
+    // the file holds a record per plugin and kind with the models in full, and the result counts the kinds
+    assert_eq!(
+        result.warnings_file.as_deref(),
+        Some(lodwright_contract::WARNINGS_FILE)
+    );
+    let file = warnings_file(&out);
+    assert_eq!(file.contract, lodwright_contract::WARNINGS_CONTRACT);
+    let kinds: Vec<(&str, u64)> = result
+        .warning_counts
+        .iter()
+        .map(|c| (c.kind.as_str(), c.count))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            ("far_model_not_found", 1),
+            ("far_model_without_lod_model", 2)
+        ]
+    );
+    assert_eq!(file.warnings.len(), 3);
+    let base = file
+        .warnings
+        .iter()
+        .find(|w| w.plugin.as_deref() == Some("Base.esm"))
+        .unwrap();
+    assert_eq!(base.kind, "far_model_without_lod_model");
+    assert_eq!(base.subjects, ["meshes/arch/parking.nif"]);
+    assert_eq!(base.count, 2);
+    assert_ne!(base.advice, "");
+    // the file is not a file of the LOD: the manifest does not list it
+    assert!(
+        !manifest(&out)
+            .files
+            .iter()
+            .any(|f| f.path == lodwright_contract::WARNINGS_FILE)
+    );
+}

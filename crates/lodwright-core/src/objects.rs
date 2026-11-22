@@ -43,6 +43,9 @@ pub struct Instance {
     pub reference_plugin: usize,
     /// Load-order index of the plugin whose base object record won.
     pub base_plugin: usize,
+    /// Load-order index of the plugin that marks the object visible from far: the one whose base object record won
+    /// when the base carries the flag, else the one whose reference record won.
+    pub flagged_by: usize,
     /// A part of a static collection: used only when the collection's own model has no LOD model.
     pub part: bool,
     /// The grid of the exterior cell that holds a temporary reference; `None` for a persistent one. Object LOD
@@ -81,6 +84,7 @@ type Ref = (u32, u32, Placement, usize, Option<(i32, i32)>);
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+#[allow(clippy::too_many_lines)] // one pass over the load order, then one over the references
 pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec<Instance>, Error> {
     let mut bases: HashMap<u32, (BaseObject, usize)> = HashMap::new();
     let mut refs: HashMap<u32, Ref> = HashMap::new();
@@ -140,6 +144,11 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         if flags & INITIALLY_DISABLED != 0 && flags & PERSISTENT == 0 {
             continue;
         }
+        let flagged_by = if base.flags & VISIBLE_WHEN_DISTANT != 0 {
+            *base_plugin
+        } else {
+            reference_plugin
+        };
         let high_priority = flags & HIGH_PRIORITY_LOD != 0;
         let has_tree_lod = base.flags & HAS_TREE_LOD != 0;
         if let Some(model) = &base.model {
@@ -153,6 +162,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
                 reference: id,
                 reference_plugin,
                 base_plugin: *base_plugin,
+                flagged_by,
                 part: false,
                 cell,
             });
@@ -175,6 +185,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
                     reference: id,
                     reference_plugin,
                     base_plugin: *part_plugin,
+                    flagged_by,
                     part: true,
                     cell,
                 });
@@ -341,5 +352,29 @@ mod tests {
             [(0x200, 7.0), (0x201, 2.0)],
             "no reference appears twice"
         );
+    }
+
+    #[test]
+    fn the_plugin_that_marks_an_object_visible_from_far_is_the_one_whose_flag_counts() {
+        // the base is flagged in Base.esm; Patch.esp flags a reference to an unflagged base of its own
+        let base = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![refr(0x200, 0x100, 0, 1.0)],
+        );
+        let patch = plugin(
+            &["Base.esm"],
+            vec![stat(0x0100_0100, "b.nif", 0)],
+            vec![refr(0x0100_0200, 0x0100_0100, VISIBLE_WHEN_DISTANT, 2.0)],
+        );
+        let plugins = vec![
+            ("Base.esm".to_owned(), base),
+            ("Patch.esp".to_owned(), patch),
+        ];
+        let mut out = visible_instances(&plugins, 0x0000_0A00).unwrap();
+        out.sort_by_key(|i| i.reference);
+        assert_eq!(out.len(), 2);
+        assert_eq!((out[0].model.as_str(), out[0].flagged_by), ("a.nif", 0));
+        assert_eq!((out[1].model.as_str(), out[1].flagged_by), ("b.nif", 1));
     }
 }

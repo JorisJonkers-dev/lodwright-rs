@@ -39,6 +39,16 @@ fn a_file_with_bytes_after_the_footer_is_refused() {
 }
 
 #[test]
+fn a_reader_that_ignores_the_tail_reads_a_file_with_bytes_after_the_footer_as_the_file_without_them()
+ {
+    let (file, mut bytes) = sample();
+    bytes.extend_from_slice(&[7; 2696]);
+    assert_eq!(NifFile::read_ignoring_trailing_bytes(&bytes), Ok(file));
+    // truncation is still an error
+    assert!(NifFile::read_ignoring_trailing_bytes(&bytes[..40]).is_err());
+}
+
+#[test]
 fn another_header_string_is_refused() {
     let (_, mut bytes) = sample();
     bytes[0] = b'g';

@@ -21,7 +21,9 @@ use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
-use crate::images::{diffuse_image, normal_image_with_alpha, specular_alpha};
+use crate::images::{
+    ShippedPatch, diffuse_image, normal_image_with_alpha, patch_image, specular_alpha,
+};
 use crate::water::{Plane, add_walls, water_mesh};
 
 const CELL_UNITS: f32 = 4096.0;
@@ -52,6 +54,14 @@ pub struct Options<'a> {
     /// Write the water planes of levels 8 to 32 as the polygons of their outlines (corners only), which takes
     /// precedence over `water_shared_vertices`.
     pub water_polygons: bool,
+    /// Asked with a block's level and first cell: `true` leaves the block's diffuse tile unwritten, so the game's own
+    /// tile of that name (shipped in its archives) is the one the engine loads. The mesh and the normal map are
+    /// written as always.
+    pub keep_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> bool + Sync)>,
+    /// Asked with a block's level and first cell when `keep_shipped` did not keep it: the game's tile and the cells
+    /// under it a mod changed, when the game ships one and some of its cells are unchanged. The diffuse tile is then
+    /// the game's own picture with the composed one written into the changed cells only.
+    pub patch_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> Option<ShippedPatch> + Sync)>,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -68,9 +78,11 @@ impl Default for Options<'_> {
             progress: None,
             water: true,
             drop_under_water: None,
-            water_walls: false,
+            water_walls: true,
             water_shared_vertices: false,
             water_polygons: false,
+            keep_shipped: None,
+            patch_shipped: None,
             reuse: None,
             cancel: None,
         }
@@ -99,6 +111,10 @@ pub struct BlockRecord {
     pub files: Vec<FileRecord>,
     /// The files were kept from an earlier run instead of being built.
     pub reused: bool,
+    /// The diffuse tile was left to the game's own ([`Options::keep_shipped`]); `files` has none.
+    pub kept_diffuse: bool,
+    /// The diffuse tile is the game's with the changed cells composed in ([`Options::patch_shipped`]).
+    pub patched_diffuse: bool,
 }
 
 /// What a run wrote.
@@ -161,6 +177,9 @@ fn block_inputs(
     if options.water && options.water_polygons {
         h.update(b"water-polygons");
     }
+    if keep_diffuse(options, job) {
+        h.update(b"keep-shipped-diffuse");
+    }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
         h.update(format!("specular-range={:?}", tiles.specular_range()).as_bytes());
@@ -222,6 +241,12 @@ fn block_inputs(
     h.finish()
 }
 
+fn keep_diffuse(options: &Options<'_>, job: &Job) -> bool {
+    options
+        .keep_shipped
+        .is_some_and(|keep| keep(job.level.level, job.cell))
+}
+
 fn run_job(
     world: &Worldspace,
     raster: &HeightRaster,
@@ -242,13 +267,30 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let inputs = block_inputs(world, &samples, job, tiles, options);
+    let mut inputs = block_inputs(world, &samples, job, tiles, options);
+    let patch = if keep_diffuse(options, job) {
+        None
+    } else {
+        options
+            .patch_shipped
+            .and_then(|f| f(job.level.level, job.cell))
+    };
+    if let Some(patch) = &patch {
+        // the shipped picture and the cells that were patched into it belong to the block's inputs
+        let mut h = Sha256Stream::new();
+        h.update(inputs.as_bytes());
+        h.update(format!("patch-shipped {:?}", patch.changed).as_bytes());
+        h.update(patch.image.rgba());
+        inputs = h.finish();
+    }
     if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
         return Ok(Some(BlockRecord {
             key,
             inputs,
             files,
             reused: true,
+            kept_diffuse: keep_diffuse(options, job),
+            patched_diffuse: patch.is_some(),
         }));
     }
     // water height at a block-local position: the cell the position lies in, counted from the block's first cell
@@ -327,19 +369,25 @@ fn run_job(
         &normal_image_with_alpha(&samples, span, units, level.normal_size, alpha.as_deref()),
         normal_format,
     )?;
-    let diffuse = dds(
-        &diffuse_image(world, id, level.diffuse_size, tiles),
-        Format::Bc1,
-    )?;
+    let kept_diffuse = keep_diffuse(options, job);
+    let mut files = vec![write_file(out, &layout::mesh_path(name, id)?, &nif)?];
+    if !kept_diffuse {
+        let composed = diffuse_image(world, id, level.diffuse_size, tiles);
+        let image = match &patch {
+            Some(p) => patch_image(&composed, &p.image, id, &p.changed),
+            None => composed,
+        };
+        let diffuse = dds(&image, Format::Bc1)?;
+        files.push(write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?);
+    }
+    files.push(write_file(out, &layout::normal_path(name, id)?, &normals)?);
     Ok(Some(BlockRecord {
         key,
         inputs,
-        files: vec![
-            write_file(out, &layout::mesh_path(name, id)?, &nif)?,
-            write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?,
-            write_file(out, &layout::normal_path(name, id)?, &normals)?,
-        ],
+        files,
         reused: false,
+        kept_diffuse,
+        patched_diffuse: patch.is_some(),
     }))
 }
 
@@ -558,6 +606,70 @@ mod tests {
     }
 
     #[test]
+    fn a_tile_the_game_ships_is_left_out_and_the_block_digest_changes() {
+        let w = world();
+        let keep_level_4 = |level: u32, _cell: (i32, i32)| level == 4;
+        let run = |keep: bool, tag: &str| {
+            let out = temp(tag);
+            let hook: &(dyn Fn(u32, (i32, i32)) -> bool + Sync) = &keep_level_4;
+            let report = generate_terrain(
+                &w,
+                &TerrainSettings::default(),
+                &out,
+                &Options {
+                    keep_shipped: keep.then_some(hook),
+                    patch_shipped: None,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            (out, report)
+        };
+        let (composed, base) = run(false, "tiles-composed");
+        let (kept, report) = run(true, "tiles-kept");
+        let tile = "textures/landscape/lod/mojave/diffuse/mojave.n.level4.x0.y0.dds";
+        let tile8 = "textures/landscape/lod/mojave/diffuse/mojave.n.level8.x0.y0.dds";
+        assert!(composed.join(tile).exists() && composed.join(tile8).exists());
+        // level 4 has no diffuse tile, level 8 keeps its own; mesh and normals are written as always
+        assert!(!kept.join(tile).exists() && kept.join(tile8).exists());
+        assert!(
+            kept.join("textures/landscape/lod/mojave/normals/mojave.n.level4.x0.y0.dds")
+                .exists()
+        );
+        assert!(
+            kept.join("meshes/landscape/lod/mojave/mojave.level4.x0.y0.nif")
+                .exists()
+        );
+        let block = |r: &super::Report, level: u32| {
+            r.blocks
+                .iter()
+                .find(|b| b.key.contains(&format!(":{level}:0:0")))
+                .cloned()
+                .unwrap()
+        };
+        assert!(block(&report, 4).kept_diffuse && !block(&report, 8).kept_diffuse);
+        assert_eq!(block(&report, 4).files.len(), 2);
+        assert_ne!(block(&report, 4).inputs, block(&base, 4).inputs);
+        assert_eq!(block(&report, 8).inputs, block(&base, 8).inputs);
+        // verify: a missing tile is an error unless a manifest exists that does not name it
+        let missing = |v: &crate::Verification| {
+            v.errors
+                .iter()
+                .filter(|e| e.problem.contains("missing texture"))
+                .count()
+        };
+        assert!(missing(&crate::verify_folder(&kept)) > 0);
+        std::fs::write(kept.join("manifest.json"), "{\"files\":[]}").unwrap();
+        assert_eq!(missing(&crate::verify_folder(&kept)), 0);
+        std::fs::write(
+            kept.join("manifest.json"),
+            format!("{{\"files\":[\"{tile}\"]}}"),
+        )
+        .unwrap();
+        assert!(missing(&crate::verify_folder(&kept)) > 0);
+    }
+
+    #[test]
     fn faces_below_the_water_are_dropped_only_with_the_option_and_it_enters_the_digest() {
         let mut coast = world();
         // water over the low cell (0, 0) at 105: its ground at 100 lies below, the cells beside it at 110 above
@@ -682,6 +794,8 @@ mod tests {
                 water_walls: false,
                 water_shared_vertices: false,
                 water_polygons: false,
+                keep_shipped: None,
+                patch_shipped: None,
                 reuse: None,
                 cancel: None,
             },
@@ -700,6 +814,8 @@ mod tests {
                 water_walls: false,
                 water_shared_vertices: false,
                 water_polygons: false,
+                keep_shipped: None,
+                patch_shipped: None,
                 reuse: None,
                 cancel: None,
             },

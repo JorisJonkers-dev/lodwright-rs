@@ -58,8 +58,17 @@ fn skirts_default() -> bool {
     true
 }
 
+fn water_walls_default() -> bool {
+    true
+}
+
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
 fn skirts_is_default(v: &bool) -> bool {
+    *v
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
+fn water_walls_is_default(v: &bool) -> bool {
     *v
 }
 
@@ -91,9 +100,14 @@ pub struct TerrainRequest {
     /// default, which keeps every face; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drop_under_water: Option<f32>,
-    /// Write walls under the outline of the water planes, from the water down to the height the game's outlines drop
-    /// to (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Write the game's water borders: a wall on every block border where the water meets it, from the water down to
+    /// the height the game's outlines drop to, and at level 4 a plane that overlaps its neighbours by 32 units
+    /// (`docs/spec/terrain-lod.md`). On by default (without them the lake shows a pale band and a dotted line at every
+    /// block seam); written only when off.
+    #[serde(
+        default = "water_walls_default",
+        skip_serializing_if = "water_walls_is_default"
+    )]
     pub water_walls: bool,
     /// Write a corner that two rectangles of the water plane have in common once, at levels 8 to 32 (fewer vertices,
     /// the same planes). Off by default; written only when on.
@@ -104,6 +118,11 @@ pub struct TerrainRequest {
     /// only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub water_polygons: bool,
+    /// Compose every diffuse tile from the land textures, also where the game ships its own far-land tile and no plugin
+    /// outside the game's own masters changed the land under it (`docs/spec/terrain-lod.md`). Off by default: such a
+    /// tile is left out of the output and the game's own is the one drawn; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub compose_shipped_tiles: bool,
 }
 
 impl Default for TerrainRequest {
@@ -115,9 +134,10 @@ impl Default for TerrainRequest {
             water: true,
             texture_scales: BTreeMap::new(),
             drop_under_water: None,
-            water_walls: false,
+            water_walls: true,
             water_shared_vertices: false,
             water_polygons: false,
+            compose_shipped_tiles: false,
         }
     }
 }

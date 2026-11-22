@@ -126,11 +126,7 @@ The game's outlines end in vertical walls, not slopes seen from above: the wall'
 ones, and its lower corners are at -14098 (`game-lod-water-walls`). The water profile of `verify --reference` measures
 it per level (depth of a block's water, area of its steep triangles, water vertices): lodwright 523, 589, 788 and 2326
 units deep against the game's 14152, 13395, 12605 and 11556 at levels 4, 8, 16 and 32, wall area 0 against 3.4e8, 4.6e8,
-6.3e8 and 4.1e8 square units. The option `terrain.water_walls` (off by default) writes walls under the outer sides of the
-wet squares inside the block (none on the block border, none between squares of one height); own design, not looked at
-in the game. With it on (ten plugins), depth 14687, 15140, 15648 and 17362 and wall area 3.7e8, 9.0e8, 2.0e9 and 3.4e9 against
-the game's 14152, 13395, 12605, 11556 and 3.4e8, 4.6e8, 6.3e8, 4.1e8: close at level 4, too much at the coarser levels
-(our outline has more perimeter than the game's); the water overlap is unchanged.
+6.3e8 and 4.1e8 square units. Measured again on the game's own blocks of the main world (numbers only): in the 50 level 4 blocks with water, none of the 5172 wall vertices lies inside the block; they stand on the borders at x = -32 and x = 16384, y = -32 and y = 16416 (the plane reaches the same lines), a wall per square of the plane that touches the border, from the water height down to -14098. At level 8 the walls stand on the borders at 0 and the full span (no overlap) with some inside the block. The option `terrain.water_walls` (on by default) writes the border walls at every level and the level 4 overlap; it writes no wall inside a block, which the game does at levels 8 to 32 for a reason not established here. Engine check: the lighter band and the dotted line at block seams in a lake view are gone with it, and the lake picture equals the game's own.
 `--no-water` (request `terrain.water: false`) leaves the planes out.
 
 ## 7. Faces under the water (own design)
@@ -162,3 +158,15 @@ difference (18.8, 49.0, 126.0, 273.4) is almost the game's own error, so no outp
 comes under it. Our largest error is 2 to 3 times the game's (median of the block maxima at level 4: 308 against 111).
 A pairwise tolerance of 1 unit is therefore not a usable verdict on terrain heights; the known-differences list states the
 cause once and `verify` still reports the numbers.
+
+## 9. Diffuse tiles the game ships
+
+The engine draws a diffuse tile by the name of the block, from whichever file with that name it finds first, so a
+generated output that leaves a tile out lets the game's own tile be drawn. `terrain.compose_shipped_tiles` (off) leaves
+a tile out where the game's archives ship one of that name, the grids agree and nothing outside the game's own masters
+changed the land under it (`docs/contracts.md`, "Far-land tiles the game ships"). Why: the tiles of the Capital Wasteland
+are baked pictures, which a composition from land textures does not match (section 9 of the measurements in
+`provenance/LOG.md`, entry `game-lod-terrain-textures`); in the engine, with the game's own tiles in place the Capital
+far land equals the Tale of Two Wastelands' own at 13 ground views and 12 high views, and without them ours is paler and
+sharper-grained. Not decided here: tiles over land that a mod changed are composed, so they differ in look from their
+baked neighbours; a bake from engine pictures would remove that.

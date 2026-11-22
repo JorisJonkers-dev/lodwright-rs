@@ -236,6 +236,10 @@
       "description": "Terrain settings.",
       "type": "object",
       "properties": {
+        "compose_shipped_tiles": {
+          "description": "Compose every diffuse tile from the land textures, also where the game ships its own far-land tile and no plugin\noutside the game's own masters changed the land under it (`docs/spec/terrain-lod.md`). Off by default: such a\ntile is left out of the output and the game's own is the one drawn; written only when on.",
+          "type": "boolean"
+        },
         "drop_under_water": {
           "description": "Leave out terrain faces that cannot be seen under water: a face whose three corners all lie at least this many\nworld units below the water plane of the cell it is in (own design, `docs/spec/terrain-lod.md`). Absent by\ndefault, which keeps every face; written only when set.",
           "type": [
@@ -284,7 +288,7 @@
           "type": "boolean"
         },
         "water_walls": {
-          "description": "Write walls under the outline of the water planes, from the water down to the height the game's outlines drop\nto (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.",
+          "description": "Write the game's water borders: a wall on every block border where the water meets it, from the water down to\nthe height the game's outlines drop to, and at level 4 a plane that overlaps its neighbours by 32 units\n(`docs/spec/terrain-lod.md`). On by default (without them the lake shows a pale band and a dotted line at every\nblock seam); written only when off.",
           "type": "boolean"
         }
       }

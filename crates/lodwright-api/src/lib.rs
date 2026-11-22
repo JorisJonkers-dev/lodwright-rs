@@ -29,6 +29,7 @@ mod generate;
 pub mod load;
 mod pack;
 mod progress;
+mod shipped;
 mod staging;
 
 pub use defaults::request_defaults;

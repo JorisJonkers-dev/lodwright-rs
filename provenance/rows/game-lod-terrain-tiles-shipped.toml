@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-terrain-tiles-shipped"
+fact = "The game ships terrain diffuse tiles at all four levels in its own worlds: Fallout 3's Wasteland and the Mojave's WastelandNV have 1024, 256, 64 and 16 tiles at levels 4, 8, 16 and 32. The Mojave's tiles equal tiles composed from the land textures within one luminance; the Capital Wasteland's are baked pictures of the finished land with objects, rubble and shade painted in."
+url = "oracle:game-lod-files"
+licence = "Mean luminances and counts of the owner's own game files compared as numbers; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured for lodwright#319. Six sampled Capital tiles per level against tiles composed from the land textures: shipped mean luminance 62.5, 60.8, 62.4, 64.1 with spread 12.7, 12.2, 10.9, 11.1; composed 82.5, 77.3, 83.0, 79.4 with 13.8, 11.4, 13.4, 16.0 (levels 4, 8, 16, 32); mean absolute difference 20 to 24 of 255 at every level. Source of the facts: the owner's game files; nothing learned from a generator's source. Adds to the unverified row game-lod-terrain-textures."

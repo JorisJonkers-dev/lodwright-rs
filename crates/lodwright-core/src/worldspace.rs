@@ -283,6 +283,14 @@ impl Worldspace {
         (x, y)
     }
 
+    /// The cells that have a `LAND` record, with or without heights.
+    pub fn land_cells(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
+        self.land_records
+            .iter()
+            .chain(self.cells.keys().filter(|k| !self.land_records.contains(k)))
+            .copied()
+    }
+
     /// Whether the world has a record for cell (`x`, `y`): an exterior `CELL` or a `LAND` record.
     #[must_use]
     pub fn has_cell_record(&self, x: i32, y: i32) -> bool {

@@ -44,6 +44,20 @@ pub fn is_game_master(plugin: &str) -> bool {
     GAME_MASTERS.iter().any(|m| m.eq_ignore_ascii_case(plugin))
 }
 
+/// Whether an archive file name is one the games ship: it starts with the name of one of the games' own plugins
+/// (`Fallout - Textures.bsa` for `Fallout.esm`'s base game, `ClassicPack - Main.bsa`, `TaleOfTwoWastelands - Main.bsa`)
+/// or is one of the two base games' archives (`Fallout - ...`, `Fallout3 - ...`). Any other name counts as a mod's.
+#[must_use]
+pub fn is_game_archive(archive: &str) -> bool {
+    let name = archive.to_ascii_lowercase();
+    name.starts_with("fallout - ")
+        || name.starts_with("fallout3 - ")
+        || GAME_MASTERS.iter().any(|m| {
+            let stem = m.rsplit_once('.').map_or(*m, |(stem, _)| stem);
+            name.starts_with(&stem.to_ascii_lowercase())
+        })
+}
+
 /// The cells of `world` (assembled from `plugins`) whose land differs from the same world built from the plugins for
 /// which `is_base` is true. Every cell is changed when the base plugins do not have the world at all.
 ///

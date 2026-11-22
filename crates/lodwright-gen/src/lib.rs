@@ -30,7 +30,7 @@ mod trees;
 mod verify;
 mod water;
 
-pub use assets::{Assets, FolderAssets};
+pub use assets::{Assets, FolderAssets, Winner};
 pub use atlas::{Atlas, Rect, pack};
 pub use correlation::{TextureCorrelation, channel_correlation, compare_textures};
 pub use diffuse::{LandTiles, Tile, blend};

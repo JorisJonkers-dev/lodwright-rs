@@ -166,8 +166,10 @@ written as always) and the game's own tile of that name is the one the engine dr
   order is compared with the same load order in which every other plugin is an empty shell: a cell counts as changed
   when its `LAND` record exists on one side only, or its heights, vertex colours or texture layers differ, or a land
   texture its layers name resolves to another file. A tile is composed when any of the cells under it changed (4, 8,
-  16 and 32 cells a side at the four levels). A texture file a mod replaces without a record is not seen: turn the
-  switch on for such a load order.
+  16 and 32 cells a side at the four levels). A cell also counts as changed when a land texture
+  it uses is a file that does not come from a game archive: each texture is resolved through the load order's loose
+  files and archives as the game does, and a loose file or a file from an archive that is not the game's (a name
+  that starts with a game plugin's name or `Fallout - `) wins over the game's.
 
 The game ships tiles at all four levels in every world measured (Fallout 3's `Wasteland` and the Mojave's
 `WastelandNV` have 1024, 256, 64 and 16 tiles at levels 4, 8, 16 and 32), and the Capital Wasteland's are baked

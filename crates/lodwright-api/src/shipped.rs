@@ -5,15 +5,15 @@
 //! block grid where ours starts, and none of the cells under the tile has land that a plugin outside the game's own
 //! masters changed (`lodwright_core::shipped`). Mods' own archives and loose files never count as shipped.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use lodwright_core::layout::{self, BlockId};
 use lodwright_core::lod::LodSettings;
 use lodwright_core::plugin::Plugin;
-use lodwright_core::shipped::{changed_cells, is_game_master};
+use lodwright_core::shipped::{changed_cells, is_game_archive, is_game_master};
 use lodwright_core::texture::TextureResolver;
 use lodwright_core::worldspace::Worldspace;
-use lodwright_gen::FolderAssets;
+use lodwright_gen::{FolderAssets, Winner};
 
 /// The decision for one world.
 pub(crate) struct Keep<'a> {
@@ -89,13 +89,53 @@ pub(crate) fn plan<'a>(
         }
         return Ok(None);
     }
-    let changed = changed_cells(plugins, world, resolver, &|name| is_game_master(name))?;
+    let mut changed = changed_cells(plugins, world, resolver, &|name| is_game_master(name))?;
+    changed.extend(retextured_cells(world, resolver, assets));
     Ok(Some(Keep {
         world: world.name().to_owned(),
         changed,
         assets,
         skip,
     }))
+}
+
+/// The cells that use a land texture whose file does not come from a game archive: a mod replaced it with a loose
+/// file or from an archive of its own, with no record to show for it, and the near land draws the new picture.
+fn retextured_cells(
+    world: &Worldspace,
+    resolver: &TextureResolver,
+    assets: &FolderAssets,
+) -> BTreeSet<(i32, i32)> {
+    let mut cache: HashMap<u32, bool> = HashMap::new();
+    let mut replaced = |id: u32| {
+        *cache.entry(id).or_insert_with(|| {
+            let Some(path) = resolver.diffuse_path(id) else {
+                return false;
+            };
+            let key = format!("textures/{}", path.replace('\\', "/"));
+            match assets.winner(&key) {
+                Winner::Missing => false,
+                Winner::Loose => true,
+                Winner::Archive(name) => !is_game_archive(&name),
+            }
+        })
+    };
+    let mut cells = BTreeSet::new();
+    for (x, y) in world.land_cells() {
+        let Some(layers) = world.layers(x, y) else {
+            continue;
+        };
+        let ids = layers
+            .base
+            .iter()
+            .flatten()
+            .copied()
+            .chain(layers.alpha.iter().map(|l| l.texture));
+        if ids.into_iter().any(&mut replaced) {
+            cells.insert((x, y));
+        }
+    }
+    cells
 }
 
 #[cfg(test)]
@@ -221,5 +261,93 @@ mod tests {
         // a start 32 cells away is the same grid
         let dir = data_folder("whole", 32);
         assert_eq!(keep_for(&dir, Vec::new()).0, vec![true, true, false, false]);
+    }
+
+    /// The game's archive holds two land textures; cell 0 uses `a`, cell 4 uses `b`. The mod has no land record.
+    /// `extra` adds a loose file or a mod archive that replaces `b`.
+    fn retextured(tag: &str, extra: &dyn Fn(&std::path::Path)) -> Vec<bool> {
+        use lodwright_core::texture::LandTexture;
+        let dir = data_folder(tag, 0);
+        let texture = |name: &str| format!("textures\\landscape\\{name}.dds");
+        archive(
+            &dir.join("Fallout - Textures.bsa"),
+            &[
+                (&texture("a"), b"a"),
+                (&texture("b"), b"b"),
+                (
+                    "textures\\landscape\\lod\\wasteland\\diffuse\\wasteland.n.level4.x0.y0.dds",
+                    b"tile",
+                ),
+                (
+                    "textures\\landscape\\lod\\wasteland\\diffuse\\wasteland.n.level4.x4.y0.dds",
+                    b"tile",
+                ),
+                (
+                    "lodsettings\\wasteland.dlodsettings",
+                    &LodSettings::for_bounds((0, 0), (7, 7), 8).to_bytes(),
+                ),
+            ],
+        );
+        extra(&dir);
+        let layered = |x: i32, texture: u32| {
+            let mut c = cell(x, 0, 1.0);
+            c.layers = Some(CellLayers {
+                base: [Some(texture), None, None, None],
+                ..CellLayers::default()
+            });
+            c
+        };
+        let mut base = plugin(&[], vec![layered(0, 0x0B00), layered(4, 0x0B01)]);
+        base.land_textures = ["a", "b"]
+            .iter()
+            .zip([0x0B00, 0x0B01])
+            .map(|(name, id)| LandTexture {
+                icon: Some(format!("landscape\\{name}.dds")),
+                ..LandTexture::new(id)
+            })
+            .collect();
+        let plugins = vec![
+            ("Fallout3.esm".to_owned(), base),
+            ("Mod.esp".to_owned(), plugin(&["Fallout3.esm"], Vec::new())),
+        ];
+        let world = WorldIndex::new(&plugins)
+            .unwrap()
+            .build(&plugins, 0x3C, Inheritance::None)
+            .unwrap();
+        let resolver = TextureResolver::from_load_order(&plugins).unwrap();
+        let names: Vec<String> = plugins.iter().map(|(n, _)| n.clone()).collect();
+        let assets = FolderAssets::open(&dir, &names).unwrap();
+        let keep = plan(
+            &world,
+            &plugins,
+            &resolver,
+            &assets,
+            (0, 0),
+            &mut Vec::new(),
+        )
+        .unwrap()
+        .unwrap();
+        [0, 4].map(|x| keep.keeps(4, (x, 0))).to_vec()
+    }
+
+    #[test]
+    fn a_texture_replaced_without_a_record_composes_the_tiles_under_it() {
+        // no replacement: both tiles stay with the game
+        assert_eq!(retextured("tex-none", &|_| {}), vec![true, true]);
+        // a loose file replaces b: the tile under cell 4 is composed, the other stays
+        let loose = |dir: &std::path::Path| {
+            let folder = dir.join("textures").join("landscape");
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(folder.join("b.dds"), b"new").unwrap();
+        };
+        assert_eq!(retextured("tex-loose", &loose), vec![true, false]);
+        // an archive of the mod replaces a
+        let archived = |dir: &std::path::Path| {
+            archive(
+                &dir.join("Mod - Main.bsa"),
+                &[("textures\\landscape\\a.dds", b"new")],
+            );
+        };
+        assert_eq!(retextured("tex-archive", &archived), vec![false, true]);
     }
 }

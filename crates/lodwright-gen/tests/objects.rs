@@ -616,3 +616,28 @@ fn a_uv_outside_the_texture_is_held_at_its_edge_not_wrapped_to_the_far_edge() {
     assert!((u_mid - f32::midpoint(u0, u_far)).abs() < 1e-4, "{uv:?}");
     assert!((v_mid - f32::midpoint(v0, v1)).abs() < 1e-4, "{uv:?}");
 }
+
+#[test]
+fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
+    let out = temp("warn-missing");
+    let report = generate_objects(
+        "Mojave",
+        &[
+            instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+            instance("zzz.nif", 1.0, 1.0, 0.0, 2, false),
+        ],
+        &assets(),
+        &out,
+    )
+    .unwrap();
+    let said: Vec<&String> = report
+        .warnings
+        .iter()
+        .filter(|w| w.contains("LOD models are missing"))
+        .collect();
+    assert_eq!(said.len(), 1, "{:?}", report.warnings);
+    assert!(
+        said[0].contains("zzz_lod.nif") && said[0].contains("left out"),
+        "{said:?}"
+    );
+}

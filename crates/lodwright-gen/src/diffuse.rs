@@ -39,6 +39,19 @@ impl Scale {
 }
 
 impl Tile {
+    /// The mean colour of the tile.
+    #[must_use]
+    pub fn mean_color(&self) -> [u8; 3] {
+        let n = self.rgb.len().max(1) as f32;
+        let mut sum = [0.0_f32; 3];
+        for p in &self.rgb {
+            for k in 0..3 {
+                sum[k] += f32::from(p[k]);
+            }
+        }
+        sum.map(|v| (v / n).round() as u8)
+    }
+
     /// The pixels, row-major.
     #[must_use]
     pub fn pixels(&self) -> &[[u8; 3]] {
@@ -247,6 +260,26 @@ impl LandTiles {
             None => warnings.push(format!("default land texture {key} not found")),
         }
         self
+    }
+
+    /// The same tiles with a flat default land colour, which replaces the default land texture: the game's own
+    /// tiles of a world fill the quadrants without a base texture with one colour.
+    #[must_use]
+    pub fn with_default_fill(mut self, rgb: [u8; 3]) -> Self {
+        self.default = Some(Tile::flat(rgb));
+        self
+    }
+
+    /// The same tiles with the default land colour the game's own tiles use for `world`, when it is one whose
+    /// tiles are not the default land texture: `TheStripWorldNew` is filled with one brown (67, 61, 49).
+    // source: game-land-fill
+    #[must_use]
+    pub fn with_world_fill(self, world: &str) -> Self {
+        if world.eq_ignore_ascii_case("TheStripWorldNew") {
+            self.with_default_fill([67, 61, 49])
+        } else {
+            self
+        }
     }
 
     /// The tile of land texture `id` (absolute `FormID`).

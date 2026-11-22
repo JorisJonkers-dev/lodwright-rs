@@ -162,3 +162,15 @@ difference (18.8, 49.0, 126.0, 273.4) is almost the game's own error, so no outp
 comes under it. Our largest error is 2 to 3 times the game's (median of the block maxima at level 4: 308 against 111).
 A pairwise tolerance of 1 unit is therefore not a usable verdict on terrain heights; the known-differences list states the
 cause once and `verify` still reports the numbers.
+
+## 9. Diffuse tiles the game ships
+
+The engine draws a diffuse tile by the name of the block, from whichever file with that name it finds first, so a
+generated output that leaves a tile out lets the game's own tile be drawn. `terrain.compose_shipped_tiles` (off) leaves
+a tile out where the game's archives ship one of that name, the grids agree and nothing outside the game's own masters
+changed the land under it (`docs/contracts.md`, "Far-land tiles the game ships"). Why: the tiles of the Capital Wasteland
+are baked pictures, which a composition from land textures does not match (section 9 of the measurements in
+`provenance/LOG.md`, entry `game-lod-terrain-textures`); in the engine, with the game's own tiles in place the Capital
+far land equals the Tale of Two Wastelands' own at 13 ground views and 12 high views, and without them ours is paler and
+sharper-grained. Not decided here: tiles over land that a mod changed are composed, so they differ in look from their
+baked neighbours; a bake from engine pictures would remove that.

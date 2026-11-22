@@ -281,6 +281,14 @@ impl Worldspace {
         (x, y)
     }
 
+    /// The cells that have a `LAND` record, with or without heights.
+    pub fn land_cells(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
+        self.land_records
+            .iter()
+            .chain(self.cells.keys().filter(|k| !self.land_records.contains(k)))
+            .copied()
+    }
+
     /// The water height of cell (`x`, `y`) for the mesh stage: its `XCLW`, else the world's default water
     /// height when the cell has the has-water flag, else `None` (no water). `None` too for a cell without LAND.
     #[must_use]

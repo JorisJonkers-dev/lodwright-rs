@@ -11,6 +11,7 @@ description = "Library API of lodwright: LOD generation called in process, with 
 [dependencies]
 lodwright-assets = { workspace = true }
 lodwright-core = { workspace = true }
+lodwright-dds = { workspace = true }
 lodwright-gen = { workspace = true }
 lodwright-contract = { workspace = true }
 lodwright-plugin-meta = { workspace = true }

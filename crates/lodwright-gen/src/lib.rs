@@ -30,13 +30,15 @@ mod trees;
 mod verify;
 mod water;
 
-pub use assets::{Assets, FolderAssets};
+pub use assets::{Assets, FolderAssets, Winner};
 pub use atlas::{Atlas, Rect, pack};
 pub use correlation::{TextureCorrelation, channel_correlation, compare_textures};
 pub use diffuse::{DEFAULT_LAND_TEXTURE, LandTiles, Tile, blend, default_land_texture_from_ini};
 pub use error::GenError;
 pub use filter::{filter_instances, glob};
-pub use images::{diffuse_image, normal_image, normal_image_with_alpha, specular_alpha};
+pub use images::{
+    ShippedPatch, diffuse_image, normal_image, normal_image_with_alpha, patch_image, specular_alpha,
+};
 pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{
     BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects, generate_objects_with_progress,

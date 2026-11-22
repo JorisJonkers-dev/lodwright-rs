@@ -26,6 +26,8 @@ const DROP_WATER_SINCE: &str = "0.9.0";
 const WALLS_SINCE: &str = "0.14.0";
 /// The release that adds `terrain.water_polygons`.
 const POLYGONS_SINCE: &str = "0.14.0";
+/// The release that adds `terrain.compose_shipped_tiles`.
+const SHIPPED_SINCE: &str = "0.16.0";
 /// The release that adds `output.pack`.
 const PACK_SINCE: &str = "0.15.0";
 
@@ -112,6 +114,11 @@ pub fn request_defaults() -> Defaults {
             "terrain.water_polygons",
             terrain.water_polygons,
             POLYGONS_SINCE,
+        ),
+        (
+            "terrain.compose_shipped_tiles",
+            terrain.compose_shipped_tiles,
+            SHIPPED_SINCE,
         ),
     ] {
         options.push(OptionInfo {
@@ -331,7 +338,8 @@ mod tests {
                     || o.since == "0.7.0"
                     || o.since == "0.9.0"
                     || o.since == "0.14.0"
-                    || o.since == "0.15.0"))));
+                    || o.since == "0.15.0"
+                    || o.since == "0.16.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

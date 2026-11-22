@@ -87,6 +87,17 @@
       "description": "How the run ended.",
       "$ref": "#/$defs/Status"
     },
+    "tiles": {
+      "description": "Diffuse tiles of a `generate` run: how many were left to the game's own far-land tiles and how many were\ncomposed; omitted when the run composes every tile (`terrain.compose_shipped_tiles`) or wrote no land tiles.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TileCounts"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "tool": {
       "description": "The tool that printed this document.",
       "$ref": "#/$defs/ToolInfo"
@@ -178,6 +189,28 @@
           "type": "string",
           "const": "failed"
         }
+      ]
+    },
+    "TileCounts": {
+      "description": "Diffuse tiles left to the game and composed.",
+      "type": "object",
+      "properties": {
+        "composed": {
+          "description": "Tiles composed from the land textures.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "kept": {
+          "description": "Tiles not written because the game ships its own and no plugin outside the game's own masters changed the\nland under it.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "kept",
+        "composed"
       ]
     },
     "ToolInfo": {

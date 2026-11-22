@@ -1,0 +1,10 @@
+[[source]]
+id = "xlodgen-skips-initially-disabled"
+fact = "Object LOD written by xLODGen leaves out references that carry the Initially Disabled flag (bit 11, 0x800) in their winning record, also when the reference or its base is Visible When Distant."
+url = "oracle:xlodgen-output"
+licence = "Vertex counts and positions of the owner's own xLODGen output compared as numbers; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on a 42-plugin load order: 629 visible-when-distant references are initially disabled (21 from the base game, the rest from mods). In the block that holds a mod's row of elevated highway pieces (all initially disabled, standing 4000 units above the road) the xLODGen block has no vertex above z 7000 where a generation that counts them has 4577. Over the 295 object blocks of the main worldspace, leaving the disabled references out brings 70 of the 76 blocks they touch closer to xLODGen's vertex count (for example 53818 against 47425 instead of 59180) and cuts the summed absolute difference by 6 percent. The game's own blocks of the unmodded game still hold the 21 base-game ones (the row on references that enter the game's blocks). Not second-read."

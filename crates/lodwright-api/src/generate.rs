@@ -195,29 +195,22 @@ fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
 
 /// A record for a warning line of a step that does not build records itself: the kind comes from the line's wording.
 fn classify(world: Option<&str>, text: &str) -> WarningRecord {
+    // the path is the word that names the file: "land texture textures/x.dds not found"
+    let path = |head: &str| head.rsplit(' ').next().unwrap_or(head).to_owned();
     let (kind, subject) = if let Some((head, _)) = text.split_once(" not found") {
-        (
-            "texture_not_found",
-            head.split_once(' ').map_or(head, |(_, p)| p),
-        )
+        if head.starts_with("land texture") {
+            ("land_texture_not_found", path(head))
+        } else {
+            ("texture_not_found", path(head))
+        }
     } else if let Some((head, _)) = text.split_once(" found but not readable") {
-        (
-            "texture_unreadable",
-            head.split_once(' ').map_or(head, |(_, p)| p),
-        )
+        ("texture_unreadable", path(head))
     } else if text.starts_with("specular alpha:") {
-        ("specular_exponent_missing", text)
+        ("specular_exponent_missing", text.to_owned())
     } else {
-        ("other", text)
+        ("other", text.to_owned())
     };
-    WarningRecord::new(
-        kind,
-        world,
-        None,
-        [subject.to_owned()],
-        None,
-        text.to_owned(),
-    )
+    WarningRecord::new(kind, world, None, [subject], None, text.to_owned())
 }
 
 /// Warning lines of a step: into the result's short list, and each as a record.
@@ -870,6 +863,26 @@ mod specular_tests {
         let warnings = specular_warnings(&lodwright_gen::LandTiles::empty());
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("stay opaque"));
+    }
+}
+
+#[cfg(test)]
+mod classify_tests {
+    use super::classify;
+
+    #[test]
+    fn a_land_texture_that_is_in_no_folder_or_archive_is_its_own_kind_and_names_the_path_only() {
+        let r = classify(
+            Some("WastelandNV"),
+            "land texture textures/Landscape/BurntGround01.dds not found",
+        );
+        assert_eq!(r.kind, "land_texture_not_found");
+        assert_eq!(r.subjects, ["textures/Landscape/BurntGround01.dds"]);
+        let r = classify(None, "texture textures/a/b.dds found but not readable (x)");
+        assert_eq!(
+            (r.kind.as_str(), r.subjects[0].as_str()),
+            ("texture_unreadable", "textures/a/b.dds")
+        );
     }
 }
 

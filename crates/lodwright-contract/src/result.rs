@@ -233,6 +233,12 @@ pub fn advice_for(kind: &str) -> &'static str {
             "A texture a model or land type names is in no folder or archive of the load order. Install or enable the \
              mod that ships it; until then a flat colour or the neutral earth is used."
         }
+        "land_texture_not_found" => {
+            "A land type names a texture that no folder or archive of the load order holds, so the layers that use it \
+             are left out of the far land. The game's own data \
+             does this for BurntGround01: nothing to do. For a mod's land type, install or enable the mod that ships \
+             the texture."
+        }
         "texture_unreadable" => {
             "A texture was found but lodwright cannot read its format. Replace it with one in a common format (BC1, \
              BC3, BC7 or uncompressed); until then a flat colour is used."

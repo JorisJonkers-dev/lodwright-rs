@@ -24,6 +24,9 @@ pub struct Tile {
     scale: Scale,
     /// The specular exponent of the land texture (`SNAM`), when its record has one.
     specular: Option<u8>,
+    /// The mean up component of the texture's normal map (1 when it has none): near land is lit through the normal
+    /// map, far land is not, so the far land of this texture is lit `1 / up` too bright (`LandTiles::lit`).
+    up: Scale,
 }
 
 /// A tiling scale, kept as its bits so that a tile stays `Eq`.
@@ -65,6 +68,7 @@ impl Tile {
             rgb: vec![rgb; (TILE * TILE) as usize],
             scale: Scale::ONE,
             specular: None,
+            up: Scale::ONE,
         }
     }
 
@@ -247,12 +251,20 @@ impl LandTiles {
         let key = format!("textures/{}", relative.replace('\\', "/"));
         let image = read_texture(assets, &key);
         let fault = image.as_ref().err().cloned();
+        // the normal map of a land texture is named after it: `dirt.dds` has `dirt_n.dds`
+        let up = key
+            .strip_suffix(".dds")
+            .map(|stem| format!("{stem}_n.dds"))
+            .and_then(|normal| read_texture(assets, &normal).ok())
+            .and_then(|normal| mean_up(&normal))
+            .unwrap_or(1.0);
         match image.ok().and_then(|i| reduce(&i)) {
             Some(rgb) => {
                 self.default = Some(Tile {
                     rgb,
                     scale: Scale::ONE,
                     specular: None,
+                    up: Scale(up.to_bits()),
                 });
             }
             None => warnings.push(texture_warning(
@@ -283,6 +295,25 @@ impl LandTiles {
         } else {
             self
         }
+    }
+
+    /// The same tiles as the near land shows them: each texture's colours times the mean up component of its normal
+    /// map, the default texture's too (own design, `docs/spec/terrain-lod.md`). Near land is lit through the
+    /// normal map and far land is not, so far land composed from the textures alone is `1 / up` too bright (measured
+    /// about 14 per cent in both worlds). A baked tile cannot hold the sun and the ambient part apart, so the whole
+    /// colour is scaled: exact where the sun dominates, a little dark in shade. A flat fill is not scaled.
+    #[must_use]
+    pub fn lit(mut self) -> Self {
+        for tile in self.tiles.values_mut().chain(self.default.as_mut()) {
+            let up = f32::from_bits(tile.up.0);
+            for p in &mut tile.rgb {
+                for c in p.iter_mut() {
+                    *c = (f32::from(*c) * up).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            tile.up = Scale::ONE;
+        }
+        self
     }
 
     /// The tile of land texture `id` (absolute `FormID`).
@@ -320,12 +351,19 @@ impl LandTiles {
                 }
             };
             if let Some(rgb) = reduce(&image) {
+                let up = resolver
+                    .normal_path(id)
+                    .map(|path| format!("textures/{}", path.replace('\\', "/")))
+                    .and_then(|key| read_texture(assets, &key).ok())
+                    .and_then(|normal| mean_up(&normal))
+                    .unwrap_or(1.0);
                 tiles.insert(
                     id,
                     Tile {
                         rgb,
                         scale: Scale::ONE,
                         specular: resolver.specular_exponent(id),
+                        up: Scale(up.to_bits()),
                     },
                 );
             }
@@ -336,6 +374,27 @@ impl LandTiles {
             default: None,
         }
     }
+}
+
+/// The mean up component of a tangent-space normal map: the blue channel of each normalised vector, over all pixels.
+/// `None` for a map that is flat black or empty.
+fn mean_up(normal: &Image) -> Option<f32> {
+    let (mut sum, mut n) = (0.0_f64, 0_u64);
+    for p in normal.rgba().as_chunks::<4>().0 {
+        let v = [
+            f64::from(p[0]) / 127.5 - 1.0,
+            f64::from(p[1]) / 127.5 - 1.0,
+            f64::from(p[2]) / 127.5 - 1.0,
+        ];
+        let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        if len > 0.0 {
+            sum += (v[2] / len).max(0.0);
+            n += 1;
+        }
+    }
+    (n > 0)
+        .then(|| (sum / n as f64) as f32)
+        .filter(|u| *u > 0.0)
 }
 
 /// A land texture image reduced to `TILE` by `TILE` colours.
@@ -377,7 +436,8 @@ mod tests {
         assert_eq!(super::default_land_texture_from_ini("[Landscape]\n"), None);
     }
 
-    use super::{LandTiles, Scale, TILE, Tile, blend};
+    use super::{LandTiles, Scale, TILE, Tile, blend, mean_up};
+    use lodwright_dds::Image;
     use std::collections::{BTreeMap, HashMap};
 
     /// A tile whose red channel rises from west to east.
@@ -390,7 +450,33 @@ mod tests {
             rgb,
             scale: Scale::ONE,
             specular: None,
+            up: Scale::ONE,
         }
+    }
+
+    #[test]
+    fn lit_scales_each_texture_by_the_up_component_of_its_normal_map_and_leaves_flat_fills() {
+        // a normal map whose vectors lean: (0.2, 0, 0.8) normalises to up 0.97
+        let leaning = [153_u8, 128, 230, 255].repeat(16);
+        let normal = Image::new(4, 4, leaning).unwrap();
+        let up = mean_up(&normal).unwrap();
+        assert!((up - 0.97).abs() < 0.005, "{up}");
+        let tile = Tile {
+            up: Scale(up.to_bits()),
+            ..Tile::flat([100, 200, 50])
+        };
+        let tiles =
+            LandTiles::from_tiles(HashMap::from([(1, tile)])).with_default_fill([67, 61, 49]);
+        let lit = tiles.lit();
+        let [r, g, b] = lit.get(1).unwrap().mean_color();
+        assert!(
+            (i32::from(r) - 97).abs() <= 1
+                && (i32::from(g) - 194).abs() <= 1
+                && (i32::from(b) - 49).abs() <= 1
+        );
+        assert_eq!(lit.default_tile().unwrap().mean_color(), [67, 61, 49]);
+        // a flat black normal map has no up component to scale by
+        assert_eq!(mean_up(&Image::new(2, 2, vec![0; 16]).unwrap()), None);
     }
 
     #[test]

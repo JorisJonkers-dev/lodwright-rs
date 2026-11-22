@@ -28,6 +28,8 @@ const WALLS_SINCE: &str = "0.14.0";
 const POLYGONS_SINCE: &str = "0.14.0";
 /// The release that adds `terrain.compose_shipped_tiles`.
 const SHIPPED_SINCE: &str = "0.16.0";
+/// The release that adds `terrain.land_light`.
+const LAND_LIGHT_SINCE: &str = "0.17.0";
 /// The release that adds `output.pack`.
 const PACK_SINCE: &str = "0.15.0";
 
@@ -120,6 +122,7 @@ pub fn request_defaults() -> Defaults {
             terrain.compose_shipped_tiles,
             SHIPPED_SINCE,
         ),
+        ("terrain.land_light", terrain.land_light, LAND_LIGHT_SINCE),
     ] {
         options.push(OptionInfo {
             default: Value::Bool(default),
@@ -280,7 +283,7 @@ mod tests {
                     }
                     // a switch that is on by default is written only when off
                     Value::Null if o.kind == OptionKind::Switch => {
-                        Value::Bool(o.key == "terrain.water_walls")
+                        Value::Bool(o.key == "terrain.water_walls" || o.key == "terrain.land_light")
                     }
                     v => v,
                 };
@@ -342,7 +345,8 @@ mod tests {
                     || o.since == "0.9.0"
                     || o.since == "0.14.0"
                     || o.since == "0.15.0"
-                    || o.since == "0.16.0"))));
+                    || o.since == "0.16.0"
+                    || o.since == "0.17.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

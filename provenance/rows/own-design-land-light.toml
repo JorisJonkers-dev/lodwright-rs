@@ -1,0 +1,10 @@
+[[source]]
+id = "own-design-land-light"
+fact = "Far land composed from the land textures alone is brighter than the loaded land beside it by one over the mean up component of the textures' normal maps (about 1.14); multiplying each texture's colours by that mean up component gives the near land's brightness. A shipped diffuse tile is judged to match the near land when its mean luminance is at most halfway between the tile composed without and with that factor."
+url = "oracle:game-lod-files"
+licence = "Brightness ratios of the owner's own game pictures and mean normal-map components, compared as numbers; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Ratios of far land to near land on a plain single-texture cell, straight down, same camera: Capital 1.148, 1.145, 1.136 and Mojave 1.135, 1.147, 1.160 for red, green and blue; the game's own Mojave tiles show 1.11 to 1.19, the baked Capital tiles +0.3 units. Mean up component of the normal maps: 0.882 Mojave, 0.865 Capital. The sun and ambient parts of the light cannot be separated in a baked picture, so the rule scales the colour as a whole. The halfway threshold is a design choice that separates two clusters of tiles (about 1.0 and about 0.78 of the unscaled composition); it is not read from the game."

@@ -270,6 +270,10 @@
             "format": "float"
           }
         },
+        "compose_shipped_tiles": {
+          "description": "Compose every diffuse tile from the land textures, also where the game ships its own far-land tile and no plugin\noutside the game's own masters changed the land under it (`docs/spec/terrain-lod.md`). Off by default: such a\ntile is left out of the output and the game's own is the one drawn; written only when on.",
+          "type": "boolean"
+        },
         "water": {
           "description": "Write water planes into the terrain blocks that have ground below water.",
           "type": "boolean",

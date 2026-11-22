@@ -486,6 +486,23 @@ pub fn generate(
             if settings.levels.iter().any(|l| l.specular_alpha) {
                 warnings.extend(specular_warnings(&tiles));
             }
+            // the diffuse tiles the game ships and nothing outside its masters changed are left to the game
+            let keep = match (&assets, request.terrain.land_textures) {
+                (Some(assets), true) if !request.terrain.compose_shipped_tiles => {
+                    crate::shipped::plan(
+                        world,
+                        &loaded.plugins,
+                        &resolver,
+                        assets,
+                        anchor,
+                        &mut warnings,
+                    )
+                    .map_err(|e| load_order_error(&e))?
+                }
+                _ => None,
+            };
+            let keep_fn =
+                |level: u32, cell: (i32, i32)| keep.as_ref().is_some_and(|k| k.keeps(level, cell));
             add_warnings(&mut doc, warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
@@ -526,6 +543,7 @@ pub fn generate(
                         water_walls: request.terrain.water_walls,
                         water_shared_vertices: request.terrain.water_shared_vertices,
                         water_polygons: request.terrain.water_polygons,
+                        keep_shipped: keep.is_some().then_some(&keep_fn),
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },
@@ -534,6 +552,16 @@ pub fn generate(
             };
             files.extend(report.files.iter().map(to_manifest_file));
             let c = counts.get_or_insert_with(BlockCounts::default);
+            if keep.is_some() {
+                let t = doc.tiles.get_or_insert_with(Default::default);
+                for b in &report.blocks {
+                    if b.kept_diffuse {
+                        t.kept += 1;
+                    } else {
+                        t.composed += 1;
+                    }
+                }
+            }
             for b in &report.blocks {
                 if b.reused {
                     c.up_to_date += 1;
@@ -687,6 +715,12 @@ pub fn generate(
     }
     progress.report(&run.start(Step::Manifest, None));
     doc.blocks = counts;
+    if let Some(t) = doc.tiles {
+        doc.reason = format!(
+            "LOD written; diffuse tiles: {} left to the game's own, {} composed",
+            t.kept, t.composed
+        );
+    }
     let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
     // staging holds exactly the manifest's files: whatever else a killed run left in it is dropped
     crate::staging::prune(&stage, &manifest.files);

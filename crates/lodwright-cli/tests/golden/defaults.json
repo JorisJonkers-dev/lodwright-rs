@@ -75,6 +75,13 @@
       "tier": 3
     },
     {
+      "default": false,
+      "key": "terrain.compose_shipped_tiles",
+      "kind": "switch",
+      "since": "0.16.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "objects.enabled",
       "kind": "switch",

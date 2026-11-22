@@ -52,6 +52,10 @@ pub struct Options<'a> {
     /// Write the water planes of levels 8 to 32 as the polygons of their outlines (corners only), which takes
     /// precedence over `water_shared_vertices`.
     pub water_polygons: bool,
+    /// Asked with a block's level and first cell: `true` leaves the block's diffuse tile unwritten, so the game's own
+    /// tile of that name (shipped in its archives) is the one the engine loads. The mesh and the normal map are
+    /// written as always.
+    pub keep_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> bool + Sync)>,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -71,6 +75,7 @@ impl Default for Options<'_> {
             water_walls: false,
             water_shared_vertices: false,
             water_polygons: false,
+            keep_shipped: None,
             reuse: None,
             cancel: None,
         }
@@ -99,6 +104,8 @@ pub struct BlockRecord {
     pub files: Vec<FileRecord>,
     /// The files were kept from an earlier run instead of being built.
     pub reused: bool,
+    /// The diffuse tile was left to the game's own ([`Options::keep_shipped`]); `files` has none.
+    pub kept_diffuse: bool,
 }
 
 /// What a run wrote.
@@ -161,6 +168,9 @@ fn block_inputs(
     if options.water && options.water_polygons {
         h.update(b"water-polygons");
     }
+    if keep_diffuse(options, job) {
+        h.update(b"keep-shipped-diffuse");
+    }
     if job.level.specular_alpha {
         // the alpha is scaled over the exponent range of the load order
         h.update(format!("specular-range={:?}", tiles.specular_range()).as_bytes());
@@ -222,6 +232,12 @@ fn block_inputs(
     h.finish()
 }
 
+fn keep_diffuse(options: &Options<'_>, job: &Job) -> bool {
+    options
+        .keep_shipped
+        .is_some_and(|keep| keep(job.level.level, job.cell))
+}
+
 fn run_job(
     world: &Worldspace,
     raster: &HeightRaster,
@@ -249,6 +265,7 @@ fn run_job(
             inputs,
             files,
             reused: true,
+            kept_diffuse: keep_diffuse(options, job),
         }));
     }
     // water height at a block-local position: the cell the position lies in, counted from the block's first cell
@@ -327,19 +344,22 @@ fn run_job(
         &normal_image_with_alpha(&samples, span, units, level.normal_size, alpha.as_deref()),
         normal_format,
     )?;
-    let diffuse = dds(
-        &diffuse_image(world, id, level.diffuse_size, tiles),
-        Format::Bc1,
-    )?;
+    let kept_diffuse = keep_diffuse(options, job);
+    let mut files = vec![write_file(out, &layout::mesh_path(name, id)?, &nif)?];
+    if !kept_diffuse {
+        let diffuse = dds(
+            &diffuse_image(world, id, level.diffuse_size, tiles),
+            Format::Bc1,
+        )?;
+        files.push(write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?);
+    }
+    files.push(write_file(out, &layout::normal_path(name, id)?, &normals)?);
     Ok(Some(BlockRecord {
         key,
         inputs,
-        files: vec![
-            write_file(out, &layout::mesh_path(name, id)?, &nif)?,
-            write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?,
-            write_file(out, &layout::normal_path(name, id)?, &normals)?,
-        ],
+        files,
         reused: false,
+        kept_diffuse,
     }))
 }
 

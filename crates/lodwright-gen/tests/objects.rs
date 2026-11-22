@@ -576,3 +576,28 @@ fn walk(dir: &std::path::Path) -> Vec<String> {
     }
     out
 }
+
+#[test]
+fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
+    let out = temp("warn-missing");
+    let report = generate_objects(
+        "Mojave",
+        &[
+            instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
+            instance("zzz.nif", 1.0, 1.0, 0.0, 2, false),
+        ],
+        &assets(),
+        &out,
+    )
+    .unwrap();
+    let said: Vec<&String> = report
+        .warnings
+        .iter()
+        .filter(|w| w.contains("LOD models are missing"))
+        .collect();
+    assert_eq!(said.len(), 1, "{:?}", report.warnings);
+    assert!(
+        said[0].contains("zzz_lod.nif") && said[0].contains("left out"),
+        "{said:?}"
+    );
+}

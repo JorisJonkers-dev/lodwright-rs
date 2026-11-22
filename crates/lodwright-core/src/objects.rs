@@ -14,7 +14,7 @@ use crate::worldspace::{absolute, master_table};
 pub const VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
 /// High Priority LOD, on references.
 pub const HIGH_PRIORITY_LOD: u32 = 0x0001_0000;
-/// Initially Disabled, on references (such references are left out of LOD, as xLODGen leaves them out; the game's
+/// Initially Disabled, on references (such references are left out of LOD, as a modded game's generated LOD leaves them out; the game's
 /// own blocks of the unmodded game still hold 21 of them).
 pub const INITIALLY_DISABLED: u32 = 0x0000_0800;
 /// Has Tree LOD, on bases.
@@ -75,7 +75,7 @@ type Ref = (u32, u32, Placement, usize, Option<(i32, i32)>);
 
 /// The instances in world `world` (absolute `FormID`) that are visible when distant: a reference counts when its
 /// base is flagged, or when the reference itself is; initially disabled references do not count (they stand
-/// where a script or an enable parent may never show them, and the LOD that xLODGen writes leaves them out).
+/// where a script or an enable parent may never show them, and the LOD that other generators write leaves them out).
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -134,7 +134,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         if base.flags & VISIBLE_WHEN_DISTANT == 0 && flags & VISIBLE_WHEN_DISTANT == 0 {
             continue;
         }
-        // source: xlodgen-skips-initially-disabled
+        // source: oracle-skips-initially-disabled
         if flags & INITIALLY_DISABLED != 0 {
             continue;
         }
@@ -284,11 +284,8 @@ mod tests {
             ("Patch.esp".to_owned(), patch),
         ];
         assert_eq!(visible_instances(&plugins, 0x0000_0A00).unwrap().len(), 1);
-        assert!(
-            visible_instances(&plugins[..1], 0x0000_0A00)
-                .unwrap()
-                .is_empty()
-        );
+        let alone = visible_instances(&plugins[..1], 0x0000_0A00).unwrap();
+        assert_eq!(alone.len(), 0);
     }
 
     #[test]

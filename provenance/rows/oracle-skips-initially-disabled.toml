@@ -1,5 +1,5 @@
 [[source]]
-id = "xlodgen-skips-initially-disabled"
+id = "oracle-skips-initially-disabled"
 fact = "Object LOD written by xLODGen leaves out references that carry the Initially Disabled flag (bit 11, 0x800) in their winning record, also when the reference or its base is Visible When Distant."
 url = "oracle:xlodgen-output"
 licence = "Vertex counts and positions of the owner's own xLODGen output compared as numbers; no content is recorded"

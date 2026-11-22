@@ -174,6 +174,6 @@ baked neighbours; a bake from engine pictures would remove that.
 ## 10. Light of the far land (own design)
 
 The land near the player is the standard for far land (`own-design-land-light`). Composed far land is multiplied per
-land texture by the mean up component of the texture's normal map (`terrain.land_light`, on by default), and a diffuse
-tile the game ships is used only where its mean luminance is at most halfway between the tile composed without and
-with that factor. The option note is `docs/contracts/options/land-light.md`.
+land texture by the mean up component of the texture's normal map (`terrain.land_light`, on by default), and the diffuse
+tiles the game ships are used only in a world where their median position between the tile composed with and without
+that factor is at most halfway. The option note is `docs/contracts/options/land-light.md`.

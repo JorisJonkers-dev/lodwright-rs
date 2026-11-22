@@ -14,9 +14,11 @@ composed; a texture with no readable normal map and a flat fill (the Strip's bro
 scaled. The rule scales the whole colour: a baked picture cannot hold the sun part and the ambient part of the light
 apart, so the result is exact where the sun dominates and a little dark in shade.
 
-A tile the game ships (see `compose_shipped_tiles`) is left to the game, or used as the base of a patched tile, only
-where it already matches the near land: its mean luminance must be at most halfway between the same tile composed
-without and with the factor. The baked Capital tiles are far below that line (about 0.78 of the unscaled composition)
+The game's tiles of a world (see `compose_shipped_tiles`) are left to the game, or used as the base of patched tiles,
+only where they already match the near land: over the tiles of the world's two highest levels, the median position of
+the shipped tile's mean luminance between the same tile composed with the factor (0) and without (1) must be at most
+0.5. One answer per world: a baked tile has objects and shade painted in, which moves its own mean either way, and a
+per-tile test left a patchwork of lit and baked tiles beside each other (seen around the Washington Monument). The baked Capital tiles are far below that line (about 0.78 of the unscaled composition)
 and are kept; the Mojave's own tiles are composed from the land textures, sit at the unscaled line, and are composed
 again, darkened. The test needs no list of worlds: it reads the shipped tile and the composition. Off, nothing is
 scaled and every shipped tile is used as `compose_shipped_tiles` says, which is the output of the releases before

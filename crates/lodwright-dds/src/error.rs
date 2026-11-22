@@ -19,8 +19,10 @@ pub enum DdsError {
     Truncated,
     /// The magic, the header size or the pixel format size is wrong.
     BadHeader,
-    /// The file has a DX10 extension header, which this crate neither writes nor reads.
+    /// The file has a DX10 extension header where only a legacy header is accepted.
     Dx10Header,
+    /// A DX10 extension header names a format other than BC7 (the `DXGI_FORMAT` value is given).
+    UnsupportedDxgiFormat(u32),
     /// A pixel format other than DXT1, DXT3, DXT5 or ATI2 (BC1, BC2, BC3, BC5).
     UnsupportedFormat([u8; 4]),
     /// A mip count of zero or more than the sizes allow.
@@ -37,6 +39,9 @@ impl fmt::Display for DdsError {
             Self::Truncated => write!(f, "input too short"),
             Self::BadHeader => write!(f, "not a valid DDS header"),
             Self::Dx10Header => write!(f, "DX10 extension headers are not supported"),
+            Self::UnsupportedDxgiFormat(n) => {
+                write!(f, "DX10 format {n} is not supported (only BC7 is read)")
+            }
             Self::UnsupportedFormat(c) => write!(f, "unsupported pixel format {c:?}"),
             Self::BadMipCount(n) => write!(f, "bad mip count {n}"),
             Self::Container(m) => write!(f, "container error: {m}"),

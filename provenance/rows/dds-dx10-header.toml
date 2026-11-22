@@ -1,0 +1,10 @@
+[[source]]
+id = "dds-dx10-header"
+fact = "A DDS whose pixel format has the FOURCC flag and the FourCC DX10 carries a 20-byte DDS_HEADER_DXT10 right after the 128-byte magic and header: dxgiFormat (u32), resourceDimension, miscFlag, arraySize, miscFlags2; the surface data starts at byte 148. DXGI_FORMAT_BC7_UNORM is 98 and DXGI_FORMAT_BC7_UNORM_SRGB is 99; BC7 stores 4 by 4 pixel blocks of 16 bytes."
+url = "https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10"
+licence = "CC-BY-4.0 (Microsoft Learn documentation)"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read from the DDS_HEADER_DXT10 page, the DXGI_FORMAT enumeration page (https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format) and the BC7 format page (https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format); no code from them. The block decoding is lodwright's own (row bptc-format). The test builds mode 6 blocks from the bit layout on the BC7 format page. Not second-read."

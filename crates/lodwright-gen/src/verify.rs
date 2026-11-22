@@ -77,6 +77,41 @@ fn parse_block(name: &str) -> Option<(u32, i32, i32, bool)> {
     Some((level.parse().ok()?, x.parse().ok()?, y.parse().ok()?, high))
 }
 
+/// The translation of a scene-graph block (a node or a shape), read from a decoded body or from the opaque bytes
+/// (name, extra data count and links, controller, flags, then three floats).
+fn translation(body: &Body) -> Option<[f32; 3]> {
+    match body {
+        Body::Node(n) => Some(n.av.translation),
+        Body::TriShape(s) | Body::TriStrips(s) => Some(s.av.translation),
+        Body::Opaque(b) => {
+            let count = usize::try_from(u32::from_le_bytes(b.get(4..8)?.try_into().ok()?)).ok()?;
+            let at = 16_usize.checked_add(count.checked_mul(4)?)?;
+            let f = |k: usize| -> Option<f32> {
+                Some(f32::from_le_bytes(
+                    b.get(at + 4 * k..at + 4 * k + 4)?.try_into().ok()?,
+                ))
+            };
+            Some([f(0)?, f(1)?, f(2)?])
+        }
+        _ => None,
+    }
+}
+
+/// The nodes and shapes of a block file with their type names and translations, in file order. The data blocks,
+/// properties and the multibound are not scene-graph objects.
+fn scene_translations(nif: &NifFile) -> Vec<(String, [f32; 3])> {
+    nif.blocks
+        .iter()
+        .filter_map(|b| {
+            let name =
+                String::from_utf8_lossy(nif.header.block_types.get(usize::from(b.type_index))?)
+                    .into_owned();
+            let scene = name.ends_with("Node") || name.ends_with("TriShape");
+            scene.then(|| translation(&b.body).map(|t| (name, t)))?
+        })
+        .collect()
+}
+
 struct Ctx {
     out: Verification,
 }
@@ -87,6 +122,39 @@ impl Ctx {
             path: path.to_owned(),
             problem: problem.into(),
         });
+    }
+
+    /// Where the block's origin sits is part of the format: a terrain block carries it on its root node and every other
+    /// node has none, an object block carries it on its shape and its root has none (measured on every block of the
+    /// game's own tree; the engine draws an object block only with the origin on the shape, #294).
+    fn check_origin(&mut self, path: &str, nif: &NifFile, x: i32, y: i32, object: bool) {
+        let origin = [x as f32 * 4096.0, y as f32 * 4096.0, 0.0];
+        let nodes = scene_translations(nif);
+        if nodes.is_empty() {
+            self.err(path, "no node or shape");
+            return;
+        }
+        for (i, (name, t)) in nodes.iter().enumerate() {
+            let carrier = if object {
+                name.ends_with("TriShape")
+            } else {
+                i == 0
+            };
+            // terrain water shapes carry their own offsets, so only the root of a terrain block is held to the format
+            if !object && i != 0 {
+                continue;
+            }
+            let want = if carrier { origin } else { [0.0; 3] };
+            if t.iter().zip(want).any(|(a, b)| (a - b).abs() > 0.001) {
+                self.err(
+                    path,
+                    format!(
+                        "{name} has translation {t:?}, the format has {want:?} (the origin sits on the {})",
+                        if object { "shape" } else { "root node" }
+                    ),
+                );
+            }
+        }
     }
 
     fn check_geometry(&mut self, path: &str, nif: &NifFile, size: Option<f32>, object: bool) {
@@ -378,6 +446,7 @@ pub fn verify_folder(root: &Path) -> Verification {
                         );
                     }
                     ctx.check_geometry(rel, &nif, (!object).then_some(size), object);
+                    ctx.check_origin(rel, &nif, x, y, object);
                     if object {
                         ctx.out.object_blocks += 1;
                     } else {
@@ -502,6 +571,18 @@ pub fn compare_folders(folder: &Path, reference: &Path) -> Vec<Finding> {
             out.push(Finding {
                 path: name.clone(),
                 problem: "block types differ".into(),
+            });
+        }
+        let (mut ta, mut tb) = (scene_translations(&a), scene_translations(&b));
+        if !name.contains("/blocks/") {
+            // a terrain block's water shapes are our own design (docs/spec/terrain-lod.md, section 6): its root only
+            ta.truncate(1);
+            tb.truncate(1);
+        }
+        if ta != tb {
+            out.push(Finding {
+                path: name.clone(),
+                problem: format!("node translations differ: {ta:?}, the reference has {tb:?}"),
             });
         }
         if !name.contains("/blocks/")
@@ -1352,6 +1433,78 @@ mod tests {
         let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x0.y0.nif");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    /// An object block named for cell (2, 1) with its origin on the shape (as the game's blocks have it) or, when
+    /// `on_root`, on the root node (as 0.3.0 to 0.15.1 wrote it: the engine then draws none of the object LOD, #294).
+    fn write_object_at_cell(root: &std::path::Path, on_root: bool) {
+        let up = vec![[0.0, 0.0, 1.0]; 3];
+        let along = vec![[1.0, 0.0, 0.0]; 3];
+        let side = vec![[0.0, 1.0, 0.0]; 3];
+        let uv = vec![[0.5, 0.5]; 3];
+        let mut nif = lodwright_nif::object_block(&lodwright_nif::ObjectBlock {
+            origin: (2.0 * 4096.0, 4096.0),
+            vertices: &[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: &up,
+            tangents: &along,
+            bitangents: &side,
+            uv: &uv,
+            indices: &[0, 1, 2],
+            segment_triangles: [1, 0, 0, 0],
+            textures: ["a.dds", "b.dds"],
+        })
+        .unwrap();
+        if on_root {
+            let (lodwright_nif::Body::Opaque(a), lodwright_nif::Body::Opaque(b)) =
+                (nif.blocks[0].body.clone(), nif.blocks[1].body.clone())
+            else {
+                panic!("root and shape are kept opaque");
+            };
+            let (mut a, mut b) = (a, b);
+            let moved: Vec<u8> = a[16..28].to_vec();
+            a[16..28].copy_from_slice(&b[16..28]);
+            b[16..28].copy_from_slice(&moved);
+            nif.blocks[0].body = lodwright_nif::Body::Opaque(a);
+            nif.blocks[1].body = lodwright_nif::Body::Opaque(b);
+        }
+        let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x2.y1.nif");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, nif.write().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn an_object_block_with_its_origin_on_the_root_node_is_an_error() {
+        let (good, bad) = (temp("origin-shape"), temp("origin-root"));
+        write_object_at_cell(&good, false);
+        write_object_at_cell(&bad, true);
+        let problems = |root: &std::path::Path| -> Vec<String> {
+            verify_folder(root)
+                .errors
+                .into_iter()
+                .map(|e| e.problem)
+                .filter(|p| p.contains("translation"))
+                .collect()
+        };
+        assert!(problems(&good).is_empty(), "{:?}", problems(&good));
+        let found = problems(&bad);
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert!(
+            found
+                .iter()
+                .all(|p| p.contains("the origin sits on the shape"))
+        );
+        // and against the game's layout the block is listed as different, not as equal
+        let diffs = super::compare_folders(&bad, &good);
+        assert!(
+            diffs
+                .iter()
+                .any(|f| f.problem.starts_with("node translations differ")),
+            "{diffs:?}"
+        );
+        assert_eq!(
+            super::compare_folders(&good, &good),
+            [] as [super::Finding; 0]
+        );
     }
 
     fn grid_errors(world_dir: &str, settings_start: Option<(i16, i16)>, name: &str) -> usize {

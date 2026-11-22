@@ -125,11 +125,30 @@ pub fn object_mesh_path(world: &str, x: i32, y: i32, high: bool) -> Result<Strin
 /// # Errors
 /// [`Error::BadWorldName`] when `world` is not a usable name.
 pub fn atlas_paths(world: &str) -> Result<[String; 2], Error> {
+    atlas_page_paths(world, 0)
+}
+
+// source: oracle-object-atlas-pages
+/// The atlas name of page `page`: `buildings` for the first, `buildings01`, `buildings02` and so on after it.
+fn atlas_name(page: usize) -> String {
+    if page == 0 {
+        "buildings".to_owned()
+    } else {
+        format!("buildings{page:02}")
+    }
+}
+
+/// Paths of atlas page `page` and its normal atlas (page 0 is [`atlas_paths`]).
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn atlas_page_paths(world: &str, page: usize) -> Result<[String; 2], Error> {
     check_world_name(world)?;
     let w = world.to_ascii_lowercase();
+    let name = atlas_name(page);
     Ok([
-        format!("textures/landscape/lod/{w}/blocks/{w}.buildings.dds"),
-        format!("textures/landscape/lod/{w}/blocks/{w}.buildings_n.dds"),
+        format!("textures/landscape/lod/{w}/blocks/{w}.{name}.dds"),
+        format!("textures/landscape/lod/{w}/blocks/{w}.{name}_n.dds"),
     ])
 }
 
@@ -140,8 +159,18 @@ pub fn atlas_paths(world: &str) -> Result<[String; 2], Error> {
 /// # Errors
 /// [`Error::BadWorldName`] when `world` is not a usable name.
 pub fn nif_atlas_paths(world: &str) -> Result<[String; 2], Error> {
+    nif_atlas_page_paths(world, 0)
+}
+
+/// The two paths an object block NIF carries for atlas page `page` (page 0 is [`nif_atlas_paths`]).
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn nif_atlas_page_paths(world: &str, page: usize) -> Result<[String; 2], Error> {
     check_world_name(world)?;
-    let base = format!("Data\\Textures\\Landscape\\LOD\\{world}\\Blocks\\{world}.Buildings");
+    let name = atlas_name(page);
+    let name = format!("B{}", &name[1..]);
+    let base = format!("Data\\Textures\\Landscape\\LOD\\{world}\\Blocks\\{world}.{name}");
     Ok([format!("{base}.dds"), format!("{base}_n.dds")])
 }
 
@@ -258,6 +287,25 @@ mod tests {
         assert_eq!(
             super::nif_atlas_paths("Mojave").unwrap()[0],
             "Data\\Textures\\Landscape\\LOD\\Mojave\\Blocks\\Mojave.Buildings.dds"
+        );
+    }
+
+    #[test]
+    fn atlas_pages_after_the_first_are_numbered_with_two_digits() {
+        assert_eq!(
+            super::atlas_page_paths("W", 0).unwrap(),
+            super::atlas_paths("W").unwrap()
+        );
+        assert_eq!(
+            super::atlas_page_paths("W", 1).unwrap(),
+            [
+                "textures/landscape/lod/w/blocks/w.buildings01.dds".to_owned(),
+                "textures/landscape/lod/w/blocks/w.buildings01_n.dds".to_owned()
+            ]
+        );
+        assert_eq!(
+            super::nif_atlas_page_paths("Mojave", 2).unwrap()[1],
+            "Data\\Textures\\Landscape\\LOD\\Mojave\\Blocks\\Mojave.Buildings02_n.dds"
         );
     }
 

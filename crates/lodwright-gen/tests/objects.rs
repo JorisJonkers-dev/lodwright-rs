@@ -6,7 +6,10 @@ use std::collections::HashMap;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, read_header};
-use lodwright_gen::{Assets, Surfaces, generate_objects, generate_objects_with_progress};
+use lodwright_gen::{
+    Assets, Surfaces, generate_objects, generate_objects_with_atlas_limit,
+    generate_objects_with_progress,
+};
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriStripsData,
     NifFile, ObjectNet,
@@ -859,4 +862,66 @@ fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_it
         }
     }
     assert_eq!((triangles, shapes), (120_000, 2));
+}
+
+#[test]
+fn textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its_own_shape() {
+    // with atlases of at most 2048 by 2048, four textures of 1024 by 1024 fill the first; the fifth goes on a second
+    let out = temp("atlas-pages");
+    let mut m = HashMap::new();
+    let mut list = Vec::new();
+    for k in 0..5_u8 {
+        m.insert(
+            format!("meshes/a/wall{k}_lod.nif"),
+            lod_model(&format!("Data\\Textures\\a\\wall{k}.dds")),
+        );
+        m.insert(
+            format!("textures/a/wall{k}.dds"),
+            texture(1024, 40 + 40 * k),
+        );
+        list.push(instance(
+            &format!("a\\Wall{k}.nif"),
+            100.0 + f32::from(k),
+            100.0,
+            0.0,
+            u32::from(k) + 1,
+            false,
+        ));
+    }
+    let report = generate_objects_with_atlas_limit(
+        "Mojave",
+        &list,
+        &Memory(m),
+        &out,
+        Surfaces::default(),
+        (2048, 2048),
+        &mut |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(report.instances, 5);
+    assert!(
+        !report.warnings.iter().any(|w| w.contains("shape")),
+        "{:?}",
+        report.warnings
+    );
+    let dir = out.join("textures/landscape/lod/mojave/blocks");
+    let first = read_header(&std::fs::read(dir.join("mojave.buildings.dds")).unwrap()).unwrap();
+    let second = read_header(&std::fs::read(dir.join("mojave.buildings01.dds")).unwrap()).unwrap();
+    assert!(dir.join("mojave.buildings01_n.dds").is_file());
+    // native size: four 1024 textures fill the 2048 by 2048 atlas; the fifth gets the smallest atlas
+    assert_eq!((first.width, first.height), (2048, 2048));
+    assert_eq!((second.width, second.height), (2048, 1024));
+    // one shape per atlas, each naming its own atlas
+    let block =
+        std::fs::read(out.join("meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif"))
+            .unwrap();
+    let text = String::from_utf8_lossy(&block);
+    assert!(text.contains("Mojave.Buildings.dds") && text.contains("Mojave.Buildings01.dds"));
+    let nif = NifFile::read(&block).unwrap();
+    let shapes = nif
+        .blocks
+        .iter()
+        .filter(|b| matches!(b.body, Body::TriShapeData(_)))
+        .count();
+    assert_eq!(shapes, 2);
 }

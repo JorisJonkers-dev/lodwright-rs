@@ -1,0 +1,10 @@
+[[source]]
+id = "oracle-object-atlas-pages"
+fact = "When the far-object textures of a world do not fit one atlas, xLODGen writes a second atlas pair beside the first, named <world>.buildings01.dds and <world>.buildings01_n.dds (the first stays <world>.buildings.dds), both atlases 8192 by 8192; a block whose objects use textures on both atlases holds one shape per atlas, each shape's texture set naming its own atlas."
+url = "oracle:xlodgen-output"
+licence = "File names, header sizes and block structure of the owner's own xLODGen output compared as numbers; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read on a 133-plugin load order: the object texture archive of the xLODGen output lists wastelandnv.buildings.dds and wastelandnv.buildings01.dds with their normal atlases (the other worlds have one atlas each); both WastelandNV atlases are DXT5 8192 by 8192 with 14 mips. A Strip block of that output holds three shapes, one naming the first atlas and two naming the second. On the same load order lodwright 0.15.1 packed the 496 textures into one 8192 by 4096 atlas by halving every texture. Not second-read."

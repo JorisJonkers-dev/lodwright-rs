@@ -24,6 +24,8 @@ const CELL_UNITS: f32 = 4096.0;
 /// Cells per object block edge.
 pub const BLOCK_CELLS: i32 = 4;
 const MAX_VERTICES: usize = 65_535;
+/// A shape's triangle count is a 16-bit field too, as its vertex count is.
+const MAX_TRIANGLES: usize = 65_535;
 /// Key of the flat texture used by shapes without one.
 const NONE: &str = "<none>";
 
@@ -307,7 +309,10 @@ fn add_instance(
         .iter()
         .map(|(_, _, remap)| remap.iter().flatten().count())
         .sum();
-    if m.vertices.len() + added > MAX_VERTICES {
+    let added_triangles: usize = kept.iter().map(|(_, faces, _)| faces.len()).sum();
+    if m.vertices.len() + added > MAX_VERTICES
+        || m.indices.len() / 3 + added_triangles > MAX_TRIANGLES
+    {
         return false;
     }
     m.dropped_under_terrain += under_terrain;
@@ -613,7 +618,7 @@ pub fn generate_objects_with_progress(
         }
         if dropped > 0 {
             report.warnings.push(format!(
-                "block x{bx} y{by}: {dropped} objects left out, each alone has more vertices than one shape can hold"
+                "block x{bx} y{by}: {dropped} objects left out, each alone has more vertices or triangles than one shape can hold"
             ));
         }
         // a high-priority instance is in its block's normal file too: count its faces once, from the normal file

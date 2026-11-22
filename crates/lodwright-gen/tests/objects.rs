@@ -54,12 +54,23 @@ fn lod_model_with(texture: &str, node_av: AvObject, shape_av: AvObject) -> Vec<u
 }
 
 /// The same model with the given node and shape transforms and UVs.
-#[allow(clippy::too_many_lines)] // one literal NIF
 fn lod_model_full(
     texture: &str,
     node_av: AvObject,
     shape_av: AvObject,
     uv: Vec<[f32; 2]>,
+) -> Vec<u8> {
+    lod_model_tris(texture, node_av, shape_av, uv, 1)
+}
+
+/// The same with a strip of `triangles` triangles over the same three vertices.
+#[allow(clippy::too_many_lines)] // one literal NIF
+fn lod_model_tris(
+    texture: &str,
+    node_av: AvObject,
+    shape_av: AvObject,
+    uv: Vec<[f32; 2]>,
+    triangles: u16,
 ) -> Vec<u8> {
     let node = NiNode {
         av: node_av,
@@ -95,8 +106,8 @@ fn lod_model_full(
             consistency: 0,
             additional_data: -1,
         },
-        num_triangles: 1,
-        strips: Some(vec![vec![0, 1, 2]]),
+        num_triangles: triangles,
+        strips: Some(vec![(0..triangles + 2).map(|k| k % 3).collect()]),
     };
     let mut lighting = Vec::new();
     for v in [u32::MAX, 0, u32::MAX] {
@@ -797,4 +808,55 @@ fn a_block_over_the_16_bit_vertex_limit_is_written_as_several_shapes_and_nothing
         }
     }
     assert_eq!((vertices, triangles, shapes), (75_000, 25_000, 2));
+}
+
+#[test]
+fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_its_vertices_fit() {
+    // 40 objects of three vertices and 3000 triangles each: 120 vertices, 120000 triangles in one block
+    let out = temp("many-triangles");
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model_tris(
+            "Data\\Textures\\a\\wall.dds",
+            av(vec![]),
+            av(vec![3]),
+            vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            3000,
+        ),
+    );
+    m.insert("textures/a/wall.dds".to_owned(), texture(128, 200));
+    let list: Vec<Instance> = (0..40_u32)
+        .map(|k| {
+            instance(
+                "a\\Wall.nif",
+                4096.0 * 4.0 + f32::from(u16::try_from(k).unwrap()),
+                4096.0 * 4.0,
+                0.0,
+                k + 1,
+                false,
+            )
+        })
+        .collect();
+    let report = generate_objects("Mojave", &list, &Memory(m), &out).unwrap();
+    assert_eq!((report.instances, report.skipped), (40, 0));
+    assert!(
+        !report.warnings.iter().any(|w| w.contains("left out")),
+        "{:?}",
+        report.warnings
+    );
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x4.y4.nif",
+    );
+    let (mut triangles, mut shapes) = (0, 0);
+    for b in &block.blocks {
+        if let Body::TriShapeData(d) = &b.body {
+            let n = d.triangles.as_ref().unwrap().len();
+            assert!(n <= 65_535);
+            triangles += n;
+            shapes += 1;
+        }
+    }
+    assert_eq!((triangles, shapes), (120_000, 2));
 }

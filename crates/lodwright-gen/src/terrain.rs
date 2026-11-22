@@ -68,7 +68,7 @@ impl Default for Options<'_> {
             progress: None,
             water: true,
             drop_under_water: None,
-            water_walls: false,
+            water_walls: true,
             water_shared_vertices: false,
             water_polygons: false,
             reuse: None,

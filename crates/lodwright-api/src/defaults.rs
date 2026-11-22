@@ -271,7 +271,10 @@ mod tests {
                     Value::Null if o.kind == OptionKind::Map => {
                         Value::Object(serde_json::Map::new())
                     }
-                    Value::Null if o.kind == OptionKind::Switch => Value::Bool(false),
+                    // a switch that is on by default is written only when off
+                    Value::Null if o.kind == OptionKind::Switch => {
+                        Value::Bool(o.key == "terrain.water_walls")
+                    }
                     v => v,
                 };
                 assert_eq!(o.default, written, "{}", o.key);

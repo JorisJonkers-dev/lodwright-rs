@@ -213,9 +213,13 @@ impl Ctx {
             self.err(path, "a vertex coordinate is not finite");
         }
         if let Some(size) = size {
+            // the game's water planes and their walls reach 32 units past the block's borders (`game-lod-water-walls`)
+            let slack = 32.5;
             let outside = verts
                 .iter()
-                .filter(|v| v[0] < -0.5 || v[1] < -0.5 || v[0] > size + 0.5 || v[1] > size + 0.5)
+                .filter(|v| {
+                    v[0] < -slack || v[1] < -slack || v[0] > size + slack || v[1] > size + slack
+                })
                 .count();
             if outside > 0 {
                 self.err(path, format!("{outside} vertices lie outside the block"));

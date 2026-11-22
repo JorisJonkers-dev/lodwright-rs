@@ -90,7 +90,7 @@ struct Wall {
 }
 
 /// How far a level 4 plane and its walls reach beyond the block's south and west borders and past its north border:
-/// the game's blocks overlap their neighbours there (`game-lod-water-border`), so no crack opens between planes.
+/// the game's blocks overlap their neighbours there (`game-lod-water-walls`), so no crack opens between planes.
 const BORDER_OVERLAP: f32 = 32.0;
 
 /// The walls of the water of one block: under every side of a wet square that lies on the block's own border, from
@@ -175,14 +175,14 @@ fn overlap_borders(mesh: &mut WaterMesh, level: u32) {
         }
         if v[1] == 0.0 {
             v[1] = -BORDER_OVERLAP;
-        } else if v[1] == far {
+        } else if v[1].to_bits() == far.to_bits() {
             v[1] = far + BORDER_OVERLAP;
         }
     }
 }
 
 /// Add the walls on the block's borders and the plane's overlap across them to `mesh` (the option
-/// `terrain.water_walls`; `game-lod-water-border`).
+/// `terrain.water_walls`; `game-lod-water-walls`).
 pub(crate) fn add_walls(
     mesh: &mut WaterMesh,
     world: &Worldspace,
@@ -606,7 +606,7 @@ mod tests {
             mesh.vertices
                 .iter()
                 .filter(|v| v[2] != super::WALL_FOOT)
-                .any(|v| v[1] == -32.0)
+                .any(|v| v[1].to_bits() == (-32.0_f32).to_bits())
         );
         assert!(
             mesh.indices

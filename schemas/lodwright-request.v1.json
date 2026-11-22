@@ -284,7 +284,7 @@
           "type": "boolean"
         },
         "water_walls": {
-          "description": "Write walls under the outline of the water planes, from the water down to the height the game's outlines drop\nto (own design, `docs/spec/terrain-lod.md`). Off by default; written only when on.",
+          "description": "Write the game's water borders: a wall on every block border where the water meets it, from the water down to\nthe height the game's outlines drop to, and at level 4 a plane that overlaps its neighbours by 32 units\n(`docs/spec/terrain-lod.md`). On by default (without them the lake shows a pale band and a dotted line at every\nblock seam); written only when off.",
           "type": "boolean"
         }
       }

@@ -600,3 +600,6 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-block-grid` (#219, second step): object blocks, tree blocks and the settings file's south-west cell start at the
   same cell as the terrain blocks in all 26 worlds with a reference; WastelandNV needs the exception recorded in the row
   (corner cell -65, game -64). Still not second-read.
+- `game-lod-object-block-nif` (#294): corrected. The block origin is the translation of the BSSegmentedTriShape; the BSMultiBoundNode root has
+  translation zero (the earlier text had it the other way round). Measured on the game's own object NIFs (numbers only), and in the engine:
+  object blocks with the origin on the root are not drawn, with it on the shape they are.

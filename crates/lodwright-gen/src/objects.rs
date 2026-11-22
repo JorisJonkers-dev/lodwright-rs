@@ -90,6 +90,12 @@ fn norm_key(path: &str) -> String {
     p.strip_prefix("data/").map_or(p.clone(), str::to_owned)
 }
 
+fn full_model_path(model: &str) -> String {
+    let m = norm_key(model);
+    let m = m.strip_prefix("meshes/").unwrap_or(&m);
+    format!("meshes/{m}")
+}
+
 fn lod_model_path(model: &str) -> String {
     let m = norm_key(model);
     let m = m.strip_prefix("meshes/").unwrap_or(&m);
@@ -455,8 +461,13 @@ pub fn generate_objects_with_atlas_limit(
     let mut report = ObjectReport::default();
     // models
     let mut models: BTreeMap<String, Option<Model>> = BTreeMap::new();
+    // the full model each LOD model stands for, for a shape that names no texture
+    let mut full_of: BTreeMap<String, String> = BTreeMap::new();
     for i in instances {
         let path = lod_model_path(&i.model);
+        full_of
+            .entry(path.clone())
+            .or_insert_with(|| full_model_path(&i.model));
         models.entry(path.clone()).or_insert_with(|| {
             assets
                 .read(&path)
@@ -464,18 +475,40 @@ pub fn generate_objects_with_atlas_limit(
                 .map(|parts| Model { parts })
         });
     }
-    // a model with a shape that has no diffuse texture is said by its path (its objects are drawn in a flat colour, and a
-    // user must not get pale shapes silently); the models that are missing or cannot be read are said in one line with
-    // their count and the first paths (many flagged bases have no LOD model in the game's own data, which is how the
-    // game's own blocks are made too)
+    // a shape with no diffuse texture takes the texture of the full model it stands for, and says so; when the full
+    // model has none either, its objects are drawn in a flat colour and that is said by the model's path (a user must
+    // not get pale shapes silently). The models that are missing or cannot be read are said in one line with their
+    // count and the first paths (many flagged bases have no LOD model in the game's own data, which is how the game's
+    // own blocks are made too)
     let mut missing: Vec<&str> = Vec::new();
-    for (path, model) in &models {
-        match model {
-            None => missing.push(path),
-            Some(m) if m.parts.iter().any(|p| p.diffuse.is_none()) => report.warnings.push(
-                format!("model {path} has a shape with no diffuse texture, a flat colour is used"),
-            ),
-            Some(_) => {}
+    for (path, model) in &mut models {
+        let Some(m) = model else {
+            missing.push(path);
+            continue;
+        };
+        if m.parts.iter().all(|p| p.diffuse.is_some()) {
+            continue;
+        }
+        let full = full_of.get(path.as_str()).and_then(|f| {
+            assets
+                .read(f)
+                .and_then(|b| parse_lod_model(&b).ok())
+                .and_then(|parts| parts.into_iter().find_map(|p| p.diffuse))
+                .map(|d| (f.clone(), d))
+        });
+        match full {
+            Some((full_path, diffuse)) => {
+                report.warnings.push(format!(
+                    "model {path} has a shape with no diffuse texture, the texture {} of {full_path} is used",
+                    norm_key(&diffuse)
+                ));
+                for p in m.parts.iter_mut().filter(|p| p.diffuse.is_none()) {
+                    p.diffuse = Some(diffuse.clone());
+                }
+            }
+            None => report.warnings.push(format!(
+                "model {path} has a shape with no diffuse texture and its full model names none, a flat colour is used"
+            )),
         }
     }
     if !missing.is_empty() {

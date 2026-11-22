@@ -925,3 +925,68 @@ fn textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its
         .count();
     assert_eq!(shapes, 2);
 }
+
+#[test]
+fn a_lod_shape_without_a_texture_takes_the_full_models_texture_and_says_so() {
+    let out = temp("no-texture");
+    let mut m = HashMap::new();
+    // the LOD model's texture set names no diffuse; the full model names a dark texture
+    m.insert("meshes/a/pole_lod.nif".to_owned(), lod_model(""));
+    m.insert(
+        "meshes/a/pole.nif".to_owned(),
+        lod_model("textures\\a\\pole.dds"),
+    );
+    m.insert("textures/a/pole.dds".to_owned(), texture(64, 30));
+    // a second model has no texture in either: it stays a flat colour, said differently
+    m.insert("meshes/a/bare_lod.nif".to_owned(), lod_model(""));
+    m.insert("meshes/a/bare.nif".to_owned(), lod_model(""));
+    let list = vec![
+        instance("a\\Pole.nif", 100.0, 100.0, 0.0, 1, false),
+        instance("a\\Bare.nif", 200.0, 100.0, 0.0, 2, false),
+    ];
+    let report = generate_objects("Mojave", &list, &Memory(m), &out).unwrap();
+    assert!(
+        report.warnings.iter().any(|w| w
+            == "model meshes/a/pole_lod.nif has a shape with no diffuse texture, the texture textures/a/pole.dds of meshes/a/pole.nif is used"),
+        "{:?}",
+        report.warnings
+    );
+    assert!(
+        report.warnings.iter().any(|w| w
+            == "model meshes/a/bare_lod.nif has a shape with no diffuse texture and its full model names none, a flat colour is used"),
+        "{:?}",
+        report.warnings
+    );
+    // the pole's corner samples the dark texture, not the flat grey
+    let atlas = lodwright_dds::decode(
+        &std::fs::read(out.join("textures/landscape/lod/mojave/blocks/mojave.buildings.dds"))
+            .unwrap(),
+    )
+    .unwrap();
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif",
+    );
+    let Body::TriShapeData(d) = &block.blocks[4].body else {
+        panic!("data block");
+    };
+    let image = &atlas.levels[0];
+    // the texel under each UV: the atlas is 2048 by 1024, so these are small exact values
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss,
+        reason = "UVs lie in 0 to 1 and the atlas is small"
+    )]
+    let texel = |u: f32, size: u32| ((u * size as f32) as u32).min(size - 1);
+    let shades: Vec<u8> = d.geometry.uv_sets[0]
+        .iter()
+        .map(|uv| {
+            image
+                .pixel(texel(uv[0], image.width()), texel(uv[1], image.height()))
+                .unwrap()[0]
+        })
+        .collect();
+    assert!(shades.iter().any(|&s| s.abs_diff(30) <= 4), "{shades:?}");
+    assert!(shades.iter().any(|&s| s.abs_diff(128) <= 4), "{shades:?}");
+}

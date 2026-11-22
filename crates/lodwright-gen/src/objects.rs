@@ -417,6 +417,19 @@ pub fn generate_objects_with_progress(
                 .map(|parts| Model { parts })
         });
     }
+    // a model that cannot be read or has a shape without a diffuse texture is said once, by its path: its objects are
+    // left out or drawn in a flat colour, and a user must not get pale shapes silently
+    for (path, model) in &models {
+        match model {
+            None => report.warnings.push(format!(
+                "model {path} is missing or cannot be read, its objects are left out"
+            )),
+            Some(m) if m.parts.iter().any(|p| p.diffuse.is_none()) => report.warnings.push(
+                format!("model {path} has a shape with no diffuse texture, a flat colour is used"),
+            ),
+            Some(_) => {}
+        }
+    }
     if models.values().all(Option::is_none) {
         report.skipped = instances.len();
         return Ok(report);

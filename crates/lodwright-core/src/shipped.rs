@@ -14,8 +14,9 @@ use crate::plugin::Plugin;
 use crate::texture::TextureResolver;
 use crate::worldspace::{Inheritance, WorldIndex, Worldspace};
 
-/// The plugins of the games themselves (Fallout: New Vegas and its add-ons, Fallout 3 and its add-ons, and the two
-/// plugins of the Tale of Two Wastelands that carry no land of their own are not among them: see the list below).
+/// The plugins of the games themselves: Fallout: New Vegas and its add-ons, Fallout 3 and its add-ons, and the two
+/// plugins of the Tale of Two Wastelands package (its own far land is made from the Fallout 3 tiles, so land it edits
+/// is not a mod's change to the picture).
 const GAME_MASTERS: &[&str] = &[
     "FalloutNV.esm",
     "DeadMoney.esm",
@@ -33,6 +34,8 @@ const GAME_MASTERS: &[&str] = &[
     "BrokenSteel.esm",
     "PointLookout.esm",
     "Zeta.esm",
+    "TaleOfTwoWastelands.esm",
+    "YUPTTW.esm",
 ];
 
 /// Whether `plugin` (a file name) is one of the games' own masters.
@@ -155,7 +158,8 @@ mod tests {
     #[test]
     fn the_games_own_plugins_are_recognised_by_name_in_any_case() {
         assert!(is_game_master("falloutnv.esm") && is_game_master("Fallout3.ESM"));
-        assert!(!is_game_master("TaleOfTwoWastelands.esm") && !is_game_master("Mod.esp"));
+        assert!(is_game_master("TaleOfTwoWastelands.esm") && is_game_master("YUPTTW.esm"));
+        assert!(!is_game_master("Mod.esp") && !is_game_master("ttw-patch.esp"));
     }
 
     #[test]

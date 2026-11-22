@@ -62,9 +62,9 @@ pub struct ObjectBlock<'a> {
     pub textures: [&'a str; 2],
 }
 
-fn shape_bytes(segments: [u32; 4]) -> Result<Vec<u8>> {
+fn shape_bytes(origin: (f32, f32), segments: [u32; 4]) -> Result<Vec<u8>> {
     // source: game-lod-object-block-nif
-    let mut b = Body::TriShape(tri_shape_for_object()).write(crate::block::Profile {
+    let mut b = Body::TriShape(tri_shape_for_object(origin)).write(crate::block::Profile {
         user_version: 11,
         user_version2: 34,
     })?;
@@ -79,8 +79,11 @@ fn shape_bytes(segments: [u32; 4]) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-fn tri_shape_for_object() -> crate::block::NiTriShape {
+/// The game's object block carries the block's origin on the shape; its root node has no translation (measured on
+/// the game's blocks: the engine draws a block only when the translation is where the game puts it).
+fn tri_shape_for_object(origin: (f32, f32)) -> crate::block::NiTriShape {
     let mut s = tri_shape();
+    s.av.translation = [origin.0, origin.1, 0.0];
     s.data = 4;
     s
 }
@@ -184,8 +187,8 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
     }
     let _ = ROOT_FLAGS;
     let bodies = [
-        Body::Opaque(root_node(block.origin, &[1], 5)),
-        Body::Opaque(shape_bytes(block.segment_triangles)?),
+        Body::Opaque(root_node((0.0, 0.0), &[1], 5)),
+        Body::Opaque(shape_bytes(block.origin, block.segment_triangles)?),
         Body::Opaque(lighting),
         Body::Opaque(texture_set(block.textures)),
         Body::TriShapeData(data),
@@ -251,6 +254,17 @@ mod tests {
         // 8 segments of 9 bytes at the end, after their count
         let tail = &shape[shape.len() - SEGMENTS * 9 - 4..];
         assert_eq!(&tail[0..4], &8_u32.to_le_bytes());
+        // the origin is on the shape, the root node has no translation (as in the game's blocks)
+        let Body::Opaque(root) = &back.blocks[0].body else {
+            panic!("the root is kept opaque");
+        };
+        let at = |bytes: &[u8]| -> [f32; 3] {
+            let f =
+                |k: usize| f32::from_le_bytes(bytes[16 + 4 * k..20 + 4 * k].try_into().unwrap());
+            [f(0), f(1), f(2)]
+        };
+        assert_eq!(at(root), [0.0, 0.0, 0.0]);
+        assert_eq!(at(shape), [98304.0, -49152.0, 0.0]);
         let Body::TriShapeData(d) = &back.blocks[4].body else {
             panic!("data");
         };

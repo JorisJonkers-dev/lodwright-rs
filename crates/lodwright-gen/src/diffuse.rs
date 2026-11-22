@@ -11,7 +11,7 @@ use lodwright_core::texture::TextureResolver;
 use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::{Filter, Image, resize};
 
-use crate::assets::Assets;
+use crate::assets::{Assets, TextureFault, read_texture, texture_warning};
 
 /// Edge of a reduced tile in pixels.
 const TILE: u32 = 32;
@@ -232,11 +232,9 @@ impl LandTiles {
             format!("landscape/{path}")
         };
         let key = format!("textures/{}", relative.replace('\\', "/"));
-        let image = assets
-            .read(&key)
-            .and_then(|b| lodwright_dds::decode(&b).ok())
-            .and_then(|d| d.levels.into_iter().next());
-        match image.and_then(|i| reduce(&i)) {
+        let image = read_texture(assets, &key);
+        let fault = image.as_ref().err().cloned();
+        match image.ok().and_then(|i| reduce(&i)) {
             Some(rgb) => {
                 self.default = Some(Tile {
                     rgb,
@@ -244,7 +242,12 @@ impl LandTiles {
                     specular: None,
                 });
             }
-            None => warnings.push(format!("default land texture {key} not found")),
+            None => warnings.push(texture_warning(
+                "default land texture",
+                &key,
+                &fault.unwrap_or(TextureFault::Unreadable("no pixels".to_owned())),
+                "",
+            )),
         }
         self
     }
@@ -276,13 +279,12 @@ impl LandTiles {
                 continue;
             };
             let key = format!("textures/{}", path.replace('\\', "/"));
-            let image = assets
-                .read(&key)
-                .and_then(|b| lodwright_dds::decode(&b).ok())
-                .and_then(|d| d.levels.into_iter().next());
-            let Some(image) = image else {
-                warnings.push(format!("land texture {key} not found"));
-                continue;
+            let image = match read_texture(assets, &key) {
+                Ok(image) => image,
+                Err(fault) => {
+                    warnings.push(texture_warning("land texture", &key, &fault, ""));
+                    continue;
+                }
             };
             if let Some(rgb) = reduce(&image) {
                 tiles.insert(

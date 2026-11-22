@@ -24,5 +24,5 @@ pub use block::{
 };
 pub use error::{NifError, Result};
 pub use file::{Block, ExportInfo, Header, NifFile};
-pub use object::{ObjectBlock, SEGMENTS, object_block};
+pub use object::{ObjectBlock, SEGMENTS, object_block, object_block_shapes};
 pub use terrain::{TerrainBlock, WaterShape, terrain_block};

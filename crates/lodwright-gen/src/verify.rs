@@ -160,11 +160,26 @@ impl Ctx {
     fn check_geometry(&mut self, path: &str, nif: &NifFile, size: Option<f32>, object: bool) {
         // a terrain block with a water plane has two more (`game-lod-water-shape`), and two more again with the empty
         // shape of `game-lod-water-placeholder`
-        let expected: &[usize] = if object { &[7] } else { &[8, 10, 12] };
-        if !expected.contains(&nif.blocks.len()) {
+        // an object block is the root, four blocks per shape, the multibound and its box (`game-lod-object-block-nif`;
+        // the game's own blocks have one to four shapes)
+        let expected: &[usize] = &[8, 10, 12];
+        let ok = if object {
+            nif.blocks.len() >= 7 && (nif.blocks.len() - 3).is_multiple_of(4)
+        } else {
+            expected.contains(&nif.blocks.len())
+        };
+        if !ok {
             self.err(
                 path,
-                format!("{} blocks, expected {}", nif.blocks.len(), expected[0]),
+                format!(
+                    "{} blocks, expected {}",
+                    nif.blocks.len(),
+                    if object {
+                        "3 plus 4 per shape"
+                    } else {
+                        "8, 10 or 12"
+                    }
+                ),
             );
         }
         if nif.header.user_version != 11 || nif.header.bethesda.as_ref().map(|b| b.0) != Some(34) {

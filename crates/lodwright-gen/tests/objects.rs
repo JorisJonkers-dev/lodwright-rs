@@ -753,3 +753,48 @@ fn a_texture_that_is_absent_and_one_that_cannot_be_decoded_get_different_warning
         report.warnings
     );
 }
+
+#[test]
+fn a_block_over_the_16_bit_vertex_limit_is_written_as_several_shapes_and_nothing_is_left_out() {
+    // 25000 objects of three vertices each: 75000 vertices in one block
+    let out = temp("many-shapes");
+    let list: Vec<Instance> = (0..25_000_u32)
+        .map(|k| {
+            instance(
+                "a\\Wall.nif",
+                4096.0 * 4.0 + f32::from(u16::try_from(k % 1000).unwrap()),
+                4096.0 * 4.0 + f32::from(u16::try_from(k / 1000).unwrap()),
+                0.0,
+                k + 1,
+                false,
+            )
+        })
+        .collect();
+    let report = generate_objects("Mojave", &list, &assets(), &out).unwrap();
+    assert_eq!((report.instances, report.skipped), (25_000, 0));
+    assert!(
+        !report.warnings.iter().any(|w| w.contains("left out")),
+        "{:?}",
+        report.warnings
+    );
+    assert!(
+        report.warnings.iter().any(|w| w.contains("2 shapes")),
+        "{:?}",
+        report.warnings
+    );
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x4.y4.nif",
+    );
+    let (mut vertices, mut triangles, mut shapes) = (0, 0, 0);
+    for b in &block.blocks {
+        if let Body::TriShapeData(d) = &b.body {
+            let n = d.geometry.vertices.as_ref().unwrap().len();
+            assert!(n <= 65_535);
+            vertices += n;
+            triangles += d.triangles.as_ref().unwrap().len();
+            shapes += 1;
+        }
+    }
+    assert_eq!((vertices, triangles, shapes), (75_000, 25_000, 2));
+}

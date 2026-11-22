@@ -1,0 +1,12 @@
+<!-- Request option note: one file per option, part of docs/contracts.md (Request and manifest). -->
+
+### Skirts at block borders
+
+`terrain.levels[].skirts` (on by default, written only when off; tier 3, since 0.9.0; on by default from the release after 0.15.2) closes the gap to a neighbouring
+block, of the same or another level, the way the game's own blocks do: under every border vertex a second vertex at
+the constant height -14098 and two triangles per border edge, facing away from the block (`game-lod-block-borders`,
+`docs/spec/terrain-lod.md` section 5). Blocks are not coupled, so no neighbour data enters a digest; the switch enters the
+digest of that level's blocks only, and off the files and digests are as before. The skirt vertices count against the
+level's vertex cap: the surface is meshed with the room that is left. Without them the game shows its background colour through the cracks between blocks of different levels (thin pale slivers
+on mountain ridges in a high view of the Strip with the full set of levels, gone with the skirts on); with the game's own
+level 32 meshes in their place the slivers are gone too.

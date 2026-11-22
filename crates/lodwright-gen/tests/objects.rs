@@ -268,6 +268,18 @@ fn objects_are_merged_per_block_with_transform_scale_and_atlas_uvs() {
             .all(|u| (0.0..=1.0).contains(&u[0]) && (0.0..=1.0).contains(&u[1]))
     );
     assert!(d.geometry.tangents.is_some() && d.geometry.normals.is_some());
+    // the segment table: one segment per cell of the block, x-major. The first object stands in cell (1, 1) of the
+    // block, the second in cell (2, 2), so segments 5 and 10 hold one triangle each and the table ends with 10.
+    let Body::Opaque(shape) = &block.blocks[1].body else {
+        panic!("shape block");
+    };
+    let count = 11;
+    let table = &shape[shape.len() - count * 9 - 4..];
+    assert_eq!(&table[..4], &u32::try_from(count).unwrap().to_le_bytes());
+    let triangles =
+        |k: usize| u32::from_le_bytes(table[4 + k * 9 + 5..4 + k * 9 + 9].try_into().unwrap());
+    let counts: Vec<u32> = (0..count).map(triangles).collect();
+    assert_eq!(counts, [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 }
 
 #[test]

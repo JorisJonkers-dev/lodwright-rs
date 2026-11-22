@@ -102,6 +102,7 @@ mod tests {
             reference,
             reference_plugin: ref_plugin,
             base_plugin,
+            flagged_by: base_plugin,
             part: false,
             cell: None,
         }

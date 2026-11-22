@@ -102,12 +102,26 @@
       "description": "The tool that printed this document.",
       "$ref": "#/$defs/ToolInfo"
     },
+    "warning_counts": {
+      "description": "How many warnings of each kind the run had, sorted by kind; the full list is in `warnings_file`. Omitted\nwhen the run had none.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/WarningCount"
+      }
+    },
     "warnings": {
       "description": "Things that did not go in and why, at most twenty lines (a missing texture, a model without LOD).",
       "type": "array",
       "items": {
         "type": "string"
       }
+    },
+    "warnings_file": {
+      "description": "Relative name of the file with every warning, one record each ([`WarningsFile`]), beside the manifest;\nomitted when the run had no warning.",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "written": {
       "description": "What was written.",
@@ -229,6 +243,26 @@
       "required": [
         "name",
         "version"
+      ]
+    },
+    "WarningCount": {
+      "description": "How many warnings of one kind a run had.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "description": "Warnings of that kind.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "kind": {
+          "description": "The kind, as in [`WarningRecord::kind`].",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "count"
       ]
     },
     "Written": {

@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
+use lodwright_contract::WarningRecord;
 use lodwright_core::layout;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
@@ -36,6 +37,9 @@ pub struct ObjectReport {
     pub files: Vec<FileRecord>,
     /// Things that did not go in and why, in a stable order.
     pub warnings: Vec<String>,
+    /// Every warning as a record (kind, plugin, subjects, advice), the complete list the `warnings` lines
+    /// summarise: a far model without a LOD model is one record per plugin that marks it visible from far.
+    pub records: Vec<WarningRecord>,
     /// Instances placed into blocks.
     pub instances: usize,
     /// Instances left out because their model has no LOD model or it could not be read.
@@ -59,6 +63,9 @@ pub struct Surfaces<'a> {
     /// The cell where the block grid of the world starts (`Worldspace::grid_anchor`); object blocks are 4 by 4
     /// cells from there. (0, 0) is the default.
     pub grid_anchor: (i32, i32),
+    /// The plugin names in load order, to name the plugin of an instance (`Instance::flagged_by`) in a warning;
+    /// empty names them by their number.
+    pub plugins: &'a [String],
 }
 
 type Mat = [[f32; 3]; 3];
@@ -395,6 +402,76 @@ fn blit(canvas: &mut [u8], width: u32, src: &Image, r: &Rect) {
     }
 }
 
+/// The records and lines for the objects whose LOD model is missing or cannot be read: one per plugin that marks them
+/// visible from far (the objects are counted, the models listed in full in the record), not one per object.
+fn far_model_records(
+    report: &mut ObjectReport,
+    world: &str,
+    plugins: &[String],
+    instances: &[&Instance],
+    models: &BTreeMap<String, Option<Model>>,
+    unreadable: &BTreeSet<String>,
+    assets: &dyn Assets,
+) {
+    // (kind, plugin index) -> full model path -> objects
+    let mut gaps: BTreeMap<(&'static str, usize), BTreeMap<String, u64>> = BTreeMap::new();
+    let mut full_found: BTreeMap<String, bool> = BTreeMap::new();
+    for i in instances {
+        let lod = lod_model_path(&i.model);
+        if models.get(&lod).is_none_or(Option::is_some) {
+            continue;
+        }
+        let full = full_model_path(&i.model);
+        let kind = if unreadable.contains(&lod) {
+            "far_model_unreadable"
+        } else if *full_found
+            .entry(full.clone())
+            .or_insert_with(|| assets.read(&full).is_some())
+        {
+            "far_model_without_lod_model"
+        } else {
+            "far_model_not_found"
+        };
+        *gaps
+            .entry((kind, i.flagged_by))
+            .or_default()
+            .entry(full)
+            .or_default() += 1;
+    }
+    for ((kind, plugin), by_model) in gaps {
+        let name = plugins
+            .get(plugin)
+            .cloned()
+            .unwrap_or_else(|| format!("plugin number {plugin}"));
+        let objects: u64 = by_model.values().sum();
+        let shown: Vec<&str> = by_model.keys().take(5).map(String::as_str).collect();
+        let more = by_model.len().saturating_sub(shown.len());
+        let list = if more > 0 {
+            format!("{} and {more} more", shown.join(", "))
+        } else {
+            shown.join(", ")
+        };
+        let what = match kind {
+            "far_model_unreadable" => "their LOD models cannot be read",
+            "far_model_not_found" => "neither a LOD model nor the full model is in the load order",
+            _ => "no LOD model exists for them in the game or any mod",
+        };
+        let message = format!(
+            "{name} marks {objects} objects of {} models visible from far, but {what}, so the objects are left out of the far view ({list})",
+            by_model.len()
+        );
+        report.records.push(WarningRecord::new(
+            kind,
+            Some(world),
+            Some(&name),
+            by_model.keys().cloned(),
+            Some(objects),
+            message.clone(),
+        ));
+        report.warnings.push(message);
+    }
+}
+
 /// Generate the object LOD of one world into `out`.
 ///
 /// `instances` come from [`lodwright_core::objects::visible_instances`]; models and textures are read through
@@ -461,6 +538,8 @@ pub fn generate_objects_with_atlas_limit(
     let mut report = ObjectReport::default();
     // models
     let mut models: BTreeMap<String, Option<Model>> = BTreeMap::new();
+    // the LOD models that exist as a file but cannot be read (the others that are missing have no file)
+    let mut unreadable: BTreeSet<String> = BTreeSet::new();
     // the full model each LOD model stands for, for a shape that names no texture
     let mut full_of: BTreeMap<String, String> = BTreeMap::new();
     for i in instances {
@@ -469,10 +548,12 @@ pub fn generate_objects_with_atlas_limit(
             .entry(path.clone())
             .or_insert_with(|| full_model_path(&i.model));
         models.entry(path.clone()).or_insert_with(|| {
-            assets
-                .read(&path)
-                .and_then(|b| parse_lod_model(&b).ok())
-                .map(|parts| Model { parts })
+            let bytes = assets.read(&path)?;
+            let parsed = parse_lod_model(&bytes).ok();
+            if parsed.is_none() {
+                unreadable.insert(path.clone());
+            }
+            parsed.map(|parts| Model { parts })
         });
     }
     // a shape with no diffuse texture takes the texture of the full model it stands for, and says so; when the full
@@ -480,10 +561,8 @@ pub fn generate_objects_with_atlas_limit(
     // not get pale shapes silently). The models that are missing or cannot be read are said in one line with their
     // count and the first paths (many flagged bases have no LOD model in the game's own data, which is how the game's
     // own blocks are made too)
-    let mut missing: Vec<&str> = Vec::new();
     for (path, model) in &mut models {
         let Some(m) = model else {
-            missing.push(path);
             continue;
         };
         if m.parts.iter().all(|p| p.diffuse.is_some()) {
@@ -496,32 +575,28 @@ pub fn generate_objects_with_atlas_limit(
                 .and_then(|parts| parts.into_iter().find_map(|p| p.diffuse))
                 .map(|d| (f.clone(), d))
         });
-        match full {
-            Some((full_path, diffuse)) => {
-                report.warnings.push(format!(
-                    "model {path} has a shape with no diffuse texture, the texture {} of {full_path} is used",
-                    norm_key(&diffuse)
-                ));
-                for p in m.parts.iter_mut().filter(|p| p.diffuse.is_none()) {
-                    p.diffuse = Some(diffuse.clone());
-                }
+        let message = if let Some((full_path, diffuse)) = full {
+            for p in m.parts.iter_mut().filter(|p| p.diffuse.is_none()) {
+                p.diffuse = Some(diffuse.clone());
             }
-            None => report.warnings.push(format!(
+            format!(
+                "model {path} has a shape with no diffuse texture, the texture {} of {full_path} is used",
+                norm_key(&diffuse)
+            )
+        } else {
+            format!(
                 "model {path} has a shape with no diffuse texture and its full model names none, a flat colour is used"
-            )),
-        }
-    }
-    if !missing.is_empty() {
-        let shown: Vec<&str> = missing.iter().take(3).copied().collect();
-        report.warnings.push(format!(
-            "{} LOD models are missing or cannot be read, their objects are left out (for example {})",
-            missing.len(),
-            shown.join(", ")
+            )
+        };
+        report.records.push(WarningRecord::new(
+            "lod_shape_without_texture",
+            Some(world),
+            None,
+            [path.clone()],
+            None,
+            message.clone(),
         ));
-    }
-    if models.values().all(Option::is_none) {
-        report.skipped = instances.len();
-        return Ok(report);
+        report.warnings.push(message);
     }
     // a static collection draws its own LOD model; its parts count only when that model is missing
     let own_lod: BTreeSet<u32> = instances
@@ -538,6 +613,19 @@ pub fn generate_objects_with_atlas_limit(
         .iter()
         .filter(|i| !(i.part && own_lod.contains(&i.reference)))
         .collect();
+    far_model_records(
+        &mut report,
+        world,
+        surfaces.plugins,
+        &instances,
+        &models,
+        &unreadable,
+        assets,
+    );
+    if models.values().all(Option::is_none) {
+        report.skipped = instances.len();
+        return Ok(report);
+    }
     // textures: key by the diffuse path of each shape
     let key_of = |p: &Part| {
         p.diffuse
@@ -564,12 +652,20 @@ pub fn generate_objects_with_atlas_limit(
             }
             Err(fault) => {
                 if k != NONE {
-                    report.warnings.push(texture_warning(
-                        "texture",
-                        k,
-                        &fault,
-                        ", a flat colour is used",
+                    let message = texture_warning("texture", k, &fault, ", a flat colour is used");
+                    let kind = match fault {
+                        crate::assets::TextureFault::Missing => "texture_not_found",
+                        crate::assets::TextureFault::Unreadable(_) => "texture_unreadable",
+                    };
+                    report.records.push(WarningRecord::new(
+                        kind,
+                        Some(world),
+                        None,
+                        [k.clone()],
+                        None,
+                        message.clone(),
                     ));
+                    report.warnings.push(message);
                 }
                 images.insert(k.clone(), flat(8, 8, [128, 128, 128, 255]));
             }
@@ -691,9 +787,18 @@ pub fn generate_objects_with_atlas_limit(
             }
         }
         if dropped > 0 {
-            report.warnings.push(format!(
+            let message = format!(
                 "block x{bx} y{by}: {dropped} objects left out, each alone has more vertices or triangles than one shape can hold"
+            );
+            report.records.push(WarningRecord::new(
+                "block_objects_left_out",
+                Some(world),
+                None,
+                [format!("x{bx} y{by}")],
+                Some(dropped as u64),
+                message.clone(),
             ));
+            report.warnings.push(message);
         }
         // a high-priority instance is in its block's normal file too: count its faces once, from the normal file
         if !high {
@@ -712,9 +817,18 @@ pub fn generate_objects_with_atlas_limit(
             continue;
         }
         if extra > 0 {
-            report.warnings.push(format!(
+            let message = format!(
                 "block x{bx} y{by}: {extra} objects did not fit one shape, the block is written as {count} shapes"
+            );
+            report.records.push(WarningRecord::new(
+                "block_split_into_shapes",
+                Some(world),
+                None,
+                [format!("x{bx} y{by}")],
+                Some(extra as u64),
+                message.clone(),
             ));
+            report.warnings.push(message);
         }
         let shapes: Vec<ObjectBlock> = chunks
             .iter()

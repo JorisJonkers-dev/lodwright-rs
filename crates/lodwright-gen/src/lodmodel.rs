@@ -267,7 +267,8 @@ impl Ctx<'_> {
 /// # Errors
 /// A message when the bytes are not a NIF this reader understands or have no geometry.
 pub fn parse_lod_model(bytes: &[u8]) -> Result<Vec<Part>, String> {
-    let file = NifFile::read(bytes).map_err(|e| e.to_string())?;
+    // bytes after the footer are ignored, as the game does: some mods ship LOD models with a stale tail
+    let file = NifFile::read_ignoring_trailing_bytes(bytes).map_err(|e| e.to_string())?;
     let mut ctx = Ctx {
         file: &file,
         parts: Vec::new(),

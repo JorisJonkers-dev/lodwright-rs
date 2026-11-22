@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use lodwright_contract::{
     BlockCounts, MANIFEST_FILE, Manifest, ManifestBlock, ManifestFile, Request, ResultDoc, Status,
-    Written, sha256_digest,
+    WARNINGS_FILE, WarningRecord, WarningsFile, Written, sha256_digest,
 };
 use lodwright_core::terrain::{LevelSettings, TerrainSettings};
 use lodwright_core::worldspace::Worldspace;
@@ -178,6 +178,10 @@ fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
         doc.warnings.pop();
     }
     for w in warnings {
+        // a warning that two steps of a run both produce is said once
+        if doc.warnings.contains(&w) {
+            continue;
+        }
         if doc.warnings.len() < LIMIT {
             doc.warnings.push(w);
         } else {
@@ -187,6 +191,61 @@ fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
     if left_out > 0 {
         doc.warnings.push(format!("{left_out}{MORE}"));
     }
+}
+
+/// A record for a warning line of a step that does not build records itself: the kind comes from the line's wording.
+fn classify(world: Option<&str>, text: &str) -> WarningRecord {
+    let (kind, subject) = if let Some((head, _)) = text.split_once(" not found") {
+        (
+            "texture_not_found",
+            head.split_once(' ').map_or(head, |(_, p)| p),
+        )
+    } else if let Some((head, _)) = text.split_once(" found but not readable") {
+        (
+            "texture_unreadable",
+            head.split_once(' ').map_or(head, |(_, p)| p),
+        )
+    } else if text.starts_with("specular alpha:") {
+        ("specular_exponent_missing", text)
+    } else {
+        ("other", text)
+    };
+    WarningRecord::new(
+        kind,
+        world,
+        None,
+        [subject.to_owned()],
+        None,
+        text.to_owned(),
+    )
+}
+
+/// Warning lines of a step: into the result's short list, and each as a record.
+fn note(doc: &mut ResultDoc, records: &mut Vec<WarningRecord>, world: &str, lines: Vec<String>) {
+    records.extend(lines.iter().map(|l| classify(Some(world), l)));
+    add_warnings(doc, lines);
+}
+
+/// Count the records per kind into the document and write the file of them into `stage`; nothing is written when
+/// the run had no warning.
+fn write_warnings(
+    doc: &mut ResultDoc,
+    stage: &Path,
+    records: Vec<WarningRecord>,
+) -> Result<(), Error> {
+    if records.is_empty() {
+        return Ok(());
+    }
+    let file = WarningsFile::new(records);
+    let text = serde_json::to_string_pretty(&file).map_err(|e| {
+        Error::new("output_failed", "cannot write the warnings file").with_detail(e.to_string())
+    })? + "\n";
+    lodwright_gen::write_output_file(stage, WARNINGS_FILE, text.as_bytes()).map_err(|e| {
+        Error::new("output_failed", "cannot write the warnings file").with_detail(e.to_string())
+    })?;
+    doc.warning_counts = file.counts;
+    doc.warnings_file = Some(WARNINGS_FILE.to_owned());
+    Ok(())
 }
 
 fn kind_of(path: &str) -> &'static str {
@@ -388,6 +447,14 @@ pub fn generate(
         "the output folder already holds this request's files".clone_into(&mut doc.reason);
         written_of("", &old.files, &mut doc);
         doc.manifest = Some(MANIFEST_FILE.to_owned());
+        // the warnings of the run that wrote the files are still beside them
+        if let Some(file) = std::fs::read(out.join(WARNINGS_FILE))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<WarningsFile>(&b).ok())
+        {
+            doc.warning_counts = file.counts;
+            doc.warnings_file = Some(WARNINGS_FILE.to_owned());
+        }
         return Ok(GenerateOutcome::Done {
             result: Box::new(doc),
         });
@@ -501,6 +568,7 @@ pub fn generate(
     let mut counts: Option<BlockCounts> = None;
     let mut patched_tiles = 0_u64;
     let mut cancelled = false;
+    let mut records: Vec<WarningRecord> = Vec::new();
     'worlds: for world in chosen {
         // the grid every level's blocks start from, as the terrain stage finds it (after dropping outlying edges)
         let anchor = world.without_outliers().grid_anchor();
@@ -555,7 +623,7 @@ pub fn generate(
                 |level: u32, cell: (i32, i32)| keep.as_ref().and_then(|k| k.patch(level, cell));
             let mean_fn =
                 |level: u32, cell: (i32, i32)| keep.as_ref().and_then(|k| k.mean(level, cell));
-            add_warnings(&mut doc, warnings);
+            note(&mut doc, &mut records, world.name(), warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
                 request.limits.memory_mib,
@@ -565,8 +633,10 @@ pub fn generate(
                 threads,
             );
             if workers < threads {
-                add_warnings(
+                note(
                     &mut doc,
+                    &mut records,
+                    world.name(),
                     vec![format!(
                         "{}: the memory budget leaves room for {workers} of {threads} terrain workers",
                         world.name()
@@ -672,6 +742,7 @@ pub fn generate(
                     .drop_under_water
                     .then_some(&water as lodwright_gen::HeightAt),
                 grid_anchor: anchor,
+                plugins: &request.plugins,
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),
@@ -692,6 +763,7 @@ pub fn generate(
             )
             .map_err(|e| gen_error(&e))?;
             add_warnings(&mut doc, objects.warnings.clone());
+            records.extend(objects.records.iter().cloned());
             if request.objects.drop_under_terrain || request.objects.drop_under_water {
                 let d = doc.dropped_faces.get_or_insert_with(Default::default);
                 d.under_terrain += objects.dropped_under_terrain as u64;
@@ -732,7 +804,7 @@ pub fn generate(
                 },
             )
             .map_err(|e| gen_error(&e))?;
-            add_warnings(&mut doc, trees.warnings.clone());
+            note(&mut doc, &mut records, world.name(), trees.warnings.clone());
             files.extend(trees.files.iter().map(to_manifest_file));
         }
         written_of(world.name(), &files, &mut doc);
@@ -780,6 +852,7 @@ pub fn generate(
     let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
     // staging holds exactly the manifest's files: whatever else a killed run left in it is dropped
     crate::staging::prune(&stage, &manifest.files);
+    write_warnings(&mut doc, &stage, records)?;
     crate::staging::finish_manifest(&stage, &manifest)?;
     crate::staging::swap(&target, &stage)?;
     doc.manifest = Some(MANIFEST_FILE.to_owned());

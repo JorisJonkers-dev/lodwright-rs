@@ -180,6 +180,7 @@ fn instance(model: &str, x: f32, reference: u32) -> Instance {
         reference,
         reference_plugin: 0,
         base_plugin: 0,
+        flagged_by: 0,
         part: false,
         cell: None,
     }

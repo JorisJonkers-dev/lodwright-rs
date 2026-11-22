@@ -68,6 +68,14 @@ pub struct ResultDoc {
     /// Things that did not go in and why, at most twenty lines (a missing texture, a model without LOD).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+    /// How many warnings of each kind the run had, sorted by kind; the full list is in `warnings_file`. Omitted
+    /// when the run had none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warning_counts: Vec<WarningCount>,
+    /// Relative name of the file with every warning, one record each ([`WarningsFile`]), beside the manifest;
+    /// omitted when the run had no warning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warnings_file: Option<String>,
     /// Relative name of the manifest, when one was written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifest: Option<String>,
@@ -83,6 +91,161 @@ pub struct ResultDoc {
     /// composed; omitted when the run composes every tile (`terrain.compose_shipped_tiles`) or wrote no land tiles.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tiles: Option<TileCounts>,
+}
+
+/// The name of the file with every warning of a run, written beside the manifest.
+pub const WARNINGS_FILE: &str = "lodwright-warnings.json";
+/// The contract name of that file.
+pub const WARNINGS_CONTRACT: &str = "lodwright-warnings";
+
+/// How many warnings of one kind a run had.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct WarningCount {
+    /// The kind, as in [`WarningRecord::kind`].
+    pub kind: String,
+    /// Warnings of that kind.
+    pub count: u64,
+}
+
+/// One warning of a run: what was left out or drawn another way, which plugin it concerns and what a person can do.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct WarningRecord {
+    /// A stable name of the kind of warning, for example `far_model_without_lod_model`.
+    pub kind: String,
+    /// The world the warning concerns; omitted when it concerns no one world.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world: Option<String>,
+    /// The plugin the warning concerns (for a far model: the plugin that marks the object visible from far); omitted
+    /// when no plugin is known. lodwright reads plugins, not mods: a person finds the mod from the plugin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
+    /// The files, blocks or models the warning is about, sorted; complete (the short list in the result is not).
+    pub subjects: Vec<String>,
+    /// How many subjects (or objects, where the kind counts objects).
+    pub count: u64,
+    /// The text of the warning.
+    pub message: String,
+    /// What a person can do about it.
+    pub advice: String,
+}
+
+impl WarningRecord {
+    /// A record of `kind` with its text and the advice that goes with the kind; one subject per entry of `subjects`
+    /// (sorted, without repeats) and `count` taken from them unless `count` is given.
+    #[must_use]
+    pub fn new(
+        kind: &str,
+        world: Option<&str>,
+        plugin: Option<&str>,
+        subjects: impl IntoIterator<Item = String>,
+        count: Option<u64>,
+        message: String,
+    ) -> Self {
+        let subjects: std::collections::BTreeSet<String> = subjects.into_iter().collect();
+        let subjects: Vec<String> = subjects.into_iter().collect();
+        Self {
+            kind: kind.to_owned(),
+            world: world.map(str::to_owned),
+            plugin: plugin.map(str::to_owned),
+            count: count.unwrap_or(subjects.len() as u64),
+            subjects,
+            message,
+            advice: advice_for(kind).to_owned(),
+        }
+    }
+}
+
+/// The file of every warning of a run (`lodwright-warnings.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct WarningsFile {
+    /// The document version; 1.
+    #[schemars(extend("const" = 1))]
+    pub schema_version: u32,
+    /// The contract name, `lodwright-warnings`.
+    #[schemars(extend("const" = "lodwright-warnings"))]
+    pub contract: String,
+    /// The warnings per kind.
+    pub counts: Vec<WarningCount>,
+    /// Every warning, sorted by kind, plugin and subjects.
+    pub warnings: Vec<WarningRecord>,
+}
+
+impl WarningsFile {
+    /// The file for `records`: sorted, and counted per kind.
+    #[must_use]
+    pub fn new(mut records: Vec<WarningRecord>) -> Self {
+        records.sort_by(|a, b| {
+            (&a.kind, &a.world, &a.plugin, &a.subjects, &a.message).cmp(&(
+                &b.kind,
+                &b.world,
+                &b.plugin,
+                &b.subjects,
+                &b.message,
+            ))
+        });
+        records.dedup();
+        Self {
+            schema_version: 1,
+            contract: WARNINGS_CONTRACT.to_owned(),
+            counts: warning_counts(&records),
+            warnings: records,
+        }
+    }
+}
+
+/// The records counted per kind, sorted by kind.
+#[must_use]
+pub fn warning_counts(records: &[WarningRecord]) -> Vec<WarningCount> {
+    let mut by: std::collections::BTreeMap<&str, u64> = std::collections::BTreeMap::new();
+    for r in records {
+        *by.entry(&r.kind).or_default() += 1;
+    }
+    by.into_iter()
+        .map(|(kind, count)| WarningCount {
+            kind: kind.to_owned(),
+            count,
+        })
+        .collect()
+}
+
+/// What a person can do about a warning of `kind`.
+#[must_use]
+pub fn advice_for(kind: &str) -> &'static str {
+    match kind {
+        "far_model_without_lod_model" => {
+            "Nothing is wrong with the load order: no LOD model exists for these models in the game or any mod, so the \
+             objects are left out of the far view (other LOD generators leave them out too). To see them from far, install a mod \
+             that ships their LOD models, or ask the author of the plugin to stop marking them visible from far."
+        }
+        "far_model_not_found" => {
+            "Neither the LOD model nor the full model was found. Check that the mod with the model is enabled and that \
+             its files are in the data folder; if the plugin needs a master or mod you left out, enable it."
+        }
+        "far_model_unreadable" => {
+            "The LOD model was found but cannot be read. Reinstall the mod that provides it, or remove its LOD \
+             model so that the objects are left out."
+        }
+        "lod_shape_without_texture" => {
+            "A shape of a LOD model names no diffuse texture. Lodwright takes the texture of the full model where it \
+             can, else draws a flat colour; ask the author of the model's mod for a fixed LOD model."
+        }
+        "texture_not_found" => {
+            "A texture a model or land type names is in no folder or archive of the load order. Install or enable the \
+             mod that ships it; until then a flat colour or the neutral earth is used."
+        }
+        "texture_unreadable" => {
+            "A texture was found but lodwright cannot read its format. Replace it with one in a common format (BC1, \
+             BC3, BC7 or uncompressed); until then a flat colour is used."
+        }
+        "block_objects_left_out" => {
+            "Single objects are too large for one block shape (more than 65535 vertices or triangles). Use a LOD \
+             model with fewer triangles for them."
+        }
+        "block_split_into_shapes" => {
+            "Nothing to do: a block with many objects is written as several shapes, as the game's own blocks are."
+        }
+        _ => "Read the message; no further advice is known for this kind of warning.",
+    }
 }
 
 /// Diffuse tiles left to the game and composed.
@@ -130,6 +293,8 @@ impl ResultDoc {
             missing_capabilities: Vec::new(),
             written: Vec::new(),
             warnings: Vec::new(),
+            warning_counts: Vec::new(),
+            warnings_file: None,
             manifest: None,
             blocks: None,
             dropped_faces: None,

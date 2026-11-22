@@ -91,7 +91,8 @@ fn contents(out: &Path) -> Vec<(String, Vec<u8>)> {
     }
     let mut files = Vec::new();
     walk(out, out, &mut files);
-    files.retain(|(name, _)| name != MANIFEST_FILE);
+    // the warnings file records the run's own warnings (the budgeted run has one more): not a file of the LOD
+    files.retain(|(name, _)| name != MANIFEST_FILE && name != lodwright_contract::WARNINGS_FILE);
     files.sort();
     files
 }

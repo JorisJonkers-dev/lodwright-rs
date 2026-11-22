@@ -131,6 +131,15 @@ others, and the old manifest's files it neither kept nor wrote are gone after th
 whenever the run does not end as `up_to_date`, and the manifest records no digests for their blocks (decision `docs/decisions/2026-11-20-object-and-tree-blocks-are-rebuilt-in-full.md`). An output folder that is not empty and has no manifest is refused
 (`output_not_empty`) unless `--overwrite` is given.
 
+A run with warnings also leaves `lodwright-warnings.json` (`lodwright-warnings`, version 1) beside the manifest; the
+manifest does not list it, so it is not part of the LOD that is installed. It holds `counts` (warnings per kind) and
+`warnings`, every warning once, sorted: `kind`, `world`, `plugin` (the plugin the warning concerns; lodwright reads
+plugins, not mods), `subjects` (every model, texture or block it is about, complete), `count`, `message` and `advice`
+(what a person can do). The result names the file in `warnings_file` and counts the records per kind in
+`warning_counts`; its own `warnings` list stays the short one (at most twenty lines). Objects that plugins mark visible
+from far whose model has no LOD model are one record per plugin and kind (`far_model_without_lod_model`,
+`far_model_not_found`, `far_model_unreadable`), not one per object.
+
 Nothing is written, replaced or removed outside the output folder. The folder may itself be a link: it is refused
 when it points into the data folder, and when either the link or the folder it points to lies in a git working tree. Below it, a folder on a file's path that is a link is
 refused (`output_link`, nothing is written through it). A temporary file is always created new, so a link already at

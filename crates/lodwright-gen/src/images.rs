@@ -259,6 +259,147 @@ pub fn diffuse_image(world: &Worldspace, id: BlockId, size: u32, tiles: &LandTil
     Image::new(size, size, rgba).expect("a square power-of-two image")
 }
 
+/// A tile the game ships whose cells are in part unchanged: its picture and the cells (absolute) a mod changed.
+pub struct ShippedPatch {
+    /// The game's own picture of the tile.
+    pub image: Image,
+    /// The cells under the tile whose land a mod changed.
+    pub changed: std::collections::BTreeSet<(i32, i32)>,
+}
+
+/// Mean and standard deviation per channel of the given pixels.
+fn channel_stats(rgba: &[u8], pixels: &[usize]) -> [(f32, f32); 3] {
+    let mut out = [(0.0, 0.0); 3];
+    if pixels.is_empty() {
+        return out;
+    }
+    let n = pixels.len() as f32;
+    for (k, o) in out.iter_mut().enumerate() {
+        let mean = pixels
+            .iter()
+            .map(|&i| f32::from(rgba[i * 4 + k]))
+            .sum::<f32>()
+            / n;
+        let var = pixels
+            .iter()
+            .map(|&i| (f32::from(rgba[i * 4 + k]) - mean).powi(2))
+            .sum::<f32>()
+            / n;
+        *o = (mean, var.sqrt());
+    }
+    out
+}
+
+/// Whether composed pixels agree with the shipped ones over `pixels` closely enough that no tone matching is needed:
+/// the means within 6 of 255 and the spreads within a quarter of each other, per channel.
+fn agrees(composed: &[(f32, f32); 3], shipped: &[(f32, f32); 3]) -> bool {
+    composed.iter().zip(shipped).all(|(c, s)| {
+        (c.0 - s.0).abs() <= 6.0 && c.1 <= s.1 * 1.25 + 1.0 && s.1 <= c.1 * 1.25 + 1.0
+    })
+}
+
+/// The game's tile with the composed picture written into the squares of the changed cells only.
+///
+/// Where the composed and shipped pictures disagree over the unchanged cells (the game's own tiles were not made by
+/// composing, as in the Capital Wasteland) each changed cell's composed pixels are brought to the mean and spread per
+/// channel of the shipped pixels of that same cell, and the patch is feathered over its first pixels inside the edge.
+#[must_use]
+pub fn patch_image(
+    composed: &Image,
+    shipped: &Image,
+    id: BlockId,
+    changed: &std::collections::BTreeSet<(i32, i32)>,
+) -> Image {
+    use lodwright_dds::{Filter, resize};
+    let n = composed.width() as usize;
+    let shipped = if shipped.width() as usize == n && shipped.height() as usize == n {
+        shipped.clone()
+    } else {
+        resize(shipped, n as u32, n as u32, Filter::Box).unwrap_or_else(|_| composed.clone())
+    };
+    let units = id.level as f32 * CELL_UNITS;
+    let cell_of = |r: usize, c: usize| {
+        let x = units * (1.0 - (c as f32 + 0.5) / n as f32);
+        let y = units * ((r as f32 + 0.5) / n as f32);
+        (
+            id.x + (x / CELL_UNITS).floor() as i32,
+            id.y + (y / CELL_UNITS).floor() as i32,
+        )
+    };
+    let mut by_cell: std::collections::BTreeMap<(i32, i32), Vec<usize>> =
+        std::collections::BTreeMap::default();
+    let mut unchanged = Vec::new();
+    let mut mask = vec![0.0_f32; n * n];
+    for r in 0..n {
+        for c in 0..n {
+            let cell = cell_of(r, c);
+            if changed.contains(&cell) {
+                by_cell.entry(cell).or_default().push(r * n + c);
+                mask[r * n + c] = 1.0;
+            } else {
+                unchanged.push(r * n + c);
+            }
+        }
+    }
+    let needs_match = unchanged.is_empty()
+        || !agrees(
+            &channel_stats(composed.rgba(), &unchanged),
+            &channel_stats(shipped.rgba(), &unchanged),
+        );
+    let mut matched = composed.rgba().to_vec();
+    if needs_match {
+        for pixels in by_cell.values() {
+            let c = channel_stats(composed.rgba(), pixels);
+            let s = channel_stats(shipped.rgba(), pixels);
+            for &i in pixels {
+                for k in 0..3 {
+                    let gain = if pixels.len() < 4 || c[k].1 < 0.5 {
+                        1.0
+                    } else {
+                        (s[k].1 / c[k].1).clamp(0.25, 4.0)
+                    };
+                    let v = (f32::from(matched[i * 4 + k]) - c[k].0) * gain + s[k].0;
+                    matched[i * 4 + k] = v.round().clamp(0.0, 255.0) as u8;
+                }
+            }
+        }
+    }
+    // feather: the weight of the patch falls over the two pixels inside a changed cell's edge
+    let blurred: Vec<f32> = (0..n * n)
+        .map(|i| {
+            let (r, c) = ((i / n) as i64, (i % n) as i64);
+            let mut sum = 0.0;
+            let mut count = 0.0;
+            for dr in -2..=2_i64 {
+                for dc in -2..=2_i64 {
+                    let (rr, cc) = (r + dr, c + dc);
+                    if (0..n as i64).contains(&rr) && (0..n as i64).contains(&cc) {
+                        sum += mask[rr as usize * n + cc as usize];
+                        count += 1.0;
+                    }
+                }
+            }
+            sum / count
+        })
+        .collect();
+    let mut out = shipped.rgba().to_vec();
+    for i in 0..n * n {
+        if mask[i] > 0.0 {
+            // only the edge pixels of a patch large enough to have an inside are feathered
+            let w = if needs_match && n >= 128 {
+                blurred[i]
+            } else {
+                1.0
+            };
+            for k in 0..3 {
+                let v = w * f32::from(matched[i * 4 + k]) + (1.0 - w) * f32::from(out[i * 4 + k]);
+                out[i * 4 + k] = v.round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    Image::new(n as u32, n as u32, out).unwrap_or_else(|_| composed.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FALLBACK, diffuse_image, normal_image};
@@ -269,6 +410,45 @@ mod tests {
 
     fn world() -> Worldspace {
         Worldspace::from_cells(1, "W", [((0, 0), CellHeights::flat(10.0))])
+    }
+
+    fn flat_image(size: u32, rgb: [u8; 3]) -> lodwright_dds::Image {
+        let rgba = (0..size * size)
+            .flat_map(|_| [rgb[0], rgb[1], rgb[2], 255])
+            .collect();
+        lodwright_dds::Image::new(size, size, rgba).unwrap()
+    }
+
+    #[test]
+    fn a_patch_changes_only_the_changed_cells_square() {
+        use super::patch_image;
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        let changed: std::collections::BTreeSet<(i32, i32)> = [(1, 2)].into_iter().collect();
+        let out = patch_image(
+            &flat_image(256, [200, 200, 200]),
+            &flat_image(256, [60, 60, 60]),
+            id,
+            &changed,
+        );
+        // pixel (row, column) lies in cell x = 3 - column / 64, y = row / 64: the cell (1, 2) is column 128..192, row 128..192
+        let px = |r: usize, c: usize| out.rgba()[(r * 256 + c) * 4];
+        assert_eq!(px(0, 0), 60);
+        assert_eq!(px(255, 255), 60);
+        // composed and shipped disagree, so the cell is brought to the shipped tone (flat pictures: its mean)
+        assert_eq!(px(160, 160), 60);
+        // a cell that agrees with the shipped picture is written as composed
+        let out = patch_image(
+            &flat_image(256, [62, 62, 62]),
+            &flat_image(256, [60, 60, 60]),
+            id,
+            &changed,
+        );
+        assert_eq!(out.rgba()[(160 * 256 + 160) * 4], 62);
+        assert_eq!(out.rgba()[0], 60);
     }
 
     #[test]

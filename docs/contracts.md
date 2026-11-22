@@ -165,8 +165,11 @@ written as always) and the game's own tile of that name is the one the engine dr
   `ThePitt.esm`, `BrokenSteel.esm`, `PointLookout.esm`, `Zeta.esm`, `TaleOfTwoWastelands.esm`, `YUPTTW.esm`). The load
   order is compared with the same load order in which every other plugin is an empty shell: a cell counts as changed
   when its `LAND` record exists on one side only, or its heights, vertex colours or texture layers differ, or a land
-  texture its layers name resolves to another file. A tile is composed when any of the cells under it changed (4, 8,
-  16 and 32 cells a side at the four levels). A cell also counts as changed when a land texture
+  texture its layers name resolves to another file. A tile with a changed cell is written (4, 8, 16 and 32 cells a
+  side at the four levels): the game's own picture with the composed one written into the squares of the changed cells
+  only. Where composed and shipped pictures disagree over the tile's unchanged cells, each changed cell's composed
+  pixels are first brought to the mean and spread per channel of the shipped pixels of that cell and the patch is
+  feathered two pixels inside its edge. A tile whose every cell changed, or that the game does not ship, is composed. A cell also counts as changed when a land texture
   it uses is a file that does not come from a game archive: each texture is resolved through the load order's loose
   files and archives as the game does, and a loose file or a file from an archive that is not the game's (a name
   that starts with a game plugin's name or `Fallout - `) wins over the game's.

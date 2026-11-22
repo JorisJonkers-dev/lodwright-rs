@@ -21,7 +21,9 @@ use lodwright_nif::{TerrainBlock, WaterShape, terrain_block};
 
 use crate::diffuse::LandTiles;
 use crate::error::GenError;
-use crate::images::{diffuse_image, normal_image_with_alpha, specular_alpha};
+use crate::images::{
+    ShippedPatch, diffuse_image, normal_image_with_alpha, patch_image, specular_alpha,
+};
 use crate::water::{Plane, add_walls, water_mesh};
 
 const CELL_UNITS: f32 = 4096.0;
@@ -56,6 +58,10 @@ pub struct Options<'a> {
     /// tile of that name (shipped in its archives) is the one the engine loads. The mesh and the normal map are
     /// written as always.
     pub keep_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> bool + Sync)>,
+    /// Asked with a block's level and first cell when `keep_shipped` did not keep it: the game's tile and the cells
+    /// under it a mod changed, when the game ships one and some of its cells are unchanged. The diffuse tile is then
+    /// the game's own picture with the composed one written into the changed cells only.
+    pub patch_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> Option<ShippedPatch> + Sync)>,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -76,6 +82,7 @@ impl Default for Options<'_> {
             water_shared_vertices: false,
             water_polygons: false,
             keep_shipped: None,
+            patch_shipped: None,
             reuse: None,
             cancel: None,
         }
@@ -106,6 +113,8 @@ pub struct BlockRecord {
     pub reused: bool,
     /// The diffuse tile was left to the game's own ([`Options::keep_shipped`]); `files` has none.
     pub kept_diffuse: bool,
+    /// The diffuse tile is the game's with the changed cells composed in ([`Options::patch_shipped`]).
+    pub patched_diffuse: bool,
 }
 
 /// What a run wrote.
@@ -258,7 +267,22 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let inputs = block_inputs(world, &samples, job, tiles, options);
+    let mut inputs = block_inputs(world, &samples, job, tiles, options);
+    let patch = if keep_diffuse(options, job) {
+        None
+    } else {
+        options
+            .patch_shipped
+            .and_then(|f| f(job.level.level, job.cell))
+    };
+    if let Some(patch) = &patch {
+        // the shipped picture and the cells that were patched into it belong to the block's inputs
+        let mut h = Sha256Stream::new();
+        h.update(inputs.as_bytes());
+        h.update(format!("patch-shipped {:?}", patch.changed).as_bytes());
+        h.update(patch.image.rgba());
+        inputs = h.finish();
+    }
     if let Some(files) = options.reuse.and_then(|reuse| reuse(&key, &inputs)) {
         return Ok(Some(BlockRecord {
             key,
@@ -266,6 +290,7 @@ fn run_job(
             files,
             reused: true,
             kept_diffuse: keep_diffuse(options, job),
+            patched_diffuse: patch.is_some(),
         }));
     }
     // water height at a block-local position: the cell the position lies in, counted from the block's first cell
@@ -347,10 +372,12 @@ fn run_job(
     let kept_diffuse = keep_diffuse(options, job);
     let mut files = vec![write_file(out, &layout::mesh_path(name, id)?, &nif)?];
     if !kept_diffuse {
-        let diffuse = dds(
-            &diffuse_image(world, id, level.diffuse_size, tiles),
-            Format::Bc1,
-        )?;
+        let composed = diffuse_image(world, id, level.diffuse_size, tiles);
+        let image = match &patch {
+            Some(p) => patch_image(&composed, &p.image, id, &p.changed),
+            None => composed,
+        };
+        let diffuse = dds(&image, Format::Bc1)?;
         files.push(write_file(out, &layout::diffuse_path(name, id)?, &diffuse)?);
     }
     files.push(write_file(out, &layout::normal_path(name, id)?, &normals)?);
@@ -360,6 +387,7 @@ fn run_job(
         files,
         reused: false,
         kept_diffuse,
+        patched_diffuse: patch.is_some(),
     }))
 }
 
@@ -590,6 +618,7 @@ mod tests {
                 &out,
                 &Options {
                     keep_shipped: keep.then_some(hook),
+                    patch_shipped: None,
                     ..Options::default()
                 },
             )
@@ -766,6 +795,7 @@ mod tests {
                 water_shared_vertices: false,
                 water_polygons: false,
                 keep_shipped: None,
+                patch_shipped: None,
                 reuse: None,
                 cancel: None,
             },
@@ -785,6 +815,7 @@ mod tests {
                 water_shared_vertices: false,
                 water_polygons: false,
                 keep_shipped: None,
+                patch_shipped: None,
                 reuse: None,
                 cancel: None,
             },

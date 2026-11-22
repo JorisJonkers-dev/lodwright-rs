@@ -461,6 +461,7 @@ pub fn generate(
     let mut all: Vec<ManifestFile> = Vec::new();
     let mut blocks: Vec<ManifestBlock> = Vec::new();
     let mut counts: Option<BlockCounts> = None;
+    let mut patched_tiles = 0_u64;
     let mut cancelled = false;
     'worlds: for world in chosen {
         // the grid every level's blocks start from, as the terrain stage finds it (after dropping outlying edges)
@@ -503,6 +504,8 @@ pub fn generate(
             };
             let keep_fn =
                 |level: u32, cell: (i32, i32)| keep.as_ref().is_some_and(|k| k.keeps(level, cell));
+            let patch_fn =
+                |level: u32, cell: (i32, i32)| keep.as_ref().and_then(|k| k.patch(level, cell));
             add_warnings(&mut doc, warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
@@ -544,6 +547,7 @@ pub fn generate(
                         water_shared_vertices: request.terrain.water_shared_vertices,
                         water_polygons: request.terrain.water_polygons,
                         keep_shipped: keep.is_some().then_some(&keep_fn),
+                        patch_shipped: keep.is_some().then_some(&patch_fn),
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },
@@ -559,6 +563,7 @@ pub fn generate(
                         t.kept += 1;
                     } else {
                         t.composed += 1;
+                        patched_tiles += u64::from(b.patched_diffuse);
                     }
                 }
             }
@@ -717,8 +722,8 @@ pub fn generate(
     doc.blocks = counts;
     if let Some(t) = doc.tiles {
         doc.reason = format!(
-            "LOD written; diffuse tiles: {} left to the game's own, {} composed",
-            t.kept, t.composed
+            "LOD written; diffuse tiles: {} left to the game's own, {} composed ({} of them written into the game's tile for the changed cells only)",
+            t.kept, t.composed, patched_tiles
         );
     }
     let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);

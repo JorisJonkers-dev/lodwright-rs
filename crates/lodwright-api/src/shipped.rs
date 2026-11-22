@@ -13,7 +13,7 @@ use lodwright_core::plugin::Plugin;
 use lodwright_core::shipped::{changed_cells, is_game_archive, is_game_master};
 use lodwright_core::texture::TextureResolver;
 use lodwright_core::worldspace::Worldspace;
-use lodwright_gen::{FolderAssets, Winner};
+use lodwright_gen::{FolderAssets, ShippedPatch, Winner};
 
 /// The decision for one world.
 pub(crate) struct Keep<'a> {
@@ -42,6 +42,37 @@ impl Keep<'_> {
                 },
             )
             .is_ok_and(|path| self.assets.shipped(&path, &*self.skip))
+    }
+}
+
+impl Keep<'_> {
+    /// The game's tile for the block of `level` cells at `cell` and the cells under it a mod changed, when the game
+    /// ships a tile of that name and only some of its cells changed.
+    pub(crate) fn patch(&self, level: u32, cell: (i32, i32)) -> Option<ShippedPatch> {
+        let n = i32::try_from(level).ok().filter(|n| *n > 0)?;
+        let changed: BTreeSet<(i32, i32)> = (cell.0..cell.0 + n)
+            .flat_map(|x| (cell.1..cell.1 + n).map(move |y| (x, y)))
+            .filter(|c| self.changed.contains(c))
+            .collect();
+        if changed.is_empty() || i32::try_from(changed.len()).is_ok_and(|len| len == n * n) {
+            return None;
+        }
+        let path = layout::diffuse_path(
+            &self.world,
+            BlockId {
+                level,
+                x: cell.0,
+                y: cell.1,
+            },
+        )
+        .ok()?;
+        let bytes = self.assets.shipped_read(&path, &*self.skip)?;
+        let image = lodwright_dds::decode(&bytes)
+            .ok()?
+            .levels
+            .into_iter()
+            .next()?;
+        Some(ShippedPatch { image, changed })
     }
 }
 

@@ -52,6 +52,8 @@ pub struct Worldspace {
     /// The cells that have a `LAND` record, with or without heights (a superset of the keys of `cells` for a world
     /// read from plugins).
     land_records: BTreeSet<(i32, i32)>,
+    /// The cells that have an exterior `CELL` record, with or without LAND.
+    cell_records: BTreeSet<(i32, i32)>,
 }
 
 /// The water of a cell as its CELL record states it.
@@ -289,6 +291,12 @@ impl Worldspace {
             .copied()
     }
 
+    /// Whether the world has a record for cell (`x`, `y`): an exterior `CELL` or a `LAND` record.
+    #[must_use]
+    pub fn has_cell_record(&self, x: i32, y: i32) -> bool {
+        self.cell_records.contains(&(x, y)) || self.land_records.contains(&(x, y))
+    }
+
     /// The water height of cell (`x`, `y`) for the mesh stage: its `XCLW`, else the world's default water
     /// height when the cell has the has-water flag, else `None` (no water). `None` too for a cell without LAND.
     #[must_use]
@@ -487,15 +495,17 @@ impl Worldspace {
         name: &str,
         cells: impl IntoIterator<Item = ((i32, i32), CellHeights)>,
     ) -> Self {
+        let cells: BTreeMap<(i32, i32), CellHeights> = cells.into_iter().collect();
         Self {
             form_id,
             name: name.to_owned(),
-            cells: cells.into_iter().collect(),
+            land_records: cells.keys().copied().collect(),
+            cells,
             layers: BTreeMap::new(),
             water: BTreeMap::new(),
             record: ResolvedRecord::default(),
             cell_min: None,
-            land_records: BTreeSet::new(),
+            cell_records: BTreeSet::new(),
         }
     }
 
@@ -585,6 +595,7 @@ impl WorldIndex {
             record: entry.record.clone(),
             cell_min: None,
             land_records: BTreeSet::new(),
+            cell_records: BTreeSet::new(),
         };
         if inheritance == Inheritance::FlaggedDefaults {
             self.inherit_defaults(&mut world);
@@ -600,6 +611,7 @@ impl WorldIndex {
                 for &(x, y) in &source.cell_coords {
                     let (mx, my) = world.cell_min.unwrap_or((x, y));
                     world.cell_min = Some((mx.min(x), my.min(y)));
+                    world.cell_records.insert((x, y));
                 }
                 world
                     .land_records

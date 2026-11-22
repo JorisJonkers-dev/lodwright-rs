@@ -15,6 +15,8 @@ use crate::diffuse::{LandTiles, Tile, blend};
 const CELL_UNITS: f32 = 4096.0;
 /// Colour of ground with no vertex colours (a neutral dry earth).
 const FALLBACK: [u8; 3] = [96, 88, 72];
+/// Colour of a cell without a LAND record in the game's own diffuse tiles (measured over 18 worlds).
+const ABSENT_CELL: [u8; 3] = [125, 126, 125];
 
 fn fill_gaps(samples: &[f32]) -> Vec<f32> {
     let valid: Vec<f32> = samples.iter().copied().filter(|v| !v.is_nan()).collect();
@@ -158,13 +160,13 @@ fn ground_color(
 ) -> [u8; 3] {
     let tint = vertex_color(world, cell, vx, vy);
     let Some(layers) = world.layers(cell.0, cell.1) else {
-        // a cell without layers is all default land texture
-        let ground = tiles.default_tile().map_or(FALLBACK, |t| {
-            t.sample((vx % 16.0) / 16.0, (vy % 16.0) / 16.0)
-        });
-        return tint.map_or(ground, |t| {
-            [0, 1, 2].map(|k| ((u16::from(ground[k]) * u16::from(t[k])) / 255) as u8)
-        });
+        // source: game-land-fill
+        // a cell with a CELL record and no LAND is the game's flat default land colour; a cell with no record at
+        // all is a flat grey
+        if !world.has_cell_record(cell.0, cell.1) {
+            return ABSENT_CELL;
+        }
+        return tiles.default_tile().map_or(FALLBACK, Tile::mean_color);
     };
     let s = stack(layers, vx, vy, tiles);
     let base = s.base.map_or(FALLBACK, |t| t.sample(s.u, s.v));
@@ -420,7 +422,12 @@ mod tests {
     use lodwright_core::worldspace::Worldspace;
 
     fn world() -> Worldspace {
-        Worldspace::from_cells(1, "W", [((0, 0), CellHeights::flat(10.0))])
+        // the four by four cells of block (0, 0) at level 4, so every pixel of the block lies in a cell
+        Worldspace::from_cells(
+            1,
+            "W",
+            (0..4).flat_map(|y| (0..4).map(move |x| ((x, y), CellHeights::flat(10.0)))),
+        )
     }
 
     fn flat_image(size: u32, rgb: [u8; 3]) -> lodwright_dds::Image {
@@ -505,6 +512,40 @@ mod tests {
         let tiles = LandTiles::empty().with_default_tile(Tile::flat([10, 20, 30]));
         let img = diffuse_image(&world(), id, 4, &tiles);
         assert_eq!(img.pixel(1, 1).unwrap(), [10, 20, 30, 255]);
+    }
+
+    #[test]
+    fn a_cell_with_no_record_at_all_is_the_games_flat_grey() {
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        let tiles = LandTiles::empty().with_default_tile(Tile::flat([10, 20, 30]));
+        // the world has no cell at (4..8, 0..4), so a block there is all cells without a record
+        let img = diffuse_image(&world(), BlockId { x: 40, ..id }, 4, &tiles);
+        assert_eq!(img.pixel(1, 1).unwrap(), [125, 126, 125, 255]);
+    }
+
+    #[test]
+    fn the_strip_world_is_filled_with_its_own_brown() {
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        let tiles = LandTiles::empty()
+            .with_default_tile(Tile::flat([10, 20, 30]))
+            .with_world_fill("TheStripWorldNew");
+        let img = diffuse_image(&world(), id, 4, &tiles);
+        assert_eq!(img.pixel(1, 1).unwrap(), [67, 61, 49, 255]);
+        let other = LandTiles::empty()
+            .with_default_tile(Tile::flat([10, 20, 30]))
+            .with_world_fill("WastelandNV");
+        assert_eq!(
+            diffuse_image(&world(), id, 4, &other).pixel(1, 1).unwrap(),
+            [10, 20, 30, 255]
+        );
     }
 
     #[test]

@@ -14,6 +14,35 @@ pub trait Assets: Sync {
     fn read(&self, path: &str) -> Option<Vec<u8>>;
 }
 
+/// Why a texture could not be loaded: no source has the file, or a source has it and it cannot be decoded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TextureFault {
+    /// No loose file or archive holds the path.
+    Missing,
+    /// The file exists, the decoder refused it (the text says why).
+    Unreadable(String),
+}
+
+/// Read and decode the largest level of the texture at `path` (block-compressed, or uncompressed 16, 24 or 32 bit).
+///
+/// # Errors
+/// [`TextureFault::Missing`] when no source has the file, [`TextureFault::Unreadable`] when it does not decode.
+pub fn read_texture(assets: &dyn Assets, path: &str) -> Result<lodwright_dds::Image, TextureFault> {
+    let bytes = assets.read(path).ok_or(TextureFault::Missing)?;
+    lodwright_dds::decode_image(&bytes).map_err(|e| TextureFault::Unreadable(e.to_string()))
+}
+
+/// The warning for a texture that could not be loaded; `what` names its use, `tail` what happens instead.
+#[must_use]
+pub fn texture_warning(what: &str, path: &str, fault: &TextureFault, tail: &str) -> String {
+    match fault {
+        TextureFault::Missing => format!("{what} {path} not found{tail}"),
+        TextureFault::Unreadable(why) => {
+            format!("{what} {path} found but not readable ({why}){tail}")
+        }
+    }
+}
+
 /// Largest single asset read: a texture or model larger than this is treated as missing.
 const MAX_ASSET: u64 = 256 * 1024 * 1024;
 

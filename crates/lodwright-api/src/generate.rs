@@ -520,6 +520,7 @@ pub fn generate(
                     lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
                         .with_scales(&texture_scales)
                         .with_default_texture(&default_land, assets, &mut warnings)
+                        .with_world_fill(world.name())
                 }
                 _ => lodwright_gen::LandTiles::empty(),
             };

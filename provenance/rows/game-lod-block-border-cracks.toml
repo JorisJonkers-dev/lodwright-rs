@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-block-border-cracks"
+fact = "Terrain blocks written without the border skirt of game-lod-block-borders leave cracks between blocks of different levels through which the background shows: thin pale slivers on mountain ridges, seen from 14000 units up over the Strip. They vanish with skirts on and with the game's own level 32 blocks in place."
+url = "oracle:game-lod-files"
+licence = "Pictures of the engine drawing the owner's own game files, compared by eye; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Effect measured in the engine for issue #316: with skirts on for all levels the slivers are gone. Skirts are on by default since this change. The row game-lod-block-borders stays unverified."

@@ -250,19 +250,19 @@
       "per_level": [
         {
           "level": 4,
-          "value": false
+          "value": true
         },
         {
           "level": 8,
-          "value": false
+          "value": true
         },
         {
           "level": 16,
-          "value": false
+          "value": true
         },
         {
           "level": 32,
-          "value": false
+          "value": true
         }
       ],
       "since": "0.9.0",

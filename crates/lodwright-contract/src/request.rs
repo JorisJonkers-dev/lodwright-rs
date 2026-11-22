@@ -48,13 +48,23 @@ pub struct LevelRequest {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub specular_alpha: bool,
     /// Close the gap between neighbouring blocks with a skirt under every border vertex, as the game's own blocks
-    /// do (`docs/spec/terrain-lod.md`). Off by default and written only when set.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// do (`docs/spec/terrain-lod.md`). On by default (without them the game shows the background through the cracks
+    /// between blocks of different levels); written only when off.
+    #[serde(default = "skirts_default", skip_serializing_if = "skirts_is_default")]
     pub skirts: bool,
+}
+
+fn skirts_default() -> bool {
+    true
 }
 
 fn water_walls_default() -> bool {
     true
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
+fn skirts_is_default(v: &bool) -> bool {
+    *v
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
@@ -397,6 +407,21 @@ mod tests {
                 && r.terrain.water
         );
         assert!(r.worlds.is_empty() && r.terrain.levels.is_empty());
+    }
+
+    #[test]
+    fn skirts_are_on_unless_the_request_turns_them_off() {
+        let json = r#"{"level":4,"quality":10.0,"max_vertices":2000,"diffuse_size":256,"normal_size":256}"#;
+        let l: LevelRequest = serde_json::from_str(json).unwrap();
+        assert!(l.skirts, "an omitted switch is on");
+        // on is not written, off is
+        assert!(!serde_json::to_string(&l).unwrap().contains("skirts"));
+        let off = LevelRequest { skirts: false, ..l };
+        assert!(
+            serde_json::to_string(&off)
+                .unwrap()
+                .contains("\"skirts\":false")
+        );
     }
 
     #[test]

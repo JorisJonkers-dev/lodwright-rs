@@ -93,7 +93,7 @@ impl Default for TerrainSettings {
             diffuse_size: size,
             normal_size: size,
             specular_alpha: false,
-            skirts: false,
+            skirts: true,
         };
         Self {
             levels: vec![

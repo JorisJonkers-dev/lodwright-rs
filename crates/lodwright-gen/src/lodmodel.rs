@@ -123,7 +123,7 @@ fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
 
 /// Where a `BSLightingShaderProperty` of a Skyrim-stream model (user version 12, stream 83: the shader's type, the
 /// name, the extra data links, the controller, two flag words and the UV offset and scale come first) links its texture
-/// set. Some Fallout models that mods ship (the DynDOLOD rock models of Tale of Two Wastelands) are written this way.
+/// set. Some Fallout models that mods ship (the `DynDOLOD` rock models of Tale of Two Wastelands) are written this way.
 fn skyrim_lighting_texture_set(bytes: &[u8]) -> Option<usize> {
     let word = |at: usize| -> Option<u32> {
         bytes
@@ -287,7 +287,7 @@ pub fn parse_lod_model(bytes: &[u8]) -> Result<Vec<Part>, String> {
 mod tests {
     use super::skyrim_lighting_texture_set;
 
-    /// The block layout measured on the DynDOLOD rock models of Tale of Two Wastelands (numbers only): shader type,
+    /// The block layout measured on the `DynDOLOD` rock models of Tale of Two Wastelands (numbers only): shader type,
     /// name, extra data count and links, controller, two flag words, UV offset and scale, then the texture set link.
     fn block(extra: &[u32], set: u32) -> Vec<u8> {
         let mut b = Vec::new();

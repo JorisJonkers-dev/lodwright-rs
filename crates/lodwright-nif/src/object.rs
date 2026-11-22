@@ -368,6 +368,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[allow(clippy::many_single_char_names)]
 mod shapes_tests {
     use super::{ObjectBlock, SEGMENTS, object_block_shapes};
     use crate::{Body, NifFile};

@@ -600,11 +600,10 @@ pub fn generate_objects_with_progress(
                     surfaces,
                 )
             };
-            let last = chunks.last_mut().expect("one chunk at least");
-            let mut placed = add(last);
-            if !placed && !last.vertices.is_empty() {
+            let mut placed = chunks.last_mut().is_some_and(&add);
+            if !placed && chunks.last().is_some_and(|m| !m.vertices.is_empty()) {
                 chunks.push(Merged::default());
-                placed = add(chunks.last_mut().expect("a new chunk"));
+                placed = chunks.last_mut().is_some_and(&add);
             }
             if placed {
                 report.instances += 1;

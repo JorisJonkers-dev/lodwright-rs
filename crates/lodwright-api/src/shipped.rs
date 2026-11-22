@@ -97,3 +97,129 @@ pub(crate) fn plan<'a>(
         skip,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::plan;
+    use lodwright_assets::PackEntry;
+    use lodwright_core::land::CellHeights;
+    use lodwright_core::layers::CellLayers;
+    use lodwright_core::lod::LodSettings;
+    use lodwright_core::plugin::{LandCell, Plugin, World};
+    use lodwright_core::texture::TextureResolver;
+    use lodwright_core::worldspace::{Inheritance, WorldIndex};
+    use lodwright_gen::FolderAssets;
+
+    fn cell(x: i32, y: i32, height: f32) -> LandCell {
+        LandCell {
+            x,
+            y,
+            heights: CellHeights::flat(height),
+            layers: Some(CellLayers::default()),
+            has_water: false,
+            water_height: None,
+        }
+    }
+
+    fn plugin(masters: &[&str], cells: Vec<LandCell>) -> Plugin {
+        Plugin {
+            masters: masters.iter().map(|m| (*m).to_owned()).collect(),
+            worlds: vec![World {
+                form_id: 0x3C,
+                editor_id: Some("Wasteland".to_owned()),
+                record: None,
+                land_coords: cells.iter().map(|c| (c.x, c.y)).collect(),
+                cell_coords: cells.iter().map(|c| (c.x, c.y)).collect(),
+                cells,
+                refs: Vec::new(),
+                deleted_refs: Vec::new(),
+            }],
+            land_textures: Vec::new(),
+            texture_sets: Vec::new(),
+            objects: Vec::new(),
+        }
+    }
+
+    fn archive(path: &std::path::Path, entries: &[(&str, &[u8])]) {
+        let entries: Vec<PackEntry> = entries
+            .iter()
+            .map(|(p, d)| PackEntry {
+                path: (*p).to_owned(),
+                data: d.to_vec(),
+                compress: false,
+            })
+            .collect();
+        std::fs::write(path, lodwright_assets::pack::write(&entries).unwrap()).unwrap();
+    }
+
+    /// A data folder with the game's archive (tiles at level 4 for the blocks x0.y0 and x4.y0, and its settings
+    /// file starting at `start`) and a mod's archive that also has a tile.
+    fn data_folder(tag: &str, start: i16) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lodwright-shipped-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let settings =
+            LodSettings::for_bounds((start, start), (start + 7, start + 7), 8).to_bytes();
+        let tile = |x: i32| {
+            format!("textures\\landscape\\lod\\wasteland\\diffuse\\wasteland.n.level4.x{x}.y0.dds")
+        };
+        archive(
+            &dir.join("Game - Textures.bsa"),
+            &[
+                (&tile(0), b"tile"),
+                (&tile(4), b"tile"),
+                ("lodsettings\\wasteland.dlodsettings", &settings),
+            ],
+        );
+        archive(&dir.join("Mod - Main.bsa"), &[(&tile(8), b"tile")]);
+        dir
+    }
+
+    fn keep_for(dir: &std::path::Path, mod_cells: Vec<LandCell>) -> (Vec<bool>, Vec<String>) {
+        let plugins = vec![
+            (
+                "Fallout3.esm".to_owned(),
+                plugin(&[], vec![cell(0, 0, 1.0), cell(4, 0, 1.0), cell(8, 0, 1.0)]),
+            ),
+            ("Mod.esp".to_owned(), plugin(&["Fallout3.esm"], mod_cells)),
+        ];
+        let world = WorldIndex::new(&plugins)
+            .unwrap()
+            .build(&plugins, 0x3C, Inheritance::None)
+            .unwrap();
+        let resolver = TextureResolver::from_load_order(&plugins).unwrap();
+        let names: Vec<String> = plugins.iter().map(|(n, _)| n.clone()).collect();
+        let assets = FolderAssets::open(dir, &names).unwrap();
+        let mut warnings = Vec::new();
+        let keep = plan(&world, &plugins, &resolver, &assets, (0, 0), &mut warnings).unwrap();
+        let decisions = [0, 4, 8, 12]
+            .map(|x| keep.as_ref().is_some_and(|k| k.keeps(4, (x, 0))))
+            .to_vec();
+        (decisions, warnings)
+    }
+
+    #[test]
+    fn a_tile_is_kept_where_the_game_ships_it_and_no_mod_changed_the_land() {
+        let dir = data_folder("keep", 0);
+        // the game's archive has the tiles of x0 and x4; the mod's archive does not count; x12 has none anywhere
+        let (kept, warnings) = keep_for(&dir, Vec::new());
+        assert_eq!(kept, vec![true, true, false, false]);
+        assert_eq!(warnings, Vec::<String>::new());
+        // a mod that changes the land of cell (5, 0) composes the block x4 only
+        let (kept, _) = keep_for(&dir, vec![cell(5, 0, 9.0)]);
+        assert_eq!(kept, vec![true, false, false, false]);
+    }
+
+    #[test]
+    fn nothing_is_kept_when_the_games_grid_is_not_ours_shifted_by_whole_blocks() {
+        // the game's settings start at -3: its blocks cover other cells than ours at the same names
+        let dir = data_folder("shift", -3);
+        let (kept, warnings) = keep_for(&dir, Vec::new());
+        assert_eq!(kept, vec![false; 4]);
+        assert_eq!(warnings.len(), 1);
+        // a start 32 cells away is the same grid
+        let dir = data_folder("whole", 32);
+        assert_eq!(keep_for(&dir, Vec::new()).0, vec![true, true, false, false]);
+    }
+}

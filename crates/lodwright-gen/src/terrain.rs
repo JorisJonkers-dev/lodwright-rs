@@ -578,6 +578,69 @@ mod tests {
     }
 
     #[test]
+    fn a_tile_the_game_ships_is_left_out_and_the_block_digest_changes() {
+        let w = world();
+        let keep_level_4 = |level: u32, _cell: (i32, i32)| level == 4;
+        let run = |keep: bool, tag: &str| {
+            let out = temp(tag);
+            let hook: &(dyn Fn(u32, (i32, i32)) -> bool + Sync) = &keep_level_4;
+            let report = generate_terrain(
+                &w,
+                &TerrainSettings::default(),
+                &out,
+                &Options {
+                    keep_shipped: keep.then_some(hook),
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            (out, report)
+        };
+        let (composed, base) = run(false, "tiles-composed");
+        let (kept, report) = run(true, "tiles-kept");
+        let tile = "textures/landscape/lod/mojave/diffuse/mojave.n.level4.x0.y0.dds";
+        let tile8 = "textures/landscape/lod/mojave/diffuse/mojave.n.level8.x0.y0.dds";
+        assert!(composed.join(tile).exists() && composed.join(tile8).exists());
+        // level 4 has no diffuse tile, level 8 keeps its own; mesh and normals are written as always
+        assert!(!kept.join(tile).exists() && kept.join(tile8).exists());
+        assert!(
+            kept.join("textures/landscape/lod/mojave/normals/mojave.n.level4.x0.y0.dds")
+                .exists()
+        );
+        assert!(
+            kept.join("meshes/landscape/lod/mojave/mojave.level4.x0.y0.nif")
+                .exists()
+        );
+        let block = |r: &super::Report, level: u32| {
+            r.blocks
+                .iter()
+                .find(|b| b.key.contains(&format!(":{level}:0:0")))
+                .cloned()
+                .unwrap()
+        };
+        assert!(block(&report, 4).kept_diffuse && !block(&report, 8).kept_diffuse);
+        assert_eq!(block(&report, 4).files.len(), 2);
+        assert_ne!(block(&report, 4).inputs, block(&base, 4).inputs);
+        assert_eq!(block(&report, 8).inputs, block(&base, 8).inputs);
+        // verify: a missing tile is an error unless a manifest exists that does not name it
+        let missing = |v: &crate::Verification| {
+            v.errors
+                .iter()
+                .filter(|e| e.problem.contains("missing texture"))
+                .count()
+        };
+        assert!(missing(&crate::verify_folder(&kept)) > 0);
+        std::fs::write(kept.join("manifest.json"), "{\"files\":[]}").unwrap();
+        assert_eq!(missing(&crate::verify_folder(&kept)), 0);
+        std::fs::write(
+            kept.join("manifest.json"),
+            format!("{{\"files\":[\"{tile}\"]}}"),
+        )
+        .unwrap();
+        assert!(missing(&crate::verify_folder(&kept)) > 0);
+    }
+
+    #[test]
     fn faces_below_the_water_are_dropped_only_with_the_option_and_it_enters_the_digest() {
         let mut coast = world();
         // water over the low cell (0, 0) at 105: its ground at 100 lies below, the cells beside it at 110 above
@@ -702,6 +765,7 @@ mod tests {
                 water_walls: false,
                 water_shared_vertices: false,
                 water_polygons: false,
+                keep_shipped: None,
                 reuse: None,
                 cancel: None,
             },
@@ -720,6 +784,7 @@ mod tests {
                 water_walls: false,
                 water_shared_vertices: false,
                 water_polygons: false,
+                keep_shipped: None,
                 reuse: None,
                 cancel: None,
             },

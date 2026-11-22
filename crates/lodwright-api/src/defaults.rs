@@ -338,7 +338,8 @@ mod tests {
                     || o.since == "0.7.0"
                     || o.since == "0.9.0"
                     || o.since == "0.14.0"
-                    || o.since == "0.15.0"))));
+                    || o.since == "0.15.0"
+                    || o.since == "0.16.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

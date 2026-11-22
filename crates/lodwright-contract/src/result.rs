@@ -79,6 +79,20 @@ pub struct ResultDoc {
     /// option is on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dropped_faces: Option<DroppedFaces>,
+    /// Diffuse tiles of a `generate` run: how many were left to the game's own far-land tiles and how many were
+    /// composed; omitted when the run composes every tile (`terrain.compose_shipped_tiles`) or wrote no land tiles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tiles: Option<TileCounts>,
+}
+
+/// Diffuse tiles left to the game and composed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct TileCounts {
+    /// Tiles not written because the game ships its own and no plugin outside the game's own masters changed the
+    /// land under it.
+    pub kept: u64,
+    /// Tiles composed from the land textures.
+    pub composed: u64,
 }
 
 /// Object faces left out, per kind.
@@ -119,6 +133,7 @@ impl ResultDoc {
             manifest: None,
             blocks: None,
             dropped_faces: None,
+            tiles: None,
         }
     }
 

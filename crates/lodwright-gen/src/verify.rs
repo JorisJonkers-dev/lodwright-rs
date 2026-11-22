@@ -506,14 +506,20 @@ pub fn verify_folder(root: &Path) -> Verification {
             }
         }
     }
-    // every terrain block has both textures
+    // every terrain block has both textures; a diffuse tile that the manifest does not name was left to the game's
+    // own (`terrain.compose_shipped_tiles` off), a tile the manifest names must be there
+    let manifest = std::fs::read_to_string(root.join("manifest.json")).ok();
     for (rel, level, x, y) in &terrain {
         let world = rel.split('/').nth(3).unwrap_or("");
         for kind in ["diffuse", "normals"] {
             let tex = format!(
                 "textures/landscape/lod/{world}/{kind}/{world}.n.level{level}.x{x}.y{y}.dds"
             );
-            if !names.contains_key(&tex) {
+            let left_to_the_game = kind == "diffuse"
+                && manifest
+                    .as_ref()
+                    .is_some_and(|m| !m.to_ascii_lowercase().contains(&tex));
+            if !names.contains_key(&tex) && !left_to_the_game {
                 ctx.err(rel, format!("missing texture {tex}"));
             }
         }

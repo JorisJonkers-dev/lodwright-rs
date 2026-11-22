@@ -105,6 +105,68 @@ impl FolderAssets {
     }
 }
 
+/// Where the file the game would read for a path comes from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Winner {
+    /// No loose file and no archive has it.
+    Missing,
+    /// A loose file in the data folder (it beats every archive).
+    Loose,
+    /// A file inside the archive of this file name.
+    Archive(String),
+}
+
+impl FolderAssets {
+    /// Which source wins `path` (case-insensitive, either separator) as the game resolves files: loose files over
+    /// archives, later archives over earlier ones.
+    #[must_use]
+    pub fn winner(&self, path: &str) -> Winner {
+        match self.resolver.resolve(path) {
+            None => Winner::Missing,
+            Some(Location::Loose(_)) => Winner::Loose,
+            Some(Location::Archive { archive, .. }) => self
+                .archives
+                .get(*archive)
+                .and_then(|(file, _)| file.file_name())
+                .map_or(Winner::Missing, |n| {
+                    Winner::Archive(n.to_string_lossy().into_owned())
+                }),
+        }
+    }
+}
+
+impl FolderAssets {
+    /// Whether an archive that `own` does not skip holds `path`: the files the game ships, as opposed to what a mod
+    /// put loose in the data folder or in an archive of its own. `own` is given each archive's file name.
+    #[must_use]
+    pub fn shipped(&self, path: &str, skip: &dyn Fn(&str) -> bool) -> bool {
+        self.shipped_entry(path, skip).is_some()
+    }
+
+    /// The bytes of `path` from an archive that `skip` does not name (see [`FolderAssets::shipped`]); the last
+    /// archive in name order that has it.
+    #[must_use]
+    pub fn shipped_read(&self, path: &str, skip: &dyn Fn(&str) -> bool) -> Option<Vec<u8>> {
+        let (file, parsed, entry) = self.shipped_entry(path, skip)?;
+        let mut reader = BufReader::new(File::open(file).ok()?);
+        parsed.extract(&mut reader, entry, MAX_ASSET).ok()
+    }
+
+    fn shipped_entry(
+        &self,
+        path: &str,
+        skip: &dyn Fn(&str) -> bool,
+    ) -> Option<(&Path, &Archive, &lodwright_assets::Entry)> {
+        self.archives.iter().rev().find_map(|(file, archive)| {
+            let name = file.file_name()?.to_string_lossy();
+            if skip(&name) {
+                return None;
+            }
+            Some((file.as_path(), archive, archive.find(path)?))
+        })
+    }
+}
+
 fn find_dir(parent: &Path, name: &str) -> Option<PathBuf> {
     std::fs::read_dir(parent).ok()?.flatten().find_map(|e| {
         (e.file_name().to_string_lossy().eq_ignore_ascii_case(name) && e.path().is_dir())

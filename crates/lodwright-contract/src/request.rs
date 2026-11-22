@@ -118,6 +118,11 @@ pub struct TerrainRequest {
     /// only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub water_polygons: bool,
+    /// Compose every diffuse tile from the land textures, also where the game ships its own far-land tile and no plugin
+    /// outside the game's own masters changed the land under it (`docs/spec/terrain-lod.md`). Off by default: such a
+    /// tile is left out of the output and the game's own is the one drawn; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub compose_shipped_tiles: bool,
 }
 
 impl Default for TerrainRequest {
@@ -132,6 +137,7 @@ impl Default for TerrainRequest {
             water_walls: true,
             water_shared_vertices: false,
             water_polygons: false,
+            compose_shipped_tiles: false,
         }
     }
 }

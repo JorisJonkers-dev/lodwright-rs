@@ -20,6 +20,7 @@ pub mod objects;
 pub mod plugin;
 pub mod probe;
 pub mod raster;
+pub mod shipped;
 pub mod terrain;
 pub mod texture;
 pub mod tin;

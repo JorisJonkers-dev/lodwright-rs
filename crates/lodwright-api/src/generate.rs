@@ -149,14 +149,28 @@ fn refuse_output(request: &Request, allow_in_repo: bool) -> Result<(), Error> {
     Ok(())
 }
 
-/// Add warnings to the document, keeping at most twenty lines in all.
+/// Add warnings to the document, keeping at most twenty lines and a last line that counts the rest.
 fn add_warnings(doc: &mut ResultDoc, warnings: Vec<String>) {
+    const LIMIT: usize = 20;
+    const MORE: &str = " more warnings were left out";
+    let mut left_out: usize = doc
+        .warnings
+        .last()
+        .and_then(|w| w.strip_suffix(MORE))
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(0);
+    if left_out > 0 {
+        doc.warnings.pop();
+    }
     for w in warnings {
-        if doc.warnings.len() < 20 {
+        if doc.warnings.len() < LIMIT {
             doc.warnings.push(w);
-        } else if doc.warnings.len() == 20 {
-            doc.warnings.push("more warnings were left out".to_owned());
+        } else {
+            left_out += 1;
         }
+    }
+    if left_out > 0 {
+        doc.warnings.push(format!("{left_out}{MORE}"));
     }
 }
 
@@ -714,5 +728,24 @@ mod specular_tests {
         let warnings = specular_warnings(&lodwright_gen::LandTiles::empty());
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("stay opaque"));
+    }
+}
+
+#[cfg(test)]
+mod warning_tests {
+    use super::add_warnings;
+    use lodwright_contract::{ResultDoc, Status};
+
+    #[test]
+    fn warnings_are_capped_at_twenty_and_the_last_line_counts_the_rest() {
+        let mut doc = ResultDoc::new("0.0.0", Status::Ok, "generated", "LOD written");
+        add_warnings(&mut doc, (0..15).map(|i| format!("a{i}")).collect());
+        assert_eq!(doc.warnings.len(), 15);
+        add_warnings(&mut doc, (0..10).map(|i| format!("b{i}")).collect());
+        assert_eq!(doc.warnings.len(), 21);
+        assert_eq!(doc.warnings[20], "5 more warnings were left out");
+        add_warnings(&mut doc, vec!["c".to_owned()]);
+        assert_eq!(doc.warnings.len(), 21);
+        assert_eq!(doc.warnings[20], "6 more warnings were left out");
     }
 }

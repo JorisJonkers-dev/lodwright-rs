@@ -72,6 +72,15 @@ fn water_walls_is_default(v: &bool) -> bool {
     *v
 }
 
+fn land_light_default() -> bool {
+    true
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
+fn land_light_is_default(v: &bool) -> bool {
+    *v
+}
+
 /// Terrain settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[allow(
@@ -123,6 +132,14 @@ pub struct TerrainRequest {
     /// tile is left out of the output and the game's own is the one drawn; written only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub compose_shipped_tiles: bool,
+    /// Darken the composed far land as the near land is lit: each land texture's colours times the mean up component
+    /// of its normal map, and a game tile is used only where it is already that dark (`docs/spec/terrain-lod.md`).
+    /// On by default; off gives the output the generator wrote before this option existed. Written only when off.
+    #[serde(
+        default = "land_light_default",
+        skip_serializing_if = "land_light_is_default"
+    )]
+    pub land_light: bool,
 }
 
 impl Default for TerrainRequest {
@@ -138,6 +155,7 @@ impl Default for TerrainRequest {
             water_shared_vertices: false,
             water_polygons: false,
             compose_shipped_tiles: false,
+            land_light: true,
         }
     }
 }

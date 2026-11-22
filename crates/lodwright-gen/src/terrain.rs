@@ -62,6 +62,15 @@ pub struct Options<'a> {
     /// under it a mod changed, when the game ships one and some of its cells are unchanged. The diffuse tile is then
     /// the game's own picture with the composed one written into the changed cells only.
     pub patch_shipped: Option<&'a (dyn Fn(u32, (i32, i32)) -> Option<ShippedPatch> + Sync)>,
+    /// Asked with a block's level and first cell: the mean luminance (0 to 255) of the game's own diffuse tile of
+    /// that name, when the game ships one. With `unlit` set, a shipped tile is used (kept or patched) only where it
+    /// is already as dark as the near land: see [`Options::unlit`].
+    pub shipped_mean: Option<&'a (dyn Fn(u32, (i32, i32)) -> Option<f32> + Sync)>,
+    /// The land tiles before they were scaled by their normal maps' up component (`LandTiles::lit`); `land` holds the
+    /// scaled ones. A shipped tile counts as matching the near land when its mean luminance is at most halfway
+    /// between the composed tile unscaled and scaled: a baked tile that is that dark was lit as the near land is, a
+    /// composed one (as the Mojave's) is as bright as the unscaled composition.
+    pub unlit: Option<&'a LandTiles>,
     /// Asked with a block's key and its inputs digest before the block is built: the files an earlier run wrote
     /// for the same key and inputs, when they are still in the output folder. The block is then not built again.
     pub reuse: Option<&'a (dyn Fn(&str, &str) -> Option<Vec<FileRecord>> + Sync)>,
@@ -83,6 +92,8 @@ impl Default for Options<'_> {
             water_polygons: false,
             keep_shipped: None,
             patch_shipped: None,
+            shipped_mean: None,
+            unlit: None,
             reuse: None,
             cancel: None,
         }
@@ -161,6 +172,7 @@ fn block_inputs(
     job: &Job,
     tiles: &LandTiles,
     options: &Options<'_>,
+    kept: bool,
 ) -> String {
     let mut h = Sha256Stream::new();
     h.update(env!("CARGO_PKG_VERSION").as_bytes());
@@ -177,7 +189,7 @@ fn block_inputs(
     if options.water && options.water_polygons {
         h.update(b"water-polygons");
     }
-    if keep_diffuse(options, job) {
+    if kept {
         h.update(b"keep-shipped-diffuse");
     }
     if job.level.specular_alpha {
@@ -247,6 +259,42 @@ fn keep_diffuse(options: &Options<'_>, job: &Job) -> bool {
         .is_some_and(|keep| keep(job.level.level, job.cell))
 }
 
+/// The mean luminance of a composed tile.
+fn mean_luma(image: &lodwright_dds::Image) -> f32 {
+    let px = image.rgba().as_chunks::<4>().0;
+    let sum: f64 = px
+        .iter()
+        .map(|p| 0.299 * f64::from(p[0]) + 0.587 * f64::from(p[1]) + 0.114 * f64::from(p[2]))
+        .sum();
+    (sum / px.len().max(1) as f64) as f32
+}
+
+/// Whether the game's own tile of this block may be used: true when the near-land test is off or the game ships no
+/// tile; else the shipped tile must be at most halfway between the unscaled and the scaled composition.
+fn matches_near_land(
+    world: &Worldspace,
+    tiles: &LandTiles,
+    options: &Options<'_>,
+    job: &Job,
+) -> bool {
+    let (Some(unlit), Some(mean)) = (options.unlit, options.shipped_mean) else {
+        return true;
+    };
+    let Some(shipped) = mean(job.level.level, job.cell) else {
+        return true;
+    };
+    let id = BlockId {
+        level: job.level.level,
+        x: job.cell.0,
+        y: job.cell.1,
+    };
+    // coarser samples give another mean: a tile is judged at the size it is written at
+    let size = job.level.diffuse_size;
+    let lit = mean_luma(&diffuse_image(world, id, size, tiles));
+    let raw = mean_luma(&diffuse_image(world, id, size, unlit));
+    shipped <= f32::midpoint(lit, raw)
+}
+
 fn run_job(
     world: &Worldspace,
     raster: &HeightRaster,
@@ -267,8 +315,16 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let mut inputs = block_inputs(world, &samples, job, tiles, options);
-    let patch = if keep_diffuse(options, job) {
+    let near = matches_near_land(world, tiles, options, job);
+    let kept = near && keep_diffuse(options, job);
+    let mut inputs = block_inputs(world, &samples, job, tiles, options, kept);
+    if !near {
+        let mut h = Sha256Stream::new();
+        h.update(inputs.as_bytes());
+        h.update(b"shipped-tile-darker-than-near-land-not-used");
+        inputs = h.finish();
+    }
+    let patch = if kept || !near {
         None
     } else {
         options
@@ -289,7 +345,7 @@ fn run_job(
             inputs,
             files,
             reused: true,
-            kept_diffuse: keep_diffuse(options, job),
+            kept_diffuse: kept,
             patched_diffuse: patch.is_some(),
         }));
     }
@@ -369,7 +425,7 @@ fn run_job(
         &normal_image_with_alpha(&samples, span, units, level.normal_size, alpha.as_deref()),
         normal_format,
     )?;
-    let kept_diffuse = keep_diffuse(options, job);
+    let kept_diffuse = kept;
     let mut files = vec![write_file(out, &layout::mesh_path(name, id)?, &nif)?];
     if !kept_diffuse {
         let composed = diffuse_image(world, id, level.diffuse_size, tiles);
@@ -619,6 +675,8 @@ mod tests {
                 &Options {
                     keep_shipped: keep.then_some(hook),
                     patch_shipped: None,
+                    shipped_mean: None,
+                    unlit: None,
                     ..Options::default()
                 },
             )
@@ -796,6 +854,8 @@ mod tests {
                 water_polygons: false,
                 keep_shipped: None,
                 patch_shipped: None,
+                shipped_mean: None,
+                unlit: None,
                 reuse: None,
                 cancel: None,
             },
@@ -816,6 +876,8 @@ mod tests {
                 water_polygons: false,
                 keep_shipped: None,
                 patch_shipped: None,
+                shipped_mean: None,
+                unlit: None,
                 reuse: None,
                 cancel: None,
             },
@@ -918,8 +980,16 @@ mod tests {
             cell,
         };
         let tiles = LandTiles::empty();
-        let digest =
-            |w: &Worldspace| block_inputs(w, &samples, &job((0, 0)), &tiles, &Options::default());
+        let digest = |w: &Worldspace| {
+            block_inputs(
+                w,
+                &samples,
+                &job((0, 0)),
+                &tiles,
+                &Options::default(),
+                false,
+            )
+        };
         assert_eq!(digest(&world()), digest(&bounded([-8.0 * 4096.0, 0.0])));
         assert_ne!(digest(&world()), digest(&bounded([-6.0 * 4096.0, 0.0])));
     }
@@ -987,18 +1057,39 @@ mod tests {
             )]))
             .with_scales(&scales.iter().copied().collect())
         };
-        let plain = block_inputs(&w, &[], &job, &tiles(&[]), &Options::default());
+        let plain = block_inputs(&w, &[], &job, &tiles(&[]), &Options::default(), false);
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 1.0)]), &Options::default()),
+            block_inputs(
+                &w,
+                &[],
+                &job,
+                &tiles(&[(7, 1.0)]),
+                &Options::default(),
+                false
+            ),
             plain
         );
         assert_ne!(
-            block_inputs(&w, &[], &job, &tiles(&[(7, 2.0)]), &Options::default()),
+            block_inputs(
+                &w,
+                &[],
+                &job,
+                &tiles(&[(7, 2.0)]),
+                &Options::default(),
+                false
+            ),
             plain
         );
         // a scale for a texture the block does not use leaves its digest alone
         assert_eq!(
-            block_inputs(&w, &[], &job, &tiles(&[(8, 2.0)]), &Options::default()),
+            block_inputs(
+                &w,
+                &[],
+                &job,
+                &tiles(&[(8, 2.0)]),
+                &Options::default(),
+                false
+            ),
             plain
         );
     }
@@ -1139,8 +1230,9 @@ mod tests {
             level: specular_level(on).levels[0],
             cell: (0, 0),
         };
-        let digest =
-            |on, tiles: &LandTiles| block_inputs(&w, &[], &level(on), tiles, &Options::default());
+        let digest = |on, tiles: &LandTiles| {
+            block_inputs(&w, &[], &level(on), tiles, &Options::default(), false)
+        };
         let a = specular_tiles(Some(10), Some((10, 200)));
         let b = specular_tiles(Some(20), Some((10, 200)));
         assert_eq!(digest(false, &a), digest(false, &b));

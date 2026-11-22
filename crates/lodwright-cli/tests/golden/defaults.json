@@ -83,6 +83,13 @@
     },
     {
       "default": true,
+      "key": "terrain.land_light",
+      "kind": "switch",
+      "since": "0.17.0",
+      "tier": 3
+    },
+    {
+      "default": true,
       "key": "objects.enabled",
       "kind": "switch",
       "since": "0.3.0",

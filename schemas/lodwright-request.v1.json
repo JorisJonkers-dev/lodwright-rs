@@ -253,6 +253,10 @@
           "type": "boolean",
           "default": true
         },
+        "land_light": {
+          "description": "Darken the composed far land as the near land is lit: each land texture's colours times the mean up component\nof its normal map, and a game tile is used only where it is already that dark (`docs/spec/terrain-lod.md`).\nOn by default; off gives the output the generator wrote before this option existed. Written only when off.",
+          "type": "boolean"
+        },
         "land_textures": {
           "description": "Blend the land textures into the diffuse maps (off: vertex colours only).",
           "type": "boolean",

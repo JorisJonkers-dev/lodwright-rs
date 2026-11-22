@@ -46,6 +46,34 @@ impl Keep<'_> {
 }
 
 impl Keep<'_> {
+    /// The mean luminance of the game's diffuse tile of the block of `level` cells at `cell`, when the game ships one.
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)] // a mean over pixels
+    pub(crate) fn mean(&self, level: u32, cell: (i32, i32)) -> Option<f32> {
+        let path = layout::diffuse_path(
+            &self.world,
+            BlockId {
+                level,
+                x: cell.0,
+                y: cell.1,
+            },
+        )
+        .ok()?;
+        let bytes = self.assets.shipped_read(&path, &*self.skip)?;
+        let image = lodwright_dds::decode(&bytes)
+            .ok()?
+            .levels
+            .into_iter()
+            .next()?;
+        let px = image.rgba().as_chunks::<4>().0;
+        let sum: f64 = px
+            .iter()
+            .map(|p| 0.299 * f64::from(p[0]) + 0.587 * f64::from(p[1]) + 0.114 * f64::from(p[2]))
+            .sum();
+        Some((sum / px.len().max(1) as f64) as f32)
+    }
+}
+
+impl Keep<'_> {
     /// The game's tile for the block of `level` cells at `cell` and the cells under it a mod changed, when the game
     /// ships a tile of that name and only some of its cells changed.
     pub(crate) fn patch(&self, level: u32, cell: (i32, i32)) -> Option<ShippedPatch> {

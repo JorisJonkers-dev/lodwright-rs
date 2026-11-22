@@ -524,6 +524,13 @@ pub fn generate(
                 }
                 _ => lodwright_gen::LandTiles::empty(),
             };
+            // far land is lit as the near land is: the unscaled tiles are kept for the test of a game tile
+            let unlit = request.terrain.land_light.then(|| tiles.clone());
+            let tiles = if request.terrain.land_light {
+                tiles.lit()
+            } else {
+                tiles
+            };
             if settings.levels.iter().any(|l| l.specular_alpha) {
                 warnings.extend(specular_warnings(&tiles));
             }
@@ -546,6 +553,8 @@ pub fn generate(
                 |level: u32, cell: (i32, i32)| keep.as_ref().is_some_and(|k| k.keeps(level, cell));
             let patch_fn =
                 |level: u32, cell: (i32, i32)| keep.as_ref().and_then(|k| k.patch(level, cell));
+            let mean_fn =
+                |level: u32, cell: (i32, i32)| keep.as_ref().and_then(|k| k.mean(level, cell));
             add_warnings(&mut doc, warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
@@ -588,6 +597,8 @@ pub fn generate(
                         water_polygons: request.terrain.water_polygons,
                         keep_shipped: keep.is_some().then_some(&keep_fn),
                         patch_shipped: keep.is_some().then_some(&patch_fn),
+                        shipped_mean: keep.is_some().then_some(&mean_fn),
+                        unlit: unlit.as_ref(),
                         reuse: Some(&reuse),
                         cancel: Some(&stop),
                     },

@@ -206,11 +206,13 @@ fn cell_of(i: &Instance) -> (i32, i32) {
     })
 }
 
+// source: game-object-uv-clamp
+/// A UV inside the atlas rectangle of its texture. A coordinate outside 0 to 1 is held at the nearest edge, as the
+/// game's own blocks do: a texture that is meant to repeat cannot repeat inside an atlas, and the fractional part
+/// would turn a vertex that is a hair outside the texture (-0.02) into the far edge (0.98) and smear the whole
+/// texture across its triangles.
 fn rect_uv(r: &Rect, atlas: &Atlas, uv: [f32; 2]) -> [f32; 2] {
-    // tiling textures cannot be shared in an atlas: the fractional part of the coordinate is used
-    let (u, v) = (uv[0] - uv[0].floor(), uv[1] - uv[1].floor());
-    let u = if uv[0] >= 1.0 && u < 1e-6 { 1.0 } else { u };
-    let v = if uv[1] >= 1.0 && v < 1e-6 { 1.0 } else { v };
+    let (u, v) = (uv[0].clamp(0.0, 1.0), uv[1].clamp(0.0, 1.0));
     [
         (r.x as f32 + u * r.w as f32) / atlas.width as f32,
         (r.y as f32 + v * r.h as f32) / atlas.height as f32,

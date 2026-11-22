@@ -44,8 +44,23 @@ fn lod_model(texture: &str) -> Vec<u8> {
 }
 
 /// The same model with the given node and shape transforms.
-#[allow(clippy::too_many_lines)] // one literal NIF
 fn lod_model_with(texture: &str, node_av: AvObject, shape_av: AvObject) -> Vec<u8> {
+    lod_model_full(
+        texture,
+        node_av,
+        shape_av,
+        vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+    )
+}
+
+/// The same model with the given node and shape transforms and UVs.
+#[allow(clippy::too_many_lines)] // one literal NIF
+fn lod_model_full(
+    texture: &str,
+    node_av: AvObject,
+    shape_av: AvObject,
+    uv: Vec<[f32; 2]>,
+) -> Vec<u8> {
     let node = NiNode {
         av: node_av,
         children: vec![1],
@@ -76,7 +91,7 @@ fn lod_model_with(texture: &str, node_av: AvObject, shape_av: AvObject) -> Vec<u
             center: [0.0; 3],
             radius: 0.0,
             vertex_colors: None,
-            uv_sets: vec![vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]],
+            uv_sets: vec![uv],
             consistency: 0,
             additional_data: -1,
         },
@@ -563,6 +578,43 @@ fn walk(dir: &std::path::Path) -> Vec<String> {
         }
     }
     out
+}
+
+#[test]
+fn a_uv_outside_the_texture_is_held_at_its_edge_not_wrapped_to_the_far_edge() {
+    // a vertex a hair outside the texture (-0.02, 1.02) must not jump to the other side of the tile, and a texture
+    // meant to repeat (2.5, -3.0) is held at the edge, as the game's own blocks do
+    let out = temp("uvclamp");
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model_full(
+            "Data\\Textures\\a\\wall.dds",
+            av(vec![]),
+            av(vec![3]),
+            vec![[-0.02, 1.02], [2.5, 0.5], [0.5, -3.0]],
+        ),
+    );
+    m.insert("textures/a/wall.dds".to_owned(), texture(128, 200));
+    let list = vec![instance("a\\Wall.nif", 4096.0 * 5.0, 4096.0, 0.0, 1, false)];
+    generate_objects("Mojave", &list, &Memory(m), &out).unwrap();
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x4.y0.nif",
+    );
+    let Body::TriShapeData(d) = &block.blocks[4].body else {
+        panic!("data block");
+    };
+    let uv = &d.geometry.uv_sets[0];
+    // the three corners of the one tile: the atlas holds only this texture, so the tile starts at (0, 0)
+    let (u0, v1) = (uv[0][0], uv[0][1]);
+    let (u_far, v_mid) = (uv[1][0], uv[1][1]);
+    let (u_mid, v0) = (uv[2][0], uv[2][1]);
+    assert!(u0 <= u_mid && u_mid <= u_far, "{uv:?}");
+    assert!(v0 <= v_mid && v_mid <= v1, "{uv:?}");
+    // held at the edges: -0.02 is the tile's left edge, 1.02 its bottom edge, 2.5 its right edge, -3.0 its top edge
+    assert!((u_mid - f32::midpoint(u0, u_far)).abs() < 1e-4, "{uv:?}");
+    assert!((v_mid - f32::midpoint(v0, v1)).abs() < 1e-4, "{uv:?}");
 }
 
 #[test]

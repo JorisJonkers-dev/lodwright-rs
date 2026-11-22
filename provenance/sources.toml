@@ -1104,6 +1104,17 @@ verified = false
 note = "Only one LOD reference of the base game separates the two rules for temporary references: it lies a fraction of a unit south of its cell's edge and the game's block follows the cell. 93 persistent LOD references lie outside the persistent cell's grid and the game's blocks follow their positions. The four blocks that still differ each hold one object whose vertices are shifted or turned as a whole (407 vertices in all), which points at placements changed after the game's blocks were built."
 
 [[source]]
+id = "game-object-uv-clamp"
+fact = "In the game's own object LOD blocks a UV outside 0 to 1 of a model is held at the edge of the model texture's atlas rectangle (clamped), not wrapped. Measured on one red cedar of WastelandNV, whose bark model has UVs from -5.8 to 1.86: its five trunk vertices in the block have the rectangle's right edge as u where the model's u is above 1 and its top edge as v for every model v below 0, while a u inside 0 to 1 lies inside the rectangle. The rectangle has no inset: the edge value is the rectangle's exact edge."
+url = "oracle:game-lod-files"
+licence = "Positions and texture coordinates of a few vertices of the owner's own game files compared with the model's; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Agrees with the public method of the Fallout LOD generator xLODGen, whose texture atlas step (LODApp.cs, UVAtlas in the repository TES5Edit/xLODGen; the repository states no licence, read for the method only, nothing copied) clamps each coordinate to the atlas entry's minimum and maximum, and whose host code (Core/wbLOD.pas of TES5Edit/TES5Edit, MPL-2.0) treats all Fallout 3 and New Vegas meshes as untiled (UVRange 10000) because those games do not support several shapes in an LOD block. Found when distant Washington buildings drew a smeared stretched texture: a model UV of -0.02 had become 0.98 under the earlier fractional-part rule."
+
+[[source]]
 id = "game-lod-water-height"
 fact = "Wherever a water plane of the game's own terrain blocks of the main worldspace overlaps a cell's ground below water, it lies at that cell's XCLW water height; a cell whose XCLW is the largest float (3.4028235e38) takes the world's default water height instead. The planes cover the ground whose mean height lies below the water height to an intersection-over-union of 0.986 at level 4."
 url = "oracle:game-lod-files"

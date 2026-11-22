@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! The object LOD block NIF: the seven-block structure the game's own object blocks have.
 //!
-//! Layout from the row `game-lod-object-block-nif` in `provenance/sources.toml`. The segment table has eight
-//! entries in the game's block (four empty, then four that partition the triangles); the meaning of the
-//! partition is not established, so [`SEGMENTS`] entries are written with the triangles split by the caller.
+//! Layout from the row `game-lod-object-block-nif` in `provenance/sources.toml`. The segment table has sixteen
+//! entries at most, one per cell of the block's four by four cells, x-major (`cell x * 4 + cell y`); each holds the
+//! triangles of the objects whose reference stands in that cell, and the triangles are stored in segment order.
 
 #![allow(
     clippy::too_many_lines,
@@ -18,7 +18,7 @@ use crate::terrain::{
 };
 
 /// Segments in the table.
-pub const SEGMENTS: usize = 8;
+pub const SEGMENTS: usize = 16;
 
 const TYPES: [&[u8]; 7] = [
     b"BSMultiBoundNode",
@@ -56,23 +56,30 @@ pub struct ObjectBlock<'a> {
     pub uv: &'a [[f32; 2]],
     /// Triangle corner indices, three per triangle.
     pub indices: &'a [u16],
-    /// The triangle count of each of the last four segments (they must add up to the triangle count).
-    pub segment_triangles: [u32; 4],
+    /// The triangle count of each segment, one per cell of the block, x-major (they must add up to the triangle
+    /// count, and the triangles must be stored in this order).
+    pub segment_triangles: [u32; SEGMENTS],
     /// The atlas and its normal atlas paths as written in the texture set.
     pub textures: [&'a str; 2],
 }
 
-fn shape_bytes(origin: (f32, f32), segments: [u32; 4]) -> Result<Vec<u8>> {
+fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS]) -> Result<Vec<u8>> {
     // source: game-lod-object-block-nif
     let mut b = Body::TriShape(tri_shape_for_object(origin)).write(crate::block::Profile {
         user_version: 11,
         user_version2: 34,
     })?;
-    put_u32(&mut b, u32::try_from(SEGMENTS).unwrap_or(8));
+    // the game's table ends with the last segment that holds a triangle
+    let count = segments
+        .iter()
+        .rposition(|&n| n > 0)
+        .map_or(1, |last| last + 1);
+    put_u32(&mut b, u32::try_from(count).unwrap_or(16));
     let mut start = 0_u32;
-    for n in [0, 0, 0, 0].into_iter().chain(segments) {
+    for &n in &segments[..count] {
         b.push(0); // flags
-        put_u32(&mut b, start * 3);
+        // an empty segment starts at 0, as in the game's blocks
+        put_u32(&mut b, if n == 0 { 0 } else { start * 3 });
         put_u32(&mut b, n);
         start += n;
     }
@@ -218,6 +225,12 @@ mod tests {
     use super::{ObjectBlock, SEGMENTS, object_block};
     use crate::{Body, NifFile};
 
+    fn one_segment(k: usize) -> [u32; SEGMENTS] {
+        let mut s = [0; SEGMENTS];
+        s[k] = 1;
+        s
+    }
+
     fn tri() -> (Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<u16>) {
         (
             vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]],
@@ -240,7 +253,7 @@ mod tests {
             bitangents: &b,
             uv: &uv,
             indices: &i,
-            segment_triangles: [0, 1, 0, 0],
+            segment_triangles: one_segment(5),
             textures: ["Data\\a.dds", "Data\\b.dds"],
         })
         .unwrap();
@@ -251,9 +264,12 @@ mod tests {
         let Body::Opaque(shape) = &back.blocks[1].body else {
             panic!("the shape is kept opaque");
         };
-        // 8 segments of 9 bytes at the end, after their count
-        let tail = &shape[shape.len() - SEGMENTS * 9 - 4..];
-        assert_eq!(&tail[0..4], &8_u32.to_le_bytes());
+        // 9 bytes per segment at the end, after their count
+        // segment 5 is the last used one, so the table has six segments
+        let tail = &shape[shape.len() - 6 * 9 - 4..];
+        assert_eq!(&tail[0..4], &6_u32.to_le_bytes());
+        // the one triangle is in segment 5, the last entry
+        assert_eq!(&tail[4 + 5 * 9 + 5..4 + 5 * 9 + 9], &1_u32.to_le_bytes());
         // the origin is on the shape, the root node has no translation (as in the game's blocks)
         let Body::Opaque(root) = &back.blocks[0].body else {
             panic!("the root is kept opaque");
@@ -285,7 +301,7 @@ mod tests {
             bitangents: &z,
             uv: &uv,
             indices: &i,
-            segment_triangles: [0, 0, 0, 0],
+            segment_triangles: [0; SEGMENTS],
             textures: ["a", "b"],
         });
         assert!(bad.is_err());

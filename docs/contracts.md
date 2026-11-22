@@ -87,98 +87,11 @@ A consumer that links an older lodwright without this call, or reads a handshake
 no default label and offers no tier 2 or tier 3 row. Adding the call changed no existing call, type or error code, so
 `lodwright-api` stays at version 1.
 
-### Land texture tiling
+### Request option notes
 
-`terrain.texture_scales` (empty by default, written only when set) says how often a land texture repeats across a
-cell quadrant in the terrain diffuse maps, by the land texture's absolute `FormID` as eight hex digits, for example
-`{"0000ABCD": 2.0}`; a texture that is not listed repeats once, as before. Each scale lies between 0.0625 and 16
-(`TEXTURE_SCALE_RANGE`). No source is known for a per-texture scale in the game's records, so this is lodwright's own
-setting, not a value read from the plugins. A scale other than 1 enters the digest of every terrain block that uses the
-texture, so changing it rebuilds those blocks and keeps the others; with no scale set, block digests and output are the
-same as before the option existed.
-
-### Specular in the normal map alpha
-
-`terrain.levels[].specular_alpha` (off by default, written only when on; tier 3, since 0.7.0) carries specular in the
-alpha channel of that level's terrain normal maps, which are then written as BC3 (DXT5) instead of BC1. The value is the
-`SNAM` specular exponent of the land textures under each pixel, blended with the same opacities as the diffuse map and
-scaled to 0 to 255 over the lowest and highest exponent of the load order; a texture without an exponent counts as the
-lowest value and the result carries a warning naming it, and when no land texture has an exponent at all the alpha stays
-opaque with one warning. This is lodwright's own design (`docs/spec/textures.md`, section 4); whether the game uses it
-is an owner check. Off, the files are byte-identical to earlier versions and the block digests do not change; on, the
-exponents enter the digest of that level's blocks only.
-
-### Terrain faces under the water
-
-`terrain.drop_under_water` (a number of world units, 0 to 100000; absent by default, written only when set; tier 3,
-since 0.9.0) leaves out terrain faces that the water hides: a face is left out when its three corners all lie at least
-that many units below the water plane of the cell its centre is in (cells without water keep all their faces). Vertices
-no kept face uses are left out too. If that would leave a block no face, the block keeps all of them. Own design
-(`docs/spec/terrain-lod.md`, section 7). Skirts, when on, are added after the drop. Absent, output and digests are as
-before; set, the offset enters the digest of every terrain block. The result's vertex and triangle counts of a block
-are the ones written.
-
-### Walls under the water outline
-
-`terrain.water_walls` (a switch, on by default, written only when off; tier 3, since 0.14.0; on by default and meaning
-the game's borders from the release after 0.15.2) writes what the game's own level blocks do where water meets a
-block's border: a vertical wall from the water height down to -14098 (the height the game's water outlines drop to)
-along every border side that has water, and at level 4 a plane that reaches 32 units past the south and west borders
-and past the north border (the east border stays), so that two planes overlap across a seam. Measured on the game's
-own blocks (`game-lod-water-walls`): no wall stands inside a level 4 block. In the engine, a lake that crosses block
-seams shows a pale band along the loaded cells' edge and a dotted line at the seam without them, and neither with them
-(`high-lake-mead`, same camera, game's own against ours, opened). Earlier releases wrote walls under the inside
-outlines of the water and none on the border; that is not what the game does and is gone. Off, the water planes are
-exactly the rectangles; the switch enters the digest of every terrain block that has water.
-
-### Shared corners of the water planes
-
-`terrain.water_shared_vertices` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes a corner
-that two rectangles of a water plane have in common once, at levels 8 to 32 (level 4 keeps one rectangle per
-cell segment). The triangles are the same corner for corner, so the water overlap and the covered ground do not change;
-only the number of vertices in the file falls. Off, output and digests are as before; on, the switch enters the digest
-of every terrain block that has water.
-
-### Water planes as polygons
-
-`terrain.water_polygons` (a switch, off by default, written only when on; tier 3, since 0.14.0) writes the water plane
-of a block at levels 8 to 32 as polygons: the squares of equal water height that touch along an edge are one region,
-its outline is traced (holes included), reduced to its corners and triangulated, so a vertex that only lies on a straight
-run is not written and the plane covers exactly the same squares at the same heights. The water overlap and depth of
-`verify` do not change; the number of vertices in the file falls (the figures are on the pull request). Level 4 keeps
-one rectangle per cell segment. A block whose outline cannot be triangulated keeps the rectangle plane (the sum of the
-triangle areas is checked against the wet squares); the switch takes precedence over `terrain.water_shared_vertices`.
-Own design (an outline of the wet squares, not a copy of anything), not yet looked at in the game: the owner decides.
-Off, output and digests are as before; on, the switch enters the digest of every terrain block that has water.
-
-### Skirts at block borders
-
-`terrain.levels[].skirts` (off by default, written only when on; tier 3, since 0.9.0) closes the gap to a neighbouring
-block, of the same or another level, the way the game's own blocks do: under every border vertex a second vertex at
-the constant height -14098 and two triangles per border edge, facing away from the block (`game-lod-block-borders`,
-`docs/spec/terrain-lod.md` section 5). Blocks are not coupled, so no neighbour data enters a digest; the switch enters the
-digest of that level's blocks only, and off the files and digests are as before. The skirt vertices count against the
-level's vertex cap: the surface is meshed with the room that is left. Whether the skirts remove the visible cracks in
-the game is an owner check (release test R2).
-
-### Where the terrain block grid starts
-
-Not a request option: terrain blocks of every level are placed on a grid that starts at the cell of the world's minimum
-corner (`NAM0`) instead of cell 0, 0, as the game's own tree does (`docs/spec/terrain-lod.md`, section 3). Block names
-and manifest keys change for worlds whose minimum corner cell is not a multiple of the level (since 0.8.1): a first run
-after the update rebuilds and renames those worlds' terrain blocks. Worlds that start on the grid keep their names,
-files and digests.
-
-### Object faces under the ground and the water
-
-`objects.drop_under_terrain` and `objects.drop_under_water` (both off by default, written only when on) leave out
-object LOD faces that cannot be seen: a face whose three corners all lie below the ground at their positions (the
-cell's height samples, interpolated between the four around each corner), or below the water height of a cell that has
-water. A face that crosses the surface is kept. Vertices that no kept face uses are left out too, so the UVs of the
-others stay where they were in the atlas. This is lodwright's own design, not a rule of the game's files. With either
-option on, the result counts the faces left out (`dropped_faces`: `under_terrain`, `under_water`; a face under both
-counts as under the ground). With both off, the output and the request digest are the same as before the options
-existed.
+What each option does, what it changes in the digests and where it came from is one file per option in
+[docs/contracts/options/](contracts/options/) (see its README). A new option adds a new file there and does not edit
+this page.
 
 ### Adding a request option
 
@@ -204,8 +117,8 @@ A new optional key does not raise `schema_version`, but it does change `schemas/
 `committed_schemas_equal_the_generated_ones` fails until the schema file is regenerated (`UPDATE_GOLDEN=1`) and the
 regenerated file is part of the same pull request. The Toolbox checks every request it builds against its snapshot of
 that schema, so a new option can be used from the Toolbox only after a release and a Component bump that refreshes the
-snapshot. Options land one pull request at a time, because each one edits the request type, the schema file and this
-page.
+snapshot. Options land one pull request at a time, because each one edits the request type and the schema file; its note is a
+new file in `docs/contracts/options/`, not an edit of this page.
 
 The run leaves `manifest.json` (`lodwright-manifest`: request digest, inputs digest, every file with size and digest) in
 the output folder. A later run with the same request over the same plugin contents finds it and the files it lists and

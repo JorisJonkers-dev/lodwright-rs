@@ -12,7 +12,7 @@ use lodwright_core::layout;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, decode, encode, resize};
-use lodwright_nif::{ObjectBlock, object_block};
+use lodwright_nif::{ObjectBlock, SEGMENTS, object_block};
 
 use crate::assets::Assets;
 use crate::atlas::{Atlas, Rect, pack};
@@ -191,7 +191,7 @@ struct Merged {
     bitangents: Vec<[f32; 3]>,
     uv: Vec<[f32; 2]>,
     indices: Vec<u16>,
-    row_triangles: [u32; 4],
+    segment_triangles: [u32; SEGMENTS],
     dropped_under_terrain: usize,
     dropped_under_water: usize,
 }
@@ -204,6 +204,16 @@ fn cell_of(i: &Instance) -> (i32, i32) {
         let cell = |v: f32| (v / CELL_UNITS).floor() as i32;
         (cell(i.placement.pos[0]), cell(i.placement.pos[1]))
     })
+}
+
+// source: game-object-block-segments
+/// The segment of a block that holds an instance's triangles: one per cell of the block's four by four cells,
+/// x-major (`cell x * 4 + cell y`), by the cell of the reference, so the game can switch off the LOD of the cells it
+/// has loaded.
+fn segment_of(i: &Instance, block: (i32, i32)) -> usize {
+    let (cx, cy) = cell_of(i);
+    let at = |c: i32, b: i32| usize::try_from((c - b).clamp(0, BLOCK_CELLS - 1)).unwrap_or(0);
+    at(cx, block.0) * BLOCK_CELLS as usize + at(cy, block.1)
 }
 
 // source: game-object-uv-clamp
@@ -225,7 +235,7 @@ fn add_instance(
     model: &Model,
     placement: &Placement,
     origin: (f32, f32),
-    row: usize,
+    segment: usize,
     atlas: &Atlas,
     key_of: &dyn Fn(&Part) -> String,
     surfaces: Surfaces,
@@ -330,7 +340,7 @@ fn add_instance(
             m.indices
                 .extend(t.map(|i| base + remap[usize::from(i)].unwrap_or(0)));
         }
-        m.row_triangles[row.min(3)] += u32::try_from(faces.len()).unwrap_or(0);
+        m.segment_triangles[segment.min(SEGMENTS - 1)] += u32::try_from(faces.len()).unwrap_or(0);
     }
     true
 }
@@ -560,15 +570,12 @@ pub fn generate_objects_with_progress(
     let [diffuse_ref, normal_ref] = layout::nif_atlas_paths(world)?;
     let total = groups.len() as u64;
     for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
-        members.sort_by_key(|i| {
-            let row = cell_of(i).1 - by;
-            (row.clamp(0, 3), i.reference, i.base)
-        });
+        members.sort_by_key(|i| (segment_of(i, (bx, by)), i.reference, i.base));
         let origin = (bx as f32 * CELL_UNITS, by as f32 * CELL_UNITS);
         let mut merged = Merged::default();
         let mut dropped = 0;
         for i in members {
-            let row = usize::try_from((cell_of(i).1 - by).clamp(0, 3)).unwrap_or(0);
+            let segment = segment_of(i, (bx, by));
             let Some(model) = models
                 .get(&lod_model_path(&i.model))
                 .and_then(Option::as_ref)
@@ -580,7 +587,7 @@ pub fn generate_objects_with_progress(
                 model,
                 &i.placement,
                 origin,
-                row,
+                segment,
                 &atlas,
                 &key_of,
                 surfaces,
@@ -612,7 +619,7 @@ pub fn generate_objects_with_progress(
             bitangents: &merged.bitangents,
             uv: &merged.uv,
             indices: &merged.indices,
-            segment_triangles: merged.row_triangles,
+            segment_triangles: merged.segment_triangles,
             textures: [&diffuse_ref, &normal_ref],
         })?
         .write()?;

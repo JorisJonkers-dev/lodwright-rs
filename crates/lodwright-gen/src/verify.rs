@@ -1438,7 +1438,7 @@ mod tests {
             bitangents: &side,
             uv: &uv,
             indices: &[0, 1, 2],
-            segment_triangles: [1, 0, 0, 0],
+            segment_triangles: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             textures: ["a.dds", "b.dds"],
         })
         .unwrap();
@@ -1462,7 +1462,7 @@ mod tests {
             bitangents: &side,
             uv: &uv,
             indices: &[0, 1, 2],
-            segment_triangles: [1, 0, 0, 0],
+            segment_triangles: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             textures: ["a.dds", "b.dds"],
         })
         .unwrap();

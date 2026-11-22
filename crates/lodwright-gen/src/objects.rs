@@ -29,6 +29,10 @@ const MAX_TRIANGLES: usize = 65_535;
 /// Key of the flat texture used by shapes without one.
 const NONE: &str = "<none>";
 
+// source: game-lod-object-normal-alpha
+/// The alpha of every texel of the far-object normal atlas: the value of the game's own Mojave atlas.
+const NORMAL_ATLAS_ALPHA: u8 = 27;
+
 /// What object generation produced.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ObjectReport {
@@ -577,6 +581,11 @@ pub fn generate_objects_with_atlas_limit(
             if let Ok(small) = resize(&img, half.w, half.h, Filter::Box) {
                 blit(&mut normal, nw, &small, &half);
             }
+        }
+        // the engine lights far objects by the normal atlas's alpha (a gloss mask): one low value everywhere, as the
+        // game's own Mojave atlas has, instead of each source's alpha (most read as full and gave far rock a grey sheen)
+        for px in normal.as_chunks_mut::<4>().0 {
+            px[3] = NORMAL_ATLAS_ALPHA;
         }
         let [diffuse_path, normal_path] = layout::atlas_page_paths(world, page)?;
         let diffuse_image = Image::new(atlas.width, atlas.height, diffuse)?;

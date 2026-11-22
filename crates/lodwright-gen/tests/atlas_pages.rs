@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Objects whose textures land on a second atlas page: the block they are written into must draw them with that page.
-//! The check follows the references a reader follows (shape, its lighting property, that property's texture set),
-//! then samples the named page at each triangle's UVs.
+//! The far-object atlases: objects whose textures land on a second atlas page must be drawn with that page (the check
+//! follows the references a reader follows: shape, its lighting property, that property's texture set, then samples
+//! the named page at each triangle's UVs), and the normal atlas carries the game's gloss value.
 
 use std::collections::HashMap;
 
@@ -41,8 +41,13 @@ fn av(properties: Vec<i32>) -> AvObject {
 }
 
 /// A one-triangle LOD model with a texture set: node, strips shape, strips data, lighting property, texture set.
-#[allow(clippy::too_many_lines)] // one literal NIF
 fn lod_model(texture: &str) -> Vec<u8> {
+    lod_model_with_normal(texture, "")
+}
+
+/// The same with a normal map in the texture set's second slot.
+#[allow(clippy::too_many_lines)] // one literal NIF
+fn lod_model_with_normal(texture: &str, normal: &str) -> Vec<u8> {
     let (node_av, shape_av, triangles) = (av(vec![]), av(vec![3]), 1_u16);
     let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
     let node = NiNode {
@@ -89,7 +94,7 @@ fn lod_model(texture: &str) -> Vec<u8> {
     lighting.extend_from_slice(&[0; 42]);
     lighting[34..38].copy_from_slice(&4_u32.to_le_bytes());
     let mut set = 6_u32.to_le_bytes().to_vec();
-    for p in [texture, ""] {
+    for p in [texture, normal] {
         set.extend_from_slice(&u32::try_from(p.len()).unwrap().to_le_bytes());
         set.extend_from_slice(p.as_bytes());
     }
@@ -303,4 +308,79 @@ fn objects_on_a_second_atlas_page_are_drawn_with_their_own_texture() {
             "triangle {k} shows {s}: {shapes:?}"
         );
     }
+}
+
+fn texture_with_alpha(size: u32, rgba: [u8; 4]) -> Vec<u8> {
+    let px: Vec<u8> = (0..size * size).flat_map(|_| rgba).collect();
+    encode(
+        &Image::new(size, size, px).unwrap(),
+        &EncodeOptions {
+            format: Format::Bc3,
+            mips: true,
+            filter: Filter::Box,
+            quality: Quality::Fast,
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn the_normal_atlas_carries_the_games_gloss_value_everywhere() {
+    // one object with a normal map whose alpha is full, one without a normal map, and the empty rest of the atlas:
+    // the normal atlas's alpha is the game's own value (27) in every texel, whatever the sources hold
+    let out = std::env::temp_dir().join(format!("lodwright-normal-alpha-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall0_lod.nif".to_owned(),
+        lod_model_with_normal(
+            "Data\\Textures\\a\\wall0.dds",
+            "Data\\Textures\\a\\wall0_n.dds",
+        ),
+    );
+    m.insert(
+        "meshes/a/wall1_lod.nif".to_owned(),
+        lod_model("Data\\Textures\\a\\wall1.dds"),
+    );
+    m.insert("textures/a/wall0.dds".to_owned(), texture(256, 100));
+    m.insert(
+        "textures/a/wall0_n.dds".to_owned(),
+        texture_with_alpha(256, [100, 150, 250, 255]),
+    );
+    m.insert("textures/a/wall1.dds".to_owned(), texture(128, 200));
+    let list = vec![
+        instance("a\\Wall0.nif", 100.0, 1),
+        instance("a\\Wall1.nif", 200.0, 2),
+    ];
+    generate_objects_with_atlas_limit(
+        "Mojave",
+        &list,
+        &Memory(m),
+        &out,
+        Surfaces::default(),
+        (8192, 8192),
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let normal =
+        std::fs::read(out.join("textures/landscape/lod/mojave/blocks/mojave.buildings_n.dds"))
+            .unwrap();
+    let _ = std::fs::remove_dir_all(&out);
+    let image = &lodwright_dds::decode(&normal).unwrap().levels[0];
+    let alpha: Vec<u8> = image.rgba().iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(alpha.len(), (image.width() * image.height()) as usize);
+    assert!(
+        alpha.iter().all(|a| a.abs_diff(27) <= 1),
+        "{:?}",
+        &alpha[..alpha.len().min(16)]
+    );
+    // the normal map itself is still there: its colour shows in the atlas
+    assert!(
+        image
+            .rgba()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|p| p[0].abs_diff(100) <= 4 && p[1].abs_diff(150) <= 4)
+    );
 }

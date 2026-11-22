@@ -81,6 +81,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
     let mut bases: HashMap<u32, (BaseObject, usize)> = HashMap::new();
     let mut refs: HashMap<u32, Ref> = HashMap::new();
     let mut order: Vec<u32> = Vec::new();
+    let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
     for (index, (_, plugin)) in plugins.iter().enumerate() {
         let table = master_table(plugins, plugin)?;
         let own = u32::try_from(index).map_err(|_| Error::Malformed("too many plugins"))?;
@@ -97,21 +98,24 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
             .iter()
             .filter(|w| absolute(w.form_id, &table, own) == world)
         {
+            // the plugin's own references and deletions in file order are not kept apart, so a reference it both
+            // deletes and places (a deleted record is followed by its replacement elsewhere) keeps the placement
+            for deleted in &source.deleted_refs {
+                refs.remove(&absolute(*deleted, &table, own));
+            }
             for r in &source.refs {
                 let id = absolute(r.form_id, &table, own);
-                if refs
-                    .insert(
-                        id,
-                        (
-                            absolute(r.base, &table, own),
-                            r.flags,
-                            r.placement,
-                            index,
-                            r.cell,
-                        ),
-                    )
-                    .is_none()
-                {
+                refs.insert(
+                    id,
+                    (
+                        absolute(r.base, &table, own),
+                        r.flags,
+                        r.placement,
+                        index,
+                        r.cell,
+                    ),
+                );
+                if seen.insert(id) {
                     order.push(id);
                 }
             }
@@ -119,7 +123,9 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
     }
     let mut out = Vec::new();
     for id in order {
-        let (base_id, flags, placement, reference_plugin, cell) = refs[&id];
+        let Some(&(base_id, flags, placement, reference_plugin, cell)) = refs.get(&id) else {
+            continue; // deleted by a later plugin
+        };
         let Some((base, base_plugin)) = bases.get(&base_id) else {
             continue;
         };
@@ -257,5 +263,43 @@ mod tests {
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[1].reference, 0x201);
+    }
+
+    #[test]
+    fn a_reference_deleted_by_a_later_plugin_drops_out_and_a_third_plugin_can_place_it_again() {
+        let base = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![refr(0x200, 0x100, 0, 1.0), refr(0x201, 0x100, 0, 2.0)],
+        );
+        // the patch deletes reference 0x200 (a deleted record has no subrecords)
+        let mut deleted = Record::new(*b"REFR", 0x0000_0200);
+        deleted.flags = 0x0000_0020;
+        let patch = plugin(&["Base.esm"], vec![], vec![deleted]);
+        let mut plugins = vec![
+            ("Base.esm".to_owned(), base),
+            ("Patch.esp".to_owned(), patch),
+        ];
+        let out = visible_instances(&plugins, 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].reference, 0x201);
+        // a plugin after the deleting one places the reference again, at a new position
+        let again = plugin(
+            &["Base.esm"],
+            vec![],
+            vec![refr(0x0000_0200, 0x0000_0100, 0, 7.0)],
+        );
+        plugins.push(("Again.esp".to_owned(), again));
+        let out = visible_instances(&plugins, 0x0000_0A00).unwrap();
+        let mut at: Vec<(u32, f32)> = out
+            .iter()
+            .map(|i| (i.reference, i.placement.pos[0]))
+            .collect();
+        at.sort_by_key(|a| a.0);
+        assert_eq!(
+            at,
+            [(0x200, 7.0), (0x201, 2.0)],
+            "no reference appears twice"
+        );
     }
 }

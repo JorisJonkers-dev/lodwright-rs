@@ -39,6 +39,10 @@ const LIGHTING_PROPERTY_TAIL: [u8; 42] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x80, 0x3f,
 ];
 
+/// Where the lighting property's texture set reference sits: after the empty name, extra data and controller (12
+/// bytes), the flags (2), the shader type, flags, second flags, environment map scale and clamp mode (4 each).
+const TEXTURE_SET_REF: usize = 12 + 2 + 5 * 4;
+
 /// Everything an object block needs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectBlock<'a> {
@@ -266,6 +270,9 @@ fn shape_blocks(block: &ObjectBlock<'_>, first: i32) -> Result<(Vec<Body>, [f32;
     put_u32(&mut lighting, 0);
     put_u32(&mut lighting, u32::MAX);
     lighting.extend_from_slice(&LIGHTING_PROPERTY_TAIL);
+    // the lighting property names the texture set of its own shape (the block after it); the tail as measured names
+    // block 3, which is right only for the first shape of a block
+    lighting[TEXTURE_SET_REF..TEXTURE_SET_REF + 4].copy_from_slice(&(first + 2).to_le_bytes());
     Ok((
         vec![
             Body::Opaque(shape_bytes(block.origin, block.segment_triangles, first)?),
@@ -410,6 +417,57 @@ mod shapes_tests {
         for (shape, data) in [(1_usize, 4_usize), (5, 8)] {
             assert!(matches!(back.blocks[data].body, Body::TriShapeData(_)));
             assert!(matches!(back.blocks[shape + 2].body, Body::Opaque(_)));
+        }
+    }
+
+    // regression: docs/regressions/2026-11-22-second-atlas-page.md
+    #[test]
+    fn each_shape_of_a_block_names_its_own_texture_set() {
+        let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let t = vec![[1.0, 0.0, 0.0]; 3];
+        let b = vec![[0.0, 1.0, 0.0]; 3];
+        let i = vec![0_u16, 1, 2];
+        let mut seg = [0; SEGMENTS];
+        seg[2] = 1;
+        let page = |textures: [&'static str; 2]| ObjectBlock {
+            origin: (4096.0, 0.0),
+            vertices: &v,
+            normals: &n,
+            tangents: &t,
+            bitangents: &b,
+            uv: &uv,
+            indices: &i,
+            segment_triangles: seg,
+            textures,
+        };
+        let file = object_block_shapes(&[
+            page(["Data\\a.dds", "Data\\a_n.dds"]),
+            page(["Data\\a01.dds", "Data\\a01_n.dds"]),
+            page(["Data\\a02.dds", "Data\\a02_n.dds"]),
+        ])
+        .unwrap();
+        let back = NifFile::read(&file.write().unwrap()).unwrap();
+        let int =
+            |bytes: &[u8], at: usize| i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        for (k, name) in ["a.dds", "a01.dds", "a02.dds"].iter().enumerate() {
+            let shape = 1 + 4 * k;
+            // the shape's property is the lighting block after it ...
+            let Body::Opaque(lighting) = &back.blocks[shape + 1].body else {
+                panic!("lighting property");
+            };
+            // ... whose texture set is the block after that, holding this shape's textures
+            let set = usize::try_from(int(lighting, super::TEXTURE_SET_REF)).unwrap();
+            assert_eq!(set, shape + 2, "shape {k}");
+            let Body::Opaque(textures) = &back.blocks[set].body else {
+                panic!("texture set");
+            };
+            assert!(
+                String::from_utf8_lossy(textures).contains(name),
+                "shape {k} names {}",
+                String::from_utf8_lossy(textures)
+            );
         }
     }
 

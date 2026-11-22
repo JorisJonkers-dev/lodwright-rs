@@ -11,6 +11,7 @@ description = "DDS writing with legacy headers, resize, mip chains and BC1, BC3 
 [dependencies]
 ddsfile = "0.6.0"
 texpresso = "2.0.2"
+texture2ddecoder = { version = "0.1.2", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

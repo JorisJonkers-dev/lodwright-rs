@@ -2,7 +2,8 @@
 //! DDS files: legacy-header writing, strict header reading, and decoding for tests.
 //!
 //! Only DXT1 (BC1), DXT5 (BC3) and ATI2 (BC5) with the 128-byte legacy header are handled. A DX10 extension
-//! header is never written and is refused on reading: the target engine's Direct3D 9 renderer cannot read it.
+//! header is never written and is refused by [`decode`]: the target engine's Direct3D 9 renderer cannot read it.
+//! [`decode_image`] reads a BC7 file with a DX10 header to RGBA, for the mods that ship their far textures that way.
 
 use crate::error::{DdsError, Result};
 use crate::image::{Image, check_dimensions};
@@ -351,14 +352,65 @@ fn decode_masked(bytes: &[u8]) -> Result<Image> {
     Image::new(width, height, rgba)
 }
 
-/// Decode the largest level of a DDS to RGBA: a block-compressed file (as [`decode`]) or an uncompressed 16, 24 or
-/// 32 bit one described by its colour masks.
+// source: dds-dx10-header
+/// Bytes of the magic, the header and the 20-byte DX10 extension header: the data starts here.
+const DX10_DATA_AT: usize = HEADER_LEN + 20;
+
+// source: dds-dx10-header
+/// The `DXGI_FORMAT` values of BC7 (`UNORM` and `UNORM_SRGB`), the one DX10 format the far-object resource mods ship.
+const DXGI_BC7: [u32; 2] = [98, 99];
+
+/// Decode the largest level of a file with a DX10 extension header. Only BC7 is read; the game's own renderer cannot
+/// read such a file, so this is for reading a mod's texture (it is re-encoded into the atlas), never for writing.
+fn decode_dx10(bytes: &[u8]) -> Result<Image> {
+    if bytes.len() < DX10_DATA_AT {
+        return Err(DdsError::Truncated);
+    }
+    if &bytes[0..4] != b"DDS " || le32(bytes, 4) != 124 {
+        return Err(DdsError::BadHeader);
+    }
+    let (height, width) = (le32(bytes, 12), le32(bytes, 16));
+    check_dimensions(width, height)?;
+    let format = le32(bytes, HEADER_LEN);
+    if !DXGI_BC7.contains(&format) {
+        return Err(DdsError::UnsupportedDxgiFormat(format));
+    }
+    let blocks = |n: u32| (n as usize).div_ceil(4).max(1);
+    let need = blocks(width) * blocks(height) * 16;
+    if bytes.len() - DX10_DATA_AT < need {
+        return Err(DdsError::Truncated);
+    }
+    let mut argb = vec![0_u32; width as usize * height as usize];
+    texture2ddecoder::decode_bc7(
+        &bytes[DX10_DATA_AT..DX10_DATA_AT + need],
+        width as usize,
+        height as usize,
+        &mut argb,
+    )
+    .map_err(|_| DdsError::BadHeader)?;
+    // the decoder writes 0xAARRGGBB in a little-endian u32 per pixel
+    let rgba = argb
+        .iter()
+        .flat_map(|p| {
+            let [b, g, r, a] = p.to_le_bytes();
+            [r, g, b, a]
+        })
+        .collect();
+    Image::new(width, height, rgba)
+}
+
+/// Decode the largest level of a DDS to RGBA: a block-compressed file (as [`decode`]), an uncompressed 16, 24 or
+/// 32 bit one described by its colour masks, or a BC7 file with a DX10 extension header.
 ///
 /// # Errors
-/// Anything [`read_header`] refuses, or a mask format that is not 16, 24 or 32 bit RGB.
+/// Anything [`read_header`] refuses, a mask format that is not 16, 24 or 32 bit RGB, or a DX10 header that names a
+/// format other than BC7 ([`DdsError::UnsupportedDxgiFormat`]).
 pub fn decode_image(bytes: &[u8]) -> Result<Image> {
     if bytes.len() >= 84 && le32(bytes, 80) & 0x4 == 0 {
         return decode_masked(bytes);
+    }
+    if bytes.len() >= 88 && bytes[84..88] == *b"DX10" {
+        return decode_dx10(bytes);
     }
     decode(bytes)?
         .levels

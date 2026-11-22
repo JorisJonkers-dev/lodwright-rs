@@ -4,8 +4,8 @@ What this pull request changes and why.
 
 ## Checklist
 
-- [ ] Provenance: every format fact this change relies on has a row in `provenance/sources.toml` (with the licence
-      of its source) and is mentioned in `provenance/LOG.md`; every `// source:` comment names such a row.
+- [ ] Provenance: every format fact this change relies on is a row file under `provenance/rows/` (with the licence
+      of its source; its `note` is the log entry); every `// source:` comment names such a row.
 - [ ] No game data: no `.esm .esp .esl .bsa .ba2 .nif .kf .dds .btr .bto .btt .lod .wav .ogg .mp3 .fos .ess`, no
       extract, dump, screenshot or output of the reference generator from real data, and no committed binary. Test data is built
       in code (`lodwright-testkit`).

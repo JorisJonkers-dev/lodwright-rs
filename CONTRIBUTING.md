@@ -24,8 +24,12 @@ game data in the repository, a pull request or an issue.
 - Small pull requests with Conventional Commit titles (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`); the title becomes the
   squash commit and release-please reads it. Do not hand-edit `CHANGELOG.md`.
 - Every source file starts with `SPDX-License-Identifier: GPL-3.0-only`.
-- Every format fact the code relies on is a row in `provenance/sources.toml`, mentioned in `provenance/LOG.md`, and
-  referenced from code with `// source: <id>`.
+- Every format fact the code relies on is a row, one file per row in `provenance/rows/<id>.toml` whose `note` is its
+  log entry, and referenced from code with `// source: <id>`. `provenance/sources.toml` and `provenance/LOG.md` are
+  frozen history: a pull request does not add a line to them (the guard says where the entry belongs).
+- Shared pages that every change used to edit are folders of files: a request option's note is a new file in
+  `docs/contracts/options/`, a provenance row is a new file in `provenance/rows/`, a decision is a new file in
+  `docs/decisions/`. Do not append to a shared log, table or page that other open pull requests also append to.
 - Tests use synthetic fixtures from `lodwright-testkit`; nothing binary is committed (`docs/TESTING.md`).
 - `unsafe` is forbidden; clippy pedantic and `-D warnings` apply.
 - Fill in the pull request template; the pipeline's `Pipeline Complete` check must be green to merge (squash).

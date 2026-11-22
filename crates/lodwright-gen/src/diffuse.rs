@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use lodwright_core::texture::TextureResolver;
 use lodwright_core::worldspace::Worldspace;
-use lodwright_dds::{Filter, resize};
+use lodwright_dds::{Filter, Image, resize};
 
 use crate::assets::Assets;
 
@@ -113,6 +113,38 @@ pub struct LandTiles {
     tiles: HashMap<u32, Tile>,
     /// Lowest and highest specular exponent of the load order's land textures; `None` when no record has one.
     specular_range: Option<(u8, u8)>,
+    /// The default land texture, which a quadrant without a base texture shows.
+    default: Option<Tile>,
+}
+
+/// The default land texture the game uses when its ini does not say (`SDefaultLandDiffuseTexture` of the game's
+/// `Fallout_default.ini`); a name without a folder is in `textures\landscape`.
+pub const DEFAULT_LAND_TEXTURE: &str = "DirtWasteland01.dds";
+
+/// The value of `SDefaultLandDiffuseTexture` in the `[Landscape]` section of an ini file's text, when it has one.
+#[must_use]
+pub fn default_land_texture_from_ini(text: &str) -> Option<String> {
+    let mut in_section = false;
+    for line in text.lines().map(str::trim) {
+        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            in_section = name.eq_ignore_ascii_case("Landscape");
+            continue;
+        }
+        let value = line
+            .split_once('=')
+            .filter(|(key, _)| {
+                in_section
+                    && key
+                        .trim()
+                        .eq_ignore_ascii_case("SDefaultLandDiffuseTexture")
+            })
+            .map(|(_, value)| value.trim())
+            .filter(|value| !value.is_empty());
+        if let Some(value) = value {
+            return Some(value.to_owned());
+        }
+    }
+    None
 }
 
 impl LandTiles {
@@ -128,7 +160,15 @@ impl LandTiles {
         Self {
             tiles,
             specular_range: None,
+            default: None,
         }
+    }
+
+    /// The same tiles with a default land tile (for tests).
+    #[cfg(test)]
+    pub(crate) fn with_default_tile(mut self, tile: Tile) -> Self {
+        self.default = Some(tile);
+        self
     }
 
     /// The same tiles with the tiling scale of each land texture in `scales` (absolute `FormID` to repeats per
@@ -170,6 +210,45 @@ impl LandTiles {
         ids
     }
 
+    /// The tile of the default land texture, when it was loaded.
+    #[must_use]
+    pub fn default_tile(&self) -> Option<&Tile> {
+        self.default.as_ref()
+    }
+
+    /// The same tiles with the default land texture `path` (relative to `textures`, as the ini states it) read
+    /// through `assets`; a texture that cannot be read is named in `warnings` and leaves the neutral earth.
+    #[must_use]
+    pub fn with_default_texture(
+        mut self,
+        path: &str,
+        assets: &dyn Assets,
+        warnings: &mut Vec<String>,
+    ) -> Self {
+        // the ini names the file relative to textures\landscape
+        let relative = if path.contains(['\\', '/']) {
+            path.to_owned()
+        } else {
+            format!("landscape/{path}")
+        };
+        let key = format!("textures/{}", relative.replace('\\', "/"));
+        let image = assets
+            .read(&key)
+            .and_then(|b| lodwright_dds::decode(&b).ok())
+            .and_then(|d| d.levels.into_iter().next());
+        match image.and_then(|i| reduce(&i)) {
+            Some(rgb) => {
+                self.default = Some(Tile {
+                    rgb,
+                    scale: Scale::ONE,
+                    specular: None,
+                });
+            }
+            None => warnings.push(format!("default land texture {key} not found")),
+        }
+        self
+    }
+
     /// The tile of land texture `id` (absolute `FormID`).
     #[must_use]
     pub fn get(&self, id: u32) -> Option<&Tile> {
@@ -205,14 +284,7 @@ impl LandTiles {
                 warnings.push(format!("land texture {key} not found"));
                 continue;
             };
-            if let Ok(small) = resize(&image, TILE, TILE, Filter::Box) {
-                let rgb = small
-                    .rgba()
-                    .as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|p| [p[0], p[1], p[2]])
-                    .collect();
+            if let Some(rgb) = reduce(&image) {
                 tiles.insert(
                     id,
                     Tile {
@@ -226,8 +298,23 @@ impl LandTiles {
         Self {
             tiles,
             specular_range: resolver.specular_range(),
+            default: None,
         }
     }
+}
+
+/// A land texture image reduced to `TILE` by `TILE` colours.
+fn reduce(image: &Image) -> Option<Vec<[u8; 3]>> {
+    let small = resize(image, TILE, TILE, Filter::Box).ok()?;
+    Some(
+        small
+            .rgba()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| [p[0], p[1], p[2]])
+            .collect(),
+    )
 }
 
 /// Blend `layers` (colour and opacity, in layer order) over `base`.
@@ -245,6 +332,16 @@ pub fn blend(base: [u8; 3], layers: &[([u8; 3], f32)]) -> [u8; 3] {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_default_land_texture_is_read_from_the_landscape_section_of_an_ini() {
+        let ini = "[Display]\nSDefaultLandDiffuseTexture=Wrong.dds\n[Landscape]\nfLandFriction=2.5\nsdefaultlanddiffusetexture = Landscape\\Mud01.dds \n[Other]\n";
+        assert_eq!(
+            super::default_land_texture_from_ini(ini).as_deref(),
+            Some("Landscape\\Mud01.dds")
+        );
+        assert_eq!(super::default_land_texture_from_ini("[Landscape]\n"), None);
+    }
+
     use super::{LandTiles, Scale, TILE, Tile, blend};
     use std::collections::{BTreeMap, HashMap};
 
@@ -305,6 +402,7 @@ mod tests {
         let tiles = LandTiles {
             tiles: HashMap::from([(1, ramp()), (2, ramp())]),
             specular_range: None,
+            default: None,
         }
         .with_scales(&BTreeMap::from([(2, 4.0), (9, 3.0)]));
         assert_eq!(tiles.get(1).unwrap().scale(), 1.0);

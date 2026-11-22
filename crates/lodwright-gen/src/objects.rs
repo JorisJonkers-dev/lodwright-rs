@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Object LOD generation: the small LOD models of every visible object, merged per block of 4 by 4 cells, with
-//! their textures packed into one atlas per world.
+//! their textures packed into atlases per world (one, or several pages when they do not fit one at native size).
 //!
 //! What goes in is from the rows `game-lod-object-layout`, `game-lod-object-block-nif` and
 //! `fnv-object-records`; the selection rule reproduces the game's own totals (see `docs/gap-list.md`).
@@ -15,7 +15,7 @@ use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, resiz
 use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
 
 use crate::assets::{Assets, read_texture, texture_warning};
-use crate::atlas::{Atlas, Rect, pack};
+use crate::atlas::{Atlas, LARGEST_ATLAS, Rect, pack_pages};
 use crate::error::GenError;
 use crate::lodmodel::{Part, parse_lod_model};
 use crate::terrain::{FileRecord, write_file};
@@ -231,6 +231,12 @@ fn rect_uv(r: &Rect, atlas: &Atlas, uv: [f32; 2]) -> [f32; 2] {
     ]
 }
 
+/// One atlas page: its rectangles, and the key of a part's texture.
+struct Page<'a> {
+    atlas: &'a Atlas,
+    key_of: &'a dyn Fn(&Part) -> String,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn add_instance(
     m: &mut Merged,
@@ -238,15 +244,20 @@ fn add_instance(
     placement: &Placement,
     origin: (f32, f32),
     segment: usize,
-    atlas: &Atlas,
-    key_of: &dyn Fn(&Part) -> String,
+    page: &Page,
     surfaces: Surfaces,
 ) -> bool {
     let rot = euler(placement.rot);
+    // only the parts whose texture is on this page
+    let parts: Vec<&Part> = model
+        .parts
+        .iter()
+        .filter(|p| page.atlas.rects.contains_key(&(page.key_of)(p)))
+        .collect();
     // per part: the corners in world units, the faces kept and the vertices those faces use
     let mut kept: Vec<(Vec<[f32; 3]>, Vec<[u16; 3]>, Vec<Option<u16>>)> = Vec::new();
     let (mut under_terrain, mut under_water) = (0, 0);
-    for part in &model.parts {
+    for part in &parts {
         let world: Vec<[f32; 3]> = part
             .vertices
             .iter()
@@ -317,7 +328,7 @@ fn add_instance(
     }
     m.dropped_under_terrain += under_terrain;
     m.dropped_under_water += under_water;
-    for (part, (world, faces, remap)) in model.parts.iter().zip(kept) {
+    for (part, (world, faces, remap)) in parts.iter().zip(kept) {
         let base = u16::try_from(m.vertices.len()).unwrap_or(u16::MAX);
         let normals = part
             .normals
@@ -327,12 +338,8 @@ fn add_instance(
             .tangents
             .clone()
             .unwrap_or_else(|| tangent_frame(&part.vertices, &part.uv, &normals, &part.triangles));
-        let key = key_of(part);
-        let rect = atlas
-            .rects
-            .get(&key)
-            .or_else(|| atlas.rects.get(NONE))
-            .copied();
+        let atlas = page.atlas;
+        let rect = atlas.rects.get(&(page.key_of)(part)).copied();
         for i in (0..part.vertices.len()).filter(|&i| remap[i].is_some()) {
             let w = world[i];
             m.vertices.push([w[0] - origin.0, w[1] - origin.1, w[2]]);
@@ -417,6 +424,31 @@ pub fn generate_objects_with_progress(
     assets: &dyn Assets,
     out: &Path,
     surfaces: Surfaces,
+    block_done: &mut dyn FnMut(u64, u64),
+) -> Result<ObjectReport, GenError> {
+    generate_objects_with_atlas_limit(
+        world,
+        instances,
+        assets,
+        out,
+        surfaces,
+        LARGEST_ATLAS,
+        block_done,
+    )
+}
+
+/// [`generate_objects_with_progress`] with atlases no larger than `largest` (width, height): the textures that do not
+/// fit one such atlas at their native size go on further atlases, each with its own shapes in the blocks.
+///
+/// # Errors
+/// As [`generate_objects`].
+pub fn generate_objects_with_atlas_limit(
+    world: &str,
+    instances: &[Instance],
+    assets: &dyn Assets,
+    out: &Path,
+    surfaces: Surfaces,
+    largest: (u32, u32),
     block_done: &mut dyn FnMut(u64, u64),
 ) -> Result<ObjectReport, GenError> {
     layout::check_world_name(world)?;
@@ -514,46 +546,50 @@ pub fn generate_objects_with_progress(
         .iter()
         .map(|(k, i)| (k.clone(), i.width(), i.height()))
         .collect();
-    let atlas = pack(&sizes);
-    let mut diffuse = vec![0_u8; (atlas.width * atlas.height * 4) as usize];
-    for (k, r) in &atlas.rects {
-        let img = &images[k];
-        if (img.width(), img.height()) == (r.w, r.h) {
-            blit(&mut diffuse, atlas.width, img, r);
-        } else if let Ok(small) = resize(img, r.w, r.h, Filter::Box) {
-            blit(&mut diffuse, atlas.width, &small, r);
+    // every texture at its native size: several atlases when they do not fit one, as the oracle's output has
+    // (halving every texture to fit one atlas blurred every far object of a large load order)
+    let atlases = pack_pages(&sizes, largest);
+    for (page, atlas) in atlases.iter().enumerate() {
+        let mut diffuse = vec![0_u8; (atlas.width * atlas.height * 4) as usize];
+        for (k, r) in &atlas.rects {
+            let img = &images[k];
+            if (img.width(), img.height()) == (r.w, r.h) {
+                blit(&mut diffuse, atlas.width, img, r);
+            } else if let Ok(small) = resize(img, r.w, r.h, Filter::Box) {
+                blit(&mut diffuse, atlas.width, &small, r);
+            }
         }
-    }
-    let (nw, nh) = ((atlas.width / 2).max(4), (atlas.height / 2).max(4));
-    let mut normal = vec![0_u8; (nw * nh * 4) as usize];
-    for px in normal.as_chunks_mut::<4>().0 {
-        px.copy_from_slice(&[128, 128, 255, 255]);
-    }
-    for (k, r) in &atlas.rects {
-        let half = Rect {
-            x: r.x / 2,
-            y: r.y / 2,
-            w: (r.w / 2).max(1),
-            h: (r.h / 2).max(1),
-        };
-        let Some(img) = normal_of.get(k).and_then(|n| load_texture(assets, n)) else {
-            continue;
-        };
-        if let Ok(small) = resize(&img, half.w, half.h, Filter::Box) {
-            blit(&mut normal, nw, &small, &half);
+        let (nw, nh) = ((atlas.width / 2).max(4), (atlas.height / 2).max(4));
+        let mut normal = vec![0_u8; (nw * nh * 4) as usize];
+        for px in normal.as_chunks_mut::<4>().0 {
+            px.copy_from_slice(&[128, 128, 255, 255]);
         }
+        for (k, r) in &atlas.rects {
+            let half = Rect {
+                x: r.x / 2,
+                y: r.y / 2,
+                w: (r.w / 2).max(1),
+                h: (r.h / 2).max(1),
+            };
+            let Some(img) = normal_of.get(k).and_then(|n| load_texture(assets, n)) else {
+                continue;
+            };
+            if let Ok(small) = resize(&img, half.w, half.h, Filter::Box) {
+                blit(&mut normal, nw, &small, &half);
+            }
+        }
+        let [diffuse_path, normal_path] = layout::atlas_page_paths(world, page)?;
+        let diffuse_image = Image::new(atlas.width, atlas.height, diffuse)?;
+        let normal_image = Image::new(nw, nh, normal)?;
+        report.files.push(write_file(
+            out,
+            &diffuse_path,
+            &encode_bc3(&diffuse_image)?,
+        )?);
+        report
+            .files
+            .push(write_file(out, &normal_path, &encode_bc3(&normal_image)?)?);
     }
-    let [diffuse_path, normal_path] = layout::atlas_paths(world)?;
-    let diffuse_image = Image::new(atlas.width, atlas.height, diffuse)?;
-    let normal_image = Image::new(nw, nh, normal)?;
-    report.files.push(write_file(
-        out,
-        &diffuse_path,
-        &encode_bc3(&diffuse_image)?,
-    )?);
-    report
-        .files
-        .push(write_file(out, &normal_path, &encode_bc3(&normal_image)?)?);
     // blocks
     let mut groups: BTreeMap<(i32, i32, bool), Vec<&Instance>> = BTreeMap::new();
     for i in instances {
@@ -576,14 +612,24 @@ pub fn generate_objects_with_progress(
             groups.entry((key.0, key.1, false)).or_default().push(i);
         }
     }
-    let [diffuse_ref, normal_ref] = layout::nif_atlas_paths(world)?;
+    let refs: Vec<[String; 2]> = (0..atlases.len())
+        .map(|page| layout::nif_atlas_page_paths(world, page))
+        .collect::<Result<_, _>>()?;
+    let pages: Vec<Page> = atlases
+        .iter()
+        .map(|atlas| Page {
+            atlas,
+            key_of: &key_of,
+        })
+        .collect();
     let total = groups.len() as u64;
     for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
         members.sort_by_key(|i| (segment_of(i, (bx, by)), i.reference, i.base));
         let origin = (bx as f32 * CELL_UNITS, by as f32 * CELL_UNITS);
-        // a block is one shape while its objects fit under the 16-bit vertex limit and several shapes after that, each
-        // with the atlas, as the game's blocks hold several shapes
-        let mut chunks: Vec<Merged> = vec![Merged::default()];
+        // per atlas page, a block is one shape while its objects fit under the 16-bit vertex and triangle limits and
+        // several shapes after that, as the game's blocks hold several shapes
+        let mut chunks: Vec<Vec<Merged>> =
+            (0..pages.len()).map(|_| vec![Merged::default()]).collect();
         let mut dropped = 0;
         for i in members {
             let segment = segment_of(i, (bx, by));
@@ -593,22 +639,17 @@ pub fn generate_objects_with_progress(
             else {
                 continue;
             };
-            let add = |m: &mut Merged| {
-                add_instance(
-                    m,
-                    model,
-                    &i.placement,
-                    origin,
-                    segment,
-                    &atlas,
-                    &key_of,
-                    surfaces,
-                )
-            };
-            let mut placed = chunks.last_mut().is_some_and(&add);
-            if !placed && chunks.last().is_some_and(|m| !m.vertices.is_empty()) {
-                chunks.push(Merged::default());
-                placed = chunks.last_mut().is_some_and(&add);
+            let mut placed = true;
+            for (page, shapes) in pages.iter().zip(chunks.iter_mut()) {
+                let add = |m: &mut Merged| {
+                    add_instance(m, model, &i.placement, origin, segment, page, surfaces)
+                };
+                let mut fits = shapes.last_mut().is_some_and(&add);
+                if !fits && shapes.last().is_some_and(|m| !m.vertices.is_empty()) {
+                    shapes.push(Merged::default());
+                    fits = shapes.last_mut().is_some_and(&add);
+                }
+                placed &= fits;
             }
             if placed {
                 report.instances += 1;
@@ -623,26 +664,30 @@ pub fn generate_objects_with_progress(
         }
         // a high-priority instance is in its block's normal file too: count its faces once, from the normal file
         if !high {
-            for m in &chunks {
+            for m in chunks.iter().flatten() {
                 report.dropped_under_terrain += m.dropped_under_terrain;
                 report.dropped_under_water += m.dropped_under_water;
             }
         }
-        chunks.retain(|m| !m.indices.is_empty());
-        if chunks.is_empty() {
+        for shapes in &mut chunks {
+            shapes.retain(|m| !m.indices.is_empty());
+        }
+        let extra: usize = chunks.iter().map(|c| c.len().saturating_sub(1)).sum();
+        let count: usize = chunks.iter().map(Vec::len).sum();
+        if count == 0 {
             block_done(done, total);
             continue;
         }
-        if chunks.len() > 1 {
+        if extra > 0 {
             report.warnings.push(format!(
-                "block x{bx} y{by}: {} objects did not fit one shape, the block is written as {} shapes",
-                chunks[1..].len(),
-                chunks.len()
+                "block x{bx} y{by}: {extra} objects did not fit one shape, the block is written as {count} shapes"
             ));
         }
         let shapes: Vec<ObjectBlock> = chunks
             .iter()
-            .map(|m| ObjectBlock {
+            .zip(&refs)
+            .flat_map(|(c, r)| c.iter().map(move |m| (m, r)))
+            .map(|(m, [diffuse_ref, normal_ref])| ObjectBlock {
                 origin,
                 vertices: &m.vertices,
                 normals: &m.normals,
@@ -651,7 +696,7 @@ pub fn generate_objects_with_progress(
                 uv: &m.uv,
                 indices: &m.indices,
                 segment_triangles: m.segment_triangles,
-                textures: [&diffuse_ref, &normal_ref],
+                textures: [diffuse_ref, normal_ref],
             })
             .collect();
         let file = object_block_shapes(&shapes)?.write()?;

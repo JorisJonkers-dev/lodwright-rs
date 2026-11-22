@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Packing the textures of object LOD into one atlas.
+//! Packing the textures of object LOD into atlases: one when they fit, more pages at native size when they do not.
 //!
 //! The game's own atlas holds every texture its models use at their native size (the measured textures add up to
 //! 97 percent of the atlas area), so the packer keeps native sizes and picks the smallest atlas that fits, halving
@@ -96,9 +96,110 @@ pub fn pack(textures: &[(String, u32, u32)]) -> Atlas {
     pack(&halved)
 }
 
+/// The largest atlas [`pack_pages`] makes unless told otherwise, as the largest of the game's own sizes above.
+pub const LARGEST_ATLAS: (u32, u32) = SIZES[SIZES.len() - 1];
+
+/// Pack textures given as (key, width, height) into as many atlases (pages) as they need, each texture at its native
+/// size: one page when everything fits an atlas no larger than `largest`, else full pages of that size and a last page
+/// of the smallest size that holds the rest. Only a texture larger than `largest` is halved. The result is
+/// deterministic: items sort by height, width and key, and fill the pages in that order.
+#[must_use]
+pub fn pack_pages(textures: &[(String, u32, u32)], largest: (u32, u32)) -> Vec<Atlas> {
+    let (widest, tallest) = largest;
+    let sizes: Vec<(u32, u32)> = SIZES
+        .iter()
+        .copied()
+        .filter(|&(w, h)| w <= widest && h <= tallest)
+        .chain(std::iter::once(largest))
+        .collect();
+    let mut items: Vec<(String, u32, u32)> = textures
+        .iter()
+        .map(|(k, w, h)| {
+            let (mut w, mut h) = ((*w).max(1), (*h).max(1));
+            while w > widest || h > tallest {
+                w = (w / 2).max(1);
+                h = (h / 2).max(1);
+            }
+            (k.clone(), w, h)
+        })
+        .collect();
+    items.sort_by(|a, b| b.2.cmp(&a.2).then(b.1.cmp(&a.1)).then(a.0.cmp(&b.0)));
+    let mut pages = Vec::new();
+    let mut rest: &[(String, u32, u32)] = &items;
+    loop {
+        if let Some(atlas) = sizes.iter().find_map(|&(width, height)| {
+            shelf(rest, width, height).map(|rects| Atlas {
+                width,
+                height,
+                rects,
+            })
+        }) {
+            pages.push(atlas);
+            return pages;
+        }
+        // a full page of the largest size: the items in order until the first that does not fit
+        let mut taken = 1;
+        while taken < rest.len() && shelf(&rest[..=taken], widest, tallest).is_some() {
+            taken += 1;
+        }
+        let rects = shelf(&rest[..taken], widest, tallest).unwrap_or_default();
+        pages.push(Atlas {
+            width: widest,
+            height: tallest,
+            rects,
+        });
+        rest = &rest[taken..];
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Rect, pack};
+    use super::{LARGEST_ATLAS, Rect, pack, pack_pages};
+
+    #[test]
+    fn textures_that_fit_one_atlas_make_one_page_as_pack_does() {
+        let few: Vec<(String, u32, u32)> = (0..40).map(|i| (format!("t{i}"), 512, 512)).collect();
+        assert_eq!(pack_pages(&few, LARGEST_ATLAS), vec![pack(&few)]);
+    }
+
+    #[test]
+    fn textures_that_do_not_fit_one_atlas_keep_their_size_on_more_pages() {
+        // 300 textures of 1024 by 1024 are 4.7 atlases of the largest size
+        let many: Vec<(String, u32, u32)> =
+            (0..300).map(|i| (format!("t{i:03}"), 1024, 1024)).collect();
+        let pages = pack_pages(&many, LARGEST_ATLAS);
+        assert_eq!(pages.len(), 5);
+        let mut seen = 0;
+        for page in &pages {
+            assert!(page.width <= 8192 && page.height <= 8192);
+            for r in page.rects.values() {
+                assert_eq!((r.w, r.h), (1024, 1024));
+                assert!(r.x + r.w <= page.width && r.y + r.h <= page.height);
+            }
+            seen += page.rects.len();
+        }
+        assert_eq!(seen, 300);
+        assert_eq!((pages[0].width, pages[0].height), (8192, 8192));
+        // the last page holds 44 textures and is the smallest size that does
+        assert_eq!(pages[4].rects.len(), 44);
+        assert_eq!((pages[4].width, pages[4].height), (8192, 8192));
+        assert_eq!(pack_pages(&many, LARGEST_ATLAS), pages);
+    }
+
+    #[test]
+    fn a_smaller_largest_atlas_makes_pages_of_that_size() {
+        let five: Vec<(String, u32, u32)> = (0..5).map(|i| (format!("t{i}"), 1024, 1024)).collect();
+        let pages = pack_pages(&five, (2048, 2048));
+        assert_eq!(pages.len(), 2);
+        assert_eq!(
+            (pages[0].width, pages[0].height, pages[0].rects.len()),
+            (2048, 2048, 4)
+        );
+        assert_eq!(
+            (pages[1].width, pages[1].height, pages[1].rects.len()),
+            (2048, 1024, 1)
+        );
+    }
 
     fn overlap(a: &Rect, b: &Rect) -> bool {
         a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h

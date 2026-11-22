@@ -31,7 +31,7 @@ mod verify;
 mod water;
 
 pub use assets::{Assets, FolderAssets, TextureFault, Winner};
-pub use atlas::{Atlas, Rect, pack};
+pub use atlas::{Atlas, LARGEST_ATLAS, Rect, pack, pack_pages};
 pub use correlation::{TextureCorrelation, channel_correlation, compare_textures};
 pub use diffuse::{DEFAULT_LAND_TEXTURE, LandTiles, Tile, blend, default_land_texture_from_ini};
 pub use error::GenError;
@@ -41,7 +41,8 @@ pub use images::{
 };
 pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{
-    BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects, generate_objects_with_progress,
+    BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects,
+    generate_objects_with_atlas_limit, generate_objects_with_progress,
 };
 pub use output::{is_plain_relative, linked_folder, write_output_file};
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};

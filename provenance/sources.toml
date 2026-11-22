@@ -1015,7 +1015,7 @@ date = 2026-11-16
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = true
-note = "One block measured. Corrected 2026-11-22 (#294): the origin is on the shape, the root has no translation; measured on all 295 object NIFs of the reference tree (numbers only) and shown in the engine: with the origin on the root the game draws none of the block. The meaning of the segment table is not established (a segment count of four with one triangle range each is what the bytes show). The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells. Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): all 295 object NIFs of WastelandNV have user version 11, user version 2 34 and exactly the seven blocks in the stated order; each data block has positions, normals, one UV set, vertex colours none and keep flags 51; block wastelandnv.level4.x24.y-12 has 1715 vertices and 2071 triangles with positions spanning x 1508 to 8269 (6761) and y -944 to 16367 (17311), which is the measured block of the fact; positions beyond the 16384 unit edge exist as stated. The segment table meaning stays open as the note says."
+note = "One block measured. Corrected 2026-11-22 (#294): the origin is on the shape, the root has no translation; measured on all 295 object NIFs of the reference tree (numbers only) and shown in the engine: with the origin on the root the game draws none of the block. The segment table is explained by game-object-block-segments. The positions extend beyond the 16384 unit block edge, as the public text says a block holds objects of surrounding cells. Re-derived 2026-11-21 by an agent that did not write the row, with a throwaway dump through the repository NIF reader over the reference tree extracted from the game archives (read in place, numbers only; the dumper was not committed): all 295 object NIFs of WastelandNV have user version 11, user version 2 34 and exactly the seven blocks in the stated order; each data block has positions, normals, one UV set, vertex colours none and keep flags 51; block wastelandnv.level4.x24.y-12 has 1715 vertices and 2071 triangles with positions spanning x 1508 to 8269 (6761) and y -944 to 16367 (17311), which is the measured block of the fact; positions beyond the 16384 unit edge exist as stated. The segment table meaning stays open as the note says."
 
 [[source]]
 id = "fnv-object-records"
@@ -1102,6 +1102,17 @@ recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
 note = "Only one LOD reference of the base game separates the two rules for temporary references: it lies a fraction of a unit south of its cell's edge and the game's block follows the cell. 93 persistent LOD references lie outside the persistent cell's grid and the game's blocks follow their positions. The four blocks that still differ each hold one object whose vertices are shifted or turned as a whole (407 vertices in all), which points at placements changed after the game's blocks were built."
+
+[[source]]
+id = "game-object-block-segments"
+fact = "The segment table of the game's own object LOD block has one segment per cell of the block's four by four cells, numbered x-major (cell x * 4 + cell y, counted from the block's south-west cell); a segment holds the triangles of the objects whose reference counts in that cell (the rule of game-object-block-cell), and the block's triangles are stored in segment order. The table ends with the last segment that holds a triangle, so it has between one and sixteen entries; an empty segment has start index 0, a non-empty one starts at three times the triangles before it. The game switches the segments of the cells it has loaded off, so that a nearby cell's own objects are not drawn twice."
+url = "oracle:game-lod-files"
+licence = "Counts and indices of the owner's own game files; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on the 289 normal object blocks of the main worldspace (numbers only): with this rule 283 generated segment tables are equal to the game's entry for entry; the other six differ in some counts because their triangle totals differ (faces left out). With the earlier table of eight entries (triangles split by row) the game drew a wall of the McCarran airport (NV_McCarran_RW models, 40 references) that the game's own blocks do not show: the engine switched off the wrong triangles of the loaded cells. Seen in pictures taken at the same place with the game's own LOD, the old table and the new one."
 
 [[source]]
 id = "game-lod-water-height"

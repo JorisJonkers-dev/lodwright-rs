@@ -603,3 +603,6 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-object-block-nif` (#294): corrected. The block origin is the translation of the BSSegmentedTriShape; the BSMultiBoundNode root has
   translation zero (the earlier text had it the other way round). Measured on the game's own object NIFs (numbers only), and in the engine:
   object blocks with the origin on the root are not drawn, with it on the shape they are.
+- `game-object-block-segments`: new row, `verified = false`. The segment table of the game's object blocks has one segment per cell of
+  the block (x-major) and ends with the last non-empty one; measured on the 289 normal object blocks of the main worldspace (numbers
+  only): 283 generated tables equal the game's. `game-lod-object-block-nif`: the note on the unexplained segment table updated.

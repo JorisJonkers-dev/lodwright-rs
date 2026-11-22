@@ -143,6 +143,9 @@ pub struct World {
     pub land_coords: Vec<(i32, i32)>,
     /// Placed references of the world's cells; only when read with [`ReadOptions::objects`].
     pub refs: Vec<PlacedRef>,
+    /// Form ids (as written in this plugin) of references this plugin deletes; only when read with
+    /// [`ReadOptions::objects`]. A deleted reference of a later plugin removes the reference of an earlier one.
+    pub deleted_refs: Vec<u32>,
 }
 
 /// What [`read`] returns.
@@ -405,6 +408,7 @@ impl Walker {
             cell_coords: Vec::new(),
             land_coords: Vec::new(),
             refs: Vec::new(),
+            deleted_refs: Vec::new(),
         });
         self.worlds.len() - 1
     }
@@ -456,6 +460,13 @@ impl Walker {
     #[allow(clippy::too_many_lines)] // one arm per record type
     fn record(&mut self, record: &RawRecord<'_>) -> Result<(), Error> {
         if record.deleted() {
+            // a deleted reference is a record of its own: it takes the reference out of the load order's result
+            if &record.signature == b"REFR"
+                && self.options.objects
+                && let Some(world) = self.world
+            {
+                self.worlds[world].deleted_refs.push(record.form_id);
+            }
             return Ok(());
         }
         match &record.signature {

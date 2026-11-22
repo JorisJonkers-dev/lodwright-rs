@@ -603,3 +603,4 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-object-block-nif` (#294): corrected. The block origin is the translation of the BSSegmentedTriShape; the BSMultiBoundNode root has
   translation zero (the earlier text had it the other way round). Measured on the game's own object NIFs (numbers only), and in the engine:
   object blocks with the origin on the root are not drawn, with it on the shape they are.
+- `game-lod-block-borders` (lodwright#SKIRTS): effect measured in the engine. Terrain blocks without skirts leave cracks between blocks of different levels through which the background shows (thin pale slivers on mountain ridges, seen from 14000 units up over the Strip; they vanish with the skirts on and with the game's own level 32 blocks in place). Skirts now on by default. Row stays `verified = false`.

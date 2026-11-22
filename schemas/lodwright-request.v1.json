@@ -163,7 +163,7 @@
           "format": "float"
         },
         "skirts": {
-          "description": "Close the gap between neighbouring blocks with a skirt under every border vertex, as the game's own blocks\ndo (`docs/spec/terrain-lod.md`). Off by default and written only when set.",
+          "description": "Close the gap between neighbouring blocks with a skirt under every border vertex, as the game's own blocks\ndo (`docs/spec/terrain-lod.md`). On by default (without them the game shows the background through the cracks\nbetween blocks of different levels); written only when off.",
           "type": "boolean"
         },
         "specular_alpha": {

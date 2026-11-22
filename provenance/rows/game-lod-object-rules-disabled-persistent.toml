@@ -1,0 +1,10 @@
+[[source]]
+id = "game-lod-object-rules-disabled-persistent"
+fact = "The game's own object blocks of the main worldspace hold the references that are both initially disabled (bit 11) and persistent (bit 10) and visible when distant through their base, and no initially disabled reference that is not persistent."
+url = "oracle:game-lod-files"
+licence = "Vertex counts of the owner's own game files compared as numbers; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Measured on the unmodded game (base game and its five add-ons, main worldspace): seven references are initially disabled and visible when distant, all seven persistent (flags 0xC00): five solar reflectors of one building and two reflector rows. In the three blocks that hold them the game's own vertex count equals the count of a generation that keeps them (13468, 2351) and is 520 and 208 above one that leaves them out; the third block holds one more (52 vertices) and differs from both by other causes. In a 42-plugin load order 629 initially disabled references are visible when distant, 15 of them persistent (the seven above and eight whose bases a mod flagged); the 18 that hung in the sky are 0x8800 (not persistent). Not second-read."

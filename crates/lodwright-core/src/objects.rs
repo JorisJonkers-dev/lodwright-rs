@@ -14,8 +14,11 @@ use crate::worldspace::{absolute, master_table};
 pub const VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
 /// High Priority LOD, on references.
 pub const HIGH_PRIORITY_LOD: u32 = 0x0001_0000;
-/// Initially Disabled, on references (such references still enter LOD in the game's own blocks).
+/// Initially Disabled, on references (such a reference is left out of LOD unless it is also persistent: the game's own
+/// blocks hold the persistent ones and none of the others).
 pub const INITIALLY_DISABLED: u32 = 0x0000_0800;
+/// Persistent, on references.
+pub const PERSISTENT: u32 = 0x0000_0400;
 /// Has Tree LOD, on bases.
 pub const HAS_TREE_LOD: u32 = 0x0000_0040;
 
@@ -73,7 +76,8 @@ fn compose(outer: &Placement, inner: &Placement) -> Placement {
 type Ref = (u32, u32, Placement, usize, Option<(i32, i32)>);
 
 /// The instances in world `world` (absolute `FormID`) that are visible when distant: a reference counts when its
-/// base is flagged, or when the reference itself is; initially disabled references count too.
+/// base is flagged, or when the reference itself is; initially disabled references do not count, except the persistent
+/// ones (the unmodded game's own blocks hold its seven persistent disabled references and no other disabled one).
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -132,6 +136,10 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         if base.flags & VISIBLE_WHEN_DISTANT == 0 && flags & VISIBLE_WHEN_DISTANT == 0 {
             continue;
         }
+        // source: oracle-skips-initially-disabled, game-lod-object-rules-disabled-persistent
+        if flags & INITIALLY_DISABLED != 0 && flags & PERSISTENT == 0 {
+            continue;
+        }
         let high_priority = flags & HIGH_PRIORITY_LOD != 0;
         let has_tree_lod = base.flags & HAS_TREE_LOD != 0;
         if let Some(model) = &base.model {
@@ -178,7 +186,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
 
 #[cfg(test)]
 mod tests {
-    use super::{INITIALLY_DISABLED, VISIBLE_WHEN_DISTANT, visible_instances};
+    use super::{INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT, visible_instances};
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
 
@@ -251,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn a_disabled_reference_still_counts_and_a_flagged_reference_counts_for_an_unflagged_base() {
+    fn a_disabled_reference_is_left_out_and_a_flagged_reference_counts_for_an_unflagged_base() {
         let p = plugin(
             &[],
             vec![stat(0x100, "a.nif", 0)],
@@ -261,8 +269,40 @@ mod tests {
             ],
         );
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
-        assert_eq!(out.len(), 2);
-        assert_eq!(out[1].reference, 0x201);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].reference, 0x201);
+    }
+
+    #[test]
+    fn a_persistent_disabled_reference_still_counts_as_in_the_games_own_blocks() {
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![
+                refr(0x200, 0x100, INITIALLY_DISABLED | PERSISTENT, 1.0),
+                refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+            ],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].reference, 0x200);
+    }
+
+    #[test]
+    fn a_later_plugin_that_enables_a_disabled_reference_brings_it_back() {
+        let base = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![refr(0x200, 0x100, INITIALLY_DISABLED, 1.0)],
+        );
+        let patch = plugin(&["Base.esm"], vec![], vec![refr(0x200, 0x100, 0, 5.0)]);
+        let plugins = vec![
+            ("Base.esm".to_owned(), base),
+            ("Patch.esp".to_owned(), patch),
+        ];
+        assert_eq!(visible_instances(&plugins, 0x0000_0A00).unwrap().len(), 1);
+        let alone = visible_instances(&plugins[..1], 0x0000_0A00).unwrap();
+        assert_eq!(alone.len(), 0);
     }
 
     #[test]

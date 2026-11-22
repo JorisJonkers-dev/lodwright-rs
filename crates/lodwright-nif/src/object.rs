@@ -63,12 +63,13 @@ pub struct ObjectBlock<'a> {
     pub textures: [&'a str; 2],
 }
 
-fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS]) -> Result<Vec<u8>> {
+fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS], first: i32) -> Result<Vec<u8>> {
     // source: game-lod-object-block-nif
-    let mut b = Body::TriShape(tri_shape_for_object(origin)).write(crate::block::Profile {
-        user_version: 11,
-        user_version2: 34,
-    })?;
+    let mut b =
+        Body::TriShape(tri_shape_for_object(origin, first)).write(crate::block::Profile {
+            user_version: 11,
+            user_version2: 34,
+        })?;
     // the game's table ends with the last segment that holds a triangle
     let count = segments
         .iter()
@@ -88,10 +89,12 @@ fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS]) -> Result<Vec<u8>>
 
 /// The game's object block carries the block's origin on the shape; its root node has no translation (measured on
 /// the game's blocks: the engine draws a block only when the translation is where the game puts it).
-fn tri_shape_for_object(origin: (f32, f32)) -> crate::block::NiTriShape {
+fn tri_shape_for_object(origin: (f32, f32), first: i32) -> crate::block::NiTriShape {
     let mut s = tri_shape();
     s.av.translation = [origin.0, origin.1, 0.0];
-    s.data = 4;
+    // the shape sits at block `first`; its lighting property follows it and its data is the third block after it
+    s.av.properties = vec![first + 1];
+    s.data = first + 3;
     s
 }
 
@@ -101,6 +104,88 @@ fn tri_shape_for_object(origin: (f32, f32)) -> crate::block::NiTriShape {
 /// [`NifError::Inconsistent`] when arrays disagree in length, there are no triangles, more than 65535 vertices,
 /// an index is out of range, or the segment counts do not add up to the triangle count.
 pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
+    object_block_shapes(std::slice::from_ref(block))
+}
+
+/// Build the NIF of one object block that holds several shapes (each its own segmented shape with its own lighting
+/// property, texture set and data, as the game's blocks do when one shape would pass 65535 vertices or the block
+/// draws from more than one atlas). `shapes` must not be empty and all carry the same origin.
+///
+/// # Errors
+/// [`NifError::Inconsistent`] as [`object_block`] for any shape, or when `shapes` is empty or the origins differ.
+pub fn object_block_shapes(shapes: &[ObjectBlock<'_>]) -> Result<NifFile> {
+    let Some(first) = shapes.first() else {
+        return Err(NifError::Inconsistent("a block needs a shape"));
+    };
+    if shapes.iter().any(|s| s.origin != first.origin) {
+        return Err(NifError::Inconsistent(
+            "the shapes of a block share an origin",
+        ));
+    }
+    let count =
+        u32::try_from(shapes.len()).map_err(|_| NifError::Inconsistent("too many shapes"))?;
+    let (mut low, mut high) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
+    let mut bodies = vec![Body::Opaque(Vec::new())];
+    let mut children = Vec::new();
+    for (k, block) in shapes.iter().enumerate() {
+        let (shape_bodies, lo, hi) = shape_blocks(block, i32::try_from(1 + 4 * k).unwrap_or(1))?;
+        for c in 0..3 {
+            low[c] = low[c].min(lo[c]);
+            high[c] = high[c].max(hi[c]);
+        }
+        children.push(u32::try_from(1 + 4 * k).unwrap_or(0));
+        bodies.extend(shape_bodies);
+    }
+    let multibound = 1 + 4 * count;
+    bodies[0] = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
+    let center = [
+        f32::midpoint(low[0], high[0]),
+        f32::midpoint(low[1], high[1]),
+        f32::midpoint(low[2], high[2]),
+    ];
+    let mut aabb = Vec::with_capacity(24);
+    for v in [
+        first.origin.0 + center[0],
+        first.origin.1 + center[1],
+        center[2],
+        (high[0] - low[0]) / 2.0,
+        (high[1] - low[1]) / 2.0,
+        (high[2] - low[2]) / 2.0,
+    ] {
+        put_f32(&mut aabb, v);
+    }
+    let _ = ROOT_FLAGS;
+    bodies.push(Body::Opaque((multibound + 1).to_le_bytes().to_vec()));
+    bodies.push(Body::Opaque(aabb));
+    // type indices: root 0, then per shape 1 to 4 (shape, lighting, texture set, data), then multibound and box
+    let n = bodies.len();
+    let type_of = |i: usize| -> u16 {
+        if i == 0 {
+            0
+        } else if i == n - 2 {
+            5
+        } else if i == n - 1 {
+            6
+        } else {
+            u16::try_from((i - 1) % 4 + 1).unwrap_or(0)
+        }
+    };
+    Ok(NifFile {
+        header: file_header(&TYPES),
+        blocks: bodies
+            .into_iter()
+            .enumerate()
+            .map(|(i, body)| Block {
+                type_index: type_of(i),
+                body,
+            })
+            .collect(),
+        roots: vec![0],
+    })
+}
+
+/// The four blocks of one shape and the corners of its vertices' box.
+fn shape_blocks(block: &ObjectBlock<'_>, first: i32) -> Result<(Vec<Body>, [f32; 3], [f32; 3])> {
     let n = block.vertices.len();
     if n == 0
         || n > usize::from(u16::MAX)
@@ -181,42 +266,16 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
     put_u32(&mut lighting, 0);
     put_u32(&mut lighting, u32::MAX);
     lighting.extend_from_slice(&LIGHTING_PROPERTY_TAIL);
-    let mut aabb = Vec::with_capacity(24);
-    for v in [
-        block.origin.0 + center[0],
-        block.origin.1 + center[1],
-        center[2],
-        (high[0] - low[0]) / 2.0,
-        (high[1] - low[1]) / 2.0,
-        (high[2] - low[2]) / 2.0,
-    ] {
-        put_f32(&mut aabb, v);
-    }
-    let _ = ROOT_FLAGS;
-    let bodies = [
-        Body::Opaque(root_node((0.0, 0.0), &[1], 5)),
-        Body::Opaque(shape_bytes(block.origin, block.segment_triangles)?),
-        Body::Opaque(lighting),
-        Body::Opaque(texture_set(block.textures)),
-        Body::TriShapeData(data),
-        Body::Opaque(5_u32.to_le_bytes().to_vec()),
-        Body::Opaque(aabb),
-    ];
-    // block 5 is the multibound, which points at block 6; the node above points at 5
-    let mut bodies = bodies;
-    bodies[5] = Body::Opaque(6_u32.to_le_bytes().to_vec());
-    Ok(NifFile {
-        header: file_header(&TYPES),
-        blocks: bodies
-            .into_iter()
-            .enumerate()
-            .map(|(i, body)| Block {
-                type_index: u16::try_from(i).unwrap_or(0),
-                body,
-            })
-            .collect(),
-        roots: vec![0],
-    })
+    Ok((
+        vec![
+            Body::Opaque(shape_bytes(block.origin, block.segment_triangles, first)?),
+            Body::Opaque(lighting),
+            Body::Opaque(texture_set(block.textures)),
+            Body::TriShapeData(data),
+        ],
+        low,
+        high,
+    ))
 }
 
 #[cfg(test)]
@@ -305,5 +364,57 @@ mod tests {
             textures: ["a", "b"],
         });
         assert!(bad.is_err());
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::many_single_char_names)]
+mod shapes_tests {
+    use super::{ObjectBlock, SEGMENTS, object_block_shapes};
+    use crate::{Body, NifFile};
+
+    #[test]
+    fn a_block_of_two_shapes_links_each_shape_to_its_own_blocks_and_reads_back() {
+        let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let t = vec![[1.0, 0.0, 0.0]; 3];
+        let b = vec![[0.0, 1.0, 0.0]; 3];
+        let i = vec![0_u16, 1, 2];
+        let mut seg = [0; SEGMENTS];
+        seg[2] = 1;
+        let one = ObjectBlock {
+            origin: (4096.0, 0.0),
+            vertices: &v,
+            normals: &n,
+            tangents: &t,
+            bitangents: &b,
+            uv: &uv,
+            indices: &i,
+            segment_triangles: seg,
+            textures: ["Data\\a.dds", "Data\\b.dds"],
+        };
+        let file = object_block_shapes(&[one.clone(), one]).unwrap();
+        let bytes = file.write().unwrap();
+        let back = NifFile::read(&bytes).unwrap();
+        // root, two times (shape, lighting, texture set, data), multibound and its box
+        assert_eq!(back.blocks.len(), 11);
+        assert_eq!(back.write().unwrap(), bytes);
+        let Body::Opaque(root) = &back.blocks[0].body else {
+            panic!("root");
+        };
+        // the root's children are blocks 1 and 5
+        let children =
+            |k: usize| u32::from_le_bytes(root[root.len() - 16 + 4 * k..][..4].try_into().unwrap());
+        assert_eq!((children(0), children(1)), (1, 5));
+        for (shape, data) in [(1_usize, 4_usize), (5, 8)] {
+            assert!(matches!(back.blocks[data].body, Body::TriShapeData(_)));
+            assert!(matches!(back.blocks[shape + 2].body, Body::Opaque(_)));
+        }
+    }
+
+    #[test]
+    fn a_block_without_a_shape_is_refused() {
+        assert!(object_block_shapes(&[]).is_err());
     }
 }

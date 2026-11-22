@@ -12,7 +12,7 @@ use lodwright_core::layout;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, resize};
-use lodwright_nif::{ObjectBlock, SEGMENTS, object_block};
+use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
 
 use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, Rect, pack};
@@ -576,7 +576,9 @@ pub fn generate_objects_with_progress(
     for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
         members.sort_by_key(|i| (segment_of(i, (bx, by)), i.reference, i.base));
         let origin = (bx as f32 * CELL_UNITS, by as f32 * CELL_UNITS);
-        let mut merged = Merged::default();
+        // a block is one shape while its objects fit under the 16-bit vertex limit and several shapes after that, each
+        // with the atlas, as the game's blocks hold several shapes
+        let mut chunks: Vec<Merged> = vec![Merged::default()];
         let mut dropped = 0;
         for i in members {
             let segment = segment_of(i, (bx, by));
@@ -586,16 +588,24 @@ pub fn generate_objects_with_progress(
             else {
                 continue;
             };
-            if add_instance(
-                &mut merged,
-                model,
-                &i.placement,
-                origin,
-                segment,
-                &atlas,
-                &key_of,
-                surfaces,
-            ) {
+            let add = |m: &mut Merged| {
+                add_instance(
+                    m,
+                    model,
+                    &i.placement,
+                    origin,
+                    segment,
+                    &atlas,
+                    &key_of,
+                    surfaces,
+                )
+            };
+            let mut placed = chunks.last_mut().is_some_and(&add);
+            if !placed && chunks.last().is_some_and(|m| !m.vertices.is_empty()) {
+                chunks.push(Merged::default());
+                placed = chunks.last_mut().is_some_and(&add);
+            }
+            if placed {
                 report.instances += 1;
             } else {
                 dropped += 1;
@@ -603,30 +613,43 @@ pub fn generate_objects_with_progress(
         }
         if dropped > 0 {
             report.warnings.push(format!(
-                "block x{bx} y{by}: {dropped} objects left out, the 16-bit vertex limit is reached"
+                "block x{bx} y{by}: {dropped} objects left out, each alone has more vertices than one shape can hold"
             ));
         }
         // a high-priority instance is in its block's normal file too: count its faces once, from the normal file
         if !high {
-            report.dropped_under_terrain += merged.dropped_under_terrain;
-            report.dropped_under_water += merged.dropped_under_water;
+            for m in &chunks {
+                report.dropped_under_terrain += m.dropped_under_terrain;
+                report.dropped_under_water += m.dropped_under_water;
+            }
         }
-        if merged.indices.is_empty() {
+        chunks.retain(|m| !m.indices.is_empty());
+        if chunks.is_empty() {
             block_done(done, total);
             continue;
         }
-        let file = object_block(&ObjectBlock {
-            origin,
-            vertices: &merged.vertices,
-            normals: &merged.normals,
-            tangents: &merged.tangents,
-            bitangents: &merged.bitangents,
-            uv: &merged.uv,
-            indices: &merged.indices,
-            segment_triangles: merged.segment_triangles,
-            textures: [&diffuse_ref, &normal_ref],
-        })?
-        .write()?;
+        if chunks.len() > 1 {
+            report.warnings.push(format!(
+                "block x{bx} y{by}: {} objects did not fit one shape, the block is written as {} shapes",
+                chunks[1..].len(),
+                chunks.len()
+            ));
+        }
+        let shapes: Vec<ObjectBlock> = chunks
+            .iter()
+            .map(|m| ObjectBlock {
+                origin,
+                vertices: &m.vertices,
+                normals: &m.normals,
+                tangents: &m.tangents,
+                bitangents: &m.bitangents,
+                uv: &m.uv,
+                indices: &m.indices,
+                segment_triangles: m.segment_triangles,
+                textures: [&diffuse_ref, &normal_ref],
+            })
+            .collect();
+        let file = object_block_shapes(&shapes)?.write()?;
         report.files.push(write_file(
             out,
             &layout::object_mesh_path(world, bx, by, high)?,

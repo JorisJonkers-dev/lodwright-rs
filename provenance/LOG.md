@@ -603,3 +603,4 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-object-block-nif` (#294): corrected. The block origin is the translation of the BSSegmentedTriShape; the BSMultiBoundNode root has
   translation zero (the earlier text had it the other way round). Measured on the game's own object NIFs (numbers only), and in the engine:
   object blocks with the origin on the root are not drawn, with it on the shape they are.
+- `game-lod-window` (#307): new row, `verified = false`. The Capital Wasteland's own settings file is (-64, -64) to (63, 63), width 128; ours started at the smallest CELL (-99) with width 256 and the engine drew no far mountains in two Capital views; with the 128 window the far mountains came back.

@@ -33,6 +33,11 @@ pub struct LodExtent {
 /// World units per cell edge.
 const CELL_UNITS: f32 = 4096.0;
 
+/// Cells a side of the window the game's LOD covers.
+const WINDOW_CELLS: i32 = 128;
+/// A world's land wider than this (cells) gets the window; the main world's 129 cells do not.
+const WINDOW_FIT: i64 = 160;
+
 /// One worldspace with the final heights of every exterior cell that has LAND.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Worldspace {
@@ -256,6 +261,13 @@ impl Worldspace {
         let Some((mut x, mut y)) = start else {
             return (0, 0);
         };
+        let (wx, wy) = self.window();
+        if let Some(w) = wx {
+            x = w;
+        }
+        if let Some(w) = wy {
+            y = w;
+        }
         // The game's tree of WastelandNV starts at (-64, -64) where its smallest CELL is (-65, -65): a start
         // exactly one cell below the first cell with LAND, where that cell lies on the 32 grid, gives way to it.
         if let Some(data) = self.bounds() {
@@ -362,7 +374,46 @@ impl Worldspace {
             out.layers.retain(|k, _| keep(k));
             out.water.retain(|k, _| keep(k));
         }
-        out
+        out.clip_to_window()
+    }
+
+    /// The game's LOD covers at most 128 cells a side: for a world whose land is wider than that (the Capital Wasteland
+    /// of a Tale of Two Wastelands load order has land from cell -99 to 100; the game's own files for it cover -64 to
+    /// 63) the window is 128 cells, started on the 32 grid nearest to the cell that centres it on the land. Per axis; `None`
+    /// for an axis that fits.
+    // source: game-lod-window
+    fn window(&self) -> (Option<i32>, Option<i32>) {
+        let Some(b) = self.bounds() else {
+            return (None, None);
+        };
+        let start = |lo: i32, hi: i32| {
+            (i64::from(hi) - i64::from(lo) + 1 > WINDOW_FIT).then(|| {
+                let centre = (i64::from(lo) + i64::from(hi)).div_euclid(2);
+                // the nearest multiple of 32 that centres the window
+                let at = ((centre - i64::from(WINDOW_CELLS) / 2 + 16).div_euclid(32)) * 32;
+                i32::try_from(at).unwrap_or(lo)
+            })
+        };
+        (start(b.min_x, b.max_x), start(b.min_y, b.max_y))
+    }
+
+    /// The same world without the cells outside the window of [`Worldspace::window`].
+    fn clip_to_window(mut self) -> Self {
+        let (wx, wy) = self.window();
+        if wx.is_none() && wy.is_none() {
+            return self;
+        }
+        let keep = |(x, y): &(i32, i32)| {
+            wx.is_none_or(|s| (s..s + WINDOW_CELLS).contains(x))
+                && wy.is_none_or(|s| (s..s + WINDOW_CELLS).contains(y))
+        };
+        self.cells.retain(|k, _| keep(k));
+        self.layers.retain(|k, _| keep(k));
+        self.water.retain(|k, _| keep(k));
+        // the clipped world starts its grid at the window
+        let (cx, cy) = self.cell_min.unwrap_or((0, 0));
+        self.cell_min = Some((wx.unwrap_or(cx), wy.unwrap_or(cy)));
+        self
     }
 
     /// Inclusive bounds, `None` for a world without cells.
@@ -857,6 +908,32 @@ mod tests {
                     max: [15.0 * u, 2.0 * u],
                 });
         assert_eq!(few.filled_over_extent().cell_count(), 16);
+    }
+
+    #[test]
+    fn a_world_with_land_beyond_128_cells_gets_the_128_cell_window_of_the_game_s_files() {
+        // the Capital Wasteland of a Tale of Two Wastelands load order: land from cell -99 to 97 across, -99 to 100
+        // up; the game's own settings for it are (-64, -64) to (63, 63), width 128
+        let u = 4096.0;
+        let cells =
+            (-99..=100).flat_map(|y| (-99..=97).map(move |x| ((x, y), CellHeights::flat(1.0))));
+        let world = Worldspace::from_cells(1, "W", cells).with_declared_bounds(
+            crate::plugin::DeclaredBounds {
+                min: [-99.0 * u, -99.0 * u],
+                max: [99.0 * u, 101.0 * u],
+            },
+        );
+        let clipped = world.without_outliers();
+        let b = clipped.bounds().unwrap();
+        assert_eq!((b.min_x, b.min_y, b.max_x, b.max_y), (-64, -64, 63, 63));
+        assert_eq!(clipped.grid_anchor(), (-64, -64));
+        let e = clipped.lod_extent().unwrap();
+        assert_eq!(
+            (e.south_west, e.north_east, e.width, e.highest_level),
+            ((-64, -64), (63, 63), 128, 32)
+        );
+        // the world that was not clipped names the same start
+        assert_eq!(world.grid_anchor(), (-64, -64));
     }
 
     #[test]

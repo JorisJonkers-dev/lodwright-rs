@@ -11,10 +11,10 @@ use std::path::Path;
 use lodwright_core::layout;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
-use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, decode, encode, resize};
+use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, resize};
 use lodwright_nif::{ObjectBlock, SEGMENTS, object_block};
 
-use crate::assets::Assets;
+use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, Rect, pack};
 use crate::error::GenError;
 use crate::lodmodel::{Part, parse_lod_model};
@@ -351,9 +351,7 @@ fn flat(width: u32, height: u32, rgba: [u8; 4]) -> Image {
 }
 
 fn load_texture(assets: &dyn Assets, key: &str) -> Option<Image> {
-    let bytes = assets.read(key)?;
-    let mut levels = decode(&bytes).ok()?.levels;
-    (!levels.is_empty()).then(|| levels.swap_remove(0))
+    read_texture(assets, key).ok()
 }
 
 fn encode_bc3(image: &Image) -> Result<Vec<u8>, GenError> {
@@ -490,15 +488,21 @@ pub fn generate_objects_with_progress(
     diffuse_keys.insert(NONE.to_owned());
     let mut images: BTreeMap<String, Image> = BTreeMap::new();
     for k in &diffuse_keys {
-        if let Some(img) = load_texture(assets, k) {
-            images.insert(k.clone(), img);
-        } else {
-            if k != NONE {
-                report
-                    .warnings
-                    .push(format!("texture {k} not found, a flat colour is used"));
+        match read_texture(assets, k) {
+            Ok(img) => {
+                images.insert(k.clone(), img);
             }
-            images.insert(k.clone(), flat(8, 8, [128, 128, 128, 255]));
+            Err(fault) => {
+                if k != NONE {
+                    report.warnings.push(texture_warning(
+                        "texture",
+                        k,
+                        &fault,
+                        ", a flat colour is used",
+                    ));
+                }
+                images.insert(k.clone(), flat(8, 8, [128, 128, 128, 255]));
+            }
         }
     }
     let sizes: Vec<(String, u32, u32)> = images

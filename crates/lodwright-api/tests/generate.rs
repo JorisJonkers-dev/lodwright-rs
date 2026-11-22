@@ -95,6 +95,18 @@ fn a_second_call_with_the_same_request_is_up_to_date() {
 }
 
 #[test]
+fn an_output_written_by_another_version_is_rebuilt_not_reported_up_to_date() {
+    let (job, out) = job("other-version");
+    generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();
+    let mut m = manifest(&out);
+    m.tool.version = "0.0.1".to_owned();
+    std::fs::write(out.join(MANIFEST_FILE), serde_json::to_vec(&m).unwrap()).unwrap();
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated");
+    assert_eq!(manifest(&out).tool.version, result.tool.version);
+}
+
+#[test]
 fn progress_starts_each_step_and_counts_every_terrain_block() {
     let (job, _) = job("progress");
     let mut events: Vec<ProgressEvent> = Vec::new();

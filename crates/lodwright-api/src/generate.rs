@@ -338,11 +338,18 @@ pub fn generate(
     // an output folder that is a link is replaced where it points: the swap renames the folder, never the link
     let target = std::fs::canonicalize(out).unwrap_or_else(|_| out.to_path_buf());
     crate::staging::recover_swap(&target)?;
-    let old = read_manifest(out);
+    let mut old = read_manifest(out);
+    // an output written by another version of lodwright is rebuilt whole: a fix of what a version writes (#294)
+    // must reach folders that already hold the same request's files
+    let same_version = old.as_ref().is_none_or(|m| m.tool.version == version);
+    if !same_version && let Some(m) = old.as_mut() {
+        m.blocks.clear();
+    }
     let mut doc = ResultDoc::new(version, Status::Ok, "generated", "LOD written");
     doc.inputs_digest = Some(loaded.inputs_digest.clone());
     doc.arguments_digest = Some(digest.clone());
     if let Some(old) = &old
+        && same_version
         && old.request_digest == digest
         && old.inputs_digest == loaded.inputs_digest
         && crate::pack::is_packed(&old.files) == request.output.pack

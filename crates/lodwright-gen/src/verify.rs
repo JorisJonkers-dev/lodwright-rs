@@ -145,7 +145,7 @@ impl Ctx {
                 continue;
             }
             let want = if carrier { origin } else { [0.0; 3] };
-            if *t != want {
+            if t.iter().zip(want).any(|(a, b)| (a - b).abs() > 0.001) {
                 self.err(
                     path,
                     format!(
@@ -1501,7 +1501,10 @@ mod tests {
                 .any(|f| f.problem.starts_with("node translations differ")),
             "{diffs:?}"
         );
-        assert!(super::compare_folders(&good, &good).is_empty());
+        assert_eq!(
+            super::compare_folders(&good, &good),
+            [] as [super::Finding; 0]
+        );
     }
 
     fn grid_errors(world_dir: &str, settings_start: Option<(i16, i16)>, name: &str) -> usize {

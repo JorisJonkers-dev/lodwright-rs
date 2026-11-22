@@ -487,6 +487,14 @@ pub fn verify_folder(root: &Path) -> Verification {
                     {
                         ctx.err(rel, "the width disagrees with the corners");
                     }
+                    // the game's own files cover at most 128 cells a side (a world with more land gets a window of
+                    // 128, measured on the Capital Wasteland); a grid wider than that is a wrong extent
+                    if s.width_cells > 128 {
+                        ctx.err(
+                            rel,
+                            "the width is more than 128 cells, the most the game's own files cover",
+                        );
+                    }
                     if s.lowest_level != 4 || ![4, 8, 16, 32].contains(&s.highest_level) {
                         ctx.err(rel, "the level range is not 4 to 4, 8, 16 or 32");
                     }
@@ -1505,6 +1513,24 @@ mod tests {
             super::compare_folders(&good, &good),
             [] as [super::Finding; 0]
         );
+    }
+
+    #[test]
+    fn a_settings_file_wider_than_128_cells_is_an_error() {
+        let root = temp("wide-settings");
+        let dir = root.join("lodsettings");
+        std::fs::create_dir_all(&dir).unwrap();
+        let wide = lodwright_core::lod::LodSettings::for_bounds((-99, -99), (97, 100), 32);
+        std::fs::write(dir.join("w.dlodsettings"), wide.to_bytes()).unwrap();
+        let narrow = lodwright_core::lod::LodSettings::for_bounds((-64, -64), (63, 63), 32);
+        std::fs::write(dir.join("n.dlodsettings"), narrow.to_bytes()).unwrap();
+        let errors = verify_folder(&root).errors;
+        let wide_errors: Vec<_> = errors
+            .iter()
+            .filter(|e| e.problem.contains("more than 128"))
+            .collect();
+        assert_eq!(wide_errors.len(), 1, "{errors:?}");
+        assert!(wide_errors[0].path.ends_with("w.dlodsettings"));
     }
 
     fn grid_errors(world_dir: &str, settings_start: Option<(i16, i16)>, name: &str) -> usize {

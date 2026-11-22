@@ -1,0 +1,10 @@
+[[source]]
+id = "game-object-block-segments"
+fact = "The segment table of the game's own object LOD block has one segment per cell of the block's four by four cells, numbered x-major (cell x * 4 + cell y, counted from the block's south-west cell); a segment holds the triangles of the objects whose reference counts in that cell (the rule of game-object-block-cell), and the block's triangles are stored in segment order. The table ends with the last segment that holds a triangle, so it has between one and sixteen entries; an empty segment has start index 0, a non-empty one starts at three times the triangles before it. The game switches the segments of the cells it has loaded off, so that a nearby cell's own objects are not drawn twice."
+url = "oracle:game-lod-files"
+licence = "Counts and indices of the owner's own game files; no content is recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Replaces the earlier reading in the note of game-lod-object-block-nif, which called the segment table unexplained. Measured on the 289 normal object blocks of the main worldspace (numbers only): with this rule 283 generated segment tables are equal to the game's entry for entry; the other six differ in some counts because their triangle totals differ (faces left out). With the earlier table of eight entries (triangles split by row) the game drew a wall of the McCarran airport (NV_McCarran_RW models, 40 references) that the game's own blocks do not show: the engine switched off the wrong triangles of the loaded cells. Seen in pictures taken at the same place with the game's own LOD, the old table and the new one."

@@ -269,20 +269,14 @@ fn mean_luma(image: &lodwright_dds::Image) -> f32 {
     (sum / px.len().max(1) as f64) as f32
 }
 
-/// Whether the game's own tile of this block may be used: true when the near-land test is off or the game ships no
-/// tile; else the shipped tile must be at most halfway between the unscaled and the scaled composition.
-fn matches_near_land(
+/// Where a shipped tile's mean luminance lies between the same tile composed with the factor (0) and without (1).
+fn shipped_position(
     world: &Worldspace,
     tiles: &LandTiles,
-    options: &Options<'_>,
+    unlit: &LandTiles,
+    shipped: f32,
     job: &Job,
-) -> bool {
-    let (Some(unlit), Some(mean)) = (options.unlit, options.shipped_mean) else {
-        return true;
-    };
-    let Some(shipped) = mean(job.level.level, job.cell) else {
-        return true;
-    };
+) -> Option<f32> {
     let id = BlockId {
         level: job.level.level,
         x: job.cell.0,
@@ -292,7 +286,43 @@ fn matches_near_land(
     let size = job.level.diffuse_size;
     let lit = mean_luma(&diffuse_image(world, id, size, tiles));
     let raw = mean_luma(&diffuse_image(world, id, size, unlit));
-    shipped <= f32::midpoint(lit, raw)
+    ((raw - lit).abs() > 0.01).then(|| (shipped - lit) / (raw - lit))
+}
+
+/// Whether the game's own tiles of a world match the near land: the median over the tiles of its two highest levels
+/// of the position of the shipped tile between the lit and the unlit composition is at most halfway. A tile of baked
+/// pictures has objects and shade painted in, which moves its mean either way, so one tile is no test; the median over
+/// a world's coarse tiles is, and one answer for the world leaves no patchwork of lit and baked tiles. True when the
+/// test is off or the game ships no tile to compare.
+fn world_matches_near_land(
+    world: &Worldspace,
+    settings: &TerrainSettings,
+    tiles: &LandTiles,
+    options: &Options<'_>,
+) -> bool {
+    let (Some(unlit), Some(mean)) = (options.unlit, options.shipped_mean) else {
+        return true;
+    };
+    let mut levels: Vec<&LevelSettings> = settings.levels.iter().collect();
+    levels.sort_by_key(|l| std::cmp::Reverse(l.level));
+    let mut positions = Vec::new();
+    for level in levels.into_iter().take(2) {
+        let Ok(grid) = BlockGrid::anchored(level.level, world.grid_anchor()) else {
+            continue;
+        };
+        let Ok(Some(raster)) = HeightRaster::build(world, grid) else {
+            continue;
+        };
+        for job in jobs_of(&raster, level) {
+            if let Some(shipped) = mean(job.level.level, job.cell) {
+                positions.extend(shipped_position(world, tiles, unlit, shipped, &job));
+            }
+        }
+    }
+    positions.sort_by(f32::total_cmp);
+    positions
+        .get(positions.len() / 2)
+        .is_none_or(|median| *median <= 0.5)
 }
 
 fn run_job(
@@ -302,6 +332,7 @@ fn run_job(
     out: &Path,
     tiles: &LandTiles,
     options: &Options,
+    near: bool,
 ) -> Result<Option<BlockRecord>, GenError> {
     let level = &job.level;
     let grid = raster.grid();
@@ -315,13 +346,12 @@ fn run_job(
         job.cell.0,
         job.cell.1
     );
-    let near = matches_near_land(world, tiles, options, job);
     let kept = near && keep_diffuse(options, job);
     let mut inputs = block_inputs(world, &samples, job, tiles, options, kept);
     if !near {
         let mut h = Sha256Stream::new();
         h.update(inputs.as_bytes());
-        h.update(b"shipped-tile-darker-than-near-land-not-used");
+        h.update(b"shipped-tiles-of-the-world-brighter-than-near-land-not-used");
         inputs = h.finish();
     }
     let patch = if kept || !near {
@@ -487,6 +517,7 @@ pub fn generate_terrain(
     let mut highest = 0;
     let stop = || options.cancel.is_some_and(|cancel| cancel());
     let cancelled = AtomicBool::new(false);
+    let near = world_matches_near_land(world, settings, tiles, options);
     for level in &settings.levels {
         if cancelled.load(Ordering::Relaxed) {
             break;
@@ -516,7 +547,7 @@ pub fn generate_terrain(
                             next.store(jobs.len(), Ordering::Relaxed);
                             break;
                         }
-                        let result = run_job(world, &raster, job, out, tiles, options);
+                        let result = run_job(world, &raster, job, out, tiles, options, near);
                         if let Some(report) = options.progress {
                             let n = finished.fetch_add(1, Ordering::Relaxed) + 1;
                             let reused = matches!(&result, Ok(Some(b)) if b.reused);

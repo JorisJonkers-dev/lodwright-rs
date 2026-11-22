@@ -603,3 +603,4 @@ Measurements on the local game files, read in place, numbers only; scratch tools
 - `game-lod-object-block-nif` (#294): corrected. The block origin is the translation of the BSSegmentedTriShape; the BSMultiBoundNode root has
   translation zero (the earlier text had it the other way round). Measured on the game's own object NIFs (numbers only), and in the engine:
   object blocks with the origin on the root are not drawn, with it on the shape they are.
+- `game-default-land-texture`: new row, `verified = false`. A quadrant without a base texture takes the default land texture of the game's ini ([Landscape] SDefaultLandDiffuseTexture); seen in the engine on loaded ground.

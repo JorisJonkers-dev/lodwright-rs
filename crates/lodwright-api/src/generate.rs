@@ -64,6 +64,21 @@ const TREE_BLOCK_CELLS: u32 = lodwright_core::trees::TREE_BLOCK_CELLS.unsigned_a
 
 /// What a run that writes specular in the alpha channel has to say about the exponents of the land textures: that
 /// none exists (the alpha stays opaque), or which textures have none (their specular counts as the lowest value).
+/// `SDefaultLandDiffuseTexture` from the game's `Fallout_default.ini` (in the folder above the data folder), else the
+/// documented default.
+fn default_land_texture(data: &Path) -> String {
+    let ini = data.parent().and_then(|game| {
+        std::fs::read_dir(game).ok()?.flatten().find(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case("Fallout_default.ini")
+        })
+    });
+    ini.and_then(|e| std::fs::read_to_string(e.path()).ok())
+        .and_then(|text| lodwright_gen::default_land_texture_from_ini(&text))
+        .unwrap_or_else(|| lodwright_gen::DEFAULT_LAND_TEXTURE.to_owned())
+}
+
 fn specular_warnings(tiles: &lodwright_gen::LandTiles) -> Vec<String> {
     if tiles.specular_range().is_none() {
         return vec![
@@ -459,6 +474,8 @@ pub fn generate(
     };
     let stop = || cancel.is_cancelled();
     let mut all: Vec<ManifestFile> = Vec::new();
+    // the default land texture of the game's ini, next to the data folder; the documented default without one
+    let default_land = default_land_texture(Path::new(&request.data_folder));
     let mut blocks: Vec<ManifestBlock> = Vec::new();
     let mut counts: Option<BlockCounts> = None;
     let mut cancelled = false;
@@ -480,6 +497,7 @@ pub fn generate(
                 (Some(assets), true) => {
                     lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
                         .with_scales(&texture_scales)
+                        .with_default_texture(&default_land, assets, &mut warnings)
                 }
                 _ => lodwright_gen::LandTiles::empty(),
             };

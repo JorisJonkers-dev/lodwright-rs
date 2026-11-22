@@ -1104,6 +1104,17 @@ verified = false
 note = "Only one LOD reference of the base game separates the two rules for temporary references: it lies a fraction of a unit south of its cell's edge and the game's block follows the cell. 93 persistent LOD references lie outside the persistent cell's grid and the game's blocks follow their positions. The four blocks that still differ each hold one object whose vertices are shifted or turned as a whole (407 vertices in all), which points at placements changed after the game's blocks were built."
 
 [[source]]
+id = "game-default-land-texture"
+fact = "A land quadrant that has no base texture is drawn with the game's default land texture, which the game's ini names in the [Landscape] section: SDefaultLandDiffuseTexture=DirtWasteland01.dds (normal map DirtWasteland01_N.dds), a file in textures\\landscape. Seen in the engine: the loaded ground of a cell whose quadrants have no base texture is a bright, cracked ground, not a flat dull colour."
+url = "oracle:game-lod-files"
+licence = "One line of the game's own ini and a picture compared by eye; no content recorded"
+date = 2026-11-22
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Fallout_default.ini of the game folder, section [Landscape]. xEdit's terrain LOD code (Core/wbLOD.pas, MPL-2.0) was searched for a missing base layer and has no rule for it in the file (its terrain LOD generation is in the LODGen program); the method here is the engine's own ini setting. Plain game: our far tiles for base-less cells stay within 1.4 luminance of the game's own tiles on average over all 1024 level 4 tiles (mean 0.9 before)."
+
+[[source]]
 id = "game-lod-water-height"
 fact = "Wherever a water plane of the game's own terrain blocks of the main worldspace overlaps a cell's ground below water, it lies at that cell's XCLW water height; a cell whose XCLW is the largest float (3.4028235e38) takes the world's default water height instead. The planes cover the ground whose mean height lies below the water height to an intersection-over-union of 0.986 at level 4."
 url = "oracle:game-lod-files"

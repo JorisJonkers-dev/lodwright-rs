@@ -120,7 +120,12 @@ fn stack<'a>(layers: &CellLayers, vx: f32, vy: f32, tiles: &'a LandTiles) -> Sta
     let quadrant = u8::from(vx >= 16.0) | (u8::from(vy >= 16.0) << 1);
     let (ox, oy) = quadrant_origin(quadrant);
     let (qx, qy) = (vx - ox as f32, vy - oy as f32);
-    let base = layers.base[usize::from(quadrant)].and_then(|id| tiles.get(id));
+    // source: game-default-land-texture
+    // a quadrant without a base texture shows the default land texture
+    let base = match layers.base[usize::from(quadrant)] {
+        Some(id) => tiles.get(id),
+        None => tiles.default_tile(),
+    };
     let mut over = Vec::new();
     for layer in layers.alpha.iter().filter(|l| l.quadrant == quadrant) {
         let Some(tile) = tiles.get(layer.texture) else {
@@ -153,7 +158,13 @@ fn ground_color(
 ) -> [u8; 3] {
     let tint = vertex_color(world, cell, vx, vy);
     let Some(layers) = world.layers(cell.0, cell.1) else {
-        return tint.unwrap_or(FALLBACK);
+        // a cell without layers is all default land texture
+        let ground = tiles.default_tile().map_or(FALLBACK, |t| {
+            t.sample((vx % 16.0) / 16.0, (vy % 16.0) / 16.0)
+        });
+        return tint.map_or(ground, |t| {
+            [0, 1, 2].map(|k| ((u16::from(ground[k]) * u16::from(t[k])) / 255) as u8)
+        });
     };
     let s = stack(layers, vx, vy, tiles);
     let base = s.base.map_or(FALLBACK, |t| t.sample(s.u, s.v));
@@ -262,7 +273,7 @@ pub fn diffuse_image(world: &Worldspace, id: BlockId, size: u32, tiles: &LandTil
 #[cfg(test)]
 mod tests {
     use super::{FALLBACK, diffuse_image, normal_image};
-    use crate::diffuse::LandTiles;
+    use crate::diffuse::{LandTiles, Tile};
     use lodwright_core::land::CellHeights;
     use lodwright_core::layout::BlockId;
     use lodwright_core::worldspace::Worldspace;
@@ -302,6 +313,18 @@ mod tests {
         samples[40] = f32::NAN;
         let img = normal_image(&samples, 9, 1024.0, 4);
         assert!(img.rgba().chunks(4).all(|p| p[2] > 200));
+    }
+
+    #[test]
+    fn a_cell_without_layers_shows_the_default_land_texture_not_the_flat_earth() {
+        let id = BlockId {
+            level: 4,
+            x: 0,
+            y: 0,
+        };
+        let tiles = LandTiles::empty().with_default_tile(Tile::flat([10, 20, 30]));
+        let img = diffuse_image(&world(), id, 4, &tiles);
+        assert_eq!(img.pixel(1, 1).unwrap(), [10, 20, 30, 255]);
     }
 
     #[test]

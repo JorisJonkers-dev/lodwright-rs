@@ -7,4 +7,4 @@ date = 2026-11-22
 recorded_by = "J.W. Jonkers"
 role = "specifier"
 verified = false
-note = "Read from the DDS_HEADER_DXT10 page, the DXGI_FORMAT enumeration page (https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format) and the BC7 format page (https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format); no code from them. The block decoding itself is done by the texture2ddecoder crate (MIT OR Apache-2.0). The test builds mode 6 blocks from the bit layout on the BC7 format page. Not second-read."
+note = "Read from the DDS_HEADER_DXT10 page, the DXGI_FORMAT enumeration page (https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format) and the BC7 format page (https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format); no code from them. The block decoding is lodwright's own (row bptc-format). The test builds mode 6 blocks from the bit layout on the BC7 format page. Not second-read."

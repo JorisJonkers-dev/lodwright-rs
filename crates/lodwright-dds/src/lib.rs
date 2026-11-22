@@ -9,6 +9,7 @@
 //! Layout facts come from the rows in `provenance/sources.toml` named in the `source:` comments (Microsoft's
 //! public DDS documentation).
 
+mod bc7;
 mod dds;
 mod error;
 mod image;

@@ -380,22 +380,11 @@ fn decode_dx10(bytes: &[u8]) -> Result<Image> {
     if bytes.len() - DX10_DATA_AT < need {
         return Err(DdsError::Truncated);
     }
-    let mut argb = vec![0_u32; width as usize * height as usize];
-    texture2ddecoder::decode_bc7(
+    let rgba = crate::bc7::decode_surface(
         &bytes[DX10_DATA_AT..DX10_DATA_AT + need],
         width as usize,
         height as usize,
-        &mut argb,
-    )
-    .map_err(|_| DdsError::BadHeader)?;
-    // the decoder writes 0xAARRGGBB in a little-endian u32 per pixel
-    let rgba = argb
-        .iter()
-        .flat_map(|p| {
-            let [b, g, r, a] = p.to_le_bytes();
-            [r, g, b, a]
-        })
-        .collect();
+    );
     Image::new(width, height, rgba)
 }
 

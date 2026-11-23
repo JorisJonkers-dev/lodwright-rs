@@ -40,9 +40,10 @@ pub use schema::{
     check_verify, schema_file_name, schema_json,
 };
 pub use verify::{
-    Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
-    KnownDifference, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
-    VerifyDoc, VerifyFinding, WaterBlock, WaterLevel, WaterProfileLevel, WaterReport,
+    Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary, FarAtlas,
+    FarMetricsLevel, FarMetricsReport, KnownDifference, ObjectBlock, ObjectReport, TerrainBlock,
+    TerrainLevel, TerrainReport, VerifyDoc, VerifyFinding, WaterBlock, WaterLevel,
+    WaterProfileLevel, WaterReport,
 };
 
 /// The plan document versions this build prints and reads, newest last.

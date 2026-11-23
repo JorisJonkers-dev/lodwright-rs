@@ -59,6 +59,10 @@ pub struct VerifyDoc {
     /// on both sides with the reference's. Omitted without a reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correlation: Option<CorrelationReport>,
+    /// With a reference: the error of the object blocks per level and the use of each object atlas. Omitted when the
+    /// folder has neither.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub far_metrics: Option<FarMetricsReport>,
     /// With `--known-differences`: the differences the list names, with its reason and release. They are reported
     /// and do not make the run fail. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -243,6 +247,55 @@ pub struct ObjectBlock {
     pub exact: bool,
 }
 
+/// The error of the object blocks against the reference's, and how much of each atlas is used. Numbers are rounded to
+/// three decimals. They are reported and never turn into a difference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FarMetricsReport {
+    /// One row per level, smallest first.
+    pub per_level: Vec<FarMetricsLevel>,
+    /// One row per object atlas of the folder, sorted by path.
+    pub atlases: Vec<FarAtlas>,
+}
+
+/// The error of the object blocks of one level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FarMetricsLevel {
+    /// Cells per block edge.
+    pub level: u32,
+    /// Blocks compared.
+    pub blocks: u64,
+    /// The largest distance from a vertex to the other block's surface, in game units.
+    pub position_max: f64,
+    /// The mean of the blocks' mean distances, in game units.
+    pub position_mean: f64,
+    /// The largest `|log2|` of the ratio of median texels per game unit: 1 is half or double the detail. Omitted when
+    /// no block's atlas sizes are known on both sides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uv_max: Option<f64>,
+    /// The mean of those numbers over the blocks that have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uv_mean: Option<f64>,
+    /// The largest silhouette error: `1 - IoU` of the outlines along the three axes, averaged.
+    pub silhouette_max: f64,
+    /// The mean silhouette error.
+    pub silhouette_mean: f64,
+}
+
+/// How much of one object atlas the folder's blocks use.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FarAtlas {
+    /// The atlas, relative to the folder, lower case.
+    pub path: String,
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// The share of the atlas some triangle covers, 0 to 1.
+    pub used: f64,
+    /// The share no triangle covers, 0 to 1.
+    pub wasted: f64,
+}
+
 /// A Pearson correlation per colour channel, from -1 to 1, rounded to three decimals.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Channels {
@@ -329,6 +382,7 @@ impl VerifyDoc {
             terrain: None,
             objects: None,
             correlation: None,
+            far_metrics: None,
             known: Vec::new(),
             stale: Vec::new(),
         }

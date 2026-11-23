@@ -228,7 +228,7 @@ wrong with the folder) and `differences` (how it differs from `--reference`, emp
 relative to the folder and a sentence for people; callers match on the path and the counts, never on the sentence.
 Nothing read from a file is copied into the report: only file names and numbers.
 
-With `--reference`, the report also carries four optional keys, measured per block present on both sides (names compared
+With `--reference`, the report also carries five optional keys, measured per block present on both sides (names compared
 in lower case):
 
 * `water`: for every terrain block with water on either side, the IoU (intersection over union) of the ground the
@@ -258,6 +258,17 @@ in lower case):
   `lowest` per channel) and `per_level` repeats it per terrain level, smallest first. Numbers are rounded to three
   decimals. It never turns into a difference and never changes the exit code. The text report prints
   `texture correlation:` and `texture correlation level L:` lines.
+* `far_metrics`: for the object blocks present on both sides, one row per level (`per_level`), and for every object
+  atlas of the folder one row (`atlases`). A level row has the `blocks` compared and three errors: **position**
+  (`position_max`, `position_mean`), the distance in game units from each vertex to the nearest point of the other
+  block's surface, in both directions; **UV** (`uv_max`, `uv_mean`), `|log2|` of the ratio of the two blocks' median
+  texels per game unit, because two atlases are laid out differently and their coordinates cannot be compared (0 is
+  the same detail, 1 is half or double along an edge; omitted when no block's atlas size is known on both sides);
+  **silhouette** (`silhouette_max`, `silhouette_mean`), `1 - IoU` of the outlines seen along the three axes on a
+  256 by 256 grid, averaged. An atlas row has the `path`, `width`, `height`, and the share `used` by some triangle's UVs
+  and `wasted`, measured on a grid of at most 1024 cells a side. Only blocks laid out as lodwright writes them are
+  read. Numbers are rounded to three decimals. The key never turns into a difference and never changes the exit code.
+  The text report prints `far objects level L:` lines and one line per atlas.
 
 With `--reference`, `water.per_level` repeats the water summary per terrain level (blocks, how many are under the
 threshold, lowest and mean), smallest level first; the text report prints one `water level L:` line each. These are the

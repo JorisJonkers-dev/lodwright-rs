@@ -35,6 +35,17 @@
         "$ref": "#/$defs/VerifyFinding"
       }
     },
+    "far_metrics": {
+      "description": "With a reference: the error of the object blocks per level and the use of each object atlas. Omitted when the\nfolder has neither.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FarMetricsReport"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "known": {
       "description": "With `--known-differences`: the differences the list names, with its reason and release. They are reported\nand do not make the run fail. Omitted when empty.",
       "type": "array",
@@ -297,6 +308,131 @@
         "blocks",
         "mean",
         "lowest"
+      ]
+    },
+    "FarAtlas": {
+      "description": "How much of one object atlas the folder's blocks use.",
+      "type": "object",
+      "properties": {
+        "height": {
+          "description": "Height in pixels.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "path": {
+          "description": "The atlas, relative to the folder, lower case.",
+          "type": "string"
+        },
+        "used": {
+          "description": "The share of the atlas some triangle covers, 0 to 1.",
+          "type": "number",
+          "format": "double"
+        },
+        "wasted": {
+          "description": "The share no triangle covers, 0 to 1.",
+          "type": "number",
+          "format": "double"
+        },
+        "width": {
+          "description": "Width in pixels.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "path",
+        "width",
+        "height",
+        "used",
+        "wasted"
+      ]
+    },
+    "FarMetricsLevel": {
+      "description": "The error of the object blocks of one level.",
+      "type": "object",
+      "properties": {
+        "blocks": {
+          "description": "Blocks compared.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "level": {
+          "description": "Cells per block edge.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "position_max": {
+          "description": "The largest distance from a vertex to the other block's surface, in game units.",
+          "type": "number",
+          "format": "double"
+        },
+        "position_mean": {
+          "description": "The mean of the blocks' mean distances, in game units.",
+          "type": "number",
+          "format": "double"
+        },
+        "silhouette_max": {
+          "description": "The largest silhouette error: `1 - IoU` of the outlines along the three axes, averaged.",
+          "type": "number",
+          "format": "double"
+        },
+        "silhouette_mean": {
+          "description": "The mean silhouette error.",
+          "type": "number",
+          "format": "double"
+        },
+        "uv_max": {
+          "description": "The largest `|log2|` of the ratio of median texels per game unit: 1 is half or double the detail. Omitted when\nno block's atlas sizes are known on both sides.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "uv_mean": {
+          "description": "The mean of those numbers over the blocks that have one.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "required": [
+        "level",
+        "blocks",
+        "position_max",
+        "position_mean",
+        "silhouette_max",
+        "silhouette_mean"
+      ]
+    },
+    "FarMetricsReport": {
+      "description": "The error of the object blocks against the reference's, and how much of each atlas is used. Numbers are rounded to\nthree decimals. They are reported and never turn into a difference.",
+      "type": "object",
+      "properties": {
+        "atlases": {
+          "description": "One row per object atlas of the folder, sorted by path.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FarAtlas"
+          }
+        },
+        "per_level": {
+          "description": "One row per level, smallest first.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FarMetricsLevel"
+          }
+        }
+      },
+      "required": [
+        "per_level",
+        "atlases"
       ]
     },
     "KnownDifference": {

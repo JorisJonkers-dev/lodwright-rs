@@ -23,6 +23,7 @@ mod filter;
 mod images;
 mod landmarks;
 mod lodmodel;
+mod metrics;
 mod objects;
 mod outline;
 mod output;
@@ -46,6 +47,7 @@ pub use landmarks::{
     ExpectedGeometry, Hit, MATCH_FRACTION, Presence, WrittenWorld, expected_geometry,
 };
 pub use lodmodel::{Part, parse_lod_model};
+pub use metrics::ShapeError;
 pub use objects::{
     BLOCK_CELLS, HeightAt, ObjectReport, Surfaces, generate_objects,
     generate_objects_with_atlas_limit, generate_objects_with_progress,
@@ -55,6 +57,7 @@ pub use own_far::OwnSource;
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees, generate_trees_with_progress};
 pub use verify::{
-    BlockComparison, Finding, OBJECT_TOLERANCE, ObjectAgreement, TerrainHeightDifference,
-    Verification, WaterOverlap, WaterProfile, compare_blocks, compare_folders, verify_folder,
+    AtlasUse, BlockComparison, FarBlockError, Finding, OBJECT_TOLERANCE, ObjectAgreement,
+    TerrainHeightDifference, Verification, WaterOverlap, WaterProfile, compare_blocks,
+    compare_folders, verify_folder,
 };

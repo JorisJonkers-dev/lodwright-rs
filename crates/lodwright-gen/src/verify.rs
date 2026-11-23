@@ -17,6 +17,8 @@ use lodwright_core::lod::LodSettings;
 use lodwright_dds::{Format, read_header};
 use lodwright_nif::{Body, NifFile};
 
+use crate::metrics::{AtlasCover, MetricShape, ShapeError, shape_error};
+
 /// One finding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
@@ -1092,6 +1094,123 @@ pub struct BlockComparison {
     pub water: Vec<WaterOverlap>,
     /// Object blocks present on both sides, sorted by path.
     pub objects: Vec<ObjectAgreement>,
+    /// The error of each object block present on both sides against the reference's, sorted by path.
+    pub far_errors: Vec<FarBlockError>,
+    /// How much of each object atlas of `folder` its blocks use, sorted by path.
+    pub atlases: Vec<AtlasUse>,
+}
+
+/// The error of one object block against the reference's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FarBlockError {
+    /// The block mesh, relative to the folder, lower case.
+    pub path: String,
+    /// The numbers.
+    pub error: ShapeError,
+}
+
+/// How much of one object atlas the blocks of a folder use.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AtlasUse {
+    /// The atlas, relative to the folder, lower case.
+    pub path: String,
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// The share of the atlas some triangle covers, 0 to 1.
+    pub used: f64,
+}
+
+/// A texture path as a block's texture set writes it, as a key of [`atlas_sizes`].
+fn texture_key(path: &str) -> String {
+    let lower = path.replace('\\', "/").to_ascii_lowercase();
+    // the game's blocks write the path from the game folder, `Data\\Textures\\...`
+    let lower = lower.strip_prefix("data/").unwrap_or(&lower);
+    if lower.starts_with("textures/") {
+        lower.to_owned()
+    } else {
+        format!("textures/{lower}")
+    }
+}
+
+/// The size of every object atlas below `root`, by lower-case path; a file that cannot be read is left out.
+fn atlas_sizes(root: &Path) -> BTreeMap<String, (u32, u32)> {
+    files_below(root)
+        .into_iter()
+        .map(|(n, p)| (n.replace('\\', "/").to_ascii_lowercase(), p))
+        .filter(|(n, _)| {
+            n.starts_with("textures/landscape/lod/")
+                && n.contains("/blocks/")
+                && n.ends_with(".dds")
+        })
+        .filter_map(|(n, p)| {
+            let header = read_header(&std::fs::read(p).ok()?).ok()?;
+            Some((n, (header.width, header.height)))
+        })
+        .collect()
+}
+
+/// The shapes of an object block in world units, each with its atlas size when `sizes` knows it. Empty for a block
+/// that is not laid out like the object blocks lodwright writes.
+fn metric_shapes(nif: &NifFile, sizes: &BTreeMap<String, (u32, u32)>) -> Vec<MetricShape> {
+    lodwright_nif::read_object_shapes(nif)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| MetricShape {
+            positions: s
+                .vertices
+                .iter()
+                .map(|v| [0, 1, 2].map(|i| f64::from(v[i]) + f64::from(s.origin[i])))
+                .collect(),
+            atlas: sizes.get(&texture_key(&s.texture)).copied(),
+            uv: s.uv,
+            triangles: s.triangles,
+        })
+        .collect()
+}
+
+/// How much of each atlas the object blocks in `files` use.
+fn atlas_use(
+    files: &BTreeMap<String, PathBuf>,
+    sizes: &BTreeMap<String, (u32, u32)>,
+) -> Vec<AtlasUse> {
+    let mut covers: BTreeMap<String, AtlasCover> = BTreeMap::new();
+    for (_, path) in files.iter().filter(|(n, _)| n.contains("/blocks/")) {
+        let Some(nif) = std::fs::read(path)
+            .ok()
+            .and_then(|b| NifFile::read(&b).ok())
+        else {
+            continue;
+        };
+        for shape in lodwright_nif::read_object_shapes(&nif).unwrap_or_default() {
+            let key = texture_key(&shape.texture);
+            let Some(size) = sizes.get(&key) else {
+                continue;
+            };
+            let metric = MetricShape {
+                uv: shape.uv,
+                triangles: shape.triangles,
+                ..MetricShape::default()
+            };
+            covers
+                .entry(key)
+                .or_insert_with(|| AtlasCover::new(*size))
+                .add(&metric);
+        }
+    }
+    covers
+        .into_iter()
+        .map(|(path, cover)| {
+            let (width, height) = sizes[&path];
+            AtlasUse {
+                used: cover.used(),
+                path,
+                width,
+                height,
+            }
+        })
+        .collect()
 }
 
 fn all_vertices_and_triangles(nif: &NifFile) -> (Vec<[f32; 3]>, usize) {
@@ -1119,7 +1238,11 @@ pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
             .collect()
     };
     let (mine, theirs) = (lower(folder), lower(reference));
-    let mut out = BlockComparison::default();
+    let (my_sizes, their_sizes) = (atlas_sizes(folder), atlas_sizes(reference));
+    let mut out = BlockComparison {
+        atlases: atlas_use(&mine, &my_sizes),
+        ..BlockComparison::default()
+    };
     for (name, path) in &mine {
         let Some(other) = theirs.get(name) else {
             continue;
@@ -1139,6 +1262,15 @@ pub fn compare_blocks(folder: &Path, reference: &Path) -> BlockComparison {
                 reference_triangles: tb,
                 unmatched_vertices: unmatched_vertices(&va, &vb),
             });
+            if let Some(error) = shape_error(
+                &metric_shapes(&a, &my_sizes),
+                &metric_shapes(&b, &their_sizes),
+            ) {
+                out.far_errors.push(FarBlockError {
+                    path: name.clone(),
+                    error,
+                });
+            }
         } else {
             if let Some((max, mean)) =
                 height_difference(&ground_triangles(&a), &ground_triangles(&b))
@@ -1201,6 +1333,65 @@ mod tests {
             std::env::temp_dir().join(format!("lodwright-verify-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    /// A folder with one object block (a square of 100 units at height `z`, over the left half of a 64 by 64 atlas).
+    fn object_folder(name: &str, z: f32) -> std::path::PathBuf {
+        let dir = temp(name);
+        let blocks = dir.join("meshes/landscape/lod/w/blocks");
+        let textures = dir.join("textures/landscape/lod/w/blocks");
+        std::fs::create_dir_all(&blocks).unwrap();
+        std::fs::create_dir_all(&textures).unwrap();
+        let vertices = [
+            [0.0, 0.0, z],
+            [100.0, 0.0, z],
+            [100.0, 100.0, z],
+            [0.0, 100.0, z],
+        ];
+        let uv = [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]];
+        let mut segment_triangles = [0; lodwright_nif::SEGMENTS];
+        segment_triangles[0] = 2;
+        // the paths as a generated block writes them
+        let paths = lodwright_core::layout::nif_atlas_paths("w").unwrap();
+        let nif = lodwright_nif::object_block(&lodwright_nif::ObjectBlock {
+            origin: (0.0, 0.0),
+            vertices: &vertices,
+            normals: &[[0.0, 0.0, 1.0]; 4],
+            tangents: &[[1.0, 0.0, 0.0]; 4],
+            bitangents: &[[0.0, 1.0, 0.0]; 4],
+            uv: &uv,
+            indices: &[0, 1, 2, 0, 2, 3],
+            segment_triangles,
+            textures: [&paths[0], &paths[1]],
+        })
+        .unwrap();
+        std::fs::write(blocks.join("w.level4.x0.y0.nif"), nif.write().unwrap()).unwrap();
+        let image = lodwright_dds::Image::new(64, 64, vec![128; 64 * 64 * 4]).unwrap();
+        std::fs::write(
+            textures.join("w.buildings.dds"),
+            crate::objects::encode_bc3(&image, 1).unwrap(),
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    fn object_blocks_get_error_numbers_and_their_atlas_its_use() {
+        let (mine, theirs) = (object_folder("far-a", 7.0), object_folder("far-b", 0.0));
+        let compared = compare_blocks(&mine, &theirs);
+        let [block] = compared.far_errors.as_slice() else {
+            panic!("{:?}", compared.far_errors);
+        };
+        assert!((block.error.position_max - 7.0).abs() < 1e-6, "{block:?}");
+        assert_eq!(block.error.uv, Some(0.0), "the same detail on both sides");
+        let [atlas] = compared.atlases.as_slice() else {
+            panic!("{:?}", compared.atlases);
+        };
+        assert_eq!((atlas.width, atlas.height), (64, 64));
+        assert!((atlas.used - 0.5).abs() < 0.05, "{atlas:?}");
+        for dir in [mine, theirs] {
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]

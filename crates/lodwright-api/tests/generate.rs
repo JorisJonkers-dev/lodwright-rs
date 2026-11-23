@@ -87,6 +87,46 @@ fn generate_writes_the_lod_and_a_manifest_and_answers_generated() {
 }
 
 #[test]
+fn the_result_profiles_every_step_with_its_time_and_the_files_it_wrote() {
+    let (job, out) = job("profile");
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    let names: Vec<(&str, Option<&str>)> = result
+        .steps
+        .iter()
+        .map(|s| (s.step.as_str(), s.world.as_deref()))
+        .collect();
+    assert_eq!(
+        names,
+        [
+            ("read_plugins", None),
+            ("setup", None),
+            ("assets_index", None),
+            ("terrain.land_tiles", Some("Island")),
+            ("terrain.shipped_plan", Some("Island")),
+            ("terrain.blocks", Some("Island")),
+            ("manifest", None),
+        ]
+    );
+    // the files of the terrain step are the manifest's terrain files, with their bytes
+    let m = manifest(&out);
+    let blocks = result
+        .steps
+        .iter()
+        .find(|s| s.step == "terrain.blocks")
+        .unwrap();
+    assert_eq!(blocks.files, u64::try_from(m.files.len()).unwrap());
+    assert_eq!(blocks.bytes, m.files.iter().map(|f| f.bytes).sum::<u64>());
+    if cfg!(target_os = "linux") {
+        assert!(blocks.cpu_ms.is_some() && blocks.peak_memory_mib.is_some());
+        // the run's peak is the highest of its steps
+        assert_eq!(
+            result.peak_memory_mib,
+            result.steps.iter().filter_map(|s| s.peak_memory_mib).max()
+        );
+    }
+}
+
+#[test]
 fn a_second_call_with_the_same_request_is_up_to_date() {
     let (job, _) = job("again");
     generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();

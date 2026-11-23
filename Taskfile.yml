@@ -22,6 +22,10 @@ tasks:
     desc: Tests and the line-coverage gate ({{.COVERAGE_MIN}}%)
     cmd: cargo llvm-cov --locked --workspace --fail-under-lines {{.COVERAGE_MIN}}
 
+  bench:
+    desc: The timing guard of the hot steps (release build, synthetic data); LODWRIGHT_BENCH=print prints the ratios
+    cmd: cargo test --locked --release -p lodwright-api --test step_bench -- --ignored --test-threads=1
+
   fuzz:check:
     desc: The fuzz harnesses compile (stable, type-check only; running them needs nightly and cargo-fuzz)
     cmd: |

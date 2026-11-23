@@ -229,8 +229,30 @@ fn generated(name: &str) -> (PathBuf, PathBuf) {
     request.limits.threads = Some(1);
     let file = data.with_extension("request.json");
     std::fs::write(&file, serde_json::to_string(&request).unwrap()).unwrap();
-    let (code, _) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
+    let (code, text) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
     assert_eq!(code, 0);
+    let result: serde_json::Value = serde_json::from_str(text.lines().last().unwrap()).unwrap();
+    let steps: Vec<&str> = result["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["step"].as_str().unwrap())
+        .collect();
+    // every phase of the object step is profiled, in the order it runs
+    assert_eq!(
+        steps,
+        [
+            "read_plugins",
+            "setup",
+            "assets_index",
+            "objects.collect",
+            "objects.models",
+            "objects.textures",
+            "objects.atlas",
+            "objects.blocks",
+            "manifest"
+        ]
+    );
     (file, out)
 }
 

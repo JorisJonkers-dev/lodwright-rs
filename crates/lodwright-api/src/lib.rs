@@ -29,6 +29,7 @@ mod generate;
 pub mod landmarks;
 pub mod load;
 mod pack;
+mod profile;
 mod progress;
 mod shipped;
 mod staging;

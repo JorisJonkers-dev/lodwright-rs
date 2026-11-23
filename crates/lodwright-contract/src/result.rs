@@ -32,6 +32,30 @@ pub struct Written {
     pub bytes: u64,
 }
 
+/// Where a run spent its time and memory: one entry per step, and per world where the step runs once for each.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct StepProfile {
+    /// The step: `read_plugins`, `terrain`, `objects`, `trees`, `pack` or `manifest` (a finer phase of a step is
+    /// named `<step>.<phase>`, for example `objects.models`).
+    pub step: String,
+    /// The world the step ran for; omitted for a step of the whole run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world: Option<String>,
+    /// Wall clock time in milliseconds.
+    pub wall_ms: u64,
+    /// CPU time of the whole process during the step in milliseconds, all threads together; omitted where the
+    /// platform cannot say. More than `wall_ms` when the step used several threads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_ms: Option<u64>,
+    /// Peak resident memory of the process during the step in MiB; omitted where the platform cannot say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_memory_mib: Option<u64>,
+    /// Files the step wrote.
+    pub files: u64,
+    /// Bytes the step wrote.
+    pub bytes: u64,
+}
+
 /// Result v1. Result and error documents go to stdout; stderr carries events and human text only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ResultDoc {
@@ -59,6 +83,10 @@ pub struct ResultDoc {
     /// Peak resident memory in MiB; omitted when the platform cannot say.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub peak_memory_mib: Option<u64>,
+    /// Time, CPU time and peak memory per step of a `generate` run, in the order the steps ran; omitted when the run
+    /// did not generate.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<StepProfile>,
     /// For `unsupported`: the capabilities that are missing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub missing_capabilities: Vec<String>,
@@ -305,6 +333,7 @@ impl ResultDoc {
             blocks: None,
             dropped_faces: None,
             tiles: None,
+            steps: Vec::new(),
         }
     }
 
@@ -384,6 +413,31 @@ pub fn peak_memory_mib() -> Option<u64> {
     parse_vm_hwm_kib(&status).map(|kib| kib.div_ceil(1024))
 }
 
+/// Start a new peak: after this, [`peak_memory_mib`] reports the highest resident size since now (Linux only; a no-op
+/// elsewhere). The peak of one step of a run is read after resetting it at the start of the step.
+pub fn reset_peak_memory() {
+    // "5" resets the peak resident size (`VmHWM`) to the current one; a file that cannot be written leaves the
+    // peak as the whole run's
+    let _ = std::fs::write("/proc/self/clear_refs", "5");
+}
+
+/// CPU time (user and system, every thread) the process has used so far in milliseconds, `None` where unavailable.
+#[must_use]
+pub fn process_cpu_ms() -> Option<u64> {
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    parse_cpu_ms(&stat)
+}
+
+fn parse_cpu_ms(stat: &str) -> Option<u64> {
+    // the process name in parentheses may hold spaces: count the fields after the last parenthesis; utime and stime
+    // are the 14th and 15th fields of the line, in clock ticks of 100 a second
+    let after = &stat[stat.rfind(')')? + 1..];
+    let mut fields = after.split_whitespace();
+    let utime: u64 = fields.nth(11)?.parse().ok()?;
+    let stime: u64 = fields.next()?.parse().ok()?;
+    Some((utime + stime) * 10)
+}
+
 fn parse_vm_hwm_kib(status: &str) -> Option<u64> {
     let line = status.lines().find(|l| l.starts_with("VmHWM:"))?;
     line.split_whitespace().nth(1)?.parse().ok()
@@ -391,7 +445,9 @@ fn parse_vm_hwm_kib(status: &str) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Handshake, ResultDoc, Status, VersionInfo, parse_vm_hwm_kib, peak_memory_mib};
+    use super::{
+        Handshake, ResultDoc, Status, VersionInfo, parse_cpu_ms, parse_vm_hwm_kib, peak_memory_mib,
+    };
 
     #[test]
     fn exit_codes_follow_the_status() {
@@ -434,5 +490,13 @@ mod tests {
             serde_json::to_string(&Handshake::current()).unwrap(),
             r#"{"contracts":[{"name":"lodwright-plan","versions":[1]},{"name":"lodwright-result","versions":[1]},{"name":"lodwright-request","versions":[1]},{"name":"lodwright-manifest","versions":[1]},{"name":"lodwright-verify","versions":[1]},{"name":"lodwright-events","versions":[1]},{"name":"lodwright-defaults","versions":[1]},{"name":"lodwright-bands","versions":[1]},{"name":"lodwright-api","versions":[1]}]}"#
         );
+    }
+
+    #[test]
+    fn cpu_time_is_read_from_the_stat_line_whatever_the_process_name_holds() {
+        // pid, name, state, then fields 4 to 13, then utime 250 and stime 50 ticks of 10 ms
+        let line = "123 (a b) c) S 1 2 3 4 5 6 7 8 9 10 250 50 0 0 20 0 1 0 100 1000 100";
+        assert_eq!(parse_cpu_ms(line), Some(3000));
+        assert_eq!(parse_cpu_ms("garbage"), None);
     }
 }

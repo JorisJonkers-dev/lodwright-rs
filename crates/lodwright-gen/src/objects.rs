@@ -66,6 +66,9 @@ pub struct Surfaces<'a> {
     /// The plugin names in load order, to name the plugin of an instance (`Instance::flagged_by`) in a warning;
     /// empty names them by their number.
     pub plugins: &'a [String],
+    /// Called with the name of each phase as it starts (`models`, `textures`, `atlas`, `blocks`), for the step
+    /// profile of a run.
+    pub phase: Option<&'a dyn Fn(&str)>,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -535,7 +538,13 @@ pub fn generate_objects_with_atlas_limit(
     block_done: &mut dyn FnMut(u64, u64),
 ) -> Result<ObjectReport, GenError> {
     layout::check_world_name(world)?;
+    let phase = |name: &str| {
+        if let Some(f) = surfaces.phase {
+            f(name);
+        }
+    };
     let mut report = ObjectReport::default();
+    phase("models");
     // models
     let mut models: BTreeMap<String, Option<Model>> = BTreeMap::new();
     // the LOD models that exist as a file but cannot be read (the others that are missing have no file)
@@ -627,6 +636,7 @@ pub fn generate_objects_with_atlas_limit(
         return Ok(report);
     }
     // textures: key by the diffuse path of each shape
+    phase("textures");
     let key_of = |p: &Part| {
         p.diffuse
             .as_deref()
@@ -677,6 +687,7 @@ pub fn generate_objects_with_atlas_limit(
         .collect();
     // every texture at its native size: several atlases when they do not fit one, as the oracle's output has
     // (halving every texture to fit one atlas blurred every far object of a large load order)
+    phase("atlas");
     let atlases = pack_pages(&sizes, largest);
     for (page, atlas) in atlases.iter().enumerate() {
         let mut diffuse = vec![0_u8; (atlas.width * atlas.height * 4) as usize];
@@ -720,6 +731,7 @@ pub fn generate_objects_with_atlas_limit(
             .push(write_file(out, &normal_path, &encode_bc3(&normal_image)?)?);
     }
     // blocks
+    phase("blocks");
     let mut groups: BTreeMap<(i32, i32, bool), Vec<&Instance>> = BTreeMap::new();
     for i in instances {
         if models

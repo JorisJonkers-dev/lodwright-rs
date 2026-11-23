@@ -413,8 +413,11 @@ pub fn generate(
         return Ok(GenerateOutcome::Cancelled);
     }
     let mut run = RunTracker::new();
+    let clock = crate::profile::StepClock::new();
     progress.report(&run.start(Step::ReadPlugins, None));
+    clock.begin("read_plugins", None);
     let loaded = load_plugins_with(data, &request.plugins, read)?;
+    clock.begin("setup", None);
     let digest = request.digest();
     // an output folder that is a link is replaced where it points: the swap renames the folder, never the link
     let target = std::fs::canonicalize(out).unwrap_or_else(|_| out.to_path_buf());
@@ -448,6 +451,7 @@ pub fn generate(
             doc.warning_counts = file.counts;
             doc.warnings_file = Some(WARNINGS_FILE.to_owned());
         }
+        doc.steps = clock.finish();
         return Ok(GenerateOutcome::Done {
             result: Box::new(doc),
         });
@@ -497,6 +501,7 @@ pub fn generate(
     );
     let need_assets =
         request.objects.enabled || request.trees.enabled || request.terrain.land_textures;
+    clock.begin("assets_index", None);
     let assets = if need_assets {
         Some(
             lodwright_gen::FolderAssets::open(data, &request.plugins).map_err(|e| {
@@ -575,6 +580,7 @@ pub fn generate(
                 break 'worlds;
             }
             progress.report(&run.start(Step::Terrain, Some(world.name())));
+            clock.begin("terrain.land_tiles", Some(world.name()));
             let mut warnings = Vec::new();
             let tiles = match (&assets, request.terrain.land_textures) {
                 (Some(assets), true) => {
@@ -596,6 +602,7 @@ pub fn generate(
                 warnings.extend(specular_warnings(&tiles));
             }
             // the diffuse tiles the game ships and nothing outside its masters changed are left to the game
+            clock.begin("terrain.shipped_plan", Some(world.name()));
             let keep = match (&assets, request.terrain.land_textures) {
                 (Some(assets), true) if !request.terrain.compose_shipped_tiles => {
                     crate::shipped::plan(
@@ -636,6 +643,7 @@ pub fn generate(
                     )],
                 );
             }
+            clock.begin("terrain.blocks", Some(world.name()));
             let report = {
                 let shared = Mutex::new((&mut *progress, &mut run));
                 let block_done = |world: &str, level: u32, done: u64, of: u64, up_to_date: bool| {
@@ -668,7 +676,9 @@ pub fn generate(
                 )
                 .map_err(|e| gen_error(&e))?
             };
+            let first = files.len();
             files.extend(report.files.iter().map(to_manifest_file));
+            clock.wrote(&files[first..]);
             let c = counts.get_or_insert_with(BlockCounts::default);
             if keep.is_some() {
                 let t = doc.tiles.get_or_insert_with(Default::default);
@@ -706,6 +716,7 @@ pub fn generate(
                 break 'worlds;
             }
             progress.report(&run.start(Step::Objects, Some(world.name())));
+            clock.begin("objects.collect", Some(world.name()));
             let instances =
                 lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
                     .map_err(|e| load_order_error(&e))?;
@@ -725,6 +736,7 @@ pub fn generate(
                 let cell = ((x / 4096.0).floor() as i32, (y / 4096.0).floor() as i32);
                 world.water_height(cell.0, cell.1)
             };
+            let phase = |name: &str| clock.begin(&format!("objects.{name}"), Some(world.name()));
             let surfaces = lodwright_gen::Surfaces {
                 ground: request
                     .objects
@@ -736,6 +748,7 @@ pub fn generate(
                     .then_some(&water as lodwright_gen::HeightAt),
                 grid_anchor: anchor,
                 plugins: &request.plugins,
+                phase: Some(&phase),
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),
@@ -762,7 +775,9 @@ pub fn generate(
                 d.under_terrain += objects.dropped_under_terrain as u64;
                 d.under_water += objects.dropped_under_water as u64;
             }
+            let first = files.len();
             files.extend(objects.files.iter().map(to_manifest_file));
+            clock.wrote(&files[first..]);
         }
         if let (Some(assets), true) = (&assets, request.trees.enabled) {
             if stop() {
@@ -771,6 +786,7 @@ pub fn generate(
                 break 'worlds;
             }
             progress.report(&run.start(Step::Trees, Some(world.name())));
+            clock.begin("trees", Some(world.name()));
             let bases = lodwright_core::trees::tree_bases(&loaded.plugins)
                 .map_err(|e| load_order_error(&e))?;
             let refs =
@@ -798,7 +814,9 @@ pub fn generate(
             )
             .map_err(|e| gen_error(&e))?;
             note(&mut doc, &mut records, world.name(), trees.warnings.clone());
+            let first = files.len();
             files.extend(trees.files.iter().map(to_manifest_file));
+            clock.wrote(&files[first..]);
         }
         written_of(world.name(), &files, &mut doc);
         all.extend(files);
@@ -820,6 +838,7 @@ pub fn generate(
             return Ok(GenerateOutcome::Cancelled);
         }
         progress.report(&run.start(Step::Pack, None));
+        clock.begin("pack", None);
         // the stub's master: the first plugin of the load order and its size (the game warns on a different size)
         let master = request.plugins.first().map_or("", String::as_str);
         let master_size = crate::load::find_plugin(data, master)
@@ -835,6 +854,7 @@ pub fn generate(
         blocks.clear();
     }
     progress.report(&run.start(Step::Manifest, None));
+    clock.begin("manifest", None);
     doc.blocks = counts;
     if let Some(t) = doc.tiles {
         doc.reason = format!(
@@ -849,6 +869,9 @@ pub fn generate(
     crate::staging::finish_manifest(&stage, &manifest)?;
     crate::staging::swap(&target, &stage)?;
     doc.manifest = Some(MANIFEST_FILE.to_owned());
+    doc.steps = clock.finish();
+    // the peak of the whole run: the steps reset the kernel's high-water mark as they start
+    doc.peak_memory_mib = doc.steps.iter().filter_map(|s| s.peak_memory_mib).max();
     Ok(GenerateOutcome::Done {
         result: Box::new(doc),
     })

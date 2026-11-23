@@ -100,6 +100,10 @@ pub const NAME_ALLOWED_FILES: [&str; 5] = [
     "xtask/tests/guards.rs",
     "CHANGELOG.md",
 ];
+/// The one file that may name the older tool, for its speed comparison, and the one spelling it may use there. The name
+/// must stand alone as a word: a path, a link or a longer word that holds it stays refused.
+const COMPARISON_FILE: &str = "README.md";
+const COMPARISON_NAME: &str = "xLODGen";
 
 /// Extensions of game data and tool output; never committed.
 pub const GAME_DATA_EXTS: [&str; 17] = [
@@ -788,6 +792,29 @@ fn check_gitignore(root: &Path, v: &mut Violations) {
 
 // --- names -------------------------------------------------------------------------------------------------------
 
+/// `line` without the occurrences of [`COMPARISON_NAME`] that stand alone as a word.
+fn without_comparison_name(line: &str) -> String {
+    let joins = |c: char| c.is_alphanumeric() || matches!(c, '/' | '\\' | '_' | '-');
+    let mut out = String::with_capacity(line.len());
+    let mut copied = 0;
+    for (at, name) in line.match_indices(COMPARISON_NAME) {
+        let end = at + name.len();
+        let before = line[..at].chars().next_back();
+        let mut after = line[end..].chars();
+        let next = after.next();
+        // a full stop ends a sentence; followed by more of a word it is a file name or a host
+        let joined = before.is_some_and(|c| joins(c) || c == '.')
+            || next.is_some_and(joins)
+            || (next == Some('.') && after.next().is_some_and(joins));
+        if !joined {
+            out.push_str(&line[copied..at]);
+            copied = end;
+        }
+    }
+    out.push_str(&line[copied..]);
+    out
+}
+
 fn check_names(root: &Path, files: &[String], v: &mut Violations) {
     for rel in files {
         if NAME_ALLOWED_FILES.contains(&rel.as_str())
@@ -806,7 +833,12 @@ fn check_names(root: &Path, files: &[String], v: &mut Violations) {
             continue;
         };
         for (number, line) in text.lines().enumerate() {
-            if line.to_lowercase().contains(OLD_NAME) {
+            let checked = if rel == COMPARISON_FILE {
+                without_comparison_name(line)
+            } else {
+                line.to_owned()
+            };
+            if checked.to_lowercase().contains(OLD_NAME) {
                 v.add(
                     &format!("{rel}:{}", number + 1),
                     "carries the retired name; it may only appear in the provenance notes",

@@ -817,6 +817,66 @@ fn case_does_not_hide_the_old_name() {
 }
 
 #[test]
+fn the_exact_comparison_name_in_the_readme_passes() {
+    let repo = Repo::new();
+    repo.write(
+        "README.md",
+        "The older tool, xLODGen, took longer than (xLODGen) did. So did xLODGen.\n",
+    );
+    repo.commit();
+    assert!(repo.check(Check::Names, None).is_empty());
+}
+
+#[test]
+fn the_bare_old_name_in_the_readme_fails() {
+    let repo = Repo::new();
+    repo.write("README.md", "LODGen took longer\n");
+    repo.commit();
+    assert_eq!(repo.check(Check::Names, None).len(), 1);
+}
+
+#[test]
+fn another_spelling_beside_the_comparison_name_in_the_readme_fails() {
+    for line in [
+        "xLODGen and LODGen\n",
+        "xlodgen\n",
+        "xLODGenFoo\n",
+        "my-xLODGen\n",
+        "xLODGen.exe\n",
+        "tools/xLODGen/run\n",
+    ] {
+        let repo = Repo::new();
+        repo.write("README.md", line);
+        repo.commit();
+        assert_eq!(repo.check(Check::Names, None).len(), 1, "{line}");
+    }
+}
+
+#[test]
+fn the_comparison_name_in_any_other_file_fails() {
+    for file in ["docs/performance.md", "docs/README.md", "notes.txt"] {
+        let repo = Repo::new();
+        repo.write(file, "xLODGen took longer\n");
+        repo.commit();
+        assert_eq!(repo.check(Check::Names, None).len(), 1, "{file}");
+    }
+}
+
+#[test]
+fn the_source_repository_link_in_the_readme_fails() {
+    for url in [
+        "https://github.com/tes5edit/xlodgen\n",
+        "https://github.com/TES5Edit/xLODGen\n",
+        "xLODGen: https://github.com/TES5Edit/xLODGen/blob/master/x.cs\n",
+    ] {
+        let repo = Repo::new();
+        repo.write("README.md", url);
+        repo.commit();
+        assert_eq!(repo.check(Check::Names, None).len(), 1, "{url}");
+    }
+}
+
+#[test]
 fn the_real_tree_is_free_of_the_old_name() {
     assert!(
         guards::run(real_root(), Check::Names, None)

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! The packing step of a run: the generated files of the staging folder become one BSA archive and its stub plugin.
+//! The packing step of a run: the generated files of the staging folder become one BSA archive, its stub plugin and
+//! its empty `.override` marker.
 //!
 //! It runs last, in the staging folder, after every world is finished and before the manifest is written. The loose
 //! files it packed are removed from staging only after the archive and the stub are written, and staging replaces
@@ -14,7 +15,7 @@ use lodwright_contract::ManifestFile;
 
 use crate::Error;
 
-/// The base name of the archive and its stub plugin: `Lodwright LOD.bsa` and `Lodwright LOD.esp`.
+/// The base name of the archive, its stub plugin and its marker: `Lodwright LOD.bsa`, `.esp` and `.override`.
 pub(crate) const ARCHIVE_BASE: &str = "Lodwright LOD";
 
 /// Whether a manifest describes a packed output: it lists an archive in the output folder itself (a loose output
@@ -55,8 +56,9 @@ fn pack_error(e: &PackError) -> Error {
     }
 }
 
-/// Pack `files` (paths relative to `stage`) into `<ARCHIVE_BASE>.bsa` with a stub plugin beside it, remove the loose
-/// files and return the manifest entries of the archive and the stub. The stub names `master` (the first plugin of the
+/// Pack `files` (paths relative to `stage`) into `<ARCHIVE_BASE>.bsa` with a stub plugin and an empty `.override` marker
+/// beside it, remove the loose files and return the manifest entries of the three. The marker is written for every load
+/// order: without it the archive loses to an earlier archive that holds the same paths. The stub names `master` (the first plugin of the
 /// load order) with the size of its file, because the game opens a plugin's archives only when it has a master.
 /// `progress` gets the number of files read.
 ///
@@ -102,6 +104,8 @@ pub(crate) fn pack_staging(
     let packed = vec![
         write(&names.archive, &archive)?,
         write(&names.plugin, &stub_plugin(master.0, master.1))?,
+        // source: fnv-archive-loading
+        write(&names.marker, b"")?,
     ];
     // only now, with the archive on disk, do the loose files go
     for file in &files {
@@ -178,14 +182,25 @@ mod tests {
         let names: Vec<&str> = packed.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(
             names,
-            [format!("{ARCHIVE_BASE}.bsa"), format!("{ARCHIVE_BASE}.esp")]
+            [
+                format!("{ARCHIVE_BASE}.bsa"),
+                format!("{ARCHIVE_BASE}.esp"),
+                format!("{ARCHIVE_BASE}.override")
+            ]
         );
         let mut left: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
         left.sort();
-        assert_eq!(left, ["Lodwright LOD.bsa", "Lodwright LOD.esp"]);
+        assert_eq!(
+            left,
+            [
+                "Lodwright LOD.bsa",
+                "Lodwright LOD.esp",
+                "Lodwright LOD.override"
+            ]
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -206,14 +221,21 @@ mod tests {
             seen.push((done, of));
         })
         .unwrap();
-        assert_eq!(packed.len(), 2);
+        assert_eq!(packed.len(), 3);
         assert_eq!(seen, [(1, 2), (2, 2)]);
         let mut left: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
         left.sort();
-        assert_eq!(left, ["Lodwright LOD.bsa", "Lodwright LOD.esp"]);
+        assert_eq!(
+            left,
+            [
+                "Lodwright LOD.bsa",
+                "Lodwright LOD.esp",
+                "Lodwright LOD.override"
+            ]
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

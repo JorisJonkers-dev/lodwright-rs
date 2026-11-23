@@ -43,13 +43,16 @@ impl fmt::Display for BadName {
 
 impl std::error::Error for BadName {}
 
-/// The file names of a packed archive and its stub: `<base>.bsa` and `<base>.esp`.
+/// The file names of a packed archive, its stub and its override marker: `<base>.bsa`, `<base>.esp` and
+/// `<base>.override`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedNames {
     /// The archive's file name.
     pub archive: String,
     /// The stub plugin's file name: the archive's base name with `.esp`.
     pub plugin: String,
+    /// The empty marker that lets the archive replace the same paths in earlier archives (`fnv-archive-loading`).
+    pub marker: String,
 }
 
 impl PackedNames {
@@ -57,8 +60,8 @@ impl PackedNames {
     ///
     /// # Errors
     /// [`BadName`] for an empty name, one with a separator, a control character or a character no file system
-    /// takes, one that is not ASCII, one that ends in a dot or space, or one that already ends in `.esp`, `.esm`
-    /// or `.bsa`.
+    /// takes, one that is not ASCII, one that ends in a dot or space, or one that already ends in `.esp`, `.esm`,
+    /// `.bsa` or `.override`.
     pub fn new(base: &str) -> Result<Self, BadName> {
         let lower = base.to_ascii_lowercase();
         let bad = base.is_empty()
@@ -67,13 +70,16 @@ impl PackedNames {
             || base
                 .chars()
                 .any(|c| c.is_control() || "<>:\"/\\|?*".contains(c))
-            || [".esp", ".esm", ".bsa"].iter().any(|e| lower.ends_with(e));
+            || [".esp", ".esm", ".bsa", ".override"]
+                .iter()
+                .any(|e| lower.ends_with(e));
         if bad {
             return Err(BadName(base.to_owned()));
         }
         Ok(Self {
             archive: format!("{base}.bsa"),
             plugin: format!("{base}.esp"),
+            marker: format!("{base}.override"),
         })
     }
 }
@@ -155,6 +161,7 @@ mod tests {
         let names = PackedNames::new("Lodwright LOD").unwrap();
         assert_eq!(names.archive, "Lodwright LOD.bsa");
         assert_eq!(names.plugin, "Lodwright LOD.esp");
+        assert_eq!(names.marker, "Lodwright LOD.override");
     }
 
     #[test]
@@ -169,6 +176,7 @@ mod tests {
             "caf\u{e9}",
             "x.ESP",
             "x.bsa",
+            "x.Override",
             "a\u{7}b",
             "a*b",
         ] {

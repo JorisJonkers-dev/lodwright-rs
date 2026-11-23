@@ -8,7 +8,7 @@ acceptance is #132), the hash vectors are numbers measured on game archives (row
 be ASCII, and the writer proved byte-equal across threads by writing from eight threads and from permuted input.
 The stub plugin (#131, `lodwright_assets::stub`) and the packing step (#136, request key `output.pack`, documented in
 `docs/contracts.md`) are built too; sections 8 and 9 below are the original proposal, and where they differ the
-contract text wins: the manifest lists the archive and the stub (no blocks), no `.override` is written, and packing
+contract text wins: the manifest lists the archive, the stub and an empty `.override` marker (no blocks), and packing
 was not switched on by default. Owner decisions: packing is opt-in and gated (D1), the archive is registered by a stub plugin of the
 same name once an in-game test confirms it (D2, #132), packing is a step at the end of a generate (D3), and the Mod
 never holds loose and packed output at the same time (G2).
@@ -136,8 +136,8 @@ verified rows, the test vector, the byte-level hash and order checks above and t
 - The packing option is refused ("not available yet") until #132 has confirmed on the target engine that the stub
   plugin registers the archive (D2); #136 depends on #132.
 - After a generate finishes in staging, the packing step reads the manifest, builds the archive from the listed files
-  (never `manifest.json`), writes the stub plugin and, only if the owner decides it is needed (it brings a JIP LN
-  dependency, `fnv-archive-loading`; not decided), the `.override` marker, removes the loose files it
+  (never `manifest.json`), writes the stub plugin and the empty `.override` marker (on the original game it needs JIP LN,
+  `fnv-archive-loading`; see `docs/contracts.md`), removes the loose files it
   packed from staging, and the usual swap publishes the result (G2: never both).
 - Proposed manifest rule: the manifest keeps listing every generated file with its digest and adds the archive and the
   stub as files with their own digests and a `packed_into` field per member. `up_to_date` compares the members'

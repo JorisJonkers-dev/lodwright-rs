@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.2](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.1...v0.16.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* **pack:** a file that several worlds list is packed once ([#396](https://github.com/JorisJonkers-dev/lodwright-rs/issues/396)) ([a11a25c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a11a25ca720a834654121c20655dae6fc3e99cdd))
+
 ## [0.16.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.0...v0.16.1) (2026-11-23)
 
 

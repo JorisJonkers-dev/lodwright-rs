@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.0...v0.16.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **terrain:** the packed output of an earlier run is not the game's archive ([#393](https://github.com/JorisJonkers-dev/lodwright-rs/issues/393)) ([4bcbffe](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4bcbffec30592ee4ccfda5b1b112abfdb348d233))
+
 ## [0.16.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.15.1...v0.16.0) (2026-11-23)
 
 

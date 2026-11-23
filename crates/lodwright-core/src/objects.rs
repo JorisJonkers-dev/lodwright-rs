@@ -316,6 +316,67 @@ mod tests {
         assert_eq!(alone.len(), 0);
     }
 
+    /// The reference with an enable parent (`XESP`: the parent's form id and a flags word).
+    fn with_enable_parent(mut r: Record) -> Record {
+        r = r.with_subrecord(*b"XESP", [0x34, 0x12, 0, 0, 0, 0, 0, 0].to_vec());
+        r
+    }
+
+    #[test]
+    fn an_initially_disabled_reference_with_an_enable_parent_is_left_out_like_one_without() {
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![
+                with_enable_parent(refr(0x200, 0x100, INITIALLY_DISABLED, 1.0)),
+                refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                refr(0x202, 0x100, 0, 3.0),
+            ],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].reference, 0x202);
+    }
+
+    #[test]
+    fn a_persistent_disabled_reference_with_an_enable_parent_is_kept() {
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![with_enable_parent(refr(
+                0x200,
+                0x100,
+                INITIALLY_DISABLED | PERSISTENT,
+                1.0,
+            ))],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+    }
+
+    #[test]
+    fn a_later_plugin_that_disables_an_enabled_reference_takes_it_out() {
+        let base = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
+            vec![refr(0x200, 0x100, 0, 1.0)],
+        );
+        let patch = plugin(
+            &["Base.esm"],
+            vec![],
+            vec![refr(0x200, 0x100, INITIALLY_DISABLED, 1.0)],
+        );
+        let plugins = vec![
+            ("Base.esm".to_owned(), base),
+            ("Patch.esp".to_owned(), patch),
+        ];
+        assert_eq!(visible_instances(&plugins, 0x0000_0A00).unwrap().len(), 0);
+        assert_eq!(
+            visible_instances(&plugins[..1], 0x0000_0A00).unwrap().len(),
+            1
+        );
+    }
+
     #[test]
     fn a_reference_deleted_by_a_later_plugin_drops_out_and_a_third_plugin_can_place_it_again() {
         let base = plugin(

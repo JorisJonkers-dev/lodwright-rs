@@ -865,6 +865,95 @@ fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_it
     assert_eq!((triangles, shapes), (120_000, 2));
 }
 
+/// The segment table at the end of a block's shape: the triangle count of each of its segments.
+fn segment_counts(shape: &[u8]) -> Vec<u32> {
+    // the table is a count, then per segment a flag byte, a start and a triangle count; it ends the shape
+    let word = |at: usize| u32::from_le_bytes(shape[at..at + 4].try_into().unwrap());
+    let mut count = 0_usize;
+    for n in 1..=16_usize {
+        let at = shape.len() - 9 * n - 4;
+        if word(at) as usize == n {
+            count = n;
+            break;
+        }
+    }
+    assert!(count > 0, "no segment table at the end of the shape");
+    let first = shape.len() - 9 * count;
+    (0..count).map(|k| word(first + 9 * k + 5)).collect()
+}
+
+#[test]
+fn a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its_texture_set() {
+    // 40 objects of 3000 triangles: two shapes. Twenty stand in cell 0 of the block and twenty in the next cell east,
+    // so the triangles of the shapes together fill segment 0 and segment 4 and no other
+    let out = temp("shapes-segments");
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model_tris(
+            "Data\\Textures\\a\\wall.dds",
+            av(vec![]),
+            av(vec![3]),
+            vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            3000,
+        ),
+    );
+    m.insert("textures/a/wall.dds".to_owned(), texture(128, 200));
+    let list: Vec<Instance> = (0..40_u32)
+        .map(|k| {
+            let cell_offset = if k < 20 { 0.0 } else { 4096.0 };
+            instance(
+                "a\\Wall.nif",
+                100.0 + cell_offset + f32::from(u16::try_from(k).unwrap()),
+                100.0,
+                0.0,
+                k + 1,
+                false,
+            )
+        })
+        .collect();
+    let report = generate_objects("Mojave", &list, &Memory(m), &out).unwrap();
+    assert_eq!((report.instances, report.skipped), (40, 0));
+    let block = read_block(
+        &out,
+        "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif",
+    );
+    let shapes: Vec<usize> = (0..block.blocks.len())
+        .filter(|&k| matches!(block.blocks[k].body, Body::TriShapeData(_)))
+        .collect();
+    assert_eq!(shapes.len(), 2);
+    let mut per_segment = vec![0_u32; 16];
+    for data in shapes {
+        // blocks per shape: the shape, its lighting property, its texture set, its data
+        let Body::Opaque(shape) = &block.blocks[data - 3].body else {
+            panic!("shape");
+        };
+        let Body::Opaque(set) = &block.blocks[data - 1].body else {
+            panic!("texture set");
+        };
+        assert!(
+            String::from_utf8_lossy(set).contains("Mojave.Buildings.dds"),
+            "every shape names the atlas"
+        );
+        let Body::TriShapeData(d) = &block.blocks[data].body else {
+            unreachable!();
+        };
+        let counts = segment_counts(shape);
+        assert_eq!(
+            counts.iter().sum::<u32>() as usize,
+            d.triangles.as_ref().unwrap().len(),
+            "the segments of a shape cover its triangles"
+        );
+        for (k, n) in counts.iter().enumerate() {
+            per_segment[k] += n;
+        }
+    }
+    let mut expected = vec![0_u32; 16];
+    expected[0] = 60_000;
+    expected[4] = 60_000;
+    assert_eq!(per_segment, expected);
+}
+
 #[test]
 fn textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its_own_shape() {
     // with atlases of at most 2048 by 2048, four textures of 1024 by 1024 fill the first; the fifth goes on a second

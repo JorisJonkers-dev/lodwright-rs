@@ -21,6 +21,7 @@ mod diffuse;
 mod error;
 mod filter;
 mod images;
+mod landmarks;
 mod lodmodel;
 mod objects;
 mod outline;
@@ -38,6 +39,9 @@ pub use error::GenError;
 pub use filter::{filter_instances, glob};
 pub use images::{
     ShippedPatch, diffuse_image, normal_image, normal_image_with_alpha, patch_image, specular_alpha,
+};
+pub use landmarks::{
+    ExpectedGeometry, Hit, MATCH_FRACTION, Presence, WrittenWorld, expected_geometry,
 };
 pub use lodmodel::{Part, parse_lod_model};
 pub use objects::{

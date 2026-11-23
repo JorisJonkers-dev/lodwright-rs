@@ -83,7 +83,7 @@ fn unsupported(version: &str) -> ResultDoc {
     doc
 }
 
-fn read_request(file: &Path) -> Result<Request, Failure> {
+pub(crate) fn read_request(file: &Path) -> Result<Request, Failure> {
     let bytes = std::fs::read(file).map_err(|e| {
         Failure::new("request_unreadable", "cannot read the request").with_detail(e.to_string())
     })?;

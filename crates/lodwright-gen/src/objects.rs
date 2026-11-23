@@ -68,12 +68,12 @@ pub struct Surfaces<'a> {
     pub plugins: &'a [String],
 }
 
-type Mat = [[f32; 3]; 3];
+pub(crate) type Mat = [[f32; 3]; 3];
 
 // source: game-object-rotation
 /// The rotation of a reference: the matrix is Rx(-x) * Ry(-y) * Rz(-z) with the usual right-handed axis rotations,
 /// which is what places a LOD model's vertices where the game's own blocks have them.
-fn euler(rot: [f32; 3]) -> Mat {
+pub(crate) fn euler(rot: [f32; 3]) -> Mat {
     let (sx, cx) = (-rot[0]).sin_cos();
     let (sy, cy) = (-rot[1]).sin_cos();
     let (sz, cz) = (-rot[2]).sin_cos();
@@ -84,7 +84,7 @@ fn euler(rot: [f32; 3]) -> Mat {
     ]
 }
 
-fn turn(m: &Mat, v: [f32; 3]) -> [f32; 3] {
+pub(crate) fn turn(m: &Mat, v: [f32; 3]) -> [f32; 3] {
     [
         m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
         m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
@@ -103,7 +103,7 @@ fn full_model_path(model: &str) -> String {
     format!("meshes/{m}")
 }
 
-fn lod_model_path(model: &str) -> String {
+pub(crate) fn lod_model_path(model: &str) -> String {
     let m = norm_key(model);
     let m = m.strip_prefix("meshes/").unwrap_or(&m);
     let stem = m.strip_suffix(".nif").unwrap_or(m);
@@ -214,7 +214,7 @@ struct Merged {
 // source: game-object-block-cell
 /// The cell an instance counts in for its block: the cell that holds a temporary reference, else the cell under
 /// its position.
-fn cell_of(i: &Instance) -> (i32, i32) {
+pub(crate) fn cell_of(i: &Instance) -> (i32, i32) {
     i.cell.unwrap_or_else(|| {
         let cell = |v: f32| (v / CELL_UNITS).floor() as i32;
         (cell(i.placement.pos[0]), cell(i.placement.pos[1]))

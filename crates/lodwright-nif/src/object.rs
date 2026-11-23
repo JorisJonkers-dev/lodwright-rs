@@ -285,6 +285,118 @@ fn shape_blocks(block: &ObjectBlock<'_>, first: i32) -> Result<(Vec<Body>, [f32;
     ))
 }
 
+/// One shape of an object block as a reader sees it: where the block puts it, what it draws with and which
+/// triangles belong to which cell segment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectShape {
+    /// The shape's translation: the south-west corner of the block; the vertices are relative to it.
+    pub origin: [f32; 3],
+    /// The diffuse texture path of the shape's texture set (as written, any case).
+    pub texture: String,
+    /// The normal texture path of the shape's texture set.
+    pub normal_texture: String,
+    /// Vertex positions relative to the origin.
+    pub vertices: Vec<[f32; 3]>,
+    /// Triangles, stored in segment order.
+    pub triangles: Vec<[u16; 3]>,
+    /// The triangle count of each entry of the segment table (the table ends at the last used segment).
+    pub segment_triangles: Vec<u32>,
+}
+
+fn word(bytes: &[u8], at: usize) -> Option<i32> {
+    Some(i32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
+}
+
+fn block_ref(bytes: &[u8], at: usize) -> Option<usize> {
+    usize::try_from(word(bytes, at)?).ok()
+}
+
+/// Read the shapes of an object block: the shapes under the root node, each with its own lighting property,
+/// texture set and data, as [`object_block_shapes`] writes them (the references are followed, not assumed).
+///
+/// # Errors
+/// [`NifError::Inconsistent`] when the file is not laid out like an object block.
+pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
+    const BAD: NifError = NifError::Inconsistent("not an object block");
+    let Some(Body::Opaque(root)) = file.blocks.first().map(|b| &b.body) else {
+        return Err(BAD);
+    };
+    let count = file
+        .blocks
+        .iter()
+        .filter(|b| matches!(b.body, Body::TriShapeData(_)))
+        .count();
+    // the root node ends with its children, an empty effect list and the multibound reference
+    let children = root.len().checked_sub(8 + 4 * count).ok_or(BAD)?;
+    if block_ref(root, children.checked_sub(4).ok_or(BAD)?) != Some(count) {
+        return Err(BAD);
+    }
+    let mut shapes = Vec::with_capacity(count);
+    for k in 0..count {
+        let shape = block_ref(root, children + 4 * k).ok_or(BAD)?;
+        let Some(Body::Opaque(shape_bytes)) = file.blocks.get(shape).map(|b| &b.body) else {
+            return Err(BAD);
+        };
+        // name, extra data list, controller, flags (u32), translation, rotation, scale, then the property list
+        let props = 4 + 4 + 4 + 4 + 12 + 36 + 4;
+        let lighting = block_ref(shape_bytes, props + 4).ok_or(BAD)?;
+        let data = block_ref(shape_bytes, props + 12).ok_or(BAD)?;
+        let Some(Body::Opaque(lighting_bytes)) = file.blocks.get(lighting).map(|b| &b.body) else {
+            return Err(BAD);
+        };
+        let set = block_ref(lighting_bytes, TEXTURE_SET_REF).ok_or(BAD)?;
+        let Some(Body::Opaque(set_bytes)) = file.blocks.get(set).map(|b| &b.body) else {
+            return Err(BAD);
+        };
+        let Some(Body::TriShapeData(d)) = file.blocks.get(data).map(|b| &b.body) else {
+            return Err(BAD);
+        };
+        let mut at = 4;
+        let mut paths = Vec::with_capacity(2);
+        for _ in 0..2 {
+            let len = block_ref(set_bytes, at).ok_or(BAD)?;
+            let text = set_bytes.get(at + 4..at + 4 + len).ok_or(BAD)?;
+            paths.push(String::from_utf8_lossy(text).into_owned());
+            at += 4 + len;
+        }
+        let f = |n: usize| -> Option<f32> {
+            Some(f32::from_le_bytes(
+                shape_bytes.get(16 + 4 * n..20 + 4 * n)?.try_into().ok()?,
+            ))
+        };
+        let origin = [f(0).ok_or(BAD)?, f(1).ok_or(BAD)?, f(2).ok_or(BAD)?];
+        // the segment table ends the shape: a count, then per segment a flag byte, a start and a triangle count. The
+        // shape before it has a fixed length, which tells the count (a word that merely equals a smaller count
+        // somewhere in the table must not be taken for it)
+        let segments = {
+            let body = Body::TriShape(tri_shape_for_object((0.0, 0.0), 0))
+                .write(crate::block::Profile {
+                    user_version: 11,
+                    user_version2: 34,
+                })?
+                .len();
+            let table = shape_bytes.len().checked_sub(body + 4).ok_or(BAD)?;
+            if table % 9 != 0 || block_ref(shape_bytes, body) != Some(table / 9) {
+                return Err(BAD);
+            }
+            (0..table / 9)
+                .map(|e| word(shape_bytes, body + 4 + 9 * e + 5).map(i32::cast_unsigned))
+                .collect::<Option<Vec<u32>>>()
+                .ok_or(BAD)?
+        };
+        let mut paths = paths.into_iter();
+        shapes.push(ObjectShape {
+            origin,
+            texture: paths.next().unwrap_or_default(),
+            normal_texture: paths.next().unwrap_or_default(),
+            vertices: d.geometry.vertices.clone().ok_or(BAD)?,
+            triangles: d.triangles.clone().ok_or(BAD)?,
+            segment_triangles: segments,
+        });
+    }
+    Ok(shapes)
+}
+
 #[cfg(test)]
 #[allow(clippy::many_single_char_names)]
 mod tests {
@@ -469,6 +581,75 @@ mod shapes_tests {
                 String::from_utf8_lossy(textures)
             );
         }
+    }
+
+    #[test]
+    fn a_reader_returns_each_shape_with_its_texture_triangles_and_segments() {
+        let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let t = vec![[1.0, 0.0, 0.0]; 3];
+        let b = vec![[0.0, 1.0, 0.0]; 3];
+        let i = vec![0_u16, 1, 2];
+        let page = |textures: [&'static str; 2], segment: usize| {
+            let mut seg = [0; SEGMENTS];
+            seg[segment] = 1;
+            ObjectBlock {
+                origin: (4096.0, -8192.0),
+                vertices: &v,
+                normals: &n,
+                tangents: &t,
+                bitangents: &b,
+                uv: &uv,
+                indices: &i,
+                segment_triangles: seg,
+                textures,
+            }
+        };
+        let file = object_block_shapes(&[
+            page(["Data\\a.dds", "Data\\a_n.dds"], 2),
+            page(["Data\\a01.dds", "Data\\a01_n.dds"], 5),
+        ])
+        .unwrap();
+        let back = NifFile::read(&file.write().unwrap()).unwrap();
+        let shapes = super::read_object_shapes(&back).unwrap();
+        assert_eq!(shapes.len(), 2);
+        assert_eq!(shapes[0].texture, "Data\\a.dds");
+        assert_eq!(shapes[1].texture, "Data\\a01.dds");
+        assert_eq!(shapes[1].normal_texture, "Data\\a01_n.dds");
+        assert_eq!(shapes[0].origin, [4096.0, -8192.0, 0.0]);
+        assert_eq!(shapes[0].vertices, v);
+        assert_eq!(shapes[0].triangles, vec![[0, 1, 2]]);
+        assert_eq!(shapes[0].segment_triangles, vec![0, 0, 1]);
+        assert_eq!(shapes[1].segment_triangles, vec![0, 0, 0, 0, 0, 1]);
+    }
+
+    #[test]
+    fn a_long_segment_table_is_read_whole_even_when_a_word_in_it_looks_like_a_smaller_count() {
+        let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let t = vec![[1.0, 0.0, 0.0]; 3];
+        let b = vec![[0.0, 1.0, 0.0]; 3];
+        // 15 triangles, one in each of the first fifteen segments: every count word is 1, as a table count of 1 is
+        let indices: Vec<u16> = (0..15).flat_map(|_| [0_u16, 1, 2]).collect();
+        let mut seg = [1; SEGMENTS];
+        seg[15] = 0;
+        let file = object_block_shapes(&[ObjectBlock {
+            origin: (0.0, 0.0),
+            vertices: &v,
+            normals: &n,
+            tangents: &t,
+            bitangents: &b,
+            uv: &uv,
+            indices: &indices,
+            segment_triangles: seg,
+            textures: ["Data\\a.dds", "Data\\a_n.dds"],
+        }])
+        .unwrap();
+        let back = NifFile::read(&file.write().unwrap()).unwrap();
+        let shapes = super::read_object_shapes(&back).unwrap();
+        assert_eq!(shapes[0].segment_triangles, vec![1; 15]);
     }
 
     #[test]

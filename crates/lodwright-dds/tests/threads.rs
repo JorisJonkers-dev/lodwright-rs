@@ -14,7 +14,7 @@ fn picture(width: u32, height: u32) -> Image {
             let edge = if (x / 7 + y / 5) % 2 == 0 { 220 } else { 30 };
             px.extend_from_slice(&[
                 edge,
-                (x * 255 / width.max(1)) as u8,
+                u8::try_from(x * 255 / width.max(1)).unwrap_or(255),
                 noise,
                 if x < width / 8 && y < height / 8 {
                     0

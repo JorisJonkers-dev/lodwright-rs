@@ -25,11 +25,28 @@ was using at the same time (load average about 10: wall times vary by a third be
 | peak resident memory | 3.5 GiB | 4.2 GiB |
 
 `terrain.blocks` is the largest step (about 80 percent of a plain run, 56 percent of a modded one). It is limited by
-the thread count: by default at most four threads work, however many cores there are. `objects.atlas` is the second:
-one thread encodes the atlas pages (BC3), and the modded load order has pages of many megabytes.
+the thread count. Since 0.16 every core works by default (`limits.threads` and `--threads` lower it), bounded by a memory budget (below). `objects.atlas` is the second:
+the atlas pages are encoded on several threads (since 0.17 in bands of block rows, with identical bytes); before that one thread encoded them, and the modded load order has pages of many megabytes.
 
 ## Guard
 
 `crates/lodwright-api/tests/step_bench.rs` times the terrain block step on a synthetic world and the atlas encode on a
 synthetic page, each against a fixed calibration loop in the same process, and fails when a ratio is four times its
 recorded value. It runs with `task bench` (a release build; an ordinary `cargo test` ignores it).
+
+## Threads and memory
+
+A request that names no thread count uses every core. A request that names no `limits.memory_mib` is held to three
+quarters of the machine's physical memory (`MemTotal`; read on Linux only, elsewhere no default budget): the terrain
+step then lowers its workers until the process, the world's height rasters and one block's textures per worker fit.
+A 16 GiB machine therefore keeps 4 GiB for the rest of the system. An explicit `limits.memory_mib` replaces the default.
+The output files are byte-identical for any thread count; only `manifest.json` differs, because its `request_digest`
+covers the request including `limits.threads`.
+
+Measured 2026-11-23, 16 thread machine shared with other work (wall seconds, peak resident GiB, all worlds):
+
+| threads | plain game | modded, 133 plugins |
+| --- | ---: | ---: |
+| 1 | 359 s, 3.38 GiB | 429 s, 3.44 GiB |
+| 4 (the old default) | 123 s, 3.43 GiB | 169 s, 3.50 GiB |
+| 16 (the new default) | 84 s, 3.64 GiB | 140 s, 3.70 GiB |

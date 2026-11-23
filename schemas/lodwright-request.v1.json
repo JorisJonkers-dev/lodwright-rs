@@ -193,7 +193,7 @@
           "minimum": 0
         },
         "threads": {
-          "description": "Worker threads; omitted means the machine decides (at most four).",
+          "description": "Worker threads; omitted means every core of the machine.",
           "type": [
             "integer",
             "null"

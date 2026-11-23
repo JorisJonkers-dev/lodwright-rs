@@ -645,3 +645,40 @@ fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_
             .any(|f| f.path == lodwright_contract::WARNINGS_FILE)
     );
 }
+
+/// Every file of `out` except the manifest (whose request digest covers the thread limit), with its bytes.
+fn output_bytes(out: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+    files_on_disk(out)
+        .into_iter()
+        .filter(|f| f != MANIFEST_FILE)
+        .map(|f| {
+            let bytes = std::fs::read(out.join(&f)).unwrap();
+            (f, bytes)
+        })
+        .collect()
+}
+
+#[test]
+fn the_output_files_are_the_same_bytes_at_any_thread_count() {
+    let mut runs = Vec::new();
+    for threads in [1u32, 4, 16] {
+        let (mut terrain, out_t) = job(&format!("det-t{threads}"));
+        terrain.request.limits.threads = Some(threads);
+        done(generate(&terrain, &mut NoProgress, &CancelToken::new()).unwrap());
+        let (mut far, out_f) = far_model_job(&format!("det-f{threads}"));
+        far.request.limits.threads = Some(threads);
+        done(generate(&far, &mut NoProgress, &CancelToken::new()).unwrap());
+        runs.push((output_bytes(&out_t), output_bytes(&out_f)));
+    }
+    assert!(!runs[0].0.is_empty() && !runs[0].1.is_empty());
+    for run in &runs[1..] {
+        assert_eq!(
+            run.0, runs[0].0,
+            "terrain output differs with the thread count"
+        );
+        assert_eq!(
+            run.1, runs[0].1,
+            "object output differs with the thread count"
+        );
+    }
+}

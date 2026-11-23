@@ -305,3 +305,67 @@ fn objects_on_a_second_atlas_page_are_drawn_with_their_own_texture() {
         );
     }
 }
+
+#[test]
+fn the_thread_count_does_not_change_a_byte_of_the_object_files() {
+    // five 1024 pixel textures on atlases of at most 2048: two pages, each large enough to be encoded in bands
+    let run = |threads: usize| {
+        let out = std::env::temp_dir().join(format!(
+            "lodwright-atlas-threads-{}-{threads}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&out);
+        let mut m = HashMap::new();
+        let mut list = Vec::new();
+        for k in 0..5_u8 {
+            m.insert(
+                format!("meshes/a/wall{k}_lod.nif"),
+                lod_model(&format!("Data\\Textures\\a\\wall{k}.dds")),
+            );
+            m.insert(
+                format!("textures/a/wall{k}.dds"),
+                texture(1024, 40 + 40 * k),
+            );
+            list.push(instance(
+                &format!("a\\Wall{k}.nif"),
+                100.0 + f32::from(k),
+                u32::from(k) + 1,
+            ));
+        }
+        generate_objects_with_atlas_limit(
+            "Mojave",
+            &list,
+            &Memory(m),
+            &out,
+            Surfaces {
+                threads,
+                ..Surfaces::default()
+            },
+            (2048, 2048),
+            &mut |_, _| {},
+        )
+        .unwrap();
+        let mut files = Vec::new();
+        let mut stack = vec![out.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    files.push((
+                        path.strip_prefix(&out).unwrap().to_path_buf(),
+                        std::fs::read(&path).unwrap(),
+                    ));
+                }
+            }
+        }
+        files.sort();
+        let _ = std::fs::remove_dir_all(&out);
+        files
+    };
+    let one = run(1);
+    assert!(one.len() >= 5);
+    assert_eq!(run(4), one);
+    assert_eq!(run(16), one);
+}

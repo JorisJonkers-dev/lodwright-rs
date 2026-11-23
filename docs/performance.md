@@ -26,7 +26,7 @@ was using at the same time (load average about 10: wall times vary by a third be
 
 `terrain.blocks` is the largest step (about 80 percent of a plain run, 56 percent of a modded one). It is limited by
 the thread count. Since 0.16 every core works by default (`limits.threads` and `--threads` lower it), bounded by a memory budget (below). `objects.atlas` is the second:
-one thread encodes the atlas pages (BC3), and the modded load order has pages of many megabytes.
+the atlas pages are encoded on several threads (since 0.17 in bands of block rows, with identical bytes); before that one thread encoded them, and the modded load order has pages of many megabytes.
 
 ## Guard
 

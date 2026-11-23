@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.3](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.2...v0.16.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **pack:** write an override marker beside the packed archive ([#400](https://github.com/JorisJonkers-dev/lodwright-rs/issues/400)) ([f0e334f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/f0e334fd83a463cbbc0e74cd68ed387d3b6d7225))
+
 ## [0.16.2](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.1...v0.16.2) (2026-11-23)
 
 

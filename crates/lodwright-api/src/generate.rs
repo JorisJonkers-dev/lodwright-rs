@@ -752,6 +752,7 @@ pub fn generate(
                 grid_anchor: anchor,
                 plugins: &request.plugins,
                 phase: Some(&phase),
+                threads,
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

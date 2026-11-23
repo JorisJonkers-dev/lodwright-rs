@@ -865,23 +865,6 @@ fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_it
     assert_eq!((triangles, shapes), (120_000, 2));
 }
 
-/// The segment table at the end of a block's shape: the triangle count of each of its segments.
-fn segment_counts(shape: &[u8]) -> Vec<u32> {
-    // the table is a count, then per segment a flag byte, a start and a triangle count; it ends the shape
-    let word = |at: usize| u32::from_le_bytes(shape[at..at + 4].try_into().unwrap());
-    let mut count = 0_usize;
-    for n in 1..=16_usize {
-        let at = shape.len() - 9 * n - 4;
-        if word(at) as usize == n {
-            count = n;
-            break;
-        }
-    }
-    assert!(count > 0, "no segment table at the end of the shape");
-    let first = shape.len() - 9 * count;
-    (0..count).map(|k| word(first + 9 * k + 5)).collect()
-}
-
 #[test]
 fn a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its_texture_set() {
     // 40 objects of 3000 triangles: two shapes. Twenty stand in cell 0 of the block and twenty in the next cell east,
@@ -918,33 +901,21 @@ fn a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its
         &out,
         "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif",
     );
-    let shapes: Vec<usize> = (0..block.blocks.len())
-        .filter(|&k| matches!(block.blocks[k].body, Body::TriShapeData(_)))
-        .collect();
+    let shapes = lodwright_nif::read_object_shapes(&block).unwrap();
     assert_eq!(shapes.len(), 2);
     let mut per_segment = vec![0_u32; 16];
-    for data in shapes {
-        // blocks per shape: the shape, its lighting property, its texture set, its data
-        let Body::Opaque(shape) = &block.blocks[data - 3].body else {
-            panic!("shape");
-        };
-        let Body::Opaque(set) = &block.blocks[data - 1].body else {
-            panic!("texture set");
-        };
+    for shape in &shapes {
         assert!(
-            String::from_utf8_lossy(set).contains("Mojave.Buildings.dds"),
-            "every shape names the atlas"
+            shape.texture.contains("Mojave.Buildings.dds"),
+            "every shape names the atlas, not {}",
+            shape.texture
         );
-        let Body::TriShapeData(d) = &block.blocks[data].body else {
-            unreachable!();
-        };
-        let counts = segment_counts(shape);
         assert_eq!(
-            counts.iter().sum::<u32>() as usize,
-            d.triangles.as_ref().unwrap().len(),
+            shape.segment_triangles.iter().sum::<u32>() as usize,
+            shape.triangles.len(),
             "the segments of a shape cover its triangles"
         );
-        for (k, n) in counts.iter().enumerate() {
+        for (k, n) in shape.segment_triangles.iter().enumerate() {
             per_segment[k] += n;
         }
     }
@@ -1226,4 +1197,141 @@ fn a_lod_model_with_bytes_after_its_footer_is_read_and_its_objects_are_drawn() {
         "{:?}",
         report.records
     );
+}
+
+// ---- the landmark presence check: where did an object go ----
+
+fn find_in(out: &std::path::Path, i: &Instance) -> lodwright_gen::Presence {
+    let expected = lodwright_gen::expected_geometry(i, &assets()).unwrap();
+    lodwright_gen::WrittenWorld::open(out, "Mojave")
+        .unwrap()
+        .find(&expected)
+}
+
+#[test]
+fn a_written_object_is_found_with_its_block_shape_texture_and_cell_segment() {
+    let out = temp("landmark-found");
+    // two objects 100 units apart in the same cell, one turned and scaled, and one in the next cell east
+    let near = instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false);
+    let turned = instance("a\\Wall.nif", 300.0, 100.0, 1.0, 2, false);
+    let east = instance("a\\Wall.nif", 4096.0 + 100.0, 100.0, 0.0, 3, false);
+    let list = [near.clone(), turned.clone(), east.clone()];
+    generate_objects("Mojave", &list, &assets(), &out).unwrap();
+    for (i, segment) in [(&near, 0), (&turned, 0), (&east, 4)] {
+        let found = find_in(&out, i);
+        assert!(found.written(), "reference {}: {found:?}", i.reference);
+        assert_eq!(found.matched_vertices, found.expected_vertices);
+        assert_eq!(found.hits.len(), 1);
+        let hit = &found.hits[0];
+        assert!(
+            hit.file.ends_with("mojave.level4.x0.y0.nif"),
+            "{}",
+            hit.file
+        );
+        assert_eq!((hit.shape, hit.triangles), (0, 1));
+        assert!(hit.texture.to_ascii_lowercase().contains("buildings"));
+        assert_eq!(hit.segments, [segment]);
+        assert_eq!(hit.expected_segment, segment);
+    }
+}
+
+#[test]
+fn an_object_that_is_not_in_the_blocks_is_not_found_though_another_stands_in_its_box() {
+    let out = temp("landmark-missing");
+    let written = instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false);
+    // the same model 150 units east: its box overlaps the written object's, its vertices are not there
+    let absent = instance("a\\Wall.nif", 250.0, 100.0, 0.0, 2, false);
+    generate_objects("Mojave", std::slice::from_ref(&written), &assets(), &out).unwrap();
+    assert!(find_in(&out, &written).written());
+    let found = find_in(&out, &absent);
+    assert!(!found.written(), "{found:?}");
+    assert_eq!(found.matched_vertices, 0);
+    assert_eq!(found.hits.len(), 0);
+}
+
+#[test]
+fn an_object_whose_far_model_is_missing_has_no_expected_geometry() {
+    let i = instance("a\\Gone.nif", 0.0, 0.0, 0.0, 1, false);
+    let err = lodwright_gen::expected_geometry(&i, &assets()).unwrap_err();
+    assert!(err.contains("no far model meshes/a/gone_lod.nif"), "{err}");
+}
+
+#[test]
+fn an_object_on_a_second_atlas_page_is_found_in_the_shape_of_that_page() {
+    let out = temp("landmark-pages");
+    let mut m = HashMap::new();
+    let mut list = Vec::new();
+    for k in 0..5_u8 {
+        m.insert(
+            format!("meshes/a/wall{k}_lod.nif"),
+            lod_model(&format!("Data\\Textures\\a\\wall{k}.dds")),
+        );
+        m.insert(
+            format!("textures/a/wall{k}.dds"),
+            texture(1024, 40 + 40 * k),
+        );
+        list.push(instance(
+            &format!("a\\Wall{k}.nif"),
+            100.0 + f32::from(k) * 300.0,
+            100.0,
+            0.0,
+            u32::from(k) + 1,
+            false,
+        ));
+    }
+    let assets = Memory(m);
+    generate_objects_with_atlas_limit(
+        "Mojave",
+        &list,
+        &assets,
+        &out,
+        Surfaces::default(),
+        (2048, 2048),
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let mut world = lodwright_gen::WrittenWorld::open(&out, "Mojave").unwrap();
+    for (k, i) in list.iter().enumerate() {
+        let found = world.find(&lodwright_gen::expected_geometry(i, &assets).unwrap());
+        assert!(found.written(), "wall {k}: {found:?}");
+        let page = if k < 4 {
+            "buildings.dds"
+        } else {
+            "buildings01.dds"
+        };
+        assert!(
+            found.hits[0].texture.to_ascii_lowercase().ends_with(page),
+            "wall {k} draws with {}",
+            found.hits[0].texture
+        );
+    }
+}
+
+#[test]
+fn an_object_in_the_last_cell_of_a_block_is_found_in_the_last_segment() {
+    let out = temp("landmark-last-segment");
+    // one object in each of the sixteen cells of block x0 y0: every segment of the table is used
+    let list: Vec<Instance> = (0..16_u32)
+        .map(|k| {
+            let (cx, cy) = (
+                f32::from(u8::try_from(k / 4).unwrap()),
+                f32::from(u8::try_from(k % 4).unwrap()),
+            );
+            instance(
+                "a\\Wall.nif",
+                4096.0 * cx + 100.0,
+                4096.0 * cy + 100.0,
+                0.0,
+                k + 1,
+                false,
+            )
+        })
+        .collect();
+    generate_objects("Mojave", &list, &assets(), &out).unwrap();
+    for (k, i) in list.iter().enumerate() {
+        let found = find_in(&out, i);
+        assert!(found.written(), "cell {k}: {found:?}");
+        assert_eq!(found.hits[0].segments, [k], "cell {k}");
+        assert_eq!(found.hits[0].expected_segment, k);
+    }
 }

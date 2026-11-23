@@ -1,0 +1,8 @@
+# synthetic landmarks for tests/landmarks.rs: name, world, model, place, note (tab separated)
+Wall West	Island	arch\wall.nif	ref:00000C00	stands
+Wall East	Island	-	ref:00000C01
+Hidden Wall	Island	arch\wall.nif	ref:00000C02	initially disabled
+Plain Wall	Island	arch\wall.nif	pos:100,100,1000
+Empty Spot	Island	arch\wall.nif	pos:2500,100,1000
+No Far Model	Island	-	ref:00000C03
+Gone	Island	-	ref:00000999

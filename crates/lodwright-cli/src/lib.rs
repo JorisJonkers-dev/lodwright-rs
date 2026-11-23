@@ -21,6 +21,7 @@ mod commands;
 mod failure;
 mod generate;
 mod known;
+mod landmarks;
 mod options;
 mod probe;
 
@@ -46,6 +47,8 @@ Usage: lodwright [--help | --version [--json]]
                       [--json] [--schema-version N]
        lodwright generate --request FILE [--allow-in-repo] [--overwrite] [--events FILE|-] [--json]
        lodwright verify <folder> [--reference <folder> [--water-iou X] [--height-tolerance U] [--known-differences FILE]] [--allow-in-repo] [--json]
+       lodwright landmarks --request FILE --landmarks FILE [--output DIR] [--baseline FILE] [--write-baseline FILE]
+                      [--allowed-drop X] [--json]
        lodwright schema <plan|result|request|manifest|verify|events|defaults|bands> [--schema-version N]
        lodwright contracts --json
        lodwright defaults --json
@@ -72,6 +75,9 @@ Commands:
                         --water-iou X a terrain block whose water IoU is under X is a difference; the terrain
                         height of each block is compared too (largest and mean difference in game units), and
                         with --height-tolerance U a block whose largest difference is over U is a difference
+  landmarks             look named landmarks (a tab separated file of references or positions with their models) up in a
+                        generated output: written or not, in which block, shape (texture) and cell segment; --baseline
+                        compares with a saved report and exits 1 when a landmark that was written is gone
   schema                print the JSON Schema of a document: plan, result, request, manifest, verify, events
                         (one progress event line), defaults or bands
   contracts --json      print the contracts this build speaks and their schema versions, as
@@ -127,6 +133,7 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
         ["schema", rest @ ..] => schema_command(rest, out, err),
         ["heightmap", rest @ ..] => heightmap_command(rest, out, err),
         ["verify", rest @ ..] => verify_command(rest, out, err),
+        ["landmarks", rest @ ..] => landmarks::command(rest, out, err),
         ["probe", rest @ ..] => match probe::run(rest, out) {
             Ok(()) => EXIT_OK,
             Err(probe::Outcome::Usage(problem)) => usage(err, &problem),

@@ -26,6 +26,7 @@ mod budget;
 mod defaults;
 mod error;
 mod generate;
+pub mod landmarks;
 pub mod load;
 mod pack;
 mod progress;

@@ -84,8 +84,79 @@ type Ref = (u32, u32, Placement, usize, Option<(i32, i32)>);
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
-#[allow(clippy::too_many_lines)] // one pass over the load order, then one over the references
 pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec<Instance>, Error> {
+    Ok(gather(plugins, world, true, false, &|base, flags| {
+        base.flags & VISIBLE_WHEN_DISTANT != 0 || flags & VISIBLE_WHEN_DISTANT != 0
+    })?
+    .into_iter()
+    .map(|(instance, _, _)| instance)
+    .collect())
+}
+
+/// A reference with the flags of its winning record, for reports.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Candidate {
+    /// The reference as generation sees it.
+    pub instance: Instance,
+    /// The flags of the reference record that won the load order.
+    pub flags: u32,
+    /// The flags of its base object.
+    pub base_flags: u32,
+}
+
+impl Candidate {
+    /// Whether generation would take this reference: something marks it visible from far, and it is not initially
+    /// disabled unless it is persistent.
+    #[must_use]
+    pub fn is_drawn_by_rule(&self) -> bool {
+        (self.base_flags | self.flags) & VISIBLE_WHEN_DISTANT != 0
+            && (self.flags & INITIALLY_DISABLED == 0 || self.flags & PERSISTENT != 0)
+    }
+
+    /// Why generation leaves this reference out, or `None` when it takes it.
+    #[must_use]
+    pub fn left_out_because(&self) -> Option<&'static str> {
+        if (self.base_flags | self.flags) & VISIBLE_WHEN_DISTANT == 0 {
+            Some("not marked visible from far")
+        } else if self.flags & INITIALLY_DISABLED != 0 && self.flags & PERSISTENT == 0 {
+            Some("initially disabled")
+        } else {
+            None
+        }
+    }
+}
+
+/// Every reference of the world (absolute `FormID`) whose base object has a model, the winning record's flags
+/// with it, whether or not anything marks it visible from far, and initially disabled ones included; a static
+/// collection is not expanded into its parts. In the order the references first appear. For reports and checks,
+/// not for generation.
+///
+/// # Errors
+/// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+pub fn references_with_model(
+    plugins: &[(String, Plugin)],
+    world: u32,
+) -> Result<Vec<Candidate>, Error> {
+    Ok(
+        gather(plugins, world, false, true, &|base, _| base.model.is_some())?
+            .into_iter()
+            .map(|(instance, flags, base_flags)| Candidate {
+                instance,
+                flags,
+                base_flags,
+            })
+            .collect(),
+    )
+}
+
+#[allow(clippy::too_many_lines)] // one pass over the load order, then one over the references
+fn gather(
+    plugins: &[(String, Plugin)],
+    world: u32,
+    parts: bool,
+    keep_disabled: bool,
+    accept: &dyn Fn(&BaseObject, u32) -> bool,
+) -> Result<Vec<(Instance, u32, u32)>, Error> {
     let mut bases: HashMap<u32, (BaseObject, usize)> = HashMap::new();
     let mut refs: HashMap<u32, Ref> = HashMap::new();
     let mut order: Vec<u32> = Vec::new();
@@ -137,11 +208,11 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         let Some((base, base_plugin)) = bases.get(&base_id) else {
             continue;
         };
-        if base.flags & VISIBLE_WHEN_DISTANT == 0 && flags & VISIBLE_WHEN_DISTANT == 0 {
+        if !accept(base, flags) {
             continue;
         }
         // source: oracle-skips-initially-disabled, game-lod-object-rules-disabled-persistent
-        if flags & INITIALLY_DISABLED != 0 && flags & PERSISTENT == 0 {
+        if !keep_disabled && flags & INITIALLY_DISABLED != 0 && flags & PERSISTENT == 0 {
             continue;
         }
         let flagged_by = if base.flags & VISIBLE_WHEN_DISTANT != 0 {
@@ -152,22 +223,26 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         let high_priority = flags & HIGH_PRIORITY_LOD != 0;
         let has_tree_lod = base.flags & HAS_TREE_LOD != 0;
         if let Some(model) = &base.model {
-            out.push(Instance {
-                base: base_id,
-                signature: base.signature,
-                model: model.clone(),
-                placement,
-                high_priority,
-                has_tree_lod,
-                reference: id,
-                reference_plugin,
-                base_plugin: *base_plugin,
-                flagged_by,
-                part: false,
-                cell,
-            });
+            out.push((
+                Instance {
+                    base: base_id,
+                    signature: base.signature,
+                    model: model.clone(),
+                    placement,
+                    high_priority,
+                    has_tree_lod,
+                    reference: id,
+                    reference_plugin,
+                    base_plugin: *base_plugin,
+                    flagged_by,
+                    part: false,
+                    cell,
+                },
+                flags,
+                base.flags,
+            ));
         }
-        for (part_id, placements) in &base.parts {
+        for (part_id, placements) in base.parts.iter().filter(|_| parts) {
             let Some((part_base, part_plugin)) = bases.get(part_id) else {
                 continue;
             };
@@ -175,20 +250,24 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
                 continue;
             };
             for inner in placements {
-                out.push(Instance {
-                    base: *part_id,
-                    signature: *b"STAT",
-                    model: model.clone(),
-                    placement: compose(&placement, inner),
-                    high_priority,
-                    has_tree_lod,
-                    reference: id,
-                    reference_plugin,
-                    base_plugin: *part_plugin,
-                    flagged_by,
-                    part: true,
-                    cell,
-                });
+                out.push((
+                    Instance {
+                        base: *part_id,
+                        signature: *b"STAT",
+                        model: model.clone(),
+                        placement: compose(&placement, inner),
+                        high_priority,
+                        has_tree_lod,
+                        reference: id,
+                        reference_plugin,
+                        base_plugin: *part_plugin,
+                        flagged_by,
+                        part: true,
+                        cell,
+                    },
+                    flags,
+                    base.flags,
+                ));
             }
         }
     }
@@ -197,7 +276,10 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
 
 #[cfg(test)]
 mod tests {
-    use super::{INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT, visible_instances};
+    use super::{
+        INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT, references_with_model,
+        visible_instances,
+    };
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
 
@@ -374,6 +456,70 @@ mod tests {
         assert_eq!(
             visible_instances(&plugins[..1], 0x0000_0A00).unwrap().len(),
             1
+        );
+    }
+
+    #[test]
+    fn every_reference_with_a_model_is_listed_with_the_reason_it_is_left_out_or_none() {
+        let p = plugin(
+            &[],
+            vec![
+                stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT),
+                stat(0x101, "b.nif", 0),
+            ],
+            vec![
+                refr(0x200, 0x100, 0, 1.0),
+                refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                refr(0x203, 0x101, 0, 4.0),
+                refr(0x204, 0x101, VISIBLE_WHEN_DISTANT, 5.0),
+            ],
+        );
+        let listed = references_with_model(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let why: Vec<(u32, Option<&str>)> = listed
+            .iter()
+            .map(|c| (c.instance.reference, c.left_out_because()))
+            .collect();
+        assert_eq!(
+            why,
+            [
+                (0x200, None),
+                (0x201, Some("initially disabled")),
+                (0x202, None),
+                (0x203, Some("not marked visible from far")),
+                (0x204, None),
+            ]
+        );
+        // the report's view agrees with what generation takes
+        let taken: Vec<u32> = listed
+            .iter()
+            .filter(|c| c.is_drawn_by_rule())
+            .map(|c| c.instance.reference)
+            .collect();
+        let generated = visible_instances(
+            &[(
+                "A.esm".to_owned(),
+                plugin(
+                    &[],
+                    vec![
+                        stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT),
+                        stat(0x101, "b.nif", 0),
+                    ],
+                    vec![
+                        refr(0x200, 0x100, 0, 1.0),
+                        refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                        refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                        refr(0x203, 0x101, 0, 4.0),
+                        refr(0x204, 0x101, VISIBLE_WHEN_DISTANT, 5.0),
+                    ],
+                ),
+            )],
+            0x0000_0A00,
+        )
+        .unwrap();
+        assert_eq!(
+            taken,
+            generated.iter().map(|i| i.reference).collect::<Vec<_>>()
         );
     }
 

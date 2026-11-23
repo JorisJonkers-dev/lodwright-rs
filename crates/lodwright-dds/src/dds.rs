@@ -205,7 +205,9 @@ fn compress_rows(
     } else {
         pixels
     };
-    format.texpresso().compress(pixels, width, height, params, out);
+    format
+        .texpresso()
+        .compress(pixels, width, height, params, out);
 }
 
 /// Levels with fewer block rows than this are compressed on the calling thread: the cost of starting threads

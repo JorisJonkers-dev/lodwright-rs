@@ -730,9 +730,11 @@ pub fn generate_objects_with_atlas_limit(
             &diffuse_path,
             &encode_bc3(&diffuse_image, surfaces.threads)?,
         )?);
-        report
-            .files
-            .push(write_file(out, &normal_path, &encode_bc3(&normal_image, surfaces.threads)?)?);
+        report.files.push(write_file(
+            out,
+            &normal_path,
+            &encode_bc3(&normal_image, surfaces.threads)?,
+        )?);
     }
     // blocks
     phase("blocks");

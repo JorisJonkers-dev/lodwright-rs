@@ -16,7 +16,11 @@ fn picture(width: u32, height: u32) -> Image {
                 edge,
                 (x * 255 / width.max(1)) as u8,
                 noise,
-                if x < width / 8 && y < height / 8 { 0 } else { 255 },
+                if x < width / 8 && y < height / 8 {
+                    0
+                } else {
+                    255
+                },
             ]);
         }
     }

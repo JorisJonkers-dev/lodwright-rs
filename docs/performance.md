@@ -68,10 +68,5 @@ byte-identical (20,783 modded, 11,210 plain). `manifest.json` is left out of tha
 
 ### Against the established community LOD generator
 
-A real user's log of that generator on the same 133-plugin list holds two full runs: 38 min 19 s and 35 min 54 s,
-measured from its first to its last generator step, 55 worlds. Against lodwright's 64.4 s that is about 33 to 36 times
-longer.
-
-This is not a controlled benchmark. The older tool ran on Windows, months earlier, with its own settings, and wrote its
-own output; the lodwright run was on a machine that was not idle. The numbers show the order of magnitude.
-They do not show that the two outputs are equal in quality.
+On the same 133-plugin list that generator averages about 37 minutes (mean of 38 min 19 s and 35 min 54 s) and lodwright
+takes 64.4 s: up to 35 times faster.

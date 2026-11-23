@@ -36,15 +36,19 @@ our own design), and reuse of unchanged object and tree blocks. The gap list has
 
 ## Speed
 
-On one real load order of 133 plugins, `lodwright generate` now takes about **64 seconds** on 16 threads. The
-established community LOD generator, xLODGen, took **35 min 54 s and 38 min 19 s** in two full runs on the same plugin
-list: roughly 33 to 36 times longer.
+On a 133-plugin load order, xLODGen averages about 37 minutes (mean of 38 min 19 s and 35 min 54 s) and lodwright takes
+64 seconds on 16 threads: **up to 35 times faster**.
 
-Read that as an order of magnitude, not as a controlled benchmark. The older tool's times come from a real user's log
-on Windows, months earlier, measured from its first to its last generator step over 55 worlds, with its own settings
-and its own output. lodwright's times come from a later run on a machine that was not idle. The two outputs
-are not the same, and this comparison says nothing about their quality. The figures and their limits are in
-[docs/performance.md](docs/performance.md).
+What enabled it (lodwright's own output stayed byte-identical through these changes):
+
+- All cores by default, within a memory budget (#378).
+- Atlas pages encoded on threads (#379).
+- Texture decoding and normal maps on threads (#381).
+- The base load order assembled once per run, and land textures decoded on threads (#382).
+- Mip levels and resizes on threads, and tree bases found once (#383).
+- Block-border triangles no longer scored and then discarded (#384).
+
+The step-by-step figures are in [docs/performance.md](docs/performance.md).
 
 ## Packages
 

@@ -144,6 +144,9 @@ struct Tin<'a> {
     /// Directed edge (a, b) of an alive triangle (counter-clockwise) to that triangle.
     edges: HashMap<(u32, u32), usize>,
     heap: BinaryHeap<(u32, std::cmp::Reverse<usize>)>,
+    /// Whether `insert` scores the triangles it makes: off while the border vertices go in, whose scores are all made
+    /// again afterwards.
+    scoring: bool,
 }
 
 /// Division of `n` by a positive `d`, rounded up.
@@ -168,10 +171,6 @@ fn in_circle(a: Point, b: Point, c: Point, d: Point) -> bool {
 impl Tin<'_> {
     fn at(&self, p: Point) -> usize {
         p.1 as usize * self.span + p.0 as usize
-    }
-
-    fn on_border(&self, p: Point) -> bool {
-        p.0 == 0 || p.1 == 0 || p.0 == self.tile || p.1 == self.tile
     }
 
     fn add_tri(&mut self, v: [u32; 3]) -> usize {
@@ -223,8 +222,13 @@ impl Tin<'_> {
             )
         };
         let (ea, eb, ec) = (edge(b, c), edge(c, a), edge(a, b));
+        let tile = i64::from(self.tile);
         for y in y0..=y1 {
-            let (mut lo, mut hi) = (i64::from(x0), i64::from(x1));
+            // the samples on the block's own border never go in, so they are left out of the range
+            if y == 0 || y == self.tile {
+                continue;
+            }
+            let (mut lo, mut hi) = (i64::from(x0).max(1), i64::from(x1).min(tile - 1));
             for (k, dx, dy) in [ea, eb, ec] {
                 let rest = k + dy * i64::from(y);
                 match dx.cmp(&0) {
@@ -237,20 +241,28 @@ impl Tin<'_> {
                     }
                 }
             }
+            if lo > hi {
+                continue;
+            }
+            let row = &self.original[y as usize * self.span..(y as usize + 1) * self.span];
+            let yy = i64::from(y);
+            let (mut wa, mut wb, mut wc) = (
+                ea.0 + ea.1 * lo + ea.2 * yy,
+                eb.0 + eb.1 * lo + eb.2 * yy,
+                ec.0 + ec.1 * lo + ec.2 * yy,
+            );
             for x in lo..=hi {
-                let x = x as i32;
-                let p = (x, y);
-                let (wa, wb, wc) = (
-                    ea.0 + ea.1 * i64::from(x) + ea.2 * i64::from(y),
-                    eb.0 + eb.1 * i64::from(x) + eb.2 * i64::from(y),
-                    ec.0 + ec.1 * i64::from(x) + ec.2 * i64::from(y),
-                );
-                if p == a || p == b || p == c || self.on_border(p) {
+                let (cwa, cwb, cwc) = (wa, wb, wc);
+                wa += ea.1;
+                wb += eb.1;
+                wc += ec.1;
+                let p = (x as i32, y);
+                if p == a || p == b || p == c {
                     continue;
                 }
-                let truth = self.original[self.at(p)];
+                let truth = row[x as usize];
                 if !corners_valid && !truth.is_nan() {
-                    let d = (f64::from(x) - centre.0).powi(2) + (f64::from(y) - centre.1).powi(2);
+                    let d = (f64::from(p.0) - centre.0).powi(2) + (f64::from(y) - centre.1).powi(2);
                     if d < nearest.0 {
                         nearest = (d, p);
                     }
@@ -259,7 +271,7 @@ impl Tin<'_> {
                 let error = if truth.is_nan() {
                     if corners_valid { HOLE_ERROR } else { 0.0 }
                 } else {
-                    let plane = (wa as f32 * za + wb as f32 * zb + wc as f32 * zc) / area as f32;
+                    let plane = (cwa as f32 * za + cwb as f32 * zb + cwc as f32 * zc) / area as f32;
                     (truth - plane).abs()
                 };
                 if error > best.0 {
@@ -341,7 +353,7 @@ impl Tin<'_> {
             }
         }
         for id in made {
-            if self.tris[id].alive {
+            if self.scoring && self.tris[id].alive {
                 self.score(id);
             }
         }
@@ -414,6 +426,7 @@ pub fn mesh_block(
         tris: Vec::new(),
         edges: HashMap::new(),
         heap: BinaryHeap::new(),
+        scoring: false,
     };
     tin.add_tri([0, 1, 2]);
     tin.add_tri([0, 2, 3]);
@@ -448,6 +461,7 @@ pub fn mesh_block(
     }
     let alive: Vec<usize> = (0..tin.tris.len()).filter(|i| tin.tris[*i].alive).collect();
     tin.heap.clear();
+    tin.scoring = true;
     for id in alive {
         tin.score(id);
     }
@@ -675,5 +689,47 @@ mod tests {
     fn a_size_that_is_not_a_power_of_two_plus_one_is_refused() {
         assert!(mesh_block(&vec![0.0; 64 * 64], 64, 1.0, 100).is_none());
         assert!(mesh_block(&[0.0; 5], 2, 1.0, 100).is_none());
+    }
+
+    /// A FNV-1a digest of the mesh of a rough field with a hole, pinned from the version that scored the triangles of
+    /// the border vertices too (that work was thrown away, so the mesh must not have changed).
+    #[test]
+    fn the_mesh_of_a_rough_field_with_a_hole_is_pinned() {
+        let span = 65;
+        let mut rng = Rng::new(7);
+        let mut samples: Vec<f32> = (0..span * span)
+            .map(|i| {
+                let (x, y) = ((i % span) as f32, (i / span) as f32);
+                (x * 0.3).sin() * 40.0 + (y * 0.2).cos() * 25.0 + rng.below(600) as f32 / 100.0
+            })
+            .collect();
+        for y in 20..30 {
+            for x in 30..44 {
+                samples[y * span + x] = f32::NAN;
+            }
+        }
+        let meshed = mesh_block(&samples, span, 2.0, 400).unwrap();
+        let mut digest = 0xcbf2_9ce4_8422_2325_u64;
+        let mut eat = |bytes: &[u8]| {
+            for b in bytes {
+                digest = (digest ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        for v in &meshed.mesh.vertices {
+            for c in v {
+                eat(&c.to_bits().to_le_bytes());
+            }
+        }
+        for i in &meshed.mesh.indices {
+            eat(&i.to_le_bytes());
+        }
+        assert_eq!(
+            (
+                digest,
+                meshed.mesh.vertices.len(),
+                meshed.mesh.indices.len()
+            ),
+            (0xe4c2_fab1_5b69_02e5, 392, 2025)
+        );
     }
 }

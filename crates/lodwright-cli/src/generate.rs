@@ -101,7 +101,13 @@ pub fn generate(options: &Options) -> ResultDoc {
     let version = env!("CARGO_PKG_VERSION");
     let has_data = !options.data.as_os_str().is_empty();
     let request = if let Some(file) = &options.request {
-        Some(read_request(file))
+        // a thread count on the command line replaces the request's, as `--overwrite` does
+        Some(read_request(file).map(|mut request| {
+            if let Some(n) = u32::try_from(options.threads).ok().filter(|n| *n > 0) {
+                request.limits.threads = Some(n);
+            }
+            request
+        }))
     } else if has_data && !options.plugins.is_empty() && options.out.is_some() {
         Some(Ok(request_from_options(options)))
     } else {

@@ -297,6 +297,8 @@ pub struct ObjectShape {
     pub normal_texture: String,
     /// Vertex positions relative to the origin.
     pub vertices: Vec<[f32; 3]>,
+    /// The UVs of the first set, one per vertex; empty when the shape has none.
+    pub uv: Vec<[f32; 2]>,
     /// Triangles, stored in segment order.
     pub triangles: Vec<[u16; 3]>,
     /// The triangle count of each entry of the segment table (the table ends at the last used segment).
@@ -390,6 +392,7 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
             texture: paths.next().unwrap_or_default(),
             normal_texture: paths.next().unwrap_or_default(),
             vertices: d.geometry.vertices.clone().ok_or(BAD)?,
+            uv: d.geometry.uv_sets.first().cloned().unwrap_or_default(),
             triangles: d.triangles.clone().ok_or(BAD)?,
             segment_triangles: segments,
         });

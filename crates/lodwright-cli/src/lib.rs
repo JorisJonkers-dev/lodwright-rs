@@ -12,9 +12,9 @@ use std::path::Path;
 
 use lodwright_contract::{
     Channels, CorrelationBlock, CorrelationLevel, CorrelationReport, CorrelationSummary,
-    DocumentKind, Handshake, ObjectBlock, ObjectReport, TerrainBlock, TerrainLevel, TerrainReport,
-    VerifyDoc, VerifyFinding, VersionInfo, WaterBlock, WaterLevel, WaterProfileLevel, WaterReport,
-    schema_json,
+    DocumentKind, FarAtlas, FarMetricsLevel, FarMetricsReport, Handshake, ObjectBlock,
+    ObjectReport, TerrainBlock, TerrainLevel, TerrainReport, VerifyDoc, VerifyFinding, VersionInfo,
+    WaterBlock, WaterLevel, WaterProfileLevel, WaterReport, schema_json,
 };
 
 mod commands;
@@ -386,6 +386,7 @@ fn verify_command(args: &[&str], out: &mut dyn Write, err: &mut dyn Write) -> u8
     if let Some(blocks) = &blocks {
         add_block_reports(&mut doc, blocks, threshold);
         add_terrain_report(&mut doc, blocks, tolerance);
+        add_far_metrics(&mut doc, blocks);
     }
     if let Some(reference) = reference {
         add_correlation_report(
@@ -574,6 +575,56 @@ fn add_block_reports(
         exact: count(per_block.iter().filter(|o| o.exact).count()),
         per_block,
     });
+}
+
+/// Add the error of the object blocks per level and the use of each atlas; nothing when there is neither.
+#[allow(clippy::cast_precision_loss, reason = "block counts are small")]
+fn add_far_metrics(doc: &mut VerifyDoc, blocks: &lodwright_gen::BlockComparison) {
+    if blocks.far_errors.is_empty() && blocks.atlases.is_empty() {
+        return;
+    }
+    let mut levels: std::collections::BTreeMap<u32, Vec<lodwright_gen::ShapeError>> =
+        std::collections::BTreeMap::new();
+    for b in &blocks.far_errors {
+        if let Some(level) = level_of(&b.path) {
+            levels.entry(level).or_default().push(b.error);
+        }
+    }
+    let per_level = levels
+        .into_iter()
+        .map(|(level, list)| {
+            let n = list.len() as f64;
+            let largest = |f: fn(&lodwright_gen::ShapeError) -> f64| {
+                round3(list.iter().map(f).fold(0.0, f64::max))
+            };
+            let mean = |f: fn(&lodwright_gen::ShapeError) -> f64| {
+                round3(list.iter().map(f).sum::<f64>() / n)
+            };
+            let uv: Vec<f64> = list.iter().filter_map(|e| e.uv).collect();
+            FarMetricsLevel {
+                level,
+                blocks: u64::try_from(list.len()).unwrap_or(u64::MAX),
+                position_max: largest(|e| e.position_max),
+                position_mean: mean(|e| e.position_mean),
+                uv_max: (!uv.is_empty()).then(|| round3(uv.iter().copied().fold(0.0, f64::max))),
+                uv_mean: (!uv.is_empty()).then(|| round3(uv.iter().sum::<f64>() / uv.len() as f64)),
+                silhouette_max: largest(|e| e.silhouette),
+                silhouette_mean: mean(|e| e.silhouette),
+            }
+        })
+        .collect();
+    let atlases = blocks
+        .atlases
+        .iter()
+        .map(|a| FarAtlas {
+            path: a.path.clone(),
+            width: a.width,
+            height: a.height,
+            used: round3(a.used),
+            wasted: round3(1.0 - a.used),
+        })
+        .collect();
+    doc.far_metrics = Some(FarMetricsReport { per_level, atlases });
 }
 
 /// The `level<L>` of a block mesh's file name (`<world>.level<L>.x<X>.y<Y>.nif`).
@@ -876,6 +927,35 @@ fn print_block_reports(doc: &VerifyDoc, out: &mut dyn Write) {
                 b.triangles,
                 b.reference_triangles,
                 b.unmatched_vertices
+            );
+        }
+    }
+    print_far_metrics(doc, out);
+}
+
+/// The far-object error per level and the use of each atlas, when the report has them.
+fn print_far_metrics(doc: &VerifyDoc, out: &mut dyn Write) {
+    if let Some(m) = &doc.far_metrics {
+        for l in &m.per_level {
+            let uv = l
+                .uv_mean
+                .map_or_else(|| "unknown".to_owned(), |u| u.to_string());
+            let _ = writeln!(
+                out,
+                "far objects level {}: {} blocks, position error max {} mean {}, UV error mean {uv}, silhouette error max {} mean {}",
+                l.level,
+                l.blocks,
+                l.position_max,
+                l.position_mean,
+                l.silhouette_max,
+                l.silhouette_mean
+            );
+        }
+        for a in &m.atlases {
+            let _ = writeln!(
+                out,
+                "{}: {}x{}, {} used, {} wasted",
+                a.path, a.width, a.height, a.used, a.wasted
             );
         }
     }

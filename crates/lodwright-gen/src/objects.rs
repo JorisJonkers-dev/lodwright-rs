@@ -389,7 +389,7 @@ fn load_texture(assets: &dyn Assets, key: &str) -> Option<Image> {
     read_texture(assets, key).ok()
 }
 
-fn encode_bc3(image: &Image, threads: usize) -> Result<Vec<u8>, GenError> {
+pub(crate) fn encode_bc3(image: &Image, threads: usize) -> Result<Vec<u8>, GenError> {
     Ok(encode_with_threads(
         image,
         &EncodeOptions {

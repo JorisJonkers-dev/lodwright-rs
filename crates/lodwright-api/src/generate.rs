@@ -496,7 +496,7 @@ pub fn generate(
         request.output.pack,
     );
     let threads = request.limits.threads.map_or_else(
-        || std::thread::available_parallelism().map_or(1, |n| n.get().min(4)),
+        crate::budget::default_threads,
         |n| n as usize,
     );
     let need_assets =
@@ -626,7 +626,10 @@ pub fn generate(
             note(&mut doc, &mut records, world.name(), warnings);
             // hold the budget: as many workers as fit beside what the process holds now (the tiles are loaded)
             let workers = crate::budget::workers(
-                request.limits.memory_mib,
+                request
+                    .limits
+                    .memory_mib
+                    .or_else(crate::budget::default_budget_mib),
                 crate::budget::resident_mib().or(plugins_mib).unwrap_or(0),
                 crate::budget::raster_mib(world, &settings),
                 crate::budget::worker_mib(&settings),

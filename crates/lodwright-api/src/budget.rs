@@ -33,6 +33,26 @@ fn parse_vm_rss_kib(status: &str) -> Option<u64> {
     line.split_whitespace().nth(1)?.parse().ok()
 }
 
+/// The worker threads of a run that names none: every core the machine offers.
+#[must_use]
+pub(crate) fn default_threads() -> usize {
+    std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+}
+
+/// The memory a run holds when the request names no budget: three quarters of the machine's physical memory
+/// (`MemTotal`), so that a 16 GiB machine keeps 4 GiB for the rest of the system. Read on Linux only; elsewhere
+/// there is no default budget and the thread count alone applies.
+#[must_use]
+pub(crate) fn default_budget_mib() -> Option<u64> {
+    let info = std::fs::read_to_string("/proc/meminfo").ok()?;
+    parse_mem_total_kib(&info).map(|kib| kib / 1024 * 3 / 4)
+}
+
+fn parse_mem_total_kib(info: &str) -> Option<u64> {
+    let line = info.lines().find(|l| l.starts_with("MemTotal:"))?;
+    line.split_whitespace().nth(1)?.parse().ok()
+}
+
 /// The height rasters of `world` for the levels of `settings`, in MiB (rounded up).
 #[must_use]
 pub(crate) fn raster_mib(world: &Worldspace, settings: &TerrainSettings) -> u64 {
@@ -87,8 +107,17 @@ pub(crate) fn workers(
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_vm_rss_kib, worker_mib, workers};
+    use super::{parse_mem_total_kib, parse_vm_rss_kib, worker_mib, workers};
     use lodwright_core::terrain::TerrainSettings;
+
+    #[test]
+    fn the_default_budget_reads_the_total_memory() {
+        assert_eq!(
+            parse_mem_total_kib("MemTotal:       16384000 kB\nMemFree: 1 kB\n"),
+            Some(16_384_000)
+        );
+        assert_eq!(parse_mem_total_kib("nothing"), None);
+    }
 
     #[test]
     fn without_a_limit_every_thread_works() {

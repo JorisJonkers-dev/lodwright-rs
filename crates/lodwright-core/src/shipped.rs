@@ -71,44 +71,84 @@ pub fn changed_cells(
     resolver: &TextureResolver,
     is_base: &dyn Fn(&str) -> bool,
 ) -> Result<BTreeSet<(i32, i32)>, Error> {
-    let shells: Vec<(String, Plugin)> = plugins
-        .iter()
-        .map(|(name, plugin)| {
-            let mut plugin = plugin.clone();
-            if !is_base(name) {
-                plugin.worlds.clear();
-                plugin.land_textures.clear();
-                plugin.texture_sets.clear();
-                plugin.objects.clear();
-            }
-            (name.clone(), plugin)
+    ShippedBase::new(plugins, is_base)?.changed_cells(world, resolver)
+}
+
+/// The base plugins' load order, assembled once: the other plugins stay as empty shells, so the form ids agree with the
+/// full order. A run that decides for many worlds builds it once instead of once per world.
+pub struct ShippedBase {
+    shells: Vec<(String, Plugin)>,
+    resolver: TextureResolver,
+    index: WorldIndex,
+}
+
+impl ShippedBase {
+    /// # Errors
+    /// [`Error::MissingMaster`] as the load order assembly gives it.
+    pub fn new(
+        plugins: &[(String, Plugin)],
+        is_base: &dyn Fn(&str) -> bool,
+    ) -> Result<Self, Error> {
+        let shells: Vec<(String, Plugin)> = plugins
+            .iter()
+            .map(|(name, plugin)| {
+                let mut plugin = plugin.clone();
+                if !is_base(name) {
+                    plugin.worlds.clear();
+                    plugin.land_textures.clear();
+                    plugin.texture_sets.clear();
+                    plugin.objects.clear();
+                }
+                (name.clone(), plugin)
+            })
+            .collect();
+        let resolver = TextureResolver::from_load_order(&shells)?;
+        let index = WorldIndex::new(&shells)?;
+        Ok(Self {
+            shells,
+            resolver,
+            index,
         })
-        .collect();
-    let base_resolver = TextureResolver::from_load_order(&shells)?;
-    let index = WorldIndex::new(&shells)?;
-    let Some(base) = index.build(&shells, world.form_id(), Inheritance::None) else {
-        return Ok(world.land_cells().collect());
-    };
-    let path_of = |r: &TextureResolver, id: u32| r.diffuse_path(id).map(str::to_ascii_lowercase);
-    let mut changed = BTreeSet::new();
-    let keys: BTreeSet<(i32, i32)> = world.land_cells().chain(base.land_cells()).collect();
-    for (x, y) in keys {
-        let same_land =
-            world.cell(x, y) == base.cell(x, y) && world.layers(x, y) == base.layers(x, y);
-        let same_textures = world.layers(x, y).is_none_or(|layers| {
-            layers
-                .base
-                .iter()
-                .flatten()
-                .copied()
-                .chain(layers.alpha.iter().map(|l| l.texture))
-                .all(|id| path_of(resolver, id) == path_of(&base_resolver, id))
-        });
-        if !(same_land && same_textures) {
-            changed.insert((x, y));
-        }
     }
-    Ok(changed)
+
+    /// [`changed_cells`] of `world` against this base.
+    ///
+    /// # Errors
+    /// [`Error::MissingMaster`] as the load order assembly gives it.
+    pub fn changed_cells(
+        &self,
+        world: &Worldspace,
+        resolver: &TextureResolver,
+    ) -> Result<BTreeSet<(i32, i32)>, Error> {
+        let Some(base) = self
+            .index
+            .build(&self.shells, world.form_id(), Inheritance::None)
+        else {
+            return Ok(world.land_cells().collect());
+        };
+        let base_resolver = &self.resolver;
+        let path_of =
+            |r: &TextureResolver, id: u32| r.diffuse_path(id).map(str::to_ascii_lowercase);
+        let mut changed = BTreeSet::new();
+        let keys: BTreeSet<(i32, i32)> = world.land_cells().chain(base.land_cells()).collect();
+        for (x, y) in keys {
+            let same_land =
+                world.cell(x, y) == base.cell(x, y) && world.layers(x, y) == base.layers(x, y);
+            let same_textures = world.layers(x, y).is_none_or(|layers| {
+                layers
+                    .base
+                    .iter()
+                    .flatten()
+                    .copied()
+                    .chain(layers.alpha.iter().map(|l| l.texture))
+                    .all(|id| path_of(resolver, id) == path_of(base_resolver, id))
+            });
+            if !(same_land && same_textures) {
+                changed.insert((x, y));
+            }
+        }
+        Ok(changed)
+    }
 }
 
 #[cfg(test)]
@@ -211,5 +251,32 @@ mod tests {
         let resolver = TextureResolver::from_load_order(&plugins).unwrap();
         let all = changed_cells(&plugins, &world, &resolver, &|n| n == "Game.esm").unwrap();
         assert_eq!(all.into_iter().collect::<Vec<_>>(), vec![(0, 0), (3, 3)]);
+    }
+
+    #[test]
+    fn a_base_built_once_answers_every_world_as_changed_cells_does() {
+        use super::ShippedBase;
+        let plugins = vec![
+            (
+                "Game.esm".to_owned(),
+                plugin(&[], vec![cell(0, 0, 1.0), cell(1, 0, 1.0)]),
+            ),
+            (
+                "Mod.esp".to_owned(),
+                plugin(&["Game.esm"], vec![cell(1, 0, 5.0), cell(2, 0, 1.0)]),
+            ),
+        ];
+        let world = WorldIndex::new(&plugins)
+            .unwrap()
+            .build(&plugins, 0x3C, Inheritance::None)
+            .unwrap();
+        let resolver = TextureResolver::from_load_order(&plugins).unwrap();
+        let is_base = |n: &str| n == "Game.esm";
+        let once = ShippedBase::new(&plugins, &is_base).unwrap();
+        let direct = changed_cells(&plugins, &world, &resolver, &is_base).unwrap();
+        // asked twice, as for two worlds, the one base gives the one answer
+        assert_eq!(once.changed_cells(&world, &resolver).unwrap(), direct);
+        assert_eq!(once.changed_cells(&world, &resolver).unwrap(), direct);
+        assert_eq!(direct.into_iter().collect::<Vec<_>>(), vec![(1, 0), (2, 0)]);
     }
 }

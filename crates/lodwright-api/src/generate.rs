@@ -567,6 +567,21 @@ pub fn generate(
     let mut patched_tiles = 0_u64;
     let mut cancelled = false;
     let mut records: Vec<WarningRecord> = Vec::new();
+    // the base plugins' load order is assembled once for every world's decision about the game's own tiles
+    let shipped_base = if assets.is_some()
+        && request.terrain.enabled
+        && request.terrain.land_textures
+        && !request.terrain.compose_shipped_tiles
+    {
+        Some(
+            lodwright_core::shipped::ShippedBase::new(&loaded.plugins, &|name| {
+                lodwright_core::shipped::is_game_master(name)
+            })
+            .map_err(|e| load_order_error(&e))?,
+        )
+    } else {
+        None
+    };
     'worlds: for world in chosen {
         // the grid every level's blocks start from, as the terrain stage finds it (after dropping outlying edges)
         let anchor = world.without_outliers().grid_anchor();
@@ -603,18 +618,17 @@ pub fn generate(
             }
             // the diffuse tiles the game ships and nothing outside its masters changed are left to the game
             clock.begin("terrain.shipped_plan", Some(world.name()));
-            let keep = match (&assets, request.terrain.land_textures) {
-                (Some(assets), true) if !request.terrain.compose_shipped_tiles => {
-                    crate::shipped::plan(
-                        world,
-                        &loaded.plugins,
-                        &resolver,
-                        assets,
-                        anchor,
-                        &mut warnings,
-                    )
-                    .map_err(|e| load_order_error(&e))?
-                }
+            let keep = match (&assets, &shipped_base) {
+                (Some(assets), Some(base)) => crate::shipped::plan(
+                    world,
+                    base,
+                    &loaded.plugins,
+                    &resolver,
+                    assets,
+                    anchor,
+                    &mut warnings,
+                )
+                .map_err(|e| load_order_error(&e))?,
                 _ => None,
             };
             let keep_fn =

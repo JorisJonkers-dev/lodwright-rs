@@ -26,6 +26,7 @@ mod lodmodel;
 mod objects;
 mod outline;
 mod output;
+mod par;
 mod terrain;
 mod trees;
 mod verify;

@@ -598,12 +598,16 @@ pub fn generate(
             clock.begin("terrain.land_tiles", Some(world.name()));
             let mut warnings = Vec::new();
             let tiles = match (&assets, request.terrain.land_textures) {
-                (Some(assets), true) => {
-                    lodwright_gen::LandTiles::load(world, &resolver, assets, &mut warnings)
-                        .with_scales(&texture_scales)
-                        .with_default_texture(&default_land, assets, &mut warnings)
-                        .with_world_fill(world.name())
-                }
+                (Some(assets), true) => lodwright_gen::LandTiles::load_with_threads(
+                    world,
+                    &resolver,
+                    assets,
+                    &mut warnings,
+                    threads,
+                )
+                .with_scales(&texture_scales)
+                .with_default_texture(&default_land, assets, &mut warnings)
+                .with_world_fill(world.name()),
                 _ => lodwright_gen::LandTiles::empty(),
             };
             // far land is lit as the near land is: the unscaled tiles are kept for the test of a game tile

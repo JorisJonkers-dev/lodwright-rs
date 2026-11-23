@@ -174,6 +174,19 @@ pub struct ObjectsRequest {
     /// only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub drop_under_water: bool,
+    /// Objects whose far shape is taken from the far blocks the games ship, by world and model. Only enabled
+    /// references without an enable parent are taken. Empty by default; written only when set.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shapes_from_shipped_blocks: Vec<ShippedShapeRule>,
+}
+
+/// One world's models whose far shape is taken from the far blocks the games ship.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ShippedShapeRule {
+    /// The worldspace's editor id, in any case. A world the load order does not have is ignored.
+    pub world: String,
+    /// Model paths relative to `meshes`, in any case and with either separator.
+    pub models: Vec<String>,
 }
 
 impl Default for ObjectsRequest {
@@ -182,6 +195,7 @@ impl Default for ObjectsRequest {
             enabled: true,
             drop_under_terrain: false,
             drop_under_water: false,
+            shapes_from_shipped_blocks: Vec::new(),
         }
     }
 }
@@ -322,6 +336,13 @@ impl Request {
         if self.output_dir.is_empty() || self.data_folder.is_empty() {
             return Err("data_folder and output_dir are required".into());
         }
+        if self.objects.shapes_from_shipped_blocks.iter().any(|r| {
+            r.world.is_empty() || r.models.is_empty() || r.models.iter().any(String::is_empty)
+        }) {
+            return Err(
+                "objects.shapes_from_shipped_blocks needs a world and at least one model in each rule".into(),
+            );
+        }
         for l in &self.terrain.levels {
             if !TERRAIN_LEVELS.contains(&l.level) {
                 return Err(format!("terrain level {} is not 4, 8, 16 or 32", l.level));
@@ -415,6 +436,22 @@ mod tests {
         let mut other = base();
         other.worlds.push("W".into());
         assert_ne!(other.digest(), r.digest());
+    }
+
+    #[test]
+    fn shipped_shape_rules_are_left_out_of_the_document_when_empty_and_checked_when_set() {
+        let mut r = Request::new("/d", &["A.esm"], "/o");
+        let empty = serde_json::to_string(&r).unwrap();
+        assert!(!empty.contains("shapes_from_shipped_blocks"));
+        r.objects.shapes_from_shipped_blocks = vec![super::ShippedShapeRule {
+            world: "World".to_owned(),
+            models: vec!["a/b.nif".to_owned()],
+        }];
+        r.validate().unwrap();
+        let back: Request = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+        r.objects.shapes_from_shipped_blocks[0].models.clear();
+        assert!(r.validate().is_err());
     }
 
     #[test]

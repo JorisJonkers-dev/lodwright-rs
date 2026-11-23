@@ -1335,3 +1335,194 @@ fn an_object_in_the_last_cell_of_a_block_is_found_in_the_last_segment() {
         assert_eq!(found.hits[0].expected_segment, k);
     }
 }
+
+// --- the far objects only the shipped blocks carry ---
+
+const OWN_BLOCK: &str = "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif";
+
+/// The files a first run wrote, by lower-case game path: stands in for the far blocks a game ships.
+fn shipped_files(out: &std::path::Path) -> HashMap<String, Vec<u8>> {
+    fn walk(root: &std::path::Path, at: &std::path::Path, all: &mut HashMap<String, Vec<u8>>) {
+        for e in std::fs::read_dir(at).unwrap().flatten() {
+            if e.path().is_dir() {
+                walk(root, &e.path(), all);
+            } else {
+                let rel = e
+                    .path()
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_lowercase();
+                let rel = rel.replace('\\', "/");
+                all.insert(rel, std::fs::read(e.path()).unwrap());
+            }
+        }
+    }
+    let mut all = HashMap::new();
+    walk(out, out, &mut all);
+    all
+}
+
+/// A shipped block holding one wall whose triangle stands 300 units from its reference's origin.
+fn shipped_wall(name: &str) -> (HashMap<String, Vec<u8>>, Instance) {
+    let mut shape = av(vec![3]);
+    shape.translation = [300.0, 300.0, 0.0];
+    let mut files = assets().0;
+    files.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        lod_model_with("Data\\Textures\\a\\wall.dds", av(vec![]), shape),
+    );
+    let wall = instance("a\\Wall.nif", 1000.0, 1000.0, 0.0, 10, false);
+    let out = temp(name);
+    generate_objects("Mojave", std::slice::from_ref(&wall), &Memory(files), &out).unwrap();
+    (shipped_files(&out), wall)
+}
+
+#[allow(clippy::cast_possible_truncation)] // whole world units, to compare
+fn block_vertices(out: &std::path::Path) -> Vec<[i32; 3]> {
+    let block = read_block(out, OWN_BLOCK);
+    let mut all = Vec::new();
+    for b in &block.blocks {
+        let shape = match &b.body {
+            Body::TriShape(s) => s.clone(),
+            Body::Opaque(o) => match Body::parse(b"NiTriShape", o, block.header.profile()) {
+                Ok((Body::TriShape(s), _)) => s,
+                _ => continue,
+            },
+            _ => continue,
+        };
+        let Some(Body::TriShapeData(d)) = block
+            .blocks
+            .get(usize::try_from(shape.data).unwrap())
+            .map(|x| &x.body)
+        else {
+            continue;
+        };
+        for v in d.geometry.vertices.iter().flatten() {
+            all.push([0, 1, 2].map(|k| (shape.av.translation[k] + v[k]).round() as i32));
+        }
+    }
+    all.sort_unstable();
+    all
+}
+
+/// Generate with `drawn` and the listed reference `listed`, with the object bounds `bounds`.
+fn with_own(
+    name: &str,
+    shipped: &HashMap<String, Vec<u8>>,
+    drawn: &[Instance],
+    listed: &Instance,
+    bounds: &HashMap<u32, [i16; 6]>,
+) -> (lodwright_gen::ObjectReport, std::path::PathBuf) {
+    let out = temp(name);
+    let read = |path: &str| shipped.get(path).cloned();
+    let references = [listed.clone()];
+    let report = generate_objects_with_progress(
+        "Mojave",
+        drawn,
+        &assets(),
+        &out,
+        Surfaces {
+            own: Some(lodwright_gen::OwnSource {
+                references: &references,
+                bounds,
+                read: &read,
+            }),
+            ..Surfaces::default()
+        },
+        &mut |_, _| {},
+    )
+    .unwrap();
+    (report, out)
+}
+
+fn listed_at(wall: &Instance) -> Instance {
+    let mut listed = wall.clone();
+    listed.base = 2;
+    "x\\Listed.nif".clone_into(&mut listed.model);
+    listed.reference = 20;
+    listed
+}
+
+#[test]
+fn a_listed_object_is_found_by_its_bounds_when_its_origin_is_outside_its_shape() {
+    let (shipped, wall) = shipped_wall("own-origin-a");
+    let bounds = HashMap::from([(2, [140, 140, -10, 260, 260, 10])]);
+    let (report, out) = with_own("own-origin-b", &shipped, &[], &listed_at(&wall), &bounds);
+    assert!(
+        report
+            .records
+            .iter()
+            .all(|r| !r.kind.starts_with("own_far"))
+    );
+    assert_eq!(
+        block_vertices(&out),
+        vec![[1300, 1300, 10], [1300, 1500, 10], [1500, 1300, 10]]
+    );
+}
+
+#[test]
+fn a_listed_object_with_empty_bounds_is_found_by_the_box_of_its_full_model() {
+    let (mut shipped, wall) = shipped_wall("own-model-a");
+    let mut full = av(vec![3]);
+    full.translation = [150.0, 150.0, 0.0];
+    // the full model's box: 150 to 250 in the object's own units, where the shape stands at scale 2
+    shipped.insert(
+        "meshes/x/listed.nif".to_owned(),
+        lod_model_with("Data\\Textures\\a\\wall.dds", av(vec![]), full),
+    );
+    let bounds = HashMap::from([(2, [0, 0, 0, 0, 0, 0])]);
+    let (_, out) = with_own("own-model-b", &shipped, &[], &listed_at(&wall), &bounds);
+    assert_eq!(block_vertices(&out).len(), 3);
+}
+
+#[test]
+fn a_piece_in_the_smaller_box_of_an_object_already_drawn_is_not_drawn_twice() {
+    let (shipped, wall) = shipped_wall("own-twice-a");
+    let mut drawn = wall.clone();
+    drawn.reference = 11;
+    drawn.placement.pos = [1300.0, 1300.0, 10.0];
+    let bounds = HashMap::from([
+        (1, [-5, -5, -5, 105, 105, 5]),
+        (2, [-100, -100, -100, 400, 400, 100]),
+    ]);
+    let (_, out) = with_own(
+        "own-twice-b",
+        &shipped,
+        &[drawn],
+        &listed_at(&wall),
+        &bounds,
+    );
+    assert_eq!(
+        block_vertices(&out).len(),
+        3,
+        "only the drawn object's own triangle"
+    );
+}
+
+#[test]
+fn a_listed_object_without_a_block_or_a_shape_is_left_out_and_said_once() {
+    let (shipped, wall) = shipped_wall("own-none-a");
+    let bounds = HashMap::from([(2, [140, 140, -10, 260, 260, 10])]);
+    let none = HashMap::new();
+    let (report, _) = with_own("own-none-b", &none, &[], &listed_at(&wall), &bounds);
+    assert_eq!(
+        report
+            .records
+            .iter()
+            .filter(|r| r.kind == "own_far_blocks_not_found")
+            .count(),
+        1
+    );
+    let mut elsewhere = listed_at(&wall);
+    elsewhere.placement.pos = [3000.0, 3000.0, 10.0];
+    let (report, _) = with_own("own-none-c", &shipped, &[], &elsewhere, &bounds);
+    assert_eq!(
+        report
+            .records
+            .iter()
+            .filter(|r| r.kind == "own_far_objects_not_found")
+            .count(),
+        1
+    );
+}

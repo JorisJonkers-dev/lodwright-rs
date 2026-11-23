@@ -50,3 +50,23 @@ Measured 2026-11-23, 16 thread machine shared with other work (wall seconds, pea
 | 1 | 359 s, 3.38 GiB | 429 s, 3.44 GiB |
 | 4 (the old default) | 123 s, 3.43 GiB | 169 s, 3.50 GiB |
 | 16 (the new default) | 84 s, 3.64 GiB | 140 s, 3.70 GiB |
+
+## Speed over the 2026-11-23 work
+
+Whole runs, all worlds, 16 thread machine shared with other work (load average up to about 10 when a run started, so
+single figures can move by a third):
+
+| lodwright | plain game | modded, 133 plugins |
+| --- | ---: | ---: |
+| start of the day (4 threads, the old default) | 123 s | 169 s |
+| every core by default | 84 s | 140 s |
+| after the speed work up to #384 | 27.4 s | 64.4 s |
+
+Each speed step was checked by comparing the sha256 of every generated file with the run before it: the files stayed
+byte-identical (20,783 modded, 11,210 plain). `manifest.json` is left out of that comparison, because its
+`request_digest` covers the request including `limits.threads`.
+
+### Against the established community LOD generator
+
+On the same 133-plugin list that generator averages about 37 minutes (mean of 38 min 19 s and 35 min 54 s) and lodwright
+takes 64.4 s: up to 35 times faster.

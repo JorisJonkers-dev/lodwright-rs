@@ -34,6 +34,22 @@ another tree. A request document (`lodwright schema request`) is how a caller dr
 Not done: loading in the game (owner only, docs/owner-runbook.md section 6), the game's own water outline (ours is
 our own design), and reuse of unchanged object and tree blocks. The gap list has each item with its state.
 
+## Speed
+
+On a 133-plugin load order, xLODGen averages about 37 minutes (mean of 38 min 19 s and 35 min 54 s) and lodwright takes
+64 seconds on 16 threads: **up to 35 times faster**.
+
+What enabled it (lodwright's own output stayed byte-identical through these changes):
+
+- All cores by default, within a memory budget (#378).
+- Atlas pages encoded on threads (#379).
+- Texture decoding and normal maps on threads (#381).
+- The base load order assembled once per run, and land textures decoded on threads (#382).
+- Mip levels and resizes on threads, and tree bases found once (#383).
+- Block-border triangles no longer scored and then discarded (#384).
+
+The step-by-step figures are in [docs/performance.md](docs/performance.md).
+
 ## Packages
 
 The `lodwright` program is published on each release as an OCI package on ghcr.io:

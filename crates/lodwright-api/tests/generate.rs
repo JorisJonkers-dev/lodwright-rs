@@ -578,6 +578,34 @@ fn warnings_file(out: &std::path::Path) -> lodwright_contract::WarningsFile {
 }
 
 #[test]
+fn shipped_shape_rules_act_only_in_the_world_they_name() {
+    let kinds = |name: &str, rule_world: Option<&str>| {
+        let (mut job, out) = far_model_job(name);
+        if let Some(world) = rule_world {
+            job.request.objects.shapes_from_shipped_blocks =
+                vec![lodwright_contract::ShippedShapeRule {
+                    world: world.to_owned(),
+                    models: vec!["arch/parking.nif".to_owned()],
+                }];
+        }
+        let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+        assert_eq!(result.code, "generated", "{result:?}");
+        warnings_file(&out)
+            .warnings
+            .iter()
+            .filter(|w| w.kind.starts_with("own_far"))
+            .map(|w| (w.kind.clone(), w.count))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(kinds("shipped-none", None), vec![]);
+    assert_eq!(kinds("shipped-other", Some("NoSuchWorld")), vec![]);
+    assert_eq!(
+        kinds("shipped-named", Some("ISLAND")),
+        vec![("own_far_blocks_not_found".to_owned(), 2)]
+    );
+}
+
+#[test]
 fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_in_the_file() {
     let (job, out) = far_model_job("far-warn");
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());

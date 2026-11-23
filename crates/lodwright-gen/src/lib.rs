@@ -51,7 +51,7 @@ pub use objects::{
     generate_objects_with_atlas_limit, generate_objects_with_progress,
 };
 pub use output::{is_plain_relative, linked_folder, write_output_file};
-pub use own_far::{OWN_ONLY_MODELS, OWN_ONLY_WORLD, OwnSource};
+pub use own_far::OwnSource;
 pub use terrain::{BlockRecord, FileRecord, Options, Report, generate_terrain};
 pub use trees::{TreeReport, billboard_path, generate_trees, generate_trees_with_progress};
 pub use verify::{

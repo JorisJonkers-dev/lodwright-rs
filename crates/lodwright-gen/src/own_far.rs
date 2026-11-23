@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Far objects that only the far blocks Tale of Two Wastelands ships carry.
+//! Far objects whose shape is taken from the far blocks the games ship.
 //!
-//! The plugins of the Capital Wasteland leave 155 references on 18 models without a far model (the unflagged ones draw
-//! nothing from the plugins' own rules; the building-kit pieces have no `_lod` model in any archive), yet the far
-//! blocks TTW ships draw them. No record flag separates them, so the models are a fixed list
-//! ([`OWN_ONLY_MODELS`]). At generation time, when the shipped blocks are present, the shape of each listed reference
-//! is cut out of the block that covers it and drawn again in the generated block with the piece of the shipped atlas it uses.
+//! Some objects are drawn by a game's shipped far blocks although nothing in the plugins selects them and no far model
+//! exists for them. The request names their models (`objects.shapes_from_shipped_blocks`); this crate holds no list. At
+//! generation time, when the shipped blocks are present, the shape of each such reference is cut out of the block that
+//! covers it and drawn again in the generated block with the piece of the shipped atlas it uses.
 //!
 //! Matching: a block holds pieces (triangles joined to each other), and one object can be several pieces whose box need
 //! not hold the object's origin. A piece belongs to a reference when all its vertices lie inside the reference's
@@ -29,45 +28,14 @@ use crate::objects::{BLOCK_CELLS, Mat, euler};
 /// path (`meshes/...`, `textures/...`) that sees only the files the games ship, not a mod's.
 #[derive(Clone, Copy)]
 pub struct OwnSource<'a> {
-    /// The references of the listed models in the world (`lodwright_core::objects::references_of_models` with
-    /// [`OWN_ONLY_MODELS`]).
+    /// The references of the models the request names for this world
+    /// (`lodwright_core::objects::references_of_models`).
     pub references: &'a [Instance],
     /// The object bounds of the base objects, by absolute `FormID` (`lodwright_core::objects::base_bounds`).
     pub bounds: &'a HashMap<u32, [i16; 6]>,
     /// The bytes of a shipped file, or `None` when there is none.
     pub read: &'a (dyn Fn(&str) -> Option<Vec<u8>> + Sync),
 }
-
-/// The 18 models whose far shapes only Tale of Two Wastelands' own far blocks carry, by path below `meshes`.
-///
-/// Why these: over the Capital Wasteland the shipped level 4 blocks hold geometry that the plugins' flags do not
-/// select; measured reference by reference it is the model that decides, with a hit rate of 100 per cent for every
-/// reference of these models and under 0.3 per cent for any other (same-flag siblings such as `RWStraightStone01`
-/// are not in the shipped blocks). The tombstones, the gas station and the ruined house have `_lod` models in the
-/// archives that no flag selects; the nine building kit pieces, the hotel wall and the barber sign have none.
-pub const OWN_ONLY_MODELS: [&str; 18] = [
-    "clutter/tombstone/tombstone01.nif",
-    "clutter/tombstone/tombstone02.nif",
-    "clutter/tombstone/tombstone03.nif",
-    "clutter/tombstone/tombstone04.nif",
-    "clutter/tombstone/tombstone05.nif",
-    "architecture/wasteland/gasstation01.nif",
-    "architecture/suburban/houseruined01.nif",
-    "architecture/urban/buildingkits/bld06mid02.nif",
-    "architecture/urban/buildingkits/bld05corner01.nif",
-    "architecture/urban/buildingkits/bld12corner01.nif",
-    "architecture/urban/buildingkits/bldangledstrdouble01.nif",
-    "architecture/urban/buildingkits/bldangledcor01.nif",
-    "architecture/urban/buildingkits/bld07corner01.nif",
-    "architecture/urban/buildingkits/bld12incorner01.nif",
-    "architecture/urban/buildingkits/bld06corner03.nif",
-    "architecture/urban/buildingkits/bld02cornervarient01.nif",
-    "architecture/urban/hotelwall01.nif",
-    "architecture/urban/signage/signbarber01.nif",
-];
-
-/// The world the list was measured over. Other worlds keep their output byte for byte.
-pub const OWN_ONLY_WORLD: &str = "Wasteland";
 
 /// Slack, in the object's own units, around its bounds: the bounds are whole numbers and a far model may stand a little
 /// proud of the full model.
@@ -358,12 +326,12 @@ pub(crate) fn warn(
         (
             "own_far_blocks_not_found",
             &found.no_block,
-            "the far blocks Tale of Two Wastelands ships are not in the load order, so these objects are left out of the far view",
+            "the shipped far blocks that should hold them are not in the load order, so these objects are left out of the far view",
         ),
         (
             "own_far_objects_not_found",
             &found.no_shape,
-            "the far blocks Tale of Two Wastelands ships hold no shape at these references, so they are left out of the far view",
+            "the shipped far blocks hold no shape at these references, so they are left out of the far view",
         ),
     ] {
         if by_model.is_empty() {
@@ -371,7 +339,7 @@ pub(crate) fn warn(
         }
         let count: u64 = by_model.values().sum();
         let message = format!(
-            "{count} objects of {} models that only those far blocks draw: {what}",
+            "{count} objects of {} models the request takes from shipped far blocks: {what}",
             by_model.len()
         );
         report.records.push(lodwright_contract::WarningRecord::new(

@@ -150,9 +150,9 @@ pub fn references_with_model(
 }
 
 /// The references in world `world` (absolute `FormID`) whose base object's model is one of `models` (paths relative to
-/// `meshes`, any case and either separator), whether or not anything marks them visible from far. Deleted references
-/// and every initially disabled reference are left out, persistent ones too: a disabled object must stay hidden until
-/// the game enables it, and a far block cannot follow that. Static collections are not expanded.
+/// `meshes`, any case and either separator), whether or not anything marks them visible from far. Deleted references,
+/// every initially disabled reference (persistent ones too) and every reference with an enable parent are left out: a
+/// far block cannot follow what a script enables. Static collections are not expanded.
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -161,11 +161,29 @@ pub fn references_of_models(
     world: u32,
     models: &[&str],
 ) -> Result<Vec<Instance>, Error> {
+    if models.is_empty() {
+        return Ok(Vec::new());
+    }
     let key = |m: &str| {
         let m = m.to_ascii_lowercase().replace('\\', "/");
         m.strip_prefix("meshes/").map_or(m.clone(), str::to_owned)
     };
     let wanted: std::collections::HashSet<String> = models.iter().map(|m| key(m)).collect();
+    // the winning record of a reference decides whether it has an enable parent
+    let mut enable_parent: HashMap<u32, bool> = HashMap::new();
+    for (index, (_, plugin)) in plugins.iter().enumerate() {
+        let table = master_table(plugins, plugin)?;
+        let own = u32::try_from(index).map_err(|_| Error::Malformed("too many plugins"))?;
+        for source in plugin
+            .worlds
+            .iter()
+            .filter(|w| absolute(w.form_id, &table, own) == world)
+        {
+            for r in &source.refs {
+                enable_parent.insert(absolute(r.form_id, &table, own), r.enable_parent);
+            }
+        }
+    }
     Ok(gather(plugins, world, false, false, &|base, flags| {
         flags & INITIALLY_DISABLED == 0
             && base
@@ -175,6 +193,7 @@ pub fn references_of_models(
     })?
     .into_iter()
     .map(|(instance, _, _)| instance)
+    .filter(|i| !enable_parent.get(&i.reference).copied().unwrap_or(false))
     .collect())
 }
 
@@ -509,6 +528,25 @@ mod tests {
         )];
         let world = plugins[0].1.worlds[0].form_id;
         let found = super::references_of_models(&plugins, world, &["a/wall.nif"]).unwrap();
+        assert_eq!(
+            found.iter().map(|i| i.reference).collect::<Vec<_>>(),
+            vec![0x200]
+        );
+    }
+
+    #[test]
+    fn references_of_models_leave_a_reference_with_an_enable_parent_out() {
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a/wall.nif", 0)],
+            vec![
+                refr(0x200, 0x100, 0, 1.0),
+                with_enable_parent(refr(0x201, 0x100, 0, 2.0)),
+            ],
+        );
+        let found =
+            super::references_of_models(&[("A.esm".to_owned(), p)], 0x0000_0A00, &["a/wall.nif"])
+                .unwrap();
         assert_eq!(
             found.iter().map(|i| i.reference).collect::<Vec<_>>(),
             vec![0x200]

@@ -756,20 +756,20 @@ pub fn generate(
                         )
                         .with_detail(e)
                     })?;
-            // the references only the far blocks the games ship draw (see `lodwright_gen::OWN_ONLY_MODELS`): their
-            // shapes are read from the games' own archives, never from a mod's
+            // the models the request takes from the shipped far blocks in this world: their shapes are read from the
+            // games' own archives, never from a mod's
+            let own_models: Vec<&str> = request
+                .objects
+                .shapes_from_shipped_blocks
+                .iter()
+                .filter(|rule| rule.world.eq_ignore_ascii_case(world.name()))
+                .flat_map(|rule| rule.models.iter().map(String::as_str))
+                .collect();
             let own_references = lodwright_gen::filter_instances(
                 lodwright_core::objects::references_of_models(
                     &loaded.plugins,
                     world.form_id(),
-                    if world
-                        .name()
-                        .eq_ignore_ascii_case(lodwright_gen::OWN_ONLY_WORLD)
-                    {
-                        &lodwright_gen::OWN_ONLY_MODELS
-                    } else {
-                        &[]
-                    },
+                    &own_models,
                 )
                 .map_err(|e| load_order_error(&e))?,
                 &request.inclusion,

@@ -219,6 +219,13 @@
           "description": "Write object LOD.",
           "type": "boolean",
           "default": true
+        },
+        "shapes_from_shipped_blocks": {
+          "description": "Objects whose far shape is taken from the far blocks the games ship, by world and model. Only enabled\nreferences without an enable parent are taken. Empty by default; written only when set.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ShippedShapeRule"
+          }
         }
       }
     },
@@ -231,6 +238,27 @@
           "type": "boolean"
         }
       }
+    },
+    "ShippedShapeRule": {
+      "description": "One world's models whose far shape is taken from the far blocks the games ship.",
+      "type": "object",
+      "properties": {
+        "models": {
+          "description": "Model paths relative to `meshes`, in any case and with either separator.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "world": {
+          "description": "The worldspace's editor id, in any case. A world the load order does not have is ignored.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "world",
+        "models"
+      ]
     },
     "TerrainRequest": {
       "description": "Terrain settings.",

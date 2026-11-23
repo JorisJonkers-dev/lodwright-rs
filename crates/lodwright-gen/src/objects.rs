@@ -381,6 +381,41 @@ fn flat(width: u32, height: u32, rgba: [u8; 4]) -> Image {
     Image::new(width, height, px).expect("a small flat image")
 }
 
+/// `f` over `items` on up to `threads` threads, the results in the order of `items` (so anything made from them is the
+/// same for any thread count). One thread, or a single item, runs on the calling thread.
+fn par_map<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let workers = threads.min(items.len());
+    if workers <= 1 {
+        return items.iter().map(f).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let slots: Vec<std::sync::Mutex<Option<R>>> =
+        items.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(item) = items.get(i) else {
+                        break;
+                    };
+                    let made = f(item);
+                    *slots[i]
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(made);
+                }
+            });
+        }
+    });
+    slots
+        .into_iter()
+        .filter_map(|m| {
+            m.into_inner()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        })
+        .collect()
+}
+
 fn load_texture(assets: &dyn Assets, key: &str) -> Option<Image> {
     read_texture(assets, key).ok()
 }
@@ -659,8 +694,10 @@ pub fn generate_objects_with_atlas_limit(
     }
     diffuse_keys.insert(NONE.to_owned());
     let mut images: BTreeMap<String, Image> = BTreeMap::new();
-    for k in &diffuse_keys {
-        match read_texture(assets, k) {
+    let keys: Vec<&String> = diffuse_keys.iter().collect();
+    let decoded = par_map(&keys, surfaces.threads, |k| read_texture(assets, k));
+    for (k, read) in keys.into_iter().zip(decoded) {
+        match read {
             Ok(img) => {
                 images.insert(k.clone(), img);
             }
@@ -694,13 +731,24 @@ pub fn generate_objects_with_atlas_limit(
     phase("atlas");
     let atlases = pack_pages(&sizes, largest);
     for (page, atlas) in atlases.iter().enumerate() {
+        let rects: Vec<(&String, &Rect)> = atlas.rects.iter().collect();
+        // the textures that need resizing, and the normal maps, are made on the worker threads; the pages are
+        // filled in order afterwards
+        let diffuse_small = par_map(&rects, surfaces.threads, |(k, r)| {
+            let img = &images[*k];
+            if (img.width(), img.height()) == (r.w, r.h) {
+                None
+            } else {
+                resize(img, r.w, r.h, Filter::Box).ok()
+            }
+        });
         let mut diffuse = vec![0_u8; (atlas.width * atlas.height * 4) as usize];
-        for (k, r) in &atlas.rects {
-            let img = &images[k];
+        for ((k, r), small) in rects.iter().zip(&diffuse_small) {
+            let img = &images[*k];
             if (img.width(), img.height()) == (r.w, r.h) {
                 blit(&mut diffuse, atlas.width, img, r);
-            } else if let Ok(small) = resize(img, r.w, r.h, Filter::Box) {
-                blit(&mut diffuse, atlas.width, &small, r);
+            } else if let Some(small) = small {
+                blit(&mut diffuse, atlas.width, small, r);
             }
         }
         let (nw, nh) = ((atlas.width / 2).max(4), (atlas.height / 2).max(4));
@@ -708,19 +756,20 @@ pub fn generate_objects_with_atlas_limit(
         for px in normal.as_chunks_mut::<4>().0 {
             px.copy_from_slice(&[128, 128, 255, 255]);
         }
-        for (k, r) in &atlas.rects {
+        let halves = par_map(&rects, surfaces.threads, |(k, r)| {
             let half = Rect {
                 x: r.x / 2,
                 y: r.y / 2,
                 w: (r.w / 2).max(1),
                 h: (r.h / 2).max(1),
             };
-            let Some(img) = normal_of.get(k).and_then(|n| load_texture(assets, n)) else {
-                continue;
-            };
-            if let Ok(small) = resize(&img, half.w, half.h, Filter::Box) {
-                blit(&mut normal, nw, &small, &half);
-            }
+            let img = normal_of.get(*k).and_then(|n| load_texture(assets, n))?;
+            resize(&img, half.w, half.h, Filter::Box)
+                .ok()
+                .map(|small| (half, small))
+        });
+        for (half, small) in halves.iter().flatten() {
+            blit(&mut normal, nw, small, half);
         }
         let [diffuse_path, normal_path] = layout::atlas_page_paths(world, page)?;
         let diffuse_image = Image::new(atlas.width, atlas.height, diffuse)?;
@@ -874,4 +923,19 @@ pub fn generate_objects_with_atlas_limit(
     }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::par_map;
+
+    #[test]
+    fn par_map_returns_the_results_in_the_order_of_the_items_for_any_thread_count() {
+        let items: Vec<u32> = (0..257).collect();
+        let expected: Vec<u32> = items.iter().map(|n| n * 3 + 1).collect();
+        for threads in [0, 1, 2, 4, 16, 1000] {
+            assert_eq!(par_map(&items, threads, |n| n * 3 + 1), expected);
+        }
+        assert_eq!(par_map(&Vec::<u32>::new(), 4, |n| *n), [] as [u32; 0]);
+    }
 }

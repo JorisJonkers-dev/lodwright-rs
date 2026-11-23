@@ -495,10 +495,10 @@ pub fn generate(
         request.trees.enabled,
         request.output.pack,
     );
-    let threads = request.limits.threads.map_or_else(
-        crate::budget::default_threads,
-        |n| n as usize,
-    );
+    let threads = request
+        .limits
+        .threads
+        .map_or_else(crate::budget::default_threads, |n| n as usize);
     let need_assets =
         request.objects.enabled || request.trees.enabled || request.terrain.land_textures;
     clock.begin("assets_index", None);

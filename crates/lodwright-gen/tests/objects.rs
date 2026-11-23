@@ -1352,7 +1352,8 @@ fn shipped_files(out: &std::path::Path) -> HashMap<String, Vec<u8>> {
                     .strip_prefix(root)
                     .unwrap()
                     .to_string_lossy()
-                    .to_lowercase().replace(\'\\\', "/");
+                    .to_lowercase();
+                let rel = rel.replace('\\', "/");
                 all.insert(rel, std::fs::read(e.path()).unwrap());
             }
         }

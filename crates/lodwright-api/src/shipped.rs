@@ -126,9 +126,11 @@ pub(crate) fn plan<'a>(
                 .to_ascii_lowercase()
         })
         .collect();
+    // the packed output of an earlier run may be in the data folder too, and its stub is not among the plugins
+    let own = format!("{}.bsa", crate::pack::ARCHIVE_BASE).to_ascii_lowercase();
     let skip = Box::new(move |archive: &str| {
         let archive = archive.to_ascii_lowercase();
-        others.iter().any(|stem| archive.starts_with(stem.as_str()))
+        archive == own || others.iter().any(|stem| archive.starts_with(stem.as_str()))
     });
     let settings = layout::settings_path(world.name())
         .ok()
@@ -320,6 +322,21 @@ mod tests {
         // a mod that changes the land of cell (5, 0) composes the block x4 only
         let (kept, _) = keep_for(&dir, vec![cell(5, 0, 9.0)]);
         assert_eq!(kept, vec![true, false, false, false]);
+    }
+
+    /// A packed output of an earlier run is in the data folder while the next run reads it, and its stub is not in
+    /// the request's plugins: its tiles are not the game's.
+    #[test]
+    fn the_archive_of_an_earlier_packed_run_is_not_the_games() {
+        let dir = data_folder("own-archive", 0);
+        let tile = |x: i32| {
+            format!("textures\\landscape\\lod\\wasteland\\diffuse\\wasteland.n.level4.x{x}.y0.dds")
+        };
+        archive(
+            &dir.join("Lodwright LOD.bsa"),
+            &[(&tile(8), b"ours"), (&tile(12), b"ours")],
+        );
+        assert_eq!(keep_for(&dir, Vec::new()).0, vec![true, true, false, false]);
     }
 
     #[test]

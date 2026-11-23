@@ -318,7 +318,7 @@ mod tests {
     fn resizing_and_mip_chains_give_the_same_bytes_at_any_thread_count() {
         // 300 by 200 has enough rows to be cut into several bands, and a pattern that every filter tap sees
         let pixels: Vec<u8> = (0..300 * 200 * 4)
-            .map(|i: u32| (i.wrapping_mul(2_654_435_761) >> 13) as u8)
+            .map(|i: u32| u8::try_from((i.wrapping_mul(2_654_435_761) >> 13) & 0xFF).unwrap())
             .collect();
         let image = Image::new(300, 200, pixels).unwrap();
         for filter in [Filter::Box, Filter::Lanczos3] {

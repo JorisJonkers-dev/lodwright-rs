@@ -253,6 +253,15 @@ pub fn advice_for(kind: &str) -> &'static str {
             "The LOD model was found but cannot be read. Reinstall the mod that provides it, or remove its LOD \
              model so that the objects are left out."
         }
+        "far_model_simplified" => {
+            "Nothing is wrong: the request asked for far shapes from full models, and these models have no LOD model of \
+             their own. Their far shapes are simplified copies. An authored LOD model, where a mod ships one, is used \
+             instead."
+        }
+        "far_model_no_solid_shape" => {
+            "These models have only see-through shapes, such as effects or glass, so no far shape is made from them and \
+             the objects stay out of the far view. Install a mod that ships a LOD model if you want them drawn."
+        }
         "lod_shape_without_texture" => {
             "A shape of a LOD model names no diffuse texture. Lodwright takes the texture of the full model where it \
              can, else draws a flat colour; ask the author of the model's mod for a fixed LOD model."

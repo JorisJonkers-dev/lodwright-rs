@@ -50,15 +50,18 @@ level 4 object blocks of the Capital Wasteland alone hold about 1.66 million. Dr
 a large addition for thin objects, so the target is roughly a tenth of the triangles. Whether lamp posts keep a usable
 silhouette at that rate is unmeasured.
 
-**Building our own add-on is possible but is the last step.** Generating far blocks locally from rules needs no
-redistribution at all and is the recommended path. Publishing an add-on would need the mod author's permission.
+**Building our own add-on is possible but is the last step.** Generating far blocks locally from rules is the
+recommended path. Publishing an add-on would need the mod author's permission.
 
-## Open before any redistribution
+## Permissions and existing add-ons
 
-- **Permissions are not verified.** The mod's page (Nexus Mods, New Vegas, mod 76230) refused automated reading, and its
-  local metadata holds no permission text. An owner must read its permissions tab.
-- **No existing LOD add-on was found** in public web searches for this mod, but the same site's pages could not be
-  opened, so this is not proof that none exists.
+- **The mod's reuse terms are unverified.** Nexus Mods' API exposes no permissions field, the mod's page (New Vegas, mod
+  76230) refused automated reading, and its local metadata holds no permission text. Nothing derived from the mod may be
+  published until someone has read its permissions on that page.
+- **Generating on the user's machine avoids redistribution.** Far shapes made at generation time from the user's own
+  copy of the mod stay on that machine, so the recommended path does not depend on those terms.
+- **No existing LOD add-on was found.** A name search of Nexus Mods' New Vegas listing for "street lights",
+  "streetlights" and "street light LOD", and public web searches, found none. A name search cannot prove that none exists.
 
 ## Synthetic fixture plan
 

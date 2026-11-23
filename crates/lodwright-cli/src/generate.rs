@@ -133,6 +133,7 @@ pub fn generate(options: &Options) -> ResultDoc {
             doc
         }
     };
-    doc.peak_memory_mib = peak_memory_mib();
+    // a run that profiled its steps reset the kernel's peak at each one: its own maximum is the run's peak
+    doc.peak_memory_mib = doc.peak_memory_mib.max(peak_memory_mib());
     doc
 }

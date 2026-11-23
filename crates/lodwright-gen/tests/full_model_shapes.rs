@@ -45,12 +45,18 @@ fn av(properties: Vec<i32>) -> AvObject {
 }
 
 /// A model with one flat grid of `size` squares, textured; `alpha` makes the shape see-through.
-#[allow(clippy::too_many_lines, reason = "one literal NIF")]
 fn grid_model(size: u16, alpha: bool) -> Vec<u8> {
+    grid_model_with_first_height(size, alpha, 0.0)
+}
+
+/// The same model with the height of its first vertex given.
+#[allow(clippy::too_many_lines, reason = "one literal NIF")]
+fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Vec<u8> {
     let row = size + 1;
-    let vertices: Vec<[f32; 3]> = (0..row)
+    let mut vertices: Vec<[f32; 3]> = (0..row)
         .flat_map(|j| (0..row).map(move |i| [f32::from(i) * 4.0, f32::from(j) * 4.0, 0.0]))
         .collect();
+    vertices[0][2] = first_height;
     let uv: Vec<[f32; 2]> = (0..row)
         .flat_map(|j| {
             (0..row).map(move |i| {
@@ -337,6 +343,23 @@ fn a_model_whose_shapes_all_have_an_alpha_property_stays_out_and_is_reported() {
 }
 
 #[test]
+fn a_solid_model_that_cannot_be_simplified_is_not_called_see_through() {
+    let store = assets(&[(
+        "meshes/a/broken.nif",
+        grid_model_with_first_height(8, false, f32::NAN),
+    )]);
+    let (report, out) = run(
+        "cannot-simplify",
+        &[instance("a\\Broken.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(kinds(&report), ["far_model_without_lod_model"]);
+}
+
+#[test]
 fn a_static_collection_with_parts_is_not_also_drawn_as_its_own_model() {
     let store = assets(&[
         ("meshes/a/collection.nif", grid_model(16, false)),
@@ -353,11 +376,14 @@ fn a_static_collection_with_parts_is_not_also_drawn_as_its_own_model() {
         .find(|r| r.kind == "far_model_simplified")
         .unwrap();
     assert_eq!(simplified.subjects, ["meshes/a/piece.nif"]);
-    assert!(
-        block_triangles(&out) <= 128 / 4,
-        "{}",
-        block_triangles(&out)
+    let (_, alone) = run(
+        "collection-piece-alone",
+        &[instance("a\\Piece.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
     );
+    assert_eq!(block_triangles(&out), block_triangles(&alone));
 }
 
 #[test]

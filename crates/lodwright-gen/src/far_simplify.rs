@@ -210,6 +210,13 @@ pub(crate) fn far_parts_from_full_model(parts: Vec<Part>, limits: FarLimits) -> 
 /// One shape simplified, holding only the vertices its triangles still use. `None` when the shape cannot be simplified
 /// or nothing of it is left.
 fn simplify_part(part: Part, locked: &[bool], limits: FarLimits) -> Option<Part> {
+    if part
+        .tangents
+        .as_ref()
+        .is_some_and(|(t, b)| t.len() != part.vertices.len() || b.len() != part.vertices.len())
+    {
+        return None;
+    }
     // a constant normal adds no error, for a shape that has none
     let flat = vec![[0.0, 0.0, 1.0]; part.vertices.len()];
     let triangles: Vec<[u32; 3]> = part.triangles.iter().map(|t| t.map(u32::from)).collect();
@@ -229,8 +236,9 @@ fn simplify_part(part: Part, locked: &[bool], limits: FarLimits) -> Option<Part>
     }
     let mut kept: BTreeMap<u32, u16> = BTreeMap::new();
     for index in simplified.triangles.iter().flatten() {
-        let next = u16::try_from(kept.len()).ok()?;
-        kept.entry(*index).or_insert(next);
+        if !kept.contains_key(index) {
+            kept.insert(*index, u16::try_from(kept.len()).ok()?);
+        }
     }
     let mut order: Vec<(u16, usize)> = kept
         .iter()

@@ -527,7 +527,15 @@ fn shapes_from_full_models(
     let made = par_map(&wanted, threads, |lod| {
         let bytes = assets.read(full_of.get(lod)?)?;
         let parts = parse_lod_model(&bytes).ok()?;
-        Some(far_parts_from_full_model(parts, limits))
+        if parts
+            .iter()
+            .filter(|part| !part.triangles.is_empty())
+            .all(|part| part.alpha)
+        {
+            return Some(None);
+        }
+        // a model that cannot be simplified stays an ordinary model without a LOD model
+        far_parts_from_full_model(parts, limits).map(Some)
     });
     let (mut simplified, mut no_solid_shape) = (BTreeSet::new(), BTreeSet::new());
     for (lod, result) in wanted.into_iter().zip(made) {

@@ -50,7 +50,7 @@ pub struct Options {
     pub no_trees: bool,
     /// `--no-water`: leave the water planes out of the terrain blocks.
     pub no_water: bool,
-    /// `generate`: worker threads; 0 chooses from the machine (at most 4).
+    /// `generate`: worker threads; 0 uses every core of the machine.
     pub threads: usize,
 }
 

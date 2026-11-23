@@ -222,7 +222,7 @@ pub struct Inclusion {
 /// Resource limits.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Limits {
-    /// Worker threads; omitted means the machine decides (at most four).
+    /// Worker threads; omitted means every core of the machine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threads: Option<u32>,
     /// A memory budget in MiB, advisory: the run refuses early when the plugins alone are expected to need more.

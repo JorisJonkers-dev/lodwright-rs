@@ -70,6 +70,12 @@ pub(crate) fn pack_staging(
     mut progress: impl FnMut(u64, u64),
 ) -> Result<Vec<ManifestFile>, Error> {
     let names = PackedNames::new(ARCHIVE_BASE).map_err(|e| failed("bad archive name", e))?;
+    // worlds share the tree billboard textures, so the list can name one file several times: it is packed once
+    let mut seen = std::collections::HashSet::with_capacity(files.len());
+    let files: Vec<&ManifestFile> = files
+        .iter()
+        .filter(|f| seen.insert(f.path.to_ascii_lowercase()))
+        .collect();
     let total = files.len() as u64;
     let mut entries = Vec::with_capacity(files.len());
     for (i, file) in files.iter().enumerate() {
@@ -98,7 +104,7 @@ pub(crate) fn pack_staging(
         write(&names.plugin, &stub_plugin(master.0, master.1))?,
     ];
     // only now, with the archive on disk, do the loose files go
-    for file in files {
+    for file in &files {
         std::fs::remove_file(stage.join(&file.path))
             .map_err(|e| failed(&format!("cannot remove {} after packing it", file.path), e))?;
     }
@@ -174,6 +180,34 @@ mod tests {
             names,
             [format!("{ARCHIVE_BASE}.bsa"), format!("{ARCHIVE_BASE}.esp")]
         );
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["Lodwright LOD.bsa", "Lodwright LOD.esp"]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Worlds share the tree billboard textures, so a run's list names such a file once per world.
+    #[test]
+    fn a_file_that_several_worlds_list_is_packed_once() {
+        let dir =
+            std::env::temp_dir().join(format!("lodwright-pack-unit-shared-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("textures/landscape/trees")).unwrap();
+        std::fs::write(dir.join("textures/landscape/trees/shared.dds"), b"tree").unwrap();
+        std::fs::create_dir_all(dir.join("meshes/a")).unwrap();
+        std::fs::write(dir.join("meshes/a/x.nif"), b"mesh").unwrap();
+        let shared = "textures/landscape/trees/shared.dds";
+        let files = vec![file(shared), file("meshes/a/x.nif"), file(shared)];
+        let mut seen = Vec::new();
+        let packed = pack_staging(&dir, &files, ("Island.esm", 5), |done, of| {
+            seen.push((done, of));
+        })
+        .unwrap();
+        assert_eq!(packed.len(), 2);
+        assert_eq!(seen, [(1, 2), (2, 2)]);
         let mut left: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())

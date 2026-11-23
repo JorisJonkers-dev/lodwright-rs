@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.16.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.15.1...v0.16.0) (2026-11-23)
+
+
+### Features
+
+* **api:** the result profiles every step with time, CPU time, peak memory and files ([#377](https://github.com/JorisJonkers-dev/lodwright-rs/issues/377)) ([6f5c180](https://github.com/JorisJonkers-dev/lodwright-rs/commit/6f5c180924d370e88c657485cf9f67342be37c35))
+* **cli:** lodwright landmarks reports whether named landmarks are written ([#376](https://github.com/JorisJonkers-dev/lodwright-rs/issues/376)) ([57d3b02](https://github.com/JorisJonkers-dev/lodwright-rs/commit/57d3b0259438c3a4ac8a535d25221013374e41ab)), closes [#375](https://github.com/JorisJonkers-dev/lodwright-rs/issues/375)
+* **generate:** one warning per plugin for far models without a LOD model, a file with every warning ([#362](https://github.com/JorisJonkers-dev/lodwright-rs/issues/362)) ([96c34ed](https://github.com/JorisJonkers-dev/lodwright-rs/commit/96c34ed2985ed3f8cd7afa47e691c6312bb7dce7))
+* **objects:** take far shapes from shipped blocks for the models a request names ([#387](https://github.com/JorisJonkers-dev/lodwright-rs/issues/387)) ([cc2d488](https://github.com/JorisJonkers-dev/lodwright-rs/commit/cc2d48891ad0fee31eb645d19dad81d79d956a53))
+* **objects:** warn per LOD model without a diffuse texture; count the warnings left out ([#306](https://github.com/JorisJonkers-dev/lodwright-rs/issues/306)) ([7a9ff6c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/7a9ff6cb452924fd8895e1ada470e1e08839a9ed))
+* **terrain:** far land is lit as the near land is, and a game tile is used only where it already matches ([#351](https://github.com/JorisJonkers-dev/lodwright-rs/issues/351)) ([4edbe60](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4edbe603bf2a8450a96507d44c1c3a72188ddf3d))
+* **terrain:** leave the game's own far-land tiles where no mod changed the land ([#334](https://github.com/JorisJonkers-dev/lodwright-rs/issues/334)) ([458d7bf](https://github.com/JorisJonkers-dev/lodwright-rs/commit/458d7bf5204ae0de88348e9a85bad1c9dcf4afe4))
+
+
+### Bug Fixes
+
+* **cli:** --threads replaces the thread count of a request file ([#380](https://github.com/JorisJonkers-dev/lodwright-rs/issues/380)) ([67c5469](https://github.com/JorisJonkers-dev/lodwright-rs/commit/67c5469424ff5087d3a867795bd4eb29625c6688))
+* **dds:** read BC7 far textures with lodwright's own decoder instead of a flat colour ([#360](https://github.com/JorisJonkers-dev/lodwright-rs/issues/360)) ([aebb809](https://github.com/JorisJonkers-dev/lodwright-rs/commit/aebb809b8c986ce1991fc1e8fd44cc77bcbe3d4a))
+* **generate:** a land texture that no folder or archive holds is its own warning kind ([#345](https://github.com/JorisJonkers-dev/lodwright-rs/issues/345)) ([#363](https://github.com/JorisJonkers-dev/lodwright-rs/issues/363)) ([cf67f76](https://github.com/JorisJonkers-dev/lodwright-rs/commit/cf67f76245864e49acc79b8e3c0c433f66710e4f))
+* **generate:** an output written by another version is rebuilt, not reported up to date ([#300](https://github.com/JorisJonkers-dev/lodwright-rs/issues/300)) ([660953b](https://github.com/JorisJonkers-dev/lodwright-rs/commit/660953b58d60956244f53a6f05ab7b4d28bd9719))
+* **nif:** an object block carries its origin on the shape, as the game's blocks do ([#295](https://github.com/JorisJonkers-dev/lodwright-rs/issues/295)) ([0b43529](https://github.com/JorisJonkers-dev/lodwright-rs/commit/0b43529486ca531a1f3e2ce03c3316f97014f14a))
+* **objects:** a block over the 16-bit triangle limit is written as several shapes, not a failed run ([#354](https://github.com/JorisJonkers-dev/lodwright-rs/issues/354)) ([bcdfb37](https://github.com/JorisJonkers-dev/lodwright-rs/commit/bcdfb375b1e4b254e11633980587579d52d44272))
+* **objects:** a far-model shape with no texture takes the full model's texture instead of a flat grey ([#357](https://github.com/JorisJonkers-dev/lodwright-rs/issues/357)) ([e00acf0](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e00acf02bfdc6ea5912287ed110bc2340f973cba))
+* **objects:** a reference deleted by a later plugin drops out of object LOD ([#302](https://github.com/JorisJonkers-dev/lodwright-rs/issues/302)) ([faa9fda](https://github.com/JorisJonkers-dev/lodwright-rs/commit/faa9fdac7d3ac8d0c6ec6c2e29e4247ac9805575))
+* **objects:** a texture coordinate outside the texture is held at its edge, as the game's blocks do ([#322](https://github.com/JorisJonkers-dev/lodwright-rs/issues/322)) ([157a10b](https://github.com/JorisJonkers-dev/lodwright-rs/commit/157a10b66e8a1bf21064141dbf0f6862bd170f54))
+* **objects:** an object block's segment table has one segment per cell, as the game's blocks do ([#328](https://github.com/JorisJonkers-dev/lodwright-rs/issues/328)) ([8d9f24e](https://github.com/JorisJonkers-dev/lodwright-rs/commit/8d9f24ec61764cc168cf57897efb2ad91cbc84d0))
+* **objects:** each shape of a block names its own texture set, so far objects on a second atlas page draw with that page ([#359](https://github.com/JorisJonkers-dev/lodwright-rs/issues/359)) ([47f1adc](https://github.com/JorisJonkers-dev/lodwright-rs/commit/47f1adcd6e19674581a96285d6a3a1fe7aa4e47e))
+* **objects:** keep every far-object texture at its native size on several atlases instead of halving them all ([#355](https://github.com/JorisJonkers-dev/lodwright-rs/issues/355)) ([b0a2679](https://github.com/JorisJonkers-dev/lodwright-rs/commit/b0a2679727fe976768f7c381dbcf339714f63a2a))
+* **objects:** keep persistent initially disabled references in object LOD, as the game's own blocks do ([#350](https://github.com/JorisJonkers-dev/lodwright-rs/issues/350)) ([cf20f3a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/cf20f3ac003ad6dba453c2496d7db16f874dd083))
+* **objects:** leave initially disabled references out of object LOD, as xLODGen does ([#341](https://github.com/JorisJonkers-dev/lodwright-rs/issues/341)) ([61cca87](https://github.com/JorisJonkers-dev/lodwright-rs/commit/61cca87776c4846f3d3eb4c863688ea35e0bf3b4))
+* **objects:** read the texture set of a BSLightingShaderProperty so Skyrim-stream LOD models are not drawn flat ([#304](https://github.com/JorisJonkers-dev/lodwright-rs/issues/304)) ([5311e02](https://github.com/JorisJonkers-dev/lodwright-rs/commit/5311e0237ea632c1b334f6626c369afdc928a709))
+* **objects:** read uncompressed DDS textures for object LOD and land, and tell a missing texture from an unreadable one ([#336](https://github.com/JorisJonkers-dev/lodwright-rs/issues/336)) ([4a2ad4a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4a2ad4a4b41f2ef161e8401931e665b68bb0a54b))
+* **objects:** write a block that passes the 16-bit vertex limit as several shapes instead of leaving objects out ([#348](https://github.com/JorisJonkers-dev/lodwright-rs/issues/348)) ([b70a5f3](https://github.com/JorisJonkers-dev/lodwright-rs/commit/b70a5f31c0f2c31d1a8e94bb00f2f5ebc8fffdcd))
+* **terrain:** a quadrant without a base texture shows the game's default land texture ([#329](https://github.com/JorisJonkers-dev/lodwright-rs/issues/329)) ([b53d067](https://github.com/JorisJonkers-dev/lodwright-rs/commit/b53d0673136e10d320477f06023b7395606527b5))
+* **terrain:** a world with land beyond 128 cells gets the game's 128 cell window ([#308](https://github.com/JorisJonkers-dev/lodwright-rs/issues/308)) ([4fe7309](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4fe7309e6aae094050b29494ec79005061f22d53))
+* **terrain:** judge whether the game's far-land tiles match the near land once per world ([#353](https://github.com/JorisJonkers-dev/lodwright-rs/issues/353)) ([df9ce93](https://github.com/JorisJonkers-dev/lodwright-rs/commit/df9ce933f64544296bf54d5f3a5664f62e25eb37))
+* **terrain:** skirts are on by default so blocks of different levels leave no cracks ([#330](https://github.com/JorisJonkers-dev/lodwright-rs/issues/330)) ([f0c8d1f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/f0c8d1f2373d689233fc75586d9b23a46b23384d))
+* **terrain:** the far land of a world is filled as the game's own tiles are: a flat default colour, the Strip's brown, grey outside the cells ([#333](https://github.com/JorisJonkers-dev/lodwright-rs/issues/333)) ([d581d15](https://github.com/JorisJonkers-dev/lodwright-rs/commit/d581d15fb365c4a118edb71e209dcef9ac1cb17d))
+* **terrain:** water walls on the block border and a level 4 overlap, on by default ([#331](https://github.com/JorisJonkers-dev/lodwright-rs/issues/331)) ([bbb90b8](https://github.com/JorisJonkers-dev/lodwright-rs/commit/bbb90b8238aa9648a74b91fd606af833d8e33b02))
+* **verify:** node translations are checked, so an object block with its origin on the root fails ([#298](https://github.com/JorisJonkers-dev/lodwright-rs/issues/298)) ([01f9059](https://github.com/JorisJonkers-dev/lodwright-rs/commit/01f9059f85193f32a4d839bce2c2c19ebac073d4))
+
+
+### Performance Improvements
+
+* **api:** assemble the base load order once and decode land textures on several threads ([#382](https://github.com/JorisJonkers-dev/lodwright-rs/issues/382)) ([c868043](https://github.com/JorisJonkers-dev/lodwright-rs/commit/c8680430a99586500cee654a92459db6ebbde7ba))
+* **api:** every core works by default, held to three quarters of the machine's memory ([#378](https://github.com/JorisJonkers-dev/lodwright-rs/issues/378)) ([ae40fb4](https://github.com/JorisJonkers-dev/lodwright-rs/commit/ae40fb4af5a4a921ad1458fcbb69ee6b0827a6e8))
+* **core:** do not score the triangles of the border vertices ([#384](https://github.com/JorisJonkers-dev/lodwright-rs/issues/384)) ([9d687c0](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9d687c004cd58ab40be71e8d1aa55504463d089a))
+* **dds:** encode the atlas pages on several threads with identical bytes ([#379](https://github.com/JorisJonkers-dev/lodwright-rs/issues/379)) ([e3675d8](https://github.com/JorisJonkers-dev/lodwright-rs/commit/e3675d8ad4735655296e20c018eb4984833eb4dc))
+* **dds:** resample mip levels on several threads, find the tree bases once ([#383](https://github.com/JorisJonkers-dev/lodwright-rs/issues/383)) ([f85215a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/f85215ad8217e6c45f25c1db4f6350b4f2553976))
+* **gen:** decode textures and make atlas textures and normal maps on several threads ([#381](https://github.com/JorisJonkers-dev/lodwright-rs/issues/381)) ([5f11541](https://github.com/JorisJonkers-dev/lodwright-rs/commit/5f1154196cde5aa1612130ab31db3164a5e0d4fd))
+
 ## [0.15.1](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.15.0...v0.15.1) (2026-11-21)
 
 

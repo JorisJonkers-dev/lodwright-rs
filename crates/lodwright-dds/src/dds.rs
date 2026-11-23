@@ -7,7 +7,7 @@
 
 use crate::error::{DdsError, Result};
 use crate::image::{Image, check_dimensions};
-use crate::resize::{Filter, mip_chain, mip_count, mip_size};
+use crate::resize::{Filter, mip_chain_with_threads, mip_count, mip_size};
 use ddsfile::{D3DFormat, Dds, FourCC, NewD3dParams};
 use std::io::Cursor;
 use texpresso::{Algorithm, Params};
@@ -271,7 +271,7 @@ pub fn encode_with_threads(
     threads: usize,
 ) -> Result<Vec<u8>> {
     let chain = if options.mips {
-        mip_chain(image, options.filter)?
+        mip_chain_with_threads(image, options.filter, threads)?
     } else {
         vec![image.clone()]
     };

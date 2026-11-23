@@ -21,4 +21,6 @@ pub use dds::{
 };
 pub use error::{DdsError, Result};
 pub use image::{Image, MAX_DIMENSION, adjust_brightness_contrast, apply_gamma, check_dimensions};
-pub use resize::{Filter, mip_chain, mip_count, mip_size, resize};
+pub use resize::{
+    Filter, mip_chain, mip_chain_with_threads, mip_count, mip_size, resize, resize_with_threads,
+};

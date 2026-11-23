@@ -110,11 +110,52 @@ fn to_u8(v: f32) -> u8 {
     }
 }
 
+/// Rows (of source or target) below which a pass runs on the calling thread: starting threads would cost more.
+const MIN_ROWS_PER_BAND: usize = 64;
+
+/// Run `fill(first_row, rows)` over `buffer` cut into bands of whole rows (`row_len` values each), on up to `threads`
+/// threads. Every row is made on its own from the same inputs, so the values do not depend on the cut.
+fn fill_rows<T: Send>(
+    buffer: &mut [T],
+    row_len: usize,
+    threads: usize,
+    fill: impl Fn(usize, &mut [T]) + Sync,
+) {
+    let rows = buffer.len().checked_div(row_len).unwrap_or(0);
+    let bands = threads.min(rows / MIN_ROWS_PER_BAND).max(1);
+    if bands == 1 {
+        fill(0, buffer);
+        return;
+    }
+    let per_band = rows.div_ceil(bands);
+    std::thread::scope(|scope| {
+        for (i, chunk) in buffer.chunks_mut(per_band * row_len).enumerate() {
+            let fill = &fill;
+            scope.spawn(move || fill(i * per_band, chunk));
+        }
+    });
+}
+
 /// Resample `image` to `width` by `height`.
 ///
 /// # Errors
 /// [`crate::DdsError::BadDimensions`] for a target of zero or above the cap.
 pub fn resize(image: &Image, width: u32, height: u32, filter: Filter) -> Result<Image> {
+    resize_with_threads(image, width, height, filter, 1)
+}
+
+/// [`resize`] with the rows of each pass made on up to `threads` threads. The bytes are the same for any thread count:
+/// every output row is computed on its own, in the same order of operations.
+///
+/// # Errors
+/// As [`resize`].
+pub fn resize_with_threads(
+    image: &Image,
+    width: u32,
+    height: u32,
+    filter: Filter,
+    threads: usize,
+) -> Result<Image> {
     check_dimensions(width, height)?;
     let (sw, sh) = (image.width() as usize, image.height() as usize);
     let (dw, dh) = (width as usize, height as usize);
@@ -122,35 +163,41 @@ pub fn resize(image: &Image, width: u32, height: u32, filter: Filter) -> Result<
 
     let htaps = taps(sw, dw, filter);
     let mut mid = vec![0.0_f32; dw * sh * 4];
-    for y in 0..sh {
-        for (x, tap) in htaps.iter().enumerate() {
-            let mut acc = [0.0_f32; 4];
-            for (k, w) in tap.weights.iter().enumerate() {
-                let at = (y * sw + tap.start + k) * 4;
-                for c in 0..4 {
-                    acc[c] += w * f32::from(src[at + c]);
+    fill_rows(&mut mid, dw * 4, threads, |first, band| {
+        for (r, row) in band.chunks_mut(dw * 4).enumerate() {
+            let y = first + r;
+            for (x, tap) in htaps.iter().enumerate() {
+                let mut acc = [0.0_f32; 4];
+                for (k, w) in tap.weights.iter().enumerate() {
+                    let at = (y * sw + tap.start + k) * 4;
+                    for c in 0..4 {
+                        acc[c] += w * f32::from(src[at + c]);
+                    }
                 }
+                row[x * 4..x * 4 + 4].copy_from_slice(&acc);
             }
-            mid[(y * dw + x) * 4..(y * dw + x) * 4 + 4].copy_from_slice(&acc);
         }
-    }
+    });
 
     let vtaps = taps(sh, dh, filter);
     let mut out = vec![0_u8; dw * dh * 4];
-    for (y, tap) in vtaps.iter().enumerate() {
-        for x in 0..dw {
-            let mut acc = [0.0_f32; 4];
-            for (k, w) in tap.weights.iter().enumerate() {
-                let at = ((tap.start + k) * dw + x) * 4;
+    fill_rows(&mut out, dw * 4, threads, |first, band| {
+        for (r, row) in band.chunks_mut(dw * 4).enumerate() {
+            let tap = &vtaps[first + r];
+            for x in 0..dw {
+                let mut acc = [0.0_f32; 4];
+                for (k, w) in tap.weights.iter().enumerate() {
+                    let at = ((tap.start + k) * dw + x) * 4;
+                    for c in 0..4 {
+                        acc[c] += w * mid[at + c];
+                    }
+                }
                 for c in 0..4 {
-                    acc[c] += w * mid[at + c];
+                    row[x * 4 + c] = to_u8(acc[c]);
                 }
             }
-            for c in 0..4 {
-                out[(y * dw + x) * 4 + c] = to_u8(acc[c]);
-            }
         }
-    }
+    });
     Image::new(width, height, out)
 }
 
@@ -159,12 +206,20 @@ pub fn resize(image: &Image, width: u32, height: u32, filter: Filter) -> Result<
 /// # Errors
 /// Never for a valid [`Image`]; the signature carries the resize error.
 pub fn mip_chain(image: &Image, filter: Filter) -> Result<Vec<Image>> {
+    mip_chain_with_threads(image, filter, 1)
+}
+
+/// [`mip_chain`] with each level resampled on up to `threads` threads (the same bytes for any thread count).
+///
+/// # Errors
+/// As [`mip_chain`].
+pub fn mip_chain_with_threads(image: &Image, filter: Filter, threads: usize) -> Result<Vec<Image>> {
     let levels = mip_count(image.width(), image.height());
     let mut chain = Vec::with_capacity(levels as usize);
     chain.push(image.clone());
     for level in 1..levels {
         let (w, h) = mip_size(image.width(), image.height(), level);
-        let next = resize(&chain[level as usize - 1], w, h, filter)?;
+        let next = resize_with_threads(&chain[level as usize - 1], w, h, filter, threads)?;
         chain.push(next);
     }
     Ok(chain)
@@ -257,5 +312,33 @@ mod tests {
     #[test]
     fn a_one_by_one_image_has_a_chain_of_one() {
         assert_eq!(mip_chain(&flat(1, 1, 3), Filter::Box).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn resizing_and_mip_chains_give_the_same_bytes_at_any_thread_count() {
+        // 300 by 200 has enough rows to be cut into several bands, and a pattern that every filter tap sees
+        let pixels: Vec<u8> = (0..300 * 200 * 4)
+            .map(|i: u32| u8::try_from((i.wrapping_mul(2_654_435_761) >> 13) & 0xFF).unwrap())
+            .collect();
+        let image = Image::new(300, 200, pixels).unwrap();
+        for filter in [Filter::Box, Filter::Lanczos3] {
+            let one = resize_with_threads(&image, 150, 100, filter, 1).unwrap();
+            let odd = resize_with_threads(&image, 97, 61, filter, 1).unwrap();
+            let chain = mip_chain_with_threads(&image, filter, 1).unwrap();
+            for threads in [0, 2, 3, 16, 1000] {
+                assert_eq!(
+                    resize_with_threads(&image, 150, 100, filter, threads).unwrap(),
+                    one
+                );
+                assert_eq!(
+                    resize_with_threads(&image, 97, 61, filter, threads).unwrap(),
+                    odd
+                );
+                assert_eq!(
+                    mip_chain_with_threads(&image, filter, threads).unwrap(),
+                    chain
+                );
+            }
+        }
     }
 }

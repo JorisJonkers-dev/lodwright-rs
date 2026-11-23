@@ -699,8 +699,10 @@ mod tests {
         let mut rng = Rng::new(7);
         let mut samples: Vec<f32> = (0..span * span)
             .map(|i| {
-                let (x, y) = ((i % span) as f32, (i / span) as f32);
-                (x * 0.3).sin() * 40.0 + (y * 0.2).cos() * 25.0 + rng.below(600) as f32 / 100.0
+                // integer terms only: the same field on every platform
+                let (x, y) = (i % span, i / span);
+                let ridge = ((x * 7 + y * 3) % 23) as f32 * 3.0 + ((x * y) % 17) as f32 * 2.0;
+                ridge + rng.below(600) as f32 / 100.0
             })
             .collect();
         for y in 20..30 {
@@ -729,7 +731,7 @@ mod tests {
                 meshed.mesh.vertices.len(),
                 meshed.mesh.indices.len()
             ),
-            (0xe4c2_fab1_5b69_02e5, 392, 2025)
+            (0x0c64_7891_098c_590b_u64, 393, 2031)
         );
     }
 }

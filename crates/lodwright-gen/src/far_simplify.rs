@@ -171,16 +171,21 @@ fn position_key(vertex: [f32; 3], offset: [f32; 3]) -> [u32; 3] {
     [0, 1, 2].map(|axis| (vertex[axis] + offset[axis] + 0.0).to_bits())
 }
 
-/// The far shapes of a full model: its solid shapes, simplified. A corner that two shapes share stays where it is, so
-/// no crack opens between them. See-through shapes are left out. `None` when no solid shape is left.
+/// The far shapes of a full model, simplified. A corner that two shapes share stays where it is, so no crack opens
+/// between them. `None` when every shape has an alpha property: such a model may be an effect or glass, and the
+/// property alone does not tell, so it gets no far shape. In a model with a shape without one, all shapes are kept,
+/// because many solid models carry the property on most of their shapes.
 pub(crate) fn far_parts_from_full_model(parts: Vec<Part>, limits: FarLimits) -> Option<Vec<Part>> {
-    let solid: Vec<Part> = parts
+    let shapes: Vec<Part> = parts
         .into_iter()
-        .filter(|part| !part.alpha && !part.triangles.is_empty())
+        .filter(|part| !part.triangles.is_empty())
         .collect();
+    if shapes.iter().all(|part| part.alpha) {
+        return None;
+    }
     let mut owners: HashMap<[u32; 3], usize> = HashMap::new();
     let mut shared: HashSet<[u32; 3]> = HashSet::new();
-    for (index, part) in solid.iter().enumerate() {
+    for (index, part) in shapes.iter().enumerate() {
         for vertex in &part.vertices {
             let key = position_key(*vertex, part.offset);
             if *owners.entry(key).or_insert(index) != index {
@@ -188,8 +193,8 @@ pub(crate) fn far_parts_from_full_model(parts: Vec<Part>, limits: FarLimits) -> 
             }
         }
     }
-    let mut far = Vec::with_capacity(solid.len());
-    for part in solid {
+    let mut far = Vec::with_capacity(shapes.len());
+    for part in shapes {
         let locked: Vec<bool> = part
             .vertices
             .iter()
@@ -316,11 +321,13 @@ mod tests {
     }
 
     #[test]
-    fn see_through_shapes_are_left_out_and_a_model_of_only_those_has_no_far_shape() {
+    fn a_model_keeps_its_alpha_shapes_unless_it_has_no_other() {
         let far =
             far_parts_from_full_model(vec![grid(0, 8, false), grid(20, 8, true)], LIMITS).unwrap();
-        assert_eq!(far.len(), 1);
-        assert!(!far[0].alpha);
+        assert_eq!(
+            far.iter().map(|p| p.alpha).collect::<Vec<_>>(),
+            [false, true]
+        );
         assert_eq!(
             far_parts_from_full_model(vec![grid(0, 8, true)], LIMITS),
             None

@@ -475,7 +475,7 @@ fn far_model_records(
         let what = match kind {
             "far_model_unreadable" => "their LOD models cannot be read",
             "far_model_not_found" => "neither a LOD model nor the full model is in the load order",
-            "far_model_no_solid_shape" => "their full models have no solid shape to simplify",
+            "far_model_no_solid_shape" => "every shape of their full models has an alpha property",
             _ => "no LOD model exists for them in the game or any mod",
         };
         let message = format!(

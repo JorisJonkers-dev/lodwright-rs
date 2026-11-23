@@ -323,7 +323,7 @@ fn an_authored_lod_model_is_used_instead_of_the_full_model() {
 }
 
 #[test]
-fn a_model_with_only_see_through_shapes_stays_out_and_is_reported() {
+fn a_model_whose_shapes_all_have_an_alpha_property_stays_out_and_is_reported() {
     let store = assets(&[("meshes/a/glass.nif", grid_model(8, true))]);
     let (report, out) = run(
         "see-through",

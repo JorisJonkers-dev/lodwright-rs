@@ -99,7 +99,7 @@ fn shape_xf(shape: &NiTriShape) -> Xf {
 }
 
 /// The texture paths of a `BSShaderTextureSet` block: the diffuse and the normal slot.
-fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
+pub(crate) fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
     let mut at = 4;
     let count = bytes
         .get(..4)
@@ -140,7 +140,7 @@ fn skyrim_lighting_texture_set(bytes: &[u8]) -> Option<usize> {
 }
 
 /// Where a `BSShaderPPLightingProperty` links its texture set (see `game-lod-terrain-block-nif`).
-fn lighting_texture_set(bytes: &[u8]) -> Option<usize> {
+pub(crate) fn lighting_texture_set(bytes: &[u8]) -> Option<usize> {
     let b = bytes.get(34..38)?;
     usize::try_from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])).ok()
 }

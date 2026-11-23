@@ -71,10 +71,29 @@ fn a_packed_run_leaves_the_archive_the_stub_and_the_manifest_and_no_loose_file()
     assert_eq!(result.code, "generated");
     assert_eq!(
         names_in(&out),
-        ["Lodwright LOD.bsa", "Lodwright LOD.esp", "manifest.json"]
+        [
+            "Lodwright LOD.bsa",
+            "Lodwright LOD.esp",
+            "Lodwright LOD.override",
+            "manifest.json"
+        ]
     );
     let listed: Vec<String> = manifest(&out).files.into_iter().map(|f| f.path).collect();
-    assert_eq!(listed, ["Lodwright LOD.bsa", "Lodwright LOD.esp"]);
+    assert_eq!(
+        listed,
+        [
+            "Lodwright LOD.bsa",
+            "Lodwright LOD.esp",
+            "Lodwright LOD.override"
+        ]
+    );
+    assert_eq!(
+        std::fs::metadata(out.join("Lodwright LOD.override"))
+            .unwrap()
+            .len(),
+        0,
+        "the marker is empty"
+    );
     assert!(
         !out.with_file_name(format!(
             "{}.lodwright-staging",
@@ -157,7 +176,12 @@ fn the_switch_changes_neither_the_request_digest_nor_a_block() {
     assert_eq!((counts.generated, counts.up_to_date), (0, built.generated));
     assert_eq!(
         names_in(&out),
-        ["Lodwright LOD.bsa", "Lodwright LOD.esp", "manifest.json"]
+        [
+            "Lodwright LOD.bsa",
+            "Lodwright LOD.esp",
+            "Lodwright LOD.override",
+            "manifest.json"
+        ]
     );
 }
 
@@ -190,6 +214,25 @@ fn switching_the_option_off_rebuilds_the_loose_files_and_the_output_never_holds_
     );
     assert!(manifest(&out).files.iter().all(|f| f.path.contains('/')));
     assert_eq!(run(&loose_job).code, "up_to_date");
+}
+
+#[test]
+fn a_lost_override_marker_is_written_again_and_going_loose_removes_it() {
+    let (job, out) = job("marker", "Island", true, 1);
+    run(&job);
+    let marker = out.join("Lodwright LOD.override");
+    std::fs::remove_file(&marker).unwrap();
+    assert_eq!(
+        run(&job).code,
+        "generated",
+        "a packed output without its marker is not up to date"
+    );
+    assert_eq!(std::fs::metadata(&marker).unwrap().len(), 0);
+    assert_eq!(run(&job).code, "up_to_date");
+    let mut loose_job = job.clone();
+    loose_job.request.output.pack = false;
+    run(&loose_job);
+    assert!(!marker.exists(), "the marker goes with the packed form");
 }
 
 #[test]
@@ -231,7 +274,12 @@ fn a_packing_step_that_fails_leaves_the_loose_output_as_it_was() {
     assert_eq!(run(&packed_job).code, "generated");
     assert_eq!(
         names_in(&out),
-        ["Lodwright LOD.bsa", "Lodwright LOD.esp", "manifest.json"]
+        [
+            "Lodwright LOD.bsa",
+            "Lodwright LOD.esp",
+            "Lodwright LOD.override",
+            "manifest.json"
+        ]
     );
 }
 

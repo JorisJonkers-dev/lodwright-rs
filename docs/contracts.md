@@ -154,20 +154,24 @@ before. The switch is read when the run is made and is a step after the generati
 request digest (`arguments_digest` is the same with it on and off) and changes no block digest: a run that switches it
 on over a loose output keeps every block (`blocks.up_to_date` counts them) and only packs.
 
-* The output folder then holds `Lodwright LOD.bsa`, `Lodwright LOD.esp` and `manifest.json`, and nothing loose; it
+* The output folder then holds `Lodwright LOD.bsa`, `Lodwright LOD.esp`, an empty `Lodwright LOD.override` and
+  `manifest.json`, and nothing loose; it
   never holds both forms. Switching the switch off applies at the next generate, which builds the loose files again.
   A file in the output folder that the previous manifest did not list is the user's and stays.
-* The manifest lists the files on disk: the archive and the stub, each with its size and digest. It lists no block, so
+* The manifest lists the files on disk: the archive, the stub and the marker, each with its size and digest. It lists no block, so
   a run after a packed one builds every block again (the loose files the blocks were kept from are gone). `up_to_date`
-  holds for a packed output when the request digest and the inputs are unchanged, the archive and the stub are intact,
+  holds for a packed output when the request digest and the inputs are unchanged, the archive, the stub and the marker are intact,
   and the form matches the request: a packed manifest (an archive at the top of the folder) against `output.pack` off,
   or the other way round, is not up to date.
 * The archive is a v104 BSA written by `lodwright_assets::pack` (names lower case with backslashes, records in
   hash order, no embedded names), the stub a plugin with no record and one master, the first plugin of the load order with the size of its file
   (`lodwright_assets::stub`; the game opens the archives of a plugin only when its master list is not empty, so a
   stub without a master would never load its archive). Object
-  and tree textures are stored compressed, everything else stored (a performance choice, not a format fact). No
-  `.override` marker is written (it would need the JIP LN plugin). `manifest.json` is never in the archive. The
+  and tree textures are stored compressed, everything else stored (a performance choice, not a format fact). The
+  empty `.override` marker is written for every load order, so that the archive wins over an earlier archive holding
+  the same paths: without it, a load order whose own archive ships far blocks keeps those. Checked on one view in the
+  engine port only. On the original game the marker works only with the JIP LN plugin; without it the earlier archive
+  can still win, and loose output (`output.pack` off) is the way to get the generated files drawn. `manifest.json` is never in the archive. The
   archive base name is fixed, `Lodwright LOD`.
 * Packing runs last, in the staging folder, and the staging folder replaces the output only when the run succeeds: a
   run killed or failing during packing leaves the previous output exactly as it was (`pack_failed`, `pack_too_large`

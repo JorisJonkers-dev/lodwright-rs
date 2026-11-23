@@ -47,6 +47,6 @@ Measured 2026-11-23, 16 thread machine shared with other work (wall seconds, pea
 
 | threads | plain game | modded, 133 plugins |
 | --- | ---: | ---: |
-| 1 | 359 s, 3.37 GiB | 429 s, 3.44 GiB |
+| 1 | 359 s, 3.38 GiB | 429 s, 3.44 GiB |
 | 4 (the old default) | 123 s, 3.43 GiB | 169 s, 3.50 GiB |
 | 16 (the new default) | 84 s, 3.64 GiB | 140 s, 3.70 GiB |

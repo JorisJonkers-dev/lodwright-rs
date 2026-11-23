@@ -582,6 +582,12 @@ pub fn generate(
     } else {
         None
     };
+    // the tree bases do not depend on the world: found once for every world's trees
+    let tree_bases = if assets.is_some() && request.trees.enabled {
+        lodwright_core::trees::tree_bases(&loaded.plugins).map_err(|e| load_order_error(&e))?
+    } else {
+        Vec::new()
+    };
     'worlds: for world in chosen {
         // the grid every level's blocks start from, as the terrain stage finds it (after dropping outlying edges)
         let anchor = world.without_outliers().grid_anchor();
@@ -809,16 +815,15 @@ pub fn generate(
             }
             progress.report(&run.start(Step::Trees, Some(world.name())));
             clock.begin("trees", Some(world.name()));
-            let bases = lodwright_core::trees::tree_bases(&loaded.plugins)
-                .map_err(|e| load_order_error(&e))?;
+            let bases = &tree_bases;
             let refs =
-                lodwright_core::trees::tree_references(&loaded.plugins, world.form_id(), &bases)
+                lodwright_core::trees::tree_references(&loaded.plugins, world.form_id(), bases)
                     .map_err(|e| load_order_error(&e))?;
             let south_west = anchor;
             let trees = lodwright_gen::generate_trees_with_progress(
                 world.name(),
                 south_west,
-                &bases,
+                bases,
                 &refs,
                 &request.plugins,
                 assets,

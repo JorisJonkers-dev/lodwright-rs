@@ -12,6 +12,7 @@ use lodwright_core::worldspace::Worldspace;
 use lodwright_dds::{Filter, Image, resize};
 
 use crate::assets::{Assets, TextureFault, read_texture, texture_warning};
+use crate::par::par_map;
 
 /// Edge of a reduced tile in pixels.
 const TILE: u32 = 32;
@@ -329,6 +330,18 @@ impl LandTiles {
         assets: &dyn Assets,
         warnings: &mut Vec<String>,
     ) -> Self {
+        Self::load_with_threads(world, resolver, assets, warnings, 1)
+    }
+
+    /// [`LandTiles::load`] with the textures decoded on up to `threads` threads; the tiles and the warnings (in the
+    /// order of the texture ids) are the same for any thread count.
+    pub fn load_with_threads(
+        world: &Worldspace,
+        resolver: &TextureResolver,
+        assets: &dyn Assets,
+        warnings: &mut Vec<String>,
+        threads: usize,
+    ) -> Self {
         let mut ids = BTreeSet::new();
         for ((x, y), _) in world.cells() {
             if let Some(layers) = world.layers(x, y) {
@@ -336,36 +349,17 @@ impl LandTiles {
                 ids.extend(layers.alpha.iter().map(|a| a.texture));
             }
         }
+        let ids: Vec<u32> = ids.into_iter().collect();
+        let made = par_map(&ids, threads, |id| load_tile(*id, resolver, assets));
         let mut tiles = HashMap::new();
-        for id in ids {
-            let Some(path) = resolver.diffuse_path(id) else {
-                warnings.push(format!("land texture {id:08X} names no texture"));
-                continue;
-            };
-            let key = format!("textures/{}", path.replace('\\', "/"));
-            let image = match read_texture(assets, &key) {
-                Ok(image) => image,
-                Err(fault) => {
-                    warnings.push(texture_warning("land texture", &key, &fault, ""));
-                    continue;
+        for (id, made) in ids.into_iter().zip(made) {
+            match made {
+                Ok(tile) => {
+                    if let Some(tile) = tile {
+                        tiles.insert(id, tile);
+                    }
                 }
-            };
-            if let Some(rgb) = reduce(&image) {
-                let up = resolver
-                    .normal_path(id)
-                    .map(|path| format!("textures/{}", path.replace('\\', "/")))
-                    .and_then(|key| read_texture(assets, &key).ok())
-                    .and_then(|normal| mean_up(&normal))
-                    .unwrap_or(1.0);
-                tiles.insert(
-                    id,
-                    Tile {
-                        rgb,
-                        scale: Scale::ONE,
-                        specular: resolver.specular_exponent(id),
-                        up: Scale(up.to_bits()),
-                    },
-                );
+                Err(warning) => warnings.push(warning),
             }
         }
         Self {
@@ -374,6 +368,35 @@ impl LandTiles {
             default: None,
         }
     }
+}
+
+/// The tile of land texture `id`: `Err` with the warning when it names no texture or cannot be read, `Ok(None)` when
+/// the picture cannot be reduced.
+fn load_tile(
+    id: u32,
+    resolver: &TextureResolver,
+    assets: &dyn Assets,
+) -> Result<Option<Tile>, String> {
+    let Some(path) = resolver.diffuse_path(id) else {
+        return Err(format!("land texture {id:08X} names no texture"));
+    };
+    let key = format!("textures/{}", path.replace('\\', "/"));
+    let image = read_texture(assets, &key)
+        .map_err(|fault| texture_warning("land texture", &key, &fault, ""))?;
+    Ok(reduce(&image).map(|rgb| {
+        let up = resolver
+            .normal_path(id)
+            .map(|path| format!("textures/{}", path.replace('\\', "/")))
+            .and_then(|key| read_texture(assets, &key).ok())
+            .and_then(|normal| mean_up(&normal))
+            .unwrap_or(1.0);
+        Tile {
+            rgb,
+            scale: Scale::ONE,
+            specular: resolver.specular_exponent(id),
+            up: Scale(up.to_bits()),
+        }
+    }))
 }
 
 /// The mean up component of a tangent-space normal map: the blue channel of each normalised vector, over all pixels.

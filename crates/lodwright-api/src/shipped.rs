@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap};
 use lodwright_core::layout::{self, BlockId};
 use lodwright_core::lod::LodSettings;
 use lodwright_core::plugin::Plugin;
-use lodwright_core::shipped::{changed_cells, is_game_archive, is_game_master};
+use lodwright_core::shipped::{ShippedBase, is_game_archive, is_game_master};
 use lodwright_core::texture::TextureResolver;
 use lodwright_core::worldspace::Worldspace;
 use lodwright_gen::{FolderAssets, ShippedPatch, Winner};
@@ -108,6 +108,7 @@ impl Keep<'_> {
 /// starts or is missing: nothing is left out then, as a tile of the same name would cover other cells.
 pub(crate) fn plan<'a>(
     world: &Worldspace,
+    base: &ShippedBase,
     plugins: &[(String, Plugin)],
     resolver: &TextureResolver,
     assets: &'a FolderAssets,
@@ -148,7 +149,7 @@ pub(crate) fn plan<'a>(
         }
         return Ok(None);
     }
-    let mut changed = changed_cells(plugins, world, resolver, &|name| is_game_master(name))?;
+    let mut changed = base.changed_cells(world, resolver)?;
     changed.extend(retextured_cells(world, resolver, assets));
     Ok(Some(Keep {
         world: world.name().to_owned(),
@@ -205,6 +206,7 @@ mod tests {
     use lodwright_core::layers::CellLayers;
     use lodwright_core::lod::LodSettings;
     use lodwright_core::plugin::{LandCell, Plugin, World};
+    use lodwright_core::shipped::{ShippedBase, is_game_master};
     use lodwright_core::texture::TextureResolver;
     use lodwright_core::worldspace::{Inheritance, WorldIndex};
     use lodwright_gen::FolderAssets;
@@ -291,7 +293,17 @@ mod tests {
         let names: Vec<String> = plugins.iter().map(|(n, _)| n.clone()).collect();
         let assets = FolderAssets::open(dir, &names).unwrap();
         let mut warnings = Vec::new();
-        let keep = plan(&world, &plugins, &resolver, &assets, (0, 0), &mut warnings).unwrap();
+        let base = ShippedBase::new(&plugins, &|n| is_game_master(n)).unwrap();
+        let keep = plan(
+            &world,
+            &base,
+            &plugins,
+            &resolver,
+            &assets,
+            (0, 0),
+            &mut warnings,
+        )
+        .unwrap();
         let decisions = [0, 4, 8, 12]
             .map(|x| keep.as_ref().is_some_and(|k| k.keeps(4, (x, 0))))
             .to_vec();
@@ -376,8 +388,10 @@ mod tests {
         let resolver = TextureResolver::from_load_order(&plugins).unwrap();
         let names: Vec<String> = plugins.iter().map(|(n, _)| n.clone()).collect();
         let assets = FolderAssets::open(&dir, &names).unwrap();
+        let base = ShippedBase::new(&plugins, &|n| is_game_master(n)).unwrap();
         let keep = plan(
             &world,
+            &base,
             &plugins,
             &resolver,
             &assets,

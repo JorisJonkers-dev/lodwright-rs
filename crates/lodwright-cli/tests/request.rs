@@ -266,3 +266,28 @@ fn progress_events_are_one_json_line_per_block_in_the_events_file() {
             .all(|e| matches!(e, lodwright_contract::Event::Block { done: 1, of: 1, .. }))
     );
 }
+
+#[test]
+fn a_thread_count_on_the_command_line_replaces_the_one_in_the_request_file() {
+    let d = data("threads");
+    let out = temp("threads-out");
+    let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
+    request.limits.threads = Some(1);
+    let file = write_request(&out, &request);
+    let (code, doc) = go(&[
+        "generate",
+        "--request",
+        file.to_str().unwrap(),
+        "--threads",
+        "2",
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{doc}");
+    let mut two = request.clone();
+    two.limits.threads = Some(2);
+    assert_eq!(doc["arguments_digest"], two.digest());
+    // without the flag the request's own count stands
+    let (code, doc) = go(&["generate", "--request", file.to_str().unwrap(), "--json"]);
+    assert_eq!(code, 0, "{doc}");
+    assert_eq!(doc["arguments_digest"], request.digest());
+}

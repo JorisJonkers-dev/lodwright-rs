@@ -756,6 +756,43 @@ pub fn generate(
                         )
                         .with_detail(e)
                     })?;
+            // the references only the far blocks the games ship draw (see `lodwright_gen::OWN_ONLY_MODELS`): their
+            // shapes are read from the games' own archives, never from a mod's
+            let own_references = lodwright_gen::filter_instances(
+                lodwright_core::objects::references_of_models(
+                    &loaded.plugins,
+                    world.form_id(),
+                    if world
+                        .name()
+                        .eq_ignore_ascii_case(lodwright_gen::OWN_ONLY_WORLD)
+                    {
+                        &lodwright_gen::OWN_ONLY_MODELS
+                    } else {
+                        &[]
+                    },
+                )
+                .map_err(|e| load_order_error(&e))?,
+                &request.inclusion,
+                &request.plugins,
+            )
+            .map_err(|e| {
+                Error::new(
+                    "request_invalid",
+                    "the request's inclusion rules are not valid",
+                )
+                .with_detail(e)
+            })?;
+            let own_bounds = if own_references.is_empty() {
+                std::collections::HashMap::new()
+            } else {
+                lodwright_core::objects::base_bounds(&loaded.plugins)
+                    .map_err(|e| load_order_error(&e))?
+            };
+            let read_own = |path: &str| {
+                assets.shipped_read(path, &|archive| {
+                    !lodwright_core::shipped::is_game_archive(archive)
+                })
+            };
             let ground = |x: f32, y: f32| world.ground_height(x, y);
             let water = |x: f32, y: f32| {
                 // source: cell-size-units
@@ -777,6 +814,11 @@ pub fn generate(
                 plugins: &request.plugins,
                 phase: Some(&phase),
                 threads,
+                own: Some(lodwright_gen::OwnSource {
+                    references: &own_references,
+                    bounds: &own_bounds,
+                    read: &read_own,
+                }),
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

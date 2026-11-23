@@ -149,6 +149,59 @@ pub fn references_with_model(
     )
 }
 
+/// The references in world `world` (absolute `FormID`) whose base object's model is one of `models` (paths relative to
+/// `meshes`, any case and either separator), whether or not anything marks them visible from far. Deleted references
+/// and every initially disabled reference are left out, persistent ones too: a disabled object must stay hidden until
+/// the game enables it, and a far block cannot follow that. Static collections are not expanded.
+///
+/// # Errors
+/// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+pub fn references_of_models(
+    plugins: &[(String, Plugin)],
+    world: u32,
+    models: &[&str],
+) -> Result<Vec<Instance>, Error> {
+    let key = |m: &str| {
+        let m = m.to_ascii_lowercase().replace('\\', "/");
+        m.strip_prefix("meshes/").map_or(m.clone(), str::to_owned)
+    };
+    let wanted: std::collections::HashSet<String> = models.iter().map(|m| key(m)).collect();
+    Ok(gather(plugins, world, false, false, &|base, flags| {
+        flags & INITIALLY_DISABLED == 0
+            && base
+                .model
+                .as_deref()
+                .is_some_and(|m| wanted.contains(&key(m)))
+    })?
+    .into_iter()
+    .map(|(instance, _, _)| instance)
+    .collect())
+}
+
+/// The object bounds (`OBND`) of every base object by absolute `FormID`, as the winning record states them.
+///
+/// # Errors
+/// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+pub fn base_bounds(plugins: &[(String, Plugin)]) -> Result<HashMap<u32, [i16; 6]>, Error> {
+    let mut out = HashMap::new();
+    for (index, (_, plugin)) in plugins.iter().enumerate() {
+        let table = master_table(plugins, plugin)?;
+        let own = u32::try_from(index).map_err(|_| Error::Malformed("too many plugins"))?;
+        for base in &plugin.objects {
+            let id = absolute(base.form_id, &table, own);
+            match base.bounds {
+                Some(b) => {
+                    out.insert(id, b);
+                }
+                None => {
+                    out.remove(&id);
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[allow(clippy::too_many_lines)] // one pass over the load order, then one over the references
 fn gather(
     plugins: &[(String, Plugin)],
@@ -434,6 +487,32 @@ mod tests {
         );
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
         assert_eq!(out.len(), 1);
+    }
+
+    #[test]
+    fn references_of_models_match_any_spelling_and_leave_every_disabled_reference_out() {
+        let plugins = vec![(
+            "a.esm".to_owned(),
+            plugin(
+                &[],
+                vec![
+                    stat(0x100, "Meshes\\A\\Wall.NIF", 0),
+                    stat(0x101, "a\\other.nif", 0),
+                ],
+                vec![
+                    refr(0x200, 0x100, 0, 1.0),
+                    refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                    refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                    refr(0x203, 0x101, 0, 4.0),
+                ],
+            ),
+        )];
+        let world = plugins[0].1.worlds[0].form_id;
+        let found = super::references_of_models(&plugins, world, &["a/wall.nif"]).unwrap();
+        assert_eq!(
+            found.iter().map(|i| i.reference).collect::<Vec<_>>(),
+            vec![0x200]
+        );
     }
 
     #[test]

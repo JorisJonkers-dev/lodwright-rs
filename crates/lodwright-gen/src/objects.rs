@@ -20,6 +20,7 @@ use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, LARGEST_ATLAS, Rect, pack_pages};
 use crate::error::GenError;
 use crate::lodmodel::{Part, parse_lod_model};
+use crate::own_far::{self, OwnSource};
 use crate::terrain::{FileRecord, write_file};
 
 const CELL_UNITS: f32 = 4096.0;
@@ -73,6 +74,8 @@ pub struct Surfaces<'a> {
     /// Worker threads for the steps that spread over them (the atlas pages are encoded on this many); 0 and 1 mean
     /// the calling thread alone. The bytes written do not depend on it.
     pub threads: usize,
+    /// The shipped far blocks to take the shapes of the references only they draw from (`own_far`); `None` takes none.
+    pub own: Option<OwnSource<'a>>,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -627,6 +630,42 @@ pub fn generate_objects_with_atlas_limit(
         .iter()
         .filter(|i| !(i.part && own_lod.contains(&i.reference)))
         .collect();
+    // the references only the shipped far blocks draw: their shapes are cut out of those blocks
+    let mut own_images: BTreeMap<String, Image> = BTreeMap::new();
+    let mut stand_ins: Vec<Instance> = Vec::new();
+    if let Some(source) = &surfaces.own {
+        let drawn: Vec<&Instance> = instances
+            .iter()
+            .copied()
+            .filter(|i| {
+                models
+                    .get(&lod_model_path(&i.model))
+                    .is_some_and(Option::is_some)
+            })
+            .collect();
+        let found = own_far::take(source, world, surfaces.grid_anchor, &drawn);
+        own_far::warn(&mut report, world, source, &found);
+        for t in found.taken {
+            let mut parts = Vec::with_capacity(t.parts.len());
+            for (part, key, image) in t.parts {
+                own_images.entry(key).or_insert(image);
+                parts.push(part);
+            }
+            models.insert(lod_model_path(&t.instance.model), Some(Model { parts }));
+            stand_ins.push(t.instance);
+        }
+    }
+    // a reference the shipped blocks cover is not also a far model that is missing
+    let covered: BTreeSet<u32> = stand_ins.iter().map(|i| i.reference).collect();
+    let instances: Vec<&Instance> = instances
+        .into_iter()
+        .filter(|i| {
+            !(covered.contains(&i.reference)
+                && models
+                    .get(&lod_model_path(&i.model))
+                    .is_none_or(Option::is_none))
+        })
+        .collect();
     far_model_records(
         &mut report,
         world,
@@ -636,6 +675,7 @@ pub fn generate_objects_with_atlas_limit(
         &unreadable,
         assets,
     );
+    let instances: Vec<&Instance> = instances.into_iter().chain(stand_ins.iter()).collect();
     if models.values().all(Option::is_none) {
         report.skipped = instances.len();
         return Ok(report);
@@ -660,7 +700,15 @@ pub fn generate_objects_with_atlas_limit(
     }
     diffuse_keys.insert(NONE.to_owned());
     let mut images: BTreeMap<String, Image> = BTreeMap::new();
-    let keys: Vec<&String> = diffuse_keys.iter().collect();
+    let keys: Vec<&String> = diffuse_keys
+        .iter()
+        .filter(|k| !own_images.contains_key(*k))
+        .collect();
+    for (k, image) in &own_images {
+        if diffuse_keys.contains(k) {
+            images.insert(k.clone(), image.clone());
+        }
+    }
     let decoded = par_map(&keys, surfaces.threads, |k| read_texture(assets, k));
     for (k, read) in keys.into_iter().zip(decoded) {
         match read {

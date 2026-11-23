@@ -19,6 +19,7 @@ mod atlas;
 mod correlation;
 mod diffuse;
 mod error;
+mod far_simplify;
 mod filter;
 mod images;
 mod landmarks;
@@ -39,6 +40,9 @@ pub use atlas::{Atlas, LARGEST_ATLAS, Rect, pack, pack_pages};
 pub use correlation::{TextureCorrelation, channel_correlation, compare_textures};
 pub use diffuse::{DEFAULT_LAND_TEXTURE, LandTiles, Tile, blend, default_land_texture_from_ini};
 pub use error::GenError;
+pub use far_simplify::{
+    FarLimits, FarMesh, FarSimplifyError, SimplifiedFarMesh, simplify_far_mesh,
+};
 pub use filter::{filter_instances, glob};
 pub use images::{
     ShippedPatch, diffuse_image, normal_image, normal_image_with_alpha, patch_image, specular_alpha,

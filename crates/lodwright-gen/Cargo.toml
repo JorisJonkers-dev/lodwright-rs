@@ -14,6 +14,7 @@ lodwright-core = { workspace = true }
 lodwright-contract = { workspace = true }
 lodwright-dds = { workspace = true }
 lodwright-nif = { workspace = true }
+meshopt-pure = { version = "=1.3.0", default-features = false }
 
 [dev-dependencies]
 lodwright-testkit = { workspace = true }

@@ -17,6 +17,7 @@ mod resize;
 
 pub use dds::{
     Decoded, EncodeOptions, Format, HEADER_LEN, Header, Quality, decode, decode_image, encode,
+    encode_with_threads,
     psnr, read_header,
 };
 pub use error::{DdsError, Result};

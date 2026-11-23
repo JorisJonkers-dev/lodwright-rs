@@ -12,7 +12,7 @@ use lodwright_contract::WarningRecord;
 use lodwright_core::layout;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
-use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, resize};
+use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode_with_threads, resize};
 use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
 
 use crate::assets::{Assets, read_texture, texture_warning};
@@ -69,6 +69,9 @@ pub struct Surfaces<'a> {
     /// Called with the name of each phase as it starts (`models`, `textures`, `atlas`, `blocks`), for the step
     /// profile of a run.
     pub phase: Option<&'a dyn Fn(&str)>,
+    /// Worker threads for the steps that spread over them (the atlas pages are encoded on this many); 0 and 1 mean
+    /// the calling thread alone. The bytes written do not depend on it.
+    pub threads: usize,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -382,8 +385,8 @@ fn load_texture(assets: &dyn Assets, key: &str) -> Option<Image> {
     read_texture(assets, key).ok()
 }
 
-fn encode_bc3(image: &Image) -> Result<Vec<u8>, GenError> {
-    Ok(encode(
+fn encode_bc3(image: &Image, threads: usize) -> Result<Vec<u8>, GenError> {
+    Ok(encode_with_threads(
         image,
         &EncodeOptions {
             format: Format::Bc3,
@@ -391,6 +394,7 @@ fn encode_bc3(image: &Image) -> Result<Vec<u8>, GenError> {
             filter: Filter::Box,
             quality: Quality::Fast,
         },
+        threads.max(1),
     )?)
 }
 
@@ -724,11 +728,11 @@ pub fn generate_objects_with_atlas_limit(
         report.files.push(write_file(
             out,
             &diffuse_path,
-            &encode_bc3(&diffuse_image)?,
+            &encode_bc3(&diffuse_image, surfaces.threads)?,
         )?);
         report
             .files
-            .push(write_file(out, &normal_path, &encode_bc3(&normal_image)?)?);
+            .push(write_file(out, &normal_path, &encode_bc3(&normal_image, surfaces.threads)?)?);
     }
     // blocks
     phase("blocks");

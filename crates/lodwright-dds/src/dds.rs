@@ -182,7 +182,37 @@ pub enum Quality {
     Normal,
 }
 
-fn compress(level: &Image, format: Format, quality: Quality) -> Vec<u8> {
+/// Compress rows of `pixels` (RGBA, `width` by `height`) into `out`.
+fn compress_rows(
+    pixels: &[u8],
+    width: usize,
+    height: usize,
+    format: Format,
+    params: Params,
+    out: &mut [u8],
+) {
+    // BC1 here stores opaque colour: the encoder would otherwise read alpha below 128 as the transparent index
+    // and flatten those pixels to black.
+    let opaque: Vec<u8>;
+    let pixels = if format == Format::Bc1 {
+        opaque = pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .flat_map(|p| [p[0], p[1], p[2], 255])
+            .collect();
+        &opaque[..]
+    } else {
+        pixels
+    };
+    format.texpresso().compress(pixels, width, height, params, out);
+}
+
+/// Levels with fewer block rows than this are compressed on the calling thread: the cost of starting threads
+/// would exceed the work.
+const MIN_BLOCK_ROWS_PER_BAND: usize = 16;
+
+fn compress(level: &Image, format: Format, quality: Quality, threads: usize) -> Vec<u8> {
     let params = Params {
         algorithm: match quality {
             Quality::Fast => Algorithm::RangeFit,
@@ -191,23 +221,30 @@ fn compress(level: &Image, format: Format, quality: Quality) -> Vec<u8> {
         ..Params::default()
     };
     let (w, h) = (level.width() as usize, level.height() as usize);
-    // BC1 here stores opaque colour: the encoder would otherwise read alpha below 128 as the transparent index
-    // and flatten those pixels to black.
-    let opaque: Vec<u8>;
-    let pixels = if format == Format::Bc1 {
-        opaque = level
-            .rgba()
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .flat_map(|p| [p[0], p[1], p[2], 255])
-            .collect();
-        &opaque[..]
-    } else {
-        level.rgba()
-    };
     let mut out = vec![0_u8; format.texpresso().compressed_size(w, h)];
-    format.texpresso().compress(pixels, w, h, params, &mut out);
+    // every 4 by 4 block is compressed on its own, so bands of whole block rows give the bytes of one pass
+    let block_rows = h.div_ceil(4);
+    let bands = threads.min(block_rows / MIN_BLOCK_ROWS_PER_BAND).max(1);
+    if bands == 1 {
+        compress_rows(level.rgba(), w, h, format, params, &mut out);
+        return out;
+    }
+    let rows_per_band = block_rows.div_ceil(bands);
+    let row_bytes = w.div_ceil(4) * format.block_bytes();
+    std::thread::scope(|scope| {
+        let mut rest = &mut out[..];
+        let mut first = 0;
+        while first < block_rows {
+            let rows = rows_per_band.min(block_rows - first);
+            let (band, tail) = rest.split_at_mut(rows * row_bytes);
+            rest = tail;
+            let y0 = first * 4;
+            let y1 = ((first + rows) * 4).min(h);
+            let pixels = &level.rgba()[y0 * w * 4..y1 * w * 4];
+            scope.spawn(move || compress_rows(pixels, w, y1 - y0, format, params, band));
+            first += rows;
+        }
+    });
     out
 }
 
@@ -217,6 +254,20 @@ fn compress(level: &Image, format: Format, quality: Quality) -> Vec<u8> {
 /// [`DdsError::Container`] if the container library refuses the sizes (cannot happen for an [`Image`]).
 // source: dds-header-layout, dds-pixel-format, dds-fourcc-formats, dds-header-flags-caps, dds-linear-size-pitch
 pub fn encode(image: &Image, options: &EncodeOptions) -> Result<Vec<u8>> {
+    encode_with_threads(image, options, 1)
+}
+
+/// [`encode`] with the blocks of each level compressed on up to `threads` threads. The bytes are the same for any
+/// thread count: blocks are compressed independently and written in the same order.
+///
+/// # Errors
+/// As [`encode`].
+// source: dds-header-layout, dds-pixel-format, dds-fourcc-formats, dds-header-flags-caps, dds-linear-size-pitch
+pub fn encode_with_threads(
+    image: &Image,
+    options: &EncodeOptions,
+    threads: usize,
+) -> Result<Vec<u8>> {
     let chain = if options.mips {
         mip_chain(image, options.filter)?
     } else {
@@ -243,7 +294,7 @@ pub fn encode(image: &Image, options: &EncodeOptions) -> Result<Vec<u8>> {
     }
     let mut data = Vec::with_capacity(dds.data.len());
     for level in &chain {
-        data.extend_from_slice(&compress(level, options.format, options.quality));
+        data.extend_from_slice(&compress(level, options.format, options.quality, threads));
     }
     if data.len() != dds.data.len() {
         return Err(DdsError::Container(

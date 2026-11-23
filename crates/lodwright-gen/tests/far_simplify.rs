@@ -156,7 +156,31 @@ fn the_error_limit_stops_a_rough_surface_before_the_triangle_target() {
         "{} triangles left",
         out.triangles.len()
     );
+    assert!(
+        out.triangles.len() < grid.triangles.len(),
+        "nothing was simplified"
+    );
     assert!(out.error <= 0.001, "error {}", out.error);
+}
+
+/// 50 triangles at 0.1 is exactly 5. Widening the `f32` share first gives 5.00000007, which would round up to 6.
+#[test]
+fn a_share_that_lands_on_a_whole_triangle_count_is_not_rounded_up() {
+    let grid = Grid::new(5, None, |_, _| 0.0);
+    assert_eq!(grid.triangles.len(), 50);
+    let out = simplify_far_mesh(
+        grid.mesh(&[]),
+        FarLimits {
+            keep: 0.1,
+            max_error: 0.01,
+        },
+    )
+    .unwrap();
+    assert!(
+        out.triangles.len() <= 5,
+        "{} triangles left",
+        out.triangles.len()
+    );
 }
 
 #[test]
@@ -282,6 +306,51 @@ fn invalid_input_is_refused() {
             max_error: f32::NAN,
         },
     ] {
+        assert_eq!(
+            simplify_far_mesh(grid.mesh(&[]), limits),
+            Err(FarSimplifyError::BadLimits)
+        );
+    }
+
+    let short_lock = [false];
+    assert_eq!(
+        simplify_far_mesh(grid.mesh(&short_lock), limits),
+        Err(FarSimplifyError::VertexListsDiffer)
+    );
+
+    let mut uvs = grid.uvs.clone();
+    uvs[1][0] = f32::INFINITY;
+    let mut mesh = grid.mesh(&[]);
+    mesh.uvs = &uvs;
+    assert_eq!(
+        simplify_far_mesh(mesh, limits),
+        Err(FarSimplifyError::NotFinite)
+    );
+
+    let mut normals = grid.normals.clone();
+    normals[1][2] = f32::NAN;
+    let mut mesh = grid.mesh(&[]);
+    mesh.normals = &normals;
+    assert_eq!(
+        simplify_far_mesh(mesh, limits),
+        Err(FarSimplifyError::NotFinite)
+    );
+
+    for keep in [1.1, -0.5, f32::NAN, f32::INFINITY] {
+        let limits = FarLimits {
+            keep,
+            max_error: 0.01,
+        };
+        assert_eq!(
+            simplify_far_mesh(grid.mesh(&[]), limits),
+            Err(FarSimplifyError::BadLimits)
+        );
+    }
+    for max_error in [-0.01, f32::INFINITY] {
+        let limits = FarLimits {
+            keep: 0.5,
+            max_error,
+        };
         assert_eq!(
             simplify_far_mesh(grid.mesh(&[]), limits),
             Err(FarSimplifyError::BadLimits)

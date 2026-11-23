@@ -102,7 +102,8 @@ pub fn simplify_far_mesh(
         .collect();
     let indices: Vec<u32> = mesh.triangles.iter().flatten().copied().collect();
     let lock: Vec<u8> = mesh.locked.iter().map(|&locked| u8::from(locked)).collect();
-    let target_triangles = (mesh.triangles.len() as f64 * f64::from(limits.keep)).ceil() as usize;
+    // in f32, the type of the share: widening it first would push an exact count such as 50 * 0.1 over the next whole number
+    let target_triangles = (mesh.triangles.len() as f32 * limits.keep).ceil() as usize;
 
     let mut destination = vec![0_u32; indices.len()];
     let mut error = 0.0_f32;

@@ -44,6 +44,46 @@ pub fn linked_folder(out: &Path, rel: &str) -> Option<PathBuf> {
 /// # Errors
 /// [`GenError::LinkInOutput`] for a path that is not plain or that passes a link, [`GenError::Io`] for a failed write.
 pub fn write_output_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
+    write_output_with(out, rel, |file| file.write_all(bytes))?;
+    Ok(FileRecord {
+        path: rel.to_owned(),
+        bytes: bytes.len() as u64,
+        digest: sha256_digest(bytes),
+    })
+}
+
+/// Write `rel` under `out` as [`write_output_file`] does, with the content from `write_content`, which writes it to the fresh
+/// file; nothing is held in memory here. The record's digest is read back from the written file, a part at a time,
+/// and equals [`sha256_digest`] of the whole content.
+///
+/// # Errors
+/// As [`write_output_file`]; [`GenError::Io`] also when `write_content` fails (the `.tmp` file is then removed and the target
+/// left as it was).
+pub fn write_output_stream(
+    out: &Path,
+    rel: &str,
+    write_content: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+) -> Result<FileRecord, GenError> {
+    let target = write_output_with(out, rel, write_content)?;
+    let io = |source| GenError::Io {
+        what: rel.to_owned(),
+        source,
+    };
+    let file = std::fs::File::open(&target).map_err(io)?;
+    let len = file.metadata().map_err(io)?.len();
+    let digest = lodwright_contract::sha256_digest_of_reader(len, file).map_err(io)?;
+    Ok(FileRecord {
+        path: rel.to_owned(),
+        bytes: len,
+        digest,
+    })
+}
+
+fn write_output_with(
+    out: &Path,
+    rel: &str,
+    write_content: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+) -> Result<PathBuf, GenError> {
     let refused = || GenError::LinkInOutput {
         what: rel.to_owned(),
     };
@@ -93,19 +133,19 @@ pub fn write_output_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileReco
         .create_new(true)
         .open(&temp)
         .map_err(io)?;
-    file.write_all(bytes).map_err(io)?;
+    if let Err(e) = write_content(&mut file).and_then(|()| file.flush()) {
+        drop(file);
+        let _ = std::fs::remove_file(&temp);
+        return Err(io(e));
+    }
     drop(file);
     std::fs::rename(&temp, &target).map_err(io)?;
-    Ok(FileRecord {
-        path: rel.to_owned(),
-        bytes: bytes.len() as u64,
-        digest: sha256_digest(bytes),
-    })
+    Ok(target)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{is_plain_relative, linked_folder, write_output_file};
+    use super::{is_plain_relative, linked_folder, write_output_file, write_output_stream};
     use crate::GenError;
 
     fn temp(name: &str) -> std::path::PathBuf {
@@ -134,6 +174,34 @@ mod tests {
         assert_eq!((record.path.as_str(), record.bytes), ("a/b/c.txt", 3));
         assert!(!out.join("a/b/c.tmp").exists());
         assert_eq!(linked_folder(&out, "a/b/c.txt"), None);
+    }
+
+    #[test]
+    fn a_streamed_file_has_the_record_of_the_same_bytes_written_at_once() {
+        let out = temp("stream");
+        let bytes: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+        let streamed =
+            write_output_stream(&out, "s/a.bin", |f| std::io::Write::write_all(f, &bytes)).unwrap();
+        let whole = write_output_file(&out, "w/a.bin", &bytes).unwrap();
+        assert_eq!(
+            (streamed.bytes, &streamed.digest),
+            (whole.bytes, &whole.digest)
+        );
+        assert_eq!(std::fs::read(out.join("s/a.bin")).unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_failed_stream_leaves_the_previous_file_and_no_temp_file() {
+        let out = temp("stream-fail");
+        write_output_file(&out, "a.bsa", b"previous").unwrap();
+        let err = write_output_stream(&out, "a.bsa", |f| {
+            std::io::Write::write_all(f, b"half")?;
+            Err(std::io::Error::other("stopped"))
+        })
+        .unwrap_err();
+        assert!(matches!(err, GenError::Io { .. }), "{err}");
+        assert_eq!(std::fs::read(out.join("a.bsa")).unwrap(), b"previous");
+        assert!(!out.join("a.tmp").exists());
     }
 
     #[test]

@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use lodwright_assets::pack::{self, PackEntry, PackError};
+use lodwright_assets::pack::{self, PackError, PackSource, StreamError};
 use lodwright_assets::stub::{PackedNames, stub_plugin};
 use lodwright_contract::ManifestFile;
 
@@ -60,7 +60,7 @@ fn pack_error(e: &PackError) -> Error {
 /// beside it, remove the loose files and return the manifest entries of the three. The marker is written for every load
 /// order: without it the archive loses to an earlier archive that holds the same paths. The stub names `master` (the first plugin of the
 /// load order) with the size of its file, because the game opens a plugin's archives only when it has a master.
-/// `progress` gets the number of files read.
+/// `progress` gets the number of files listed. At most one file and its compressed copy are held in memory.
 ///
 /// # Errors
 /// `output_failed` when a file cannot be read, written or removed; `pack_too_large` when the files do not fit one
@@ -79,19 +79,55 @@ pub(crate) fn pack_staging(
         .filter(|f| seen.insert(f.path.to_ascii_lowercase()))
         .collect();
     let total = files.len() as u64;
-    let mut entries = Vec::with_capacity(files.len());
+    let mut sources = Vec::with_capacity(files.len());
     for (i, file) in files.iter().enumerate() {
-        let data = std::fs::read(stage.join(&file.path))
-            .map_err(|e| failed(&format!("cannot read {} to pack it", file.path), e))?;
-        entries.push(PackEntry {
+        let len = std::fs::metadata(stage.join(&file.path))
+            .map_err(|e| failed(&format!("cannot read {} to pack it", file.path), e))?
+            .len();
+        sources.push(PackSource {
             path: file.path.clone(),
-            data,
+            len,
             compress: compress(&file.path),
         });
         progress(i as u64 + 1, total);
     }
-    let archive = pack::write(&entries).map_err(|e| pack_error(&e))?;
-    drop(entries);
+    // One file and its compressed copy are in memory at a time: compressed copies wait in a spool file beside the
+    // archive until the index is written, the stored files are read again as their turn comes.
+    let spool_path = stage.join(format!("{ARCHIVE_BASE}.spool"));
+    let _ = std::fs::remove_file(&spool_path);
+    let mut spool = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&spool_path)
+        .map_err(|e| failed("cannot make the pack spool", e))?;
+    let mut refused = None;
+    let archive = lodwright_gen::write_output_stream(stage, &names.archive, |out| {
+        let mut out = std::io::BufWriter::with_capacity(1 << 20, out);
+        let mut read = |at: usize| std::fs::read(stage.join(&sources[at].path));
+        match pack::write_streamed(&sources, &mut read, &mut spool, &mut out) {
+            Ok(_) => std::io::Write::flush(&mut out),
+            Err(e) => {
+                let message = e.to_string();
+                refused = Some(e);
+                Err(std::io::Error::other(message))
+            }
+        }
+    });
+    drop(spool);
+    let _ = std::fs::remove_file(&spool_path);
+    let archive = match (archive, refused) {
+        (_, Some(StreamError::Pack(e))) => return Err(pack_error(&e)),
+        (_, Some(e @ StreamError::Io { .. })) => {
+            return Err(failed("cannot pack the generated files", e));
+        }
+        (Err(e), None) => return Err(failed(&format!("cannot write {}", names.archive), e)),
+        (Ok(r), None) => ManifestFile {
+            path: r.path,
+            bytes: r.bytes,
+            digest: r.digest,
+        },
+    };
     let write = |name: &str, bytes: &[u8]| {
         lodwright_gen::write_output_file(stage, name, bytes)
             .map(|r| ManifestFile {
@@ -102,7 +138,7 @@ pub(crate) fn pack_staging(
             .map_err(|e| failed(&format!("cannot write {name}"), e))
     };
     let packed = vec![
-        write(&names.archive, &archive)?,
+        archive,
         write(&names.plugin, &stub_plugin(master.0, master.1))?,
         // source: fnv-archive-loading
         write(&names.marker, b"")?,

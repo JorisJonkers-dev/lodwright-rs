@@ -17,5 +17,5 @@ pub mod stub;
 pub use bsa::{Archive, Entry};
 pub use error::Error;
 pub use extract::{ExtractError, Extracted, extract_all, extract_to_temp};
-pub use pack::{PackEntry, PackError};
+pub use pack::{PackEntry, PackError, PackSource, StreamError};
 pub use resolve::{ArchiveListing, ConflictRule, Listing, Location, Resolver};

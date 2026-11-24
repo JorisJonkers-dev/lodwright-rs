@@ -53,7 +53,7 @@ pub use landmarks::{
 pub use lodmodel::{Part, parse_lod_model};
 pub use metrics::ShapeError;
 pub use objects::{
-    BLOCK_CELLS, HeightAt, ObjectReport, RuleShapes, Surfaces, generate_objects,
+    BLOCK_CELLS, HeightAt, ObjectReport, RuleReplaces, RuleShapes, Surfaces, generate_objects,
     generate_objects_with_atlas_limit, generate_objects_with_progress,
 };
 pub use output::{is_plain_relative, linked_folder, write_output_file, write_output_stream};

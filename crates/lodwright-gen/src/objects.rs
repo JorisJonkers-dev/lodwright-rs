@@ -59,6 +59,9 @@ pub type HeightAt<'a> = &'a dyn Fn(f32, f32) -> Option<f32>;
 /// The far-shape limits a caller's rule gives one object, or `None` when no rule gives it any.
 pub type RuleShapes<'a> = &'a dyn Fn(&Instance) -> Option<FarLimits>;
 
+/// Whether a caller's rule draws one object from its full model even when it has an authored LOD model.
+pub type RuleReplaces<'a> = &'a dyn Fn(&Instance) -> bool;
+
 /// The surfaces under which object faces are left out; `None` keeps every face (the default).
 #[derive(Clone, Copy, Default)]
 pub struct Surfaces<'a> {
@@ -90,6 +93,10 @@ pub struct Surfaces<'a> {
     /// it in the glow slot of that page's shapes and give them an emissive material, so lit windows and signs glow
     /// from far at night. Off by default: the blocks and atlases are then the same bytes as without it.
     pub glow: bool,
+    /// The objects whose rule (`rule_shapes`) draws them from their full model even over an authored LOD model. A
+    /// model is replaced only when this answers yes for every drawn object that uses it, and keeps its LOD model when
+    /// its full model cannot be simplified. `None` replaces none.
+    pub rule_replaces: Option<RuleReplaces<'a>>,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -599,7 +606,7 @@ fn shapes_from_full_models(
     }
     if !simplified.is_empty() {
         let message = format!(
-            "{} models without a LOD model are drawn from far as simplified copies of their full models",
+            "{} models are drawn from far as simplified copies of their full models",
             simplified.len()
         );
         report.records.push(WarningRecord::new(
@@ -837,6 +844,22 @@ pub fn generate_objects_with_atlas_limit(
                     .is_none_or(Option::is_none))
         })
         .collect();
+    // the authored LOD models that a rule replaces: set aside, and put back when no full-model shape is made for them
+    let mut replaced: BTreeMap<String, Model> = BTreeMap::new();
+    if let Some(replaces) = surfaces.rule_replaces {
+        let mut every: BTreeMap<String, bool> = BTreeMap::new();
+        for i in &instances {
+            let lod = lod_model_path(&i.model);
+            if models.get(&lod).is_some_and(Option::is_some) {
+                *every.entry(lod).or_insert(true) &= replaces(i);
+            }
+        }
+        for (lod, yes) in every {
+            if yes && let Some(Some(model)) = models.insert(lod.clone(), None) {
+                replaced.insert(lod, model);
+            }
+        }
+    }
     let (no_solid_shape, partial) =
         if surfaces.full_models.is_some() || surfaces.rule_shapes.is_some() {
             shapes_from_full_models(
@@ -852,6 +875,11 @@ pub fn generate_objects_with_atlas_limit(
         } else {
             (BTreeSet::new(), BTreeSet::new())
         };
+    for (lod, model) in replaced {
+        if let Some(slot @ None) = models.get_mut(&lod) {
+            *slot = Some(model);
+        }
+    }
     // an object whose model was made from its full model for other objects only (a rule's `generate`) stays out
     let withheld = |i: &Instance| {
         !partial.is_empty()

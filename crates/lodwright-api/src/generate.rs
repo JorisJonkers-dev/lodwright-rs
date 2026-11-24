@@ -841,6 +841,8 @@ pub fn generate(
             };
             let phase = |name: &str| clock.begin(&format!("objects.{name}"), Some(world.name()));
             let rule_shapes = |i: &lodwright_core::objects::Instance| include.generate_for(i);
+            let rule_replaces =
+                |i: &lodwright_core::objects::Instance| include.replaces_lod_model_for(i);
             let surfaces = lodwright_gen::Surfaces {
                 ground: request
                     .objects
@@ -869,6 +871,9 @@ pub fn generate(
                     .generates()
                     .then_some(&rule_shapes as lodwright_gen::RuleShapes<'_>),
                 glow: request.objects.far_glow,
+                rule_replaces: include
+                    .replaces()
+                    .then_some(&rule_replaces as lodwright_gen::RuleReplaces<'_>),
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

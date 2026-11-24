@@ -143,6 +143,10 @@
             "string",
             "null"
           ]
+        },
+        "replace_lod_model": {
+          "description": "With `generate`: draw the objects this rule matches from their simplified full model even when they have an\nauthored LOD model, for models whose LOD model lacks what the full model has (the glow maps of lit buildings).\nA model is replaced only when such a rule matches every drawn object that uses it; otherwise its LOD model\nstays. Off by default; written only when on.",
+          "type": "boolean"
         }
       },
       "required": [

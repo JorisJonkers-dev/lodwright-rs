@@ -11,10 +11,11 @@ use std::path::Path;
 use crate::par::par_map;
 use lodwright_contract::WarningRecord;
 use lodwright_core::layout;
+use lodwright_core::lights::FarLightSource;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode_with_threads, resize};
-use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
+use lodwright_nif::{FarLightsShape, ObjectBlock, SEGMENTS, object_block_with_lights};
 
 use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, LARGEST_ATLAS, Rect, pack_pages};
@@ -45,6 +46,8 @@ pub struct ObjectReport {
     pub records: Vec<WarningRecord>,
     /// Instances placed into blocks.
     pub instances: usize,
+    /// Far light points written (`objects.far_lights`), one per light, in the normal files.
+    pub far_lights: usize,
     /// Instances left out because their model has no LOD model or it could not be read.
     pub skipped: usize,
     /// Faces left out because they lie wholly under the ground ([`Surfaces::ground`]).
@@ -86,6 +89,99 @@ pub struct Surfaces<'a> {
     /// rule), whatever `full_models` says; `None` for an object no such rule names. Only the objects it answers for
     /// get such a shape: another object with the same model and no LOD model stays out unless `full_models` is set.
     pub rule_shapes: Option<RuleShapes<'a>>,
+    /// The steady lights of the world (`objects.far_lights`): each one within [`FAR_LIGHT_REACH`] of an object of its
+    /// block is drawn as a small light point in the block's normal file; empty draws none.
+    pub far_lights: &'a [FarLightSource],
+}
+
+/// How near (world units, on the ground plane) a light must stand to an object of its block to get a far light point:
+/// a lamp beside a drawn post or building, not a light alone in the open. Own design.
+pub const FAR_LIGHT_REACH: f32 = 300.0;
+/// Half the size of a far light point (world units): three crossed squares 48 units wide. Own design.
+const FAR_LIGHT_HALF: f32 = 24.0;
+/// A far light point's colour is this share of its light's colour, so rows of lamps do not add up to a white bar.
+const FAR_LIGHT_DIM: f32 = 0.5;
+/// Light points per block at most: each takes 12 vertices of the shape's 65535.
+const FAR_LIGHTS_PER_BLOCK: usize = 5000;
+
+/// The geometry of a block's far light points.
+#[derive(Default)]
+struct LightPoints {
+    vertices: Vec<[f32; 3]>,
+    colors: Vec<[f32; 4]>,
+    uv: Vec<[f32; 2]>,
+    indices: Vec<u16>,
+}
+
+/// The light points of the lights of `lights` that stand within [`FAR_LIGHT_REACH`] of one of `members`, relative to
+/// `origin`: three crossed squares per light (one flat, two upright), in the lights' given order.
+fn light_points(
+    lights: &[&FarLightSource],
+    members: &[&Instance],
+    origin: (f32, f32),
+) -> LightPoints {
+    let reach = FAR_LIGHT_REACH * FAR_LIGHT_REACH;
+    let mut out = LightPoints::default();
+    let h = FAR_LIGHT_HALF;
+    let corners: [[[f32; 3]; 4]; 3] = [
+        [[-h, -h, 0.0], [h, -h, 0.0], [h, h, 0.0], [-h, h, 0.0]],
+        [[-h, 0.0, -h], [h, 0.0, -h], [h, 0.0, h], [-h, 0.0, h]],
+        [[0.0, -h, -h], [0.0, h, -h], [0.0, h, h], [0.0, -h, h]],
+    ];
+    let uv = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
+    for l in lights
+        .iter()
+        .filter(|l| {
+            members.iter().any(|i| {
+                let (dx, dy) = (i.placement.pos[0] - l.pos[0], i.placement.pos[1] - l.pos[1]);
+                dx * dx + dy * dy <= reach
+            })
+        })
+        .take(FAR_LIGHTS_PER_BLOCK)
+    {
+        let c = l.color.map(|v| f32::from(v) / 255.0 * FAR_LIGHT_DIM);
+        let colour = [c[0], c[1], c[2], 1.0];
+        let at = [l.pos[0] - origin.0, l.pos[1] - origin.1, l.pos[2]];
+        for quad in &corners {
+            let first = u16::try_from(out.vertices.len()).unwrap_or(u16::MAX);
+            for (k, corner) in quad.iter().enumerate() {
+                out.vertices
+                    .push([at[0] + corner[0], at[1] + corner[1], at[2] + corner[2]]);
+                out.colors.push(colour);
+                out.uv.push(uv[k]);
+            }
+            out.indices.extend_from_slice(&[
+                first,
+                first + 1,
+                first + 2,
+                first,
+                first + 2,
+                first + 3,
+            ]);
+        }
+    }
+    out
+}
+
+/// The light point texture: a soft round spot, white, its alpha and colour falling to 0 at the rim. Own design.
+fn light_point_texture(threads: usize) -> Result<Vec<u8>, GenError> {
+    const SIZE: u32 = 32;
+    let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
+    let half = SIZE as f32 / 2.0;
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let (dx, dy) = (
+                (x as f32 + 0.5 - half) / half,
+                (y as f32 + 0.5 - half) / half,
+            );
+            let r = (dx * dx + dy * dy).sqrt();
+            let v = (1.0 - r).clamp(0.0, 1.0).powi(2);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0 to 255
+            let b = (v * 255.0).round() as u8;
+            rgba.extend_from_slice(&[b, b, b, b]);
+        }
+    }
+    encode_bc3(&Image::new(SIZE, SIZE, rgba)?, threads)
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -987,6 +1083,26 @@ pub fn generate_objects_with_atlas_limit(
             key_of: &key_of,
         })
         .collect();
+    // the far lights of each block, by the block their position falls in
+    let mut lights_of: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
+    for l in surfaces.far_lights {
+        // source: cell-size-units
+        #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+        let (cx, cy) = (
+            (l.pos[0] / CELL_UNITS).floor() as i32,
+            (l.pos[1] / CELL_UNITS).floor() as i32,
+        );
+        let (ax, ay) = surfaces.grid_anchor;
+        lights_of
+            .entry((
+                ax + (cx - ax).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+                ay + (cy - ay).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+            ))
+            .or_default()
+            .push(l);
+    }
+    let [light_texture_path, light_texture_ref] = layout::far_lights_texture_paths(world)?;
+    let mut lights_written = false;
     let total = groups.len() as u64;
     for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
         members.sort_by_key(|i| (segment_of(i, (bx, by)), i.reference, i.base));
@@ -996,6 +1112,7 @@ pub fn generate_objects_with_atlas_limit(
         let mut chunks: Vec<Vec<Merged>> =
             (0..pages.len()).map(|_| vec![Merged::default()]).collect();
         let mut dropped = 0;
+        let members_of_block = members.clone();
         for i in members {
             let segment = segment_of(i, (bx, by));
             let Some(model) = models
@@ -1082,13 +1199,37 @@ pub fn generate_objects_with_atlas_limit(
                 textures: [diffuse_ref, normal_ref],
             })
             .collect();
-        let file = object_block_shapes(&shapes)?.write()?;
+        // light points go in the normal file only: the high file is drawn much farther, where they would be noise
+        let points = (!high)
+            .then(|| lights_of.get(&(bx, by)))
+            .flatten()
+            .map(|lights| light_points(lights, &members_of_block, origin))
+            .filter(|p| !p.indices.is_empty());
+        let lights = points.as_ref().map(|p| FarLightsShape {
+            vertices: &p.vertices,
+            colors: &p.colors,
+            uv: &p.uv,
+            indices: &p.indices,
+            texture: &light_texture_ref,
+        });
+        if let Some(p) = &points {
+            report.far_lights += p.vertices.len() / 12;
+            lights_written = true;
+        }
+        let file = object_block_with_lights(&shapes, lights.as_ref())?.write()?;
         report.files.push(write_file(
             out,
             &layout::object_mesh_path(world, bx, by, high)?,
             &file,
         )?);
         block_done(done, total);
+    }
+    if lights_written {
+        report.files.push(write_file(
+            out,
+            &light_texture_path,
+            &light_point_texture(surfaces.threads)?,
+        )?);
     }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)

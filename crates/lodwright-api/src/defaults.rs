@@ -32,6 +32,8 @@ const SHIPPED_SINCE: &str = "0.16.0";
 const LAND_LIGHT_SINCE: &str = "0.17.0";
 /// The release that adds `output.pack`.
 const PACK_SINCE: &str = "0.15.0";
+/// The release that adds `objects.far_lights`.
+const FAR_LIGHTS_SINCE: &str = "0.18.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -145,6 +147,12 @@ pub fn request_defaults() -> Defaults {
             ..option(&doc, key, OptionKind::Switch)
         });
     }
+    options.push(OptionInfo {
+        default: Value::Bool(objects.far_lights),
+        tier: 3,
+        since: FAR_LIGHTS_SINCE.to_owned(),
+        ..option(&doc, "objects.far_lights", OptionKind::Switch)
+    });
     options.push(option(&doc, "trees.enabled", OptionKind::Switch));
     // off by default and not written while off: the default comes from the request type
     options.push(OptionInfo {
@@ -346,7 +354,13 @@ mod tests {
                     || o.since == "0.14.0"
                     || o.since == "0.15.0"
                     || o.since == "0.16.0"
-                    || o.since == "0.17.0"))));
+                    || o.since == "0.17.0"
+                    || o.since == "0.18.0"))));
+        let lights = d.option("objects.far_lights").unwrap();
+        assert_eq!(
+            (lights.tier, lights.kind, &lights.default),
+            (3, OptionKind::Switch, &Value::Bool(false))
+        );
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();

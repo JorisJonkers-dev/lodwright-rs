@@ -25,6 +25,7 @@ pub use block::{
 pub use error::{NifError, Result};
 pub use file::{Block, ExportInfo, Header, NifFile};
 pub use object::{
-    ObjectBlock, ObjectShape, SEGMENTS, object_block, object_block_shapes, read_object_shapes,
+    FAR_LIGHTS_MARKER, FarLightsShape, ObjectBlock, ObjectShape, SEGMENTS, object_block,
+    object_block_shapes, object_block_with_lights, read_object_shapes,
 };
 pub use terrain::{TerrainBlock, WaterShape, terrain_block};

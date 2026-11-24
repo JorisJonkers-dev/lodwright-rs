@@ -118,6 +118,72 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
 /// # Errors
 /// [`NifError::Inconsistent`] as [`object_block`] for any shape, or when `shapes` is empty or the origins differ.
 pub fn object_block_shapes(shapes: &[ObjectBlock<'_>]) -> Result<NifFile> {
+    object_block_with_lights(shapes, None)
+}
+
+/// The marker name of the far lights shape: a `NiStringExtraData` of this name on the shape tells the engine to
+/// draw it only at night. One general name that any tool may write.
+pub const FAR_LIGHTS_MARKER: &str = "FarLights";
+
+/// The small unlit, additive light points of one object block (`objects.far_lights`), drawn as one plain shape
+/// beside the block's object shapes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FarLightsShape<'a> {
+    /// Positions relative to the block's origin.
+    pub vertices: &'a [[f32; 3]],
+    /// Colours, red, green, blue and alpha from 0 to 1, one per vertex.
+    pub colors: &'a [[f32; 4]],
+    /// UVs, one per vertex.
+    pub uv: &'a [[f32; 2]],
+    /// Triangle corner indices, three per triangle.
+    pub indices: &'a [u16],
+    /// The light point texture path as written in the shader property.
+    pub texture: &'a str,
+}
+
+/// Block types a far lights shape adds to the block's type table, in this order after [`TYPES`].
+const LIGHT_TYPES: [&[u8]; 4] = [
+    b"NiTriShape",
+    b"BSShaderNoLightingProperty",
+    b"NiAlphaProperty",
+    b"NiStringExtraData",
+];
+
+// source: nif-no-lighting-property-layout, nif-alpha-flags
+/// The far lights shape's unlit property after its name, extra data and controller: `NiShadeProperty` flags (1),
+/// shader type `SHADER_NOLIGHTING` (33), shader flags `ZBuffer_Test` only (bit 31: hidden behind nearer things), second
+/// flags `Vertex_Colors` only (bit 5; `ZBuffer_Write` clear, so light points never hide each other), environment map
+/// scale 1, texture clamp mode 3 (wrap both); then the file name and the four falloff numbers.
+fn no_lighting_property(texture: &str) -> Vec<u8> {
+    let mut b = Vec::with_capacity(64);
+    put_u32(&mut b, u32::MAX); // name
+    put_u32(&mut b, 0); // extra data
+    put_u32(&mut b, u32::MAX); // controller
+    b.extend_from_slice(&1_u16.to_le_bytes());
+    put_u32(&mut b, 33);
+    put_u32(&mut b, 0x8000_0000);
+    put_u32(&mut b, 0x20);
+    put_f32(&mut b, 1.0);
+    put_u32(&mut b, 3);
+    put_u32(&mut b, u32::try_from(texture.len()).unwrap_or(0));
+    b.extend_from_slice(texture.as_bytes());
+    // the falloff is left unset (-1 each), so the points are drawn the same from every side
+    for _ in 0..4 {
+        put_f32(&mut b, -1.0);
+    }
+    b
+}
+
+/// Build the NIF of one object block as [`object_block_shapes`], with the block's far light points as one more
+/// shape when `lights` is given: a plain `NiTriShape` with vertex colours, an unlit property, an additive alpha
+/// property (source ONE, destination ONE, no alpha test) and a `NiStringExtraData` named [`FAR_LIGHTS_MARKER`].
+///
+/// # Errors
+/// As [`object_block_shapes`]; and [`NifError::Inconsistent`] when the light arrays disagree or hold no triangles.
+pub fn object_block_with_lights(
+    shapes: &[ObjectBlock<'_>],
+    lights: Option<&FarLightsShape<'_>>,
+) -> Result<NifFile> {
     let Some(first) = shapes.first() else {
         return Err(NifError::Inconsistent("a block needs a shape"));
     };
@@ -174,18 +240,131 @@ pub fn object_block_shapes(shapes: &[ObjectBlock<'_>]) -> Result<NifFile> {
             u16::try_from((i - 1) % 4 + 1).unwrap_or(0)
         }
     };
+    let mut blocks: Vec<Block> = bodies
+        .into_iter()
+        .enumerate()
+        .map(|(i, body)| Block {
+            type_index: type_of(i),
+            body,
+        })
+        .collect();
+    let mut header = file_header(&TYPES);
+    if let Some(lights) = lights {
+        let at =
+            i32::try_from(blocks.len()).map_err(|_| NifError::Inconsistent("too many blocks"))?;
+        children.push(at.cast_unsigned());
+        blocks[0].body = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
+        let types = u16::try_from(TYPES.len()).unwrap_or(0);
+        for (body, type_index) in light_blocks(lights, first.origin, at)?.into_iter().zip([
+            types,
+            types + 1,
+            types + 2,
+            4,
+            types + 3,
+        ]) {
+            blocks.push(Block { type_index, body });
+        }
+        header
+            .block_types
+            .extend(LIGHT_TYPES.iter().map(|t| t.to_vec()));
+        header.strings.push(FAR_LIGHTS_MARKER.as_bytes().to_vec());
+    }
     Ok(NifFile {
-        header: file_header(&TYPES),
-        blocks: bodies
-            .into_iter()
-            .enumerate()
-            .map(|(i, body)| Block {
-                type_index: type_of(i),
-                body,
-            })
-            .collect(),
+        header,
+        blocks,
         roots: vec![0],
     })
+}
+
+/// The five blocks of the far lights shape, which starts at block `at`: the shape, its unlit property, its alpha
+/// property, its data and its marker.
+fn light_blocks(lights: &FarLightsShape<'_>, origin: (f32, f32), at: i32) -> Result<Vec<Body>> {
+    let n = lights.vertices.len();
+    if n == 0 || n > usize::from(u16::MAX) || lights.colors.len() != n || lights.uv.len() != n {
+        return Err(NifError::Inconsistent(
+            "light vertex arrays disagree or are empty",
+        ));
+    }
+    if lights.indices.is_empty()
+        || !lights.indices.len().is_multiple_of(3)
+        || lights.indices.iter().any(|i| usize::from(*i) >= n)
+    {
+        return Err(NifError::Inconsistent("light points need valid triangles"));
+    }
+    let triangles = u16::try_from(lights.indices.len() / 3)
+        .map_err(|_| NifError::Inconsistent("too many light triangles"))?;
+    let (mut low, mut high) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
+    for v in lights.vertices {
+        for k in 0..3 {
+            low[k] = low[k].min(v[k]);
+            high[k] = high[k].max(v[k]);
+        }
+    }
+    let center = [
+        f32::midpoint(low[0], high[0]),
+        f32::midpoint(low[1], high[1]),
+        f32::midpoint(low[2], high[2]),
+    ];
+    let radius = lights
+        .vertices
+        .iter()
+        .map(|v| {
+            ((v[0] - center[0]).powi(2) + (v[1] - center[1]).powi(2) + (v[2] - center[2]).powi(2))
+                .sqrt()
+        })
+        .fold(0.0_f32, f32::max);
+    let mut shape = tri_shape();
+    shape.av.translation = [origin.0, origin.1, 0.0];
+    shape.av.properties = vec![at + 1, at + 2];
+    shape.av.net.extra_data = vec![at + 4];
+    shape.data = at + 3;
+    // source: nif-alpha-flags
+    // alpha blend on, source and destination ONE (0), no alpha test: the points add their colour to what is behind
+    let alpha = crate::block::NiAlphaProperty {
+        net: crate::block::ObjectNet {
+            name: -1,
+            extra_data: Vec::new(),
+            controller: -1,
+        },
+        flags: 0x0001,
+        threshold: 0,
+    };
+    let data = NiTriShapeData {
+        geometry: GeometryData {
+            group_id: 0,
+            num_vertices: u16::try_from(n)
+                .map_err(|_| NifError::Inconsistent("too many vertices"))?,
+            keep_flags: 0,
+            compress_flags: 0,
+            vertices: Some(lights.vertices.to_vec()),
+            vector_flags: 1,
+            material_crc: 0,
+            normals: None,
+            tangents: None,
+            center,
+            radius,
+            vertex_colors: Some(lights.colors.to_vec()),
+            uv_sets: vec![lights.uv.to_vec()],
+            consistency: 0,
+            additional_data: -1,
+        },
+        num_triangles: triangles,
+        num_triangle_points: u32::from(triangles) * 3,
+        triangles: Some(lights.indices.as_chunks::<3>().0.to_vec()),
+        match_groups: Vec::new(),
+    };
+    // source: nif-string-extra-data-layout
+    // NiExtraData name (string index 0, the marker), then the string data (none)
+    let mut marker = Vec::with_capacity(8);
+    put_u32(&mut marker, 0);
+    put_u32(&mut marker, u32::MAX);
+    Ok(vec![
+        Body::TriShape(shape),
+        Body::Opaque(no_lighting_property(lights.texture)),
+        Body::AlphaProperty(alpha),
+        Body::TriShapeData(data),
+        Body::Opaque(marker),
+    ])
 }
 
 /// The four blocks of one shape and the corners of its vertices' box.
@@ -336,6 +515,16 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
     let mut shapes = Vec::with_capacity(count);
     for k in 0..count {
         let shape = block_ref(root, children + 4 * k).ok_or(BAD)?;
+        // a far lights shape (a plain NiTriShape, see [`FarLightsShape`]) is not an object shape
+        let segmented = file.blocks.get(shape).is_some_and(|b| {
+            file.header
+                .block_types
+                .get(usize::from(b.type_index))
+                .is_some_and(|t| t.as_slice() == TYPES[1])
+        });
+        if !segmented {
+            continue;
+        }
         let Some(Body::Opaque(shape_bytes)) = file.blocks.get(shape).map(|b| &b.body) else {
             return Err(BAD);
         };
@@ -658,5 +847,115 @@ mod shapes_tests {
     #[test]
     fn a_block_without_a_shape_is_refused() {
         assert!(object_block_shapes(&[]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod lights_tests {
+    use super::{
+        FAR_LIGHTS_MARKER, FarLightsShape, ObjectBlock, SEGMENTS, object_block_shapes,
+        object_block_with_lights, read_object_shapes,
+    };
+    use crate::{Body, NifFile};
+
+    fn object<'a>(
+        v: &'a [[f32; 3]],
+        n: &'a [[f32; 3]],
+        uv: &'a [[f32; 2]],
+        i: &'a [u16],
+    ) -> ObjectBlock<'a> {
+        let mut segments = [0; SEGMENTS];
+        segments[0] = 1;
+        ObjectBlock {
+            origin: (4096.0, 8192.0),
+            vertices: v,
+            normals: n,
+            tangents: n,
+            bitangents: n,
+            uv,
+            indices: i,
+            segment_triangles: segments,
+            textures: ["a.dds", "a_n.dds"],
+        }
+    }
+
+    #[test]
+    fn a_block_with_light_points_carries_one_marked_unlit_additive_shape_and_still_reads_its_objects()
+     {
+        let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let n = [[0.0, 0.0, 1.0]; 3];
+        let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let i = [0, 1, 2];
+        let block = object(&v, &n, &uv, &i);
+        let lv = [
+            [10.0, 10.0, 500.0],
+            [30.0, 10.0, 500.0],
+            [10.0, 30.0, 500.0],
+        ];
+        let colors = [[0.5, 0.5, 0.25, 1.0]; 3];
+        let lights = FarLightsShape {
+            vertices: &lv,
+            colors: &colors,
+            uv: &uv,
+            indices: &i,
+            texture: "textures\\landscape\\lod\\farlight.dds",
+        };
+        let file = object_block_with_lights(std::slice::from_ref(&block), Some(&lights)).unwrap();
+        let bytes = file.write().unwrap();
+        let back = NifFile::read(&bytes).unwrap();
+        assert_eq!(back.write().unwrap(), bytes);
+        assert_eq!(back.blocks.len(), 7 + 5);
+        assert_eq!(
+            back.header.strings,
+            vec![FAR_LIGHTS_MARKER.as_bytes().to_vec()]
+        );
+        let type_name =
+            |k: usize| back.header.block_types[usize::from(back.blocks[k].type_index)].clone();
+        assert_eq!(type_name(7), b"NiTriShape".to_vec());
+        assert_eq!(type_name(8), b"BSShaderNoLightingProperty".to_vec());
+        assert_eq!(type_name(9), b"NiAlphaProperty".to_vec());
+        assert_eq!(type_name(10), b"NiTriShapeData".to_vec());
+        assert_eq!(type_name(11), b"NiStringExtraData".to_vec());
+        let Body::TriShape(shape) = &back.blocks[7].body else {
+            panic!("the light shape is a NiTriShape");
+        };
+        assert_eq!(shape.av.properties, vec![8, 9]);
+        assert_eq!(shape.av.net.extra_data, vec![11]);
+        assert_eq!(shape.data, 10);
+        assert_eq!(shape.av.translation, [4096.0, 8192.0, 0.0]);
+        let Body::AlphaProperty(alpha) = &back.blocks[9].body else {
+            panic!("alpha");
+        };
+        assert_eq!(alpha.flags, 0x0001);
+        let Body::Opaque(unlit) = &back.blocks[8].body else {
+            panic!("unlit property");
+        };
+        let word = |at: usize| u32::from_le_bytes(unlit[at..at + 4].try_into().unwrap());
+        // after name, extra data, controller (12) and the shade flags (2): type, flags, second flags
+        assert_eq!((word(14), word(18), word(22)), (33, 0x8000_0000, 0x20));
+        let Body::TriShapeData(data) = &back.blocks[10].body else {
+            panic!("data");
+        };
+        assert_eq!(data.geometry.vertex_colors.as_deref(), Some(&colors[..]));
+        let Body::Opaque(marker) = &back.blocks[11].body else {
+            panic!("marker");
+        };
+        assert_eq!(&marker[..4], &0_u32.to_le_bytes());
+        // the reader still finds the one object shape and nothing else
+        let shapes = read_object_shapes(&back).unwrap();
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(shapes[0].texture, "a.dds");
+    }
+
+    #[test]
+    fn without_light_points_the_block_is_the_one_without_the_option() {
+        let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let n = [[0.0, 0.0, 1.0]; 3];
+        let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let i = [0, 1, 2];
+        let block = object(&v, &n, &uv, &i);
+        let with = object_block_with_lights(std::slice::from_ref(&block), None).unwrap();
+        let without = object_block_shapes(std::slice::from_ref(&block)).unwrap();
+        assert_eq!(with.write().unwrap(), without.write().unwrap());
     }
 }

@@ -161,6 +161,7 @@ impl Default for TerrainRequest {
 }
 
 /// Object LOD settings.
+#[allow(clippy::struct_excessive_bools)] // each one is a switch of the request
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ObjectsRequest {
     /// Write object LOD.
@@ -183,6 +184,11 @@ pub struct ObjectsRequest {
     /// game's own LOD is the standard; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shapes_from_full_models: Option<FullModelShapes>,
+    /// Draw the steady lights that stand beside far objects as small unlit light points, one marked shape per object
+    /// block that the engine shows only at night. Off by default, because an engine without that night switch shows
+    /// them by day too; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_lights: bool,
 }
 
 /// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
@@ -219,6 +225,7 @@ impl Default for ObjectsRequest {
             drop_under_water: false,
             shapes_from_shipped_blocks: Vec::new(),
             shapes_from_full_models: None,
+            far_lights: false,
         }
     }
 }

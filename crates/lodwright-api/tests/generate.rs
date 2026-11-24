@@ -1100,3 +1100,98 @@ fn the_output_files_are_the_same_bytes_at_any_thread_count() {
         );
     }
 }
+
+// ---- objects.far_lights: small light points beside far objects, one marked shape per block (#339) ----
+
+/// [`far_model_job`] with a far model for `Base.esm`'s parking model, plus `Lights.esp`: one steady light of radius
+/// 512 beside the parking objects, one 5000 units away from every object and one too small.
+fn far_lights_job(name: &str) -> (GenerateRequest, PathBuf) {
+    use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
+    use lodwright_testkit::world::record_group;
+    let (mut job, out) = far_model_job(name);
+    let data = PathBuf::from(&job.request.data_folder);
+    std::fs::write(data.join("meshes/arch/parking_lod.nif"), triangle_model()).unwrap();
+    let light = |id: u32, radius: u32| {
+        let mut d = Vec::new();
+        d.extend_from_slice(&0_i32.to_le_bytes()); // time
+        d.extend_from_slice(&radius.to_le_bytes());
+        d.extend_from_slice(&[255, 200, 100, 0]); // colour
+        d.extend_from_slice(&0_u32.to_le_bytes()); // flags: steady
+        for v in [1.0_f32, 90.0] {
+            d.extend_from_slice(&v.to_le_bytes());
+        }
+        d.extend_from_slice(&0_u32.to_le_bytes());
+        d.extend_from_slice(&0.0_f32.to_le_bytes());
+        Record::new(*b"LIGH", id).with_subrecord(*b"DATA", d)
+    };
+    let refs = Group::new(1, 0xB00_u32.to_le_bytes())
+        .with(refr(0x0100_0E00, 0x0100_0300, 60.0))
+        .with(refr(0x0100_0E01, 0x0100_0300, 4000.0))
+        .with(refr(0x0100_0E02, 0x0100_0301, 70.0));
+    let lights = PluginBuilder::new()
+        .master("Base.esm")
+        .group(record_group(
+            *b"LIGH",
+            vec![light(0x0100_0300, 512), light(0x0100_0301, 64)],
+        ))
+        .group(refs)
+        .build();
+    std::fs::write(data.join("Lights.esp"), lights).unwrap();
+    job.request.plugins.push("Lights.esp".to_owned());
+    (job, out)
+}
+
+/// The output's files under `meshes` and `textures`, lower case with `/`.
+fn lod_files(out: &std::path::Path) -> Vec<String> {
+    files_on_disk(out)
+        .into_iter()
+        .map(|f| f.to_ascii_lowercase())
+        .filter(|f| f.starts_with("meshes/") || f.starts_with("textures/"))
+        .collect()
+}
+
+#[test]
+fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_with_the_option() {
+    let (mut on, on_out) = far_lights_job("far-lights-on");
+    on.request.objects.far_lights = true;
+    let result = done(generate(&on, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    let files = lod_files(&on_out);
+    assert!(
+        files.iter().any(|f| f.ends_with("island.farlights.dds")),
+        "{files:?}"
+    );
+    let block = files
+        .iter()
+        .find(|f| f.starts_with("meshes/") && f.rsplit('.').next() == Some("nif"))
+        .unwrap();
+    let nif = lodwright_nif::NifFile::read(&std::fs::read(on_out.join(block)).unwrap()).unwrap();
+    assert_eq!(
+        nif.header.strings,
+        vec![lodwright_nif::FAR_LIGHTS_MARKER.as_bytes().to_vec()]
+    );
+    // the one light beside the objects: three crossed squares, 12 vertices; the far one and the small one are left out
+    let light_data = nif
+        .blocks
+        .iter()
+        .filter_map(|b| match &b.body {
+            lodwright_nif::Body::TriShapeData(d) if d.geometry.vertex_colors.is_some() => {
+                Some(d.geometry.num_vertices)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(light_data, vec![12]);
+
+    let (off, off_out) = far_lights_job("far-lights-off");
+    done(generate(&off, &mut NoProgress, &CancelToken::new()).unwrap());
+    let files = lod_files(&off_out);
+    assert!(!files.iter().any(|f| f.contains("farlights")), "{files:?}");
+    let block = files
+        .iter()
+        .find(|f| f.starts_with("meshes/") && f.rsplit('.').next() == Some("nif"))
+        .unwrap();
+    let nif = lodwright_nif::NifFile::read(&std::fs::read(off_out.join(block)).unwrap()).unwrap();
+    assert_eq!(nif.header.strings, Vec::<Vec<u8>>::new());
+    assert_eq!(nif.blocks.len(), 7);
+}

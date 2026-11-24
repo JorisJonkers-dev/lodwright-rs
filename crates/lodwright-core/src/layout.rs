@@ -152,6 +152,20 @@ pub fn atlas_page_paths(world: &str, page: usize) -> Result<[String; 2], Error> 
     ])
 }
 
+/// The light point texture of the far light points of `world` (`objects.far_lights`): the file path in the output
+/// and the path the blocks name. Own design: the game ships no such file.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn far_lights_texture_paths(world: &str) -> Result<[String; 2], Error> {
+    check_world_name(world)?;
+    let w = world.to_ascii_lowercase();
+    Ok([
+        format!("textures/landscape/lod/{w}/blocks/{w}.farlights.dds"),
+        format!("Data\\Textures\\Landscape\\LOD\\{world}\\Blocks\\{world}.FarLights.dds"),
+    ])
+}
+
 // source: game-lod-object-block-nif
 /// The two paths an object block NIF carries for the atlas and the normal atlas, as the game's own files write
 /// them.

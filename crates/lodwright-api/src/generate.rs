@@ -868,6 +868,7 @@ pub fn generate(
                 rule_shapes: include
                     .generates()
                     .then_some(&rule_shapes as lodwright_gen::RuleShapes<'_>),
+                glow: request.objects.far_glow,
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

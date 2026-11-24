@@ -285,6 +285,10 @@
           "type": "boolean",
           "default": true
         },
+        "far_glow": {
+          "description": "Write a glow atlas beside each object atlas page whose textures have glow maps, name it in the glow slot of\nthe far blocks and give them an emissive material, so lit windows, signs and lamps glow from far at night. Off\nby default until proven; written only when on.",
+          "type": "boolean"
+        },
         "shapes_from_full_models": {
           "description": "Draw objects that have no LOD model with a simplified copy of their full model. Off by default, because the\ngame's own LOD is the standard; written only when set.",
           "anyOf": [

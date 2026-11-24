@@ -86,6 +86,10 @@ pub struct Surfaces<'a> {
     /// rule), whatever `full_models` says; `None` for an object no such rule names. Only the objects it answers for
     /// get such a shape: another object with the same model and no LOD model stays out unless `full_models` is set.
     pub rule_shapes: Option<RuleShapes<'a>>,
+    /// Write a glow atlas beside each atlas page whose textures have glow maps (black where a texture has none), name
+    /// it in the glow slot of that page's shapes and give them an emissive material, so lit windows and signs glow
+    /// from far at night. Off by default: the blocks and atlases are then the same bytes as without it.
+    pub glow: bool,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -659,6 +663,45 @@ pub fn generate_objects_with_progress(
     )
 }
 
+/// The glow atlas of one atlas page at half its size, as the normal atlas is: each texture's glow map in the texture's
+/// rectangle, black where a texture has none or its glow map cannot be read. `None` when no texture on the page has a
+/// glow map that can be read, so such a page gets no glow atlas.
+fn glow_atlas(
+    rects: &[(&String, &Rect)],
+    glow_of: &HashMap<String, String>,
+    assets: &dyn Assets,
+    atlas: &Atlas,
+    threads: usize,
+) -> Option<Image> {
+    if !rects.iter().any(|(k, _)| glow_of.contains_key(*k)) {
+        return None;
+    }
+    let (gw, gh) = ((atlas.width / 2).max(4), (atlas.height / 2).max(4));
+    let halves = par_map(rects, threads, |(k, r)| {
+        let half = Rect {
+            x: r.x / 2,
+            y: r.y / 2,
+            w: (r.w / 2).max(1),
+            h: (r.h / 2).max(1),
+        };
+        let img = glow_of.get(*k).and_then(|g| load_texture(assets, g))?;
+        resize(&img, half.w, half.h, Filter::Box)
+            .ok()
+            .map(|small| (half, small))
+    });
+    if halves.iter().all(Option::is_none) {
+        return None;
+    }
+    let mut glow = vec![0_u8; (gw * gh * 4) as usize];
+    for px in glow.as_chunks_mut::<4>().0 {
+        px[3] = 255;
+    }
+    for (half, small) in halves.iter().flatten() {
+        blit(&mut glow, gw, small, half);
+    }
+    Image::new(gw, gh, glow).ok()
+}
+
 /// [`generate_objects_with_progress`] with atlases no larger than `largest` (width, height): the textures that do not
 /// fit one such atlas at their native size go on further atlases, each with its own shapes in the blocks.
 ///
@@ -844,11 +887,17 @@ pub fn generate_objects_with_atlas_limit(
     };
     let mut diffuse_keys: BTreeSet<String> = BTreeSet::new();
     let mut normal_of: HashMap<String, String> = HashMap::new();
+    let mut glow_of: HashMap<String, String> = HashMap::new();
     for model in models.values().flatten() {
         for p in &model.parts {
             let k = key_of(p);
             if let Some(n) = &p.normal_map {
                 normal_of.entry(k.clone()).or_insert_with(|| norm_key(n));
+            }
+            if surfaces.glow
+                && let Some(g) = &p.glow_map
+            {
+                glow_of.entry(k.clone()).or_insert_with(|| norm_key(g));
             }
             diffuse_keys.insert(k);
         }
@@ -899,6 +948,8 @@ pub fn generate_objects_with_atlas_limit(
     // (halving every texture to fit one atlas blurred every far object of a large load order)
     phase("atlas");
     let atlases = pack_pages(&sizes, largest);
+    // the pages that got a glow atlas
+    let mut glowing = vec![false; atlases.len()];
     for (page, atlas) in atlases.iter().enumerate() {
         let rects: Vec<(&String, &Rect)> = atlas.rects.iter().collect();
         // the textures that need resizing, and the normal maps, are made on the worker threads; the pages are
@@ -953,6 +1004,14 @@ pub fn generate_objects_with_atlas_limit(
             &normal_path,
             &encode_bc3(&normal_image, surfaces.threads)?,
         )?);
+        if let Some(glow) = glow_atlas(&rects, &glow_of, assets, atlas, surfaces.threads) {
+            report.files.push(write_file(
+                out,
+                &layout::atlas_page_glow_path(world, page)?,
+                &encode_bc3(&glow, surfaces.threads)?,
+            )?);
+            glowing[page] = true;
+        }
     }
     // blocks
     phase("blocks");
@@ -979,6 +1038,14 @@ pub fn generate_objects_with_atlas_limit(
     }
     let refs: Vec<[String; 2]> = (0..atlases.len())
         .map(|page| layout::nif_atlas_page_paths(world, page))
+        .collect::<Result<_, _>>()?;
+    let glow_refs: Vec<Option<String>> = glowing
+        .iter()
+        .enumerate()
+        .map(|(page, on)| {
+            on.then(|| layout::nif_atlas_page_glow_path(world, page))
+                .transpose()
+        })
         .collect::<Result<_, _>>()?;
     let pages: Vec<Page> = atlases
         .iter()
@@ -1068,9 +1135,9 @@ pub fn generate_objects_with_atlas_limit(
         }
         let shapes: Vec<ObjectBlock> = chunks
             .iter()
-            .zip(&refs)
+            .zip(refs.iter().zip(&glow_refs))
             .flat_map(|(c, r)| c.iter().map(move |m| (m, r)))
-            .map(|(m, [diffuse_ref, normal_ref])| ObjectBlock {
+            .map(|(m, ([diffuse_ref, normal_ref], glow_ref))| ObjectBlock {
                 origin,
                 vertices: &m.vertices,
                 normals: &m.normals,
@@ -1080,6 +1147,7 @@ pub fn generate_objects_with_atlas_limit(
                 indices: &m.indices,
                 segment_triangles: m.segment_triangles,
                 textures: [diffuse_ref, normal_ref],
+                glow: glow_ref.as_deref(),
             })
             .collect();
         let file = object_block_shapes(&shapes)?.write()?;

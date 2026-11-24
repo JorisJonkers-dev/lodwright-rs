@@ -162,6 +162,10 @@ impl Default for TerrainRequest {
 
 /// Object LOD settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the request document has one switch per kind of object output"
+)]
 pub struct ObjectsRequest {
     /// Write object LOD.
     #[serde(default = "yes")]
@@ -182,6 +186,11 @@ pub struct ObjectsRequest {
     /// game's own LOD is the standard; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shapes_from_full_models: Option<FullModelShapes>,
+    /// Write a glow atlas beside each object atlas page whose textures have glow maps, name it in the glow slot of
+    /// the far blocks and give them an emissive material, so lit windows, signs and lamps glow from far at night. Off
+    /// by default until proven; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_glow: bool,
 }
 
 /// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
@@ -218,6 +227,7 @@ impl Default for ObjectsRequest {
             drop_under_water: false,
             shapes_from_shipped_blocks: Vec::new(),
             shapes_from_full_models: None,
+            far_glow: false,
         }
     }
 }

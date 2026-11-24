@@ -124,8 +124,8 @@ impl IncludeRules {
     }
 
     /// Add to `visible` the references of `candidates` that match a rule and are not in it yet, in the candidates'
-    /// order, and return how many matching references were held back (`held_back`: disabled at the start or with an
-    /// enable parent) that are not in `visible` either.
+    /// order, and return how many matching references were held back (`held_back`: disabled at the start, themselves or
+    /// through their enable parent) that are not in `visible` either.
     pub fn take(
         &self,
         visible: &mut Vec<Instance>,

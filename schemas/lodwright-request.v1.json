@@ -178,7 +178,7 @@
           }
         },
         "include_rules": {
-          "description": "Take objects that nothing marks visible from far into object LOD when they match one of these rules. Only\nreferences enabled at the start and without an enable parent are taken; the exclusion rules above still win.\nEmpty by default and written only when set, so a request without rules keeps its digest.",
+          "description": "Take objects that nothing marks visible from far into object LOD when they match one of these rules. Only\nreferences that stand when the game starts (themselves and through their enable parent) are taken; the\nexclusion rules above still win.\nEmpty by default and written only when set, so a request without rules keeps its digest.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/IncludeRule"
@@ -297,7 +297,7 @@
           ]
         },
         "shapes_from_shipped_blocks": {
-          "description": "Objects whose far shape is taken from the far blocks the games ship, by world and model. Only enabled\nreferences without an enable parent are taken. Empty by default; written only when set.",
+          "description": "Objects whose far shape is taken from the far blocks the games ship, by world and model. Only references\nthat stand when the game starts (themselves and through their enable parent) are taken. Empty by default;\nwritten only when set.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/ShippedShapeRule"

@@ -36,7 +36,7 @@ triangles found and the cell segments that hold them, next to the segment the la
 | --- | --- |
 | `written` | found in the blocks |
 | `missing` | generation takes it by its rules and the blocks do not hold it |
-| `excluded` | a rule leaves it out on purpose: not marked visible from far, initially disabled (persistent too), or kept disabled at the start by its enable parent |
+| `excluded` | a rule leaves it out on purpose: not marked visible from far, initially disabled and not persistent, or kept disabled at the start by its enable parent |
 | `no_far_model` | no far model, or it cannot be read |
 | `unresolved` | the reference is not in the world, or has another model than the file says |
 

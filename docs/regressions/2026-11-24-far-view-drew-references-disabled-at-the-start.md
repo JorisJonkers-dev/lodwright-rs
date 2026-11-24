@@ -5,4 +5,6 @@
   parents (`XESP`) were not read, so a reference kept disabled by its parent was drawn from far.
 - Tests: `objects::tests::a_reference_follows_the_start_state_of_its_enable_parent_chain`,
   `objects::tests::a_later_plugin_that_disables_an_enable_parent_takes_its_children_out`,
-  `objects::tests::a_persistent_disabled_reference_is_left_out_as_it_is_not_there_at_the_start` (lodwright-core).
+  `objects::tests::a_disabled_reference_is_left_out_and_a_flagged_reference_counts_for_an_unflagged_base` (lodwright-core).
+- Correction: leaving out persistent disabled references as well was itself a regression; see
+  `2026-11-24-far-view-dropped-persistent-disabled-landmarks.md`.

@@ -470,7 +470,7 @@ fn check_inclusion(inclusion: &Inclusion) -> Result<(), String> {
             && (kind.len() != 4
                 || !kind
                     .bytes()
-                    .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_'))
+                    .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit()))
         {
             return Err(format!(
                 "include_rules record_type {kind:?} is not a four-letter record type"
@@ -627,6 +627,11 @@ mod tests {
         r.inclusion
             .include_rules
             .push(rule("lights/*", Some("stat")));
+        assert!(r.validate().unwrap_err().contains("record type"));
+        let mut r = base();
+        r.inclusion
+            .include_rules
+            .push(rule("lights/*", Some("____")));
         assert!(r.validate().unwrap_err().contains("record type"));
         let mut r = base();
         r.inclusion

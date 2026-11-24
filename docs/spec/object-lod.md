@@ -21,6 +21,11 @@ reference select what appears (reported by modders in the forum thread of `fnv-l
 references are selected, how scale and rotation are baked, how SCOL (static collection) records are expanded, how
 textures are collected into the atlas: no public document. M6 gives the protocol.
 
+lodwright takes a reference when the reference or its base is flagged visible when distant. The request option
+`objects.far_model_without_flag` (off by default, `docs/contracts/options/far-models-without-the-far-view-flag.md`)
+also takes unflagged references whose model has a `_lod.nif` far model, as another generator's output was measured to
+do (#426).
+
 Measured on the game's own blocks: a reference turns its model by `game-object-rotation`; a vertex lands at
 `pos + R * (s * v + T)`, where the model's translations `T` are not scaled by the reference scale `s` and the rotations
 of the model's nodes are ignored (`game-object-shape-offset`). A temporary reference counts in the block of the cell that holds it, a persistent one in

@@ -52,6 +52,10 @@ pub struct Manifest {
     /// of earlier versions, which then rebuild every block.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<ManifestBlock>,
+    /// Identity of the generator build that wrote the files: changes with any change to the code that decides what
+    /// is written, also between two builds of one version. Absent in manifests of earlier builds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
 }
 
 /// The contract name of the manifest.
@@ -77,7 +81,15 @@ impl Manifest {
             inputs_digest: inputs_digest.to_owned(),
             files,
             blocks: Vec::new(),
+            build: None,
         }
+    }
+
+    /// The same manifest naming the generator build that wrote it.
+    #[must_use]
+    pub fn with_build(mut self, build: &str) -> Self {
+        self.build = Some(build.to_owned());
+        self
     }
 
     /// The same manifest with `blocks` (sorted here).

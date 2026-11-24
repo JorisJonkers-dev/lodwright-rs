@@ -83,8 +83,12 @@ pub(crate) fn resume_or_clear(
     if !exists(stage) {
         return Ok(None);
     }
-    let checkpoint = read_manifest_file(stage, CHECKPOINT_FILE)
-        .filter(|c| c.request_digest == request_digest && c.inputs_digest == inputs_digest);
+    // a checkpoint of another generator build is not resumed: its blocks may differ from what this build writes
+    let checkpoint = read_manifest_file(stage, CHECKPOINT_FILE).filter(|c| {
+        c.request_digest == request_digest
+            && c.inputs_digest == inputs_digest
+            && c.build.as_deref() == Some(crate::BUILD)
+    });
     if checkpoint.is_none() {
         std::fs::remove_dir_all(stage)
             .map_err(|e| failed("cannot remove the staging folder", &e))?;
@@ -107,7 +111,9 @@ pub(crate) fn write_checkpoint(
     let mut blocks = blocks.to_vec();
     blocks.sort_by(|a, b| a.key.cmp(&b.key));
     blocks.dedup_by(|a, b| a.key == b.key);
-    let manifest = Manifest::new(version, request_digest, inputs_digest, files).with_blocks(blocks);
+    let manifest = Manifest::new(version, request_digest, inputs_digest, files)
+        .with_blocks(blocks)
+        .with_build(crate::BUILD);
     let text = serde_json::to_string_pretty(&manifest).map_err(|e| {
         Error::new("output_failed", "cannot write the checkpoint").with_detail(e.to_string())
     })? + "\n";
@@ -370,6 +376,17 @@ mod tests {
             1
         );
         assert!(stage.exists());
+        // a checkpoint another build of the generator wrote is not resumed (#422)
+        let other = super::read_manifest_file(&stage, CHECKPOINT_FILE)
+            .unwrap()
+            .with_build("0.0.0+other");
+        std::fs::write(
+            stage.join(CHECKPOINT_FILE),
+            serde_json::to_vec(&other).unwrap(),
+        )
+        .unwrap();
+        assert!(resume_or_clear(&stage, "r", "i").unwrap().is_none());
+        assert!(!stage.exists(), "another build: removed");
     }
 
     #[test]

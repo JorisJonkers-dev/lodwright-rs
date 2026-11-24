@@ -147,6 +147,33 @@ fn an_output_written_by_another_version_is_rebuilt_not_reported_up_to_date() {
 }
 
 #[test]
+fn an_output_written_by_another_build_of_the_same_version_is_rebuilt() {
+    let (job, out) = job("other-build");
+    generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();
+    let mut m = manifest(&out);
+    assert_eq!(
+        m.build.as_deref(),
+        Some(lodwright_api::BUILD),
+        "the manifest names its build"
+    );
+    // the same version number, another build (#422)
+    m.build = Some(format!("{}+0000000000000000", m.tool.version));
+    std::fs::write(out.join(MANIFEST_FILE), serde_json::to_vec(&m).unwrap()).unwrap();
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated");
+    assert_eq!(manifest(&out).build.as_deref(), Some(lodwright_api::BUILD));
+    // a manifest from before builds were named counts as another build too
+    let mut m = manifest(&out);
+    m.build = None;
+    std::fs::write(out.join(MANIFEST_FILE), serde_json::to_vec(&m).unwrap()).unwrap();
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated");
+    // and the same build with the same request is still up to date
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "up_to_date");
+}
+
+#[test]
 fn progress_starts_each_step_and_counts_every_terrain_block() {
     let (job, _) = job("progress");
     let mut events: Vec<ProgressEvent> = Vec::new();

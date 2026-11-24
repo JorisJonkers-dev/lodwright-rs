@@ -34,6 +34,10 @@ mod progress;
 mod shipped;
 mod staging;
 
+/// The identity of this generator build: its version and a hash of the code and lock file that decide what a run
+/// writes. An output whose manifest names another build is rebuilt whole (#422).
+pub const BUILD: &str = env!("LODWRIGHT_BUILD");
+
 pub use defaults::request_defaults;
 pub use error::Error;
 pub use generate::{GenerateOutcome, GenerateRequest, generate};

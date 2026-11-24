@@ -425,7 +425,11 @@ pub fn generate(
     let mut old = read_manifest(out);
     // an output written by another version of lodwright is rebuilt whole: a fix of what a version writes (#294)
     // must reach folders that already hold the same request's files
-    let same_version = old.as_ref().is_none_or(|m| m.tool.version == version);
+    // (#422) and so is one written by another build of the same version: two builds between releases both carry the
+    // version number, and the later one may write different files
+    let same_version = old
+        .as_ref()
+        .is_none_or(|m| m.tool.version == version && m.build.as_deref() == Some(crate::BUILD));
     if !same_version && let Some(m) = old.as_mut() {
         m.blocks.clear();
     }
@@ -980,7 +984,9 @@ pub fn generate(
             t.kept, t.composed, patched_tiles
         );
     }
-    let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all).with_blocks(blocks);
+    let manifest = Manifest::new(version, &digest, &loaded.inputs_digest, all)
+        .with_blocks(blocks)
+        .with_build(crate::BUILD);
     // staging holds exactly the manifest's files: whatever else a killed run left in it is dropped
     crate::staging::prune(&stage, &manifest.files);
     write_warnings(&mut doc, &stage, records)?;

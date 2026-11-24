@@ -11,6 +11,13 @@
         "$ref": "#/$defs/ManifestBlock"
       }
     },
+    "build": {
+      "description": "Identity of the generator build that wrote the files: changes with any change to the code that decides what\nis written, also between two builds of one version. Absent in manifests of earlier builds.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "contract": {
       "description": "The contract name, `lodwright-manifest`.",
       "type": "string",

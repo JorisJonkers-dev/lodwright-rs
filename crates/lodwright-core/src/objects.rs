@@ -87,16 +87,20 @@ type Ref = (
     Option<(u32, bool)>,
 );
 
+/// The start state a reference needs: its flags and its enable parent (absolute `FormID`, opposite).
+type StartState = (u32, Option<(u32, bool)>);
+
 /// Whether reference `id` is disabled when the game starts: initially disabled itself, or enabled through an enable
-/// parent that is disabled then (or, with the opposite flag, one that is enabled then). A parent that is not a
-/// reference of this world (an actor, or a reference elsewhere) counts as enabled. A chain is followed to its end
-/// however long it is; a loop counts as enabled.
-fn disabled_at_start(refs: &HashMap<u32, Ref>, id: u32) -> bool {
+/// parent that is disabled then (or, with the opposite flag, one that is enabled then). `state` gives a reference's
+/// winning flags and enable parent, in any world of the load order. A parent that is not a reference of any world (an
+/// actor, or a reference in an interior) counts as enabled. A chain is followed to its end however long it is; a loop
+/// counts as enabled.
+fn disabled_at_start(state: &dyn Fn(u32) -> Option<StartState>, id: u32) -> bool {
     let mut at = id;
     let mut flips = false;
     let mut seen: HashSet<u32> = HashSet::new();
     while seen.insert(at) {
-        let Some(&(_, flags, _, _, _, parent)) = refs.get(&at) else {
+        let Some((flags, parent)) = state(at) else {
             return flips;
         };
         if flags & INITIALLY_DISABLED != 0 {
@@ -109,6 +113,38 @@ fn disabled_at_start(refs: &HashMap<u32, Ref>, id: u32) -> bool {
         at = parent;
     }
     false
+}
+
+/// The winning flags and enable parent of every reference in every world but `world`, for enable parents that stand
+/// in another world than their children (a marker in the Strip that turns on lights seen from the Mojave).
+/// A plugin whose masters are not in the load order is passed over: [`gather`] has refused the load order already.
+fn start_states_elsewhere(plugins: &[(String, Plugin)], world: u32) -> HashMap<u32, StartState> {
+    let mut out: HashMap<u32, StartState> = HashMap::new();
+    for (index, (_, plugin)) in plugins.iter().enumerate() {
+        let (Ok(table), Ok(own)) = (master_table(plugins, plugin), u32::try_from(index)) else {
+            continue;
+        };
+        for source in plugin
+            .worlds
+            .iter()
+            .filter(|w| absolute(w.form_id, &table, own) != world)
+        {
+            for deleted in &source.deleted_refs {
+                out.remove(&absolute(*deleted, &table, own));
+            }
+            for r in &source.refs {
+                out.insert(
+                    absolute(r.form_id, &table, own),
+                    (
+                        r.flags,
+                        r.enable_parent
+                            .map(|p| (absolute(p.form_id, &table, own), p.opposite)),
+                    ),
+                );
+            }
+        }
+    }
+    out
 }
 
 /// The instances in world `world` (absolute `FormID`) that are visible when distant: a reference counts when its
@@ -191,8 +227,8 @@ pub fn references_with_model(
 
 /// The references in world `world` (absolute `FormID`) whose base object's model is one of `models` (paths relative to
 /// `meshes`, any case and either separator), whether or not anything marks them visible from far. Deleted references,
-/// every initially disabled reference (persistent ones too) and every reference with an enable parent are left out: a
-/// far block cannot follow what a script enables. Static collections are not expanded.
+/// every initially disabled reference (persistent ones too) and every reference its enable parent keeps disabled at the
+/// start are left out, as for the far view's own objects. Static collections are not expanded.
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -217,14 +253,14 @@ pub fn references_of_models(
     .taken)
 }
 
-/// What [`references_where`] found: the references a far block can draw, and those it leaves out because they start
-/// disabled or have an enable parent.
+/// What [`references_where`] found: the references that stand in the world when the game starts, and those left out
+/// because they are disabled then (themselves, or through their enable parent chain).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Matched {
-    /// Enabled at the start and without an enable parent.
+    /// Enabled at the start, through their enable parent chain too.
     pub taken: Vec<Instance>,
-    /// Initially disabled (persistent ones too) or with an enable parent: a far block cannot follow what a script
-    /// enables.
+    /// Initially disabled (persistent ones too) or kept disabled at the start by their enable parent chain: a far block
+    /// shows what stands when the game starts.
     pub held_back: Vec<Instance>,
 }
 
@@ -239,29 +275,11 @@ pub fn references_where(
     world: u32,
     accept: &dyn Fn(&BaseObject) -> bool,
 ) -> Result<Matched, Error> {
-    // the winning record of a reference decides whether it has an enable parent
-    let mut enable_parent: HashMap<u32, bool> = HashMap::new();
-    for (index, (_, plugin)) in plugins.iter().enumerate() {
-        let table = master_table(plugins, plugin)?;
-        let own = u32::try_from(index).map_err(|_| Error::Malformed("too many plugins"))?;
-        for source in plugin
-            .worlds
-            .iter()
-            .filter(|w| absolute(w.form_id, &table, own) == world)
-        {
-            for r in &source.refs {
-                enable_parent.insert(absolute(r.form_id, &table, own), r.enable_parent.is_some());
-            }
-        }
-    }
     let mut out = Matched::default();
-    for (instance, flags, _, _) in gather(plugins, world, false, true, &|base, _| accept(base))? {
-        if flags & INITIALLY_DISABLED != 0
-            || enable_parent
-                .get(&instance.reference)
-                .copied()
-                .unwrap_or(false)
-        {
+    for (instance, flags, _, hidden_by_parent) in
+        gather(plugins, world, false, true, &|base, _| accept(base))?
+    {
+        if flags & INITIALLY_DISABLED != 0 || hidden_by_parent {
             out.held_back.push(instance);
         } else {
             out.taken.push(instance);
@@ -347,6 +365,17 @@ fn gather(
             }
         }
     }
+    // a parent in another world is looked up there; those references are read only when a parent is not found here
+    let elsewhere: std::cell::OnceCell<HashMap<u32, StartState>> = std::cell::OnceCell::new();
+    let state = |at: u32| -> Option<StartState> {
+        if let Some(&(_, flags, _, _, _, parent)) = refs.get(&at) {
+            return Some((flags, parent));
+        }
+        elsewhere
+            .get_or_init(|| start_states_elsewhere(plugins, world))
+            .get(&at)
+            .copied()
+    };
     let mut out = Vec::new();
     for id in order {
         let Some(&(base_id, flags, placement, reference_plugin, cell, _)) = refs.get(&id) else {
@@ -361,7 +390,7 @@ fn gather(
         // source: oracle-skips-initially-disabled
         // what stands at the start: initially disabled references (persistent ones too, unlike the game's own blocks)
         // and references their enable parent keeps disabled are left out
-        let hidden_by_parent = flags & INITIALLY_DISABLED == 0 && disabled_at_start(&refs, id);
+        let hidden_by_parent = flags & INITIALLY_DISABLED == 0 && disabled_at_start(&state, id);
         if !keep_disabled && (flags & INITIALLY_DISABLED != 0 || hidden_by_parent) {
             continue;
         }
@@ -724,13 +753,14 @@ mod tests {
     }
 
     #[test]
-    fn references_of_models_leave_a_reference_with_an_enable_parent_out() {
+    fn references_of_models_leave_a_reference_its_enable_parent_keeps_disabled_out() {
         let p = plugin(
             &[],
-            vec![stat(0x100, "a/wall.nif", 0)],
+            vec![stat(0x100, "a/wall.nif", 0), stat(0x101, "marker.nif", 0)],
             vec![
                 refr(0x200, 0x100, 0, 1.0),
-                with_enable_parent(refr(0x201, 0x100, 0, 2.0)),
+                refr(0x300, 0x101, INITIALLY_DISABLED, 0.0),
+                with_parent(refr(0x201, 0x100, 0, 2.0), 0x300, false),
             ],
         );
         let found =
@@ -751,8 +781,13 @@ mod tests {
                 refr(0x200, 0x100, 0, 1.0),
                 refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
                 refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                // a parent that is not a reference of the load order counts as enabled
                 with_enable_parent(refr(0x203, 0x100, 0, 4.0)),
                 refr(0x204, 0x101, 0, 5.0),
+                // a parent disabled at the start keeps its child out, and lets its opposite child in
+                refr(0x300, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0),
+                with_parent(refr(0x205, 0x100, 0, 6.0), 0x300, false),
+                with_parent(refr(0x206, 0x100, 0, 7.0), 0x300, true),
             ],
         );
         let found = super::references_where(&[("A.esm".to_owned(), p)], 0x0000_0A00, &|b| {
@@ -760,8 +795,74 @@ mod tests {
         })
         .unwrap();
         let ids = |v: &[super::Instance]| v.iter().map(|i| i.reference).collect::<Vec<_>>();
-        assert_eq!(ids(&found.taken), vec![0x200]);
-        assert_eq!(ids(&found.held_back), vec![0x201, 0x202, 0x203]);
+        assert_eq!(ids(&found.taken), vec![0x200, 0x203, 0x206]);
+        assert_eq!(ids(&found.held_back), vec![0x201, 0x202, 0x205]);
+    }
+
+    /// A plugin with the statics in world 0xA00 and a second world 0xB00 that holds `markers`.
+    fn plugin_two_worlds(
+        statics: Vec<Record>,
+        refs: Vec<Record>,
+        markers: Vec<Record>,
+    ) -> crate::plugin::Plugin {
+        let mut stats = Group::new(0, *b"STAT");
+        for s in statics {
+            stats = stats.with(s);
+        }
+        let mut world = Group::new(1, 0x0000_0A00_u32.to_le_bytes());
+        for r in refs {
+            world = world.with(r);
+        }
+        let mut other = Group::new(1, 0x0000_0B00_u32.to_le_bytes());
+        for r in markers {
+            other = other.with(r);
+        }
+        let bytes = PluginBuilder::new()
+            .group(stats)
+            .group(world)
+            .group(other)
+            .build();
+        read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn an_enable_parent_in_another_world_decides_the_start_state() {
+        // lights seen from far whose enable parent is a disabled marker in another world (the Strip's lights): the
+        // child is disabled at the start, its opposite twin stands
+        let p = plugin_two_worlds(
+            vec![
+                stat(0x100, "a/lights.nif", VISIBLE_WHEN_DISTANT),
+                stat(0x101, "marker.nif", 0),
+            ],
+            vec![
+                with_parent(refr(0x200, 0x100, PERSISTENT, 1.0), 0x300, false),
+                with_parent(refr(0x201, 0x100, PERSISTENT, 2.0), 0x300, true),
+                with_parent(refr(0x202, 0x100, PERSISTENT, 3.0), 0x301, false),
+            ],
+            vec![
+                refr(0x300, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0),
+                refr(0x301, 0x101, PERSISTENT, 0.0),
+            ],
+        );
+        let plugins = [("A.esm".to_owned(), p)];
+        let ids = |v: &[super::Instance]| v.iter().map(|i| i.reference).collect::<Vec<_>>();
+        assert_eq!(
+            ids(&visible_instances(&plugins, 0x0000_0A00).unwrap()),
+            vec![0x201, 0x202]
+        );
+        let found = super::references_where(&plugins, 0x0000_0A00, &|b| {
+            b.model.as_deref() == Some("a/lights.nif")
+        })
+        .unwrap();
+        assert_eq!(ids(&found.taken), vec![0x201, 0x202]);
+        assert_eq!(ids(&found.held_back), vec![0x200]);
     }
 
     #[test]

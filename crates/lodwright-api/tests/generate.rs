@@ -692,8 +692,8 @@ fn include_job(name: &str) -> (GenerateRequest, PathBuf) {
         r.flags = flags;
         r
     };
-    // XESP: the parent's form id and a flags word
-    let parent = [0x0100_0D00_u32.to_le_bytes(), [0; 4]].concat();
+    // XESP: the parent's form id and a flags word; the parent is the disabled lamp, so this one is disabled too
+    let parent = [0x0100_0D01_u32.to_le_bytes(), [0; 4]].concat();
     let refs = Group::new(1, 0xB00_u32.to_le_bytes())
         .with(flagged(0x0100_0D00, 60.0, 0))
         .with(flagged(0x0100_0D01, 70.0, INITIALLY_DISABLED))
@@ -934,7 +934,7 @@ fn an_include_rule_takes_the_enabled_references_and_reports_the_held_back_ones()
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(result.code, "generated", "{result:?}");
     // the two enabled lamps reach the far-model step (which reports them: they have no LOD model); the disabled one,
-    // the persistent disabled one and the one with an enable parent are held back and counted
+    // the persistent disabled one and the one its disabled enable parent keeps out are held back and counted
     assert_eq!(
         lamp_records(&out),
         vec![

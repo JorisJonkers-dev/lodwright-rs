@@ -27,7 +27,7 @@ you see far away. Without it, mods change the world up close while the horizon s
 ## Fast
 
 <p align="center">
-  <img src="docs/images/speed.svg" alt="Building the far view for a load order of 133 plugins: xLODGen takes about 37 minutes, lodwright-rs 64 seconds" width="100%">
+  <img src="docs/images/speed.svg" alt="Building the far view for a load order of 133 plugins: the older tool, xLODGen, takes about 37 minutes; lodwright-rs 64 seconds" width="100%">
 </p>
 
 - 🖥️ Runs on Linux, Windows and macOS; the older tools run on Windows only.

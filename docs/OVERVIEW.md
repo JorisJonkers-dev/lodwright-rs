@@ -13,7 +13,7 @@ project, the clean-room rule and where to read next.
 - **Far land lit as the near land is.** The game's own far-land tiles are kept where no mod changed the land, and a
   composed tile is darkened to match the land near the player.
 - **Far water.** Lakes and rivers are drawn at a distance, with water walls at block borders so no gaps show.
-- **Speed.** On a 133-plugin load order, xLODGen averages about 37 minutes and lodwright takes 64 seconds on 16
+- **Speed.** On a 133-plugin load order, the older community generator averages about 37 minutes and lodwright takes 64 seconds on 16
   threads; step-by-step figures are in [docs/performance.md](performance.md).
 
 What is still open, with measurements, is in [docs/gap-list.md](gap-list.md).

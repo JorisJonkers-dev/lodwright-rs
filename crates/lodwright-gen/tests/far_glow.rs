@@ -44,8 +44,51 @@ fn av(properties: Vec<i32>) -> AvObject {
 
 /// A one-triangle LOD model whose texture set names `diffuse` and, in slot 2, `glow` (empty for none).
 fn model(diffuse: &str, glow: &str) -> Vec<u8> {
+    let mut lighting = Vec::new();
+    for v in [u32::MAX, 0, u32::MAX] {
+        lighting.extend_from_slice(&v.to_le_bytes());
+    }
+    lighting.extend_from_slice(&[0; 42]);
+    lighting[34..38].copy_from_slice(&4_u32.to_le_bytes());
+    let mut set = 6_u32.to_le_bytes().to_vec();
+    for p in [diffuse, "", glow] {
+        set.extend_from_slice(&u32::try_from(p.len()).unwrap().to_le_bytes());
+        set.extend_from_slice(p.as_bytes());
+    }
+    set.extend_from_slice(&[0; 12]);
+    one_shape(
+        &[b"BSShaderPPLightingProperty", b"BSShaderTextureSet"],
+        vec![Body::Opaque(lighting), Body::Opaque(set)],
+    )
+}
+
+/// A one-triangle model drawn without lighting and blended by its alpha, as the light strips on a casino front are:
+/// its `BSShaderNoLightingProperty` names `texture`.
+fn card_model(texture: &str) -> Vec<u8> {
+    let mut unlit = Vec::new();
+    for v in [u32::MAX, 0, u32::MAX] {
+        unlit.extend_from_slice(&v.to_le_bytes());
+    }
+    unlit.extend_from_slice(&[0; 22]);
+    unlit.extend_from_slice(&u32::try_from(texture.len()).unwrap().to_le_bytes());
+    unlit.extend_from_slice(texture.as_bytes());
+    unlit.extend_from_slice(&[0; 16]);
+    // name, extra data, controller, blend flags and threshold
+    let mut alpha = Vec::new();
+    for v in [u32::MAX, 0, u32::MAX] {
+        alpha.extend_from_slice(&v.to_le_bytes());
+    }
+    alpha.extend_from_slice(&[0xed, 0x00, 0x80]);
+    one_shape(
+        &[b"BSShaderNoLightingProperty", b"NiAlphaProperty"],
+        vec![Body::Opaque(unlit), Body::Opaque(alpha)],
+    )
+}
+
+/// A model of one triangle whose shape has the two property blocks `properties` (types and bodies).
+fn one_shape(property_types: &[&[u8]; 2], properties: Vec<Body>) -> Vec<u8> {
     let shape = NiTriShape {
-        av: av(vec![3]),
+        av: av(vec![3, 4]),
         data: 2,
         skin_instance: -1,
         material_names: vec![],
@@ -76,29 +119,12 @@ fn model(diffuse: &str, glow: &str) -> Vec<u8> {
         num_triangles: 1,
         strips: Some(vec![vec![0, 1, 2]]),
     };
-    let mut lighting = Vec::new();
-    for v in [u32::MAX, 0, u32::MAX] {
-        lighting.extend_from_slice(&v.to_le_bytes());
-    }
-    lighting.extend_from_slice(&[0; 42]);
-    lighting[34..38].copy_from_slice(&4_u32.to_le_bytes());
-    let mut set = 6_u32.to_le_bytes().to_vec();
-    for p in [diffuse, "", glow] {
-        set.extend_from_slice(&u32::try_from(p.len()).unwrap().to_le_bytes());
-        set.extend_from_slice(p.as_bytes());
-    }
-    set.extend_from_slice(&[0; 12]);
-    let types: Vec<Vec<u8>> = [
-        &b"NiNode"[..],
-        b"NiTriStrips",
-        b"NiTriStripsData",
-        b"BSShaderPPLightingProperty",
-        b"BSShaderTextureSet",
-    ]
-    .iter()
-    .map(|t| t.to_vec())
-    .collect();
-    let bodies = vec![
+    let types: Vec<Vec<u8>> = [&b"NiNode"[..], b"NiTriStrips", b"NiTriStripsData"]
+        .iter()
+        .chain(property_types)
+        .map(|t| t.to_vec())
+        .collect();
+    let mut bodies = vec![
         Body::Node(NiNode {
             av: av(vec![]),
             children: vec![1],
@@ -106,9 +132,8 @@ fn model(diffuse: &str, glow: &str) -> Vec<u8> {
         }),
         Body::TriStrips(shape),
         Body::TriStripsData(data),
-        Body::Opaque(lighting),
-        Body::Opaque(set),
     ];
+    bodies.extend(properties);
     NifFile {
         header: Header {
             user_version: 11,
@@ -372,4 +397,104 @@ fn a_lod_model_stays_when_the_rule_does_not_match_every_object_that_uses_it() {
     assert!(!files.iter().any(|f| f == GLOW), "{files:?}");
     // both walls are still drawn, from the authored LOD model
     assert_eq!(shapes(&out)[0].triangles.len(), 3);
+}
+
+/// A texture of one colour and alpha, BC3.
+fn texture_rgba(size: u32, rgba: [u8; 4]) -> Vec<u8> {
+    let px: Vec<u8> = (0..size * size).flat_map(|_| rgba).collect();
+    encode(
+        &Image::new(size, size, px).unwrap(),
+        &EncodeOptions {
+            format: Format::Bc3,
+            mips: true,
+            filter: Filter::Box,
+            quality: Quality::Fast,
+        },
+    )
+    .unwrap()
+}
+
+/// A rock with a LOD model and casino lights with a full model only: one shape drawn without lighting, blended by its
+/// alpha, made far by a rule.
+fn generate_lights(name: &str, glow: bool) -> (std::path::PathBuf, Vec<String>) {
+    let mut m = assets("").0;
+    m.insert(
+        "meshes/a/lights.nif".to_owned(),
+        card_model("textures\\fx\\strip.dds"),
+    );
+    m.insert(
+        "textures/fx/strip.dds".to_owned(),
+        texture_rgba(64, [255, 255, 255, 128]),
+    );
+    let out = std::env::temp_dir().join(format!("lodwright-glow-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    let limits = |i: &Instance| {
+        i.model
+            .contains("lights")
+            .then_some(lodwright_gen::FarLimits {
+                keep: 1.0,
+                max_error: 0.05,
+            })
+    };
+    let list = [
+        instance("a\\lights.nif", 100.0, 1),
+        instance("a\\rock.nif", 300.0, 2),
+    ];
+    let report = generate_objects_with_progress(
+        "Mojave",
+        &list,
+        &Memory(m),
+        &out,
+        Surfaces {
+            glow,
+            rule_shapes: Some(&limits),
+            ..Surfaces::default()
+        },
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let files = report.files.iter().map(|f| f.path.clone()).collect();
+    (out, files)
+}
+
+#[test]
+fn with_far_glow_a_shape_drawn_without_lighting_is_a_black_card_that_glows_with_its_texture() {
+    let (out, files) = generate_lights("card", true);
+    assert!(files.iter().any(|f| f == GLOW), "{files:?}");
+    let shapes = shapes(&out);
+    assert!(shapes[0].emissive);
+    // the rock's triangle and the card's
+    assert_eq!(shapes[0].triangles.len(), 2);
+    // the card glows with its texture weighted by its alpha: white at half alpha is half grey
+    let glow = decode_image(&std::fs::read(out.join(GLOW)).unwrap()).unwrap();
+    let lit: Vec<&[u8; 4]> = glow
+        .rgba()
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .filter(|p| p[0] > 0)
+        .collect();
+    assert_eq!(lit.len(), 32 * 32);
+    assert!(
+        lit.iter().all(|p| (118..=138).contains(&p[0])),
+        "{:?}",
+        lit[0]
+    );
+    // and by day it is black: the card's place in the atlas is black, the rock keeps its colour
+    let atlas = decode_image(
+        &std::fs::read(out.join("textures/landscape/lod/mojave/blocks/mojave.buildings.dds"))
+            .unwrap(),
+    )
+    .unwrap();
+    let px = atlas.rgba().as_chunks::<4>().0;
+    assert!(px.iter().filter(|p| p[..3] == [0, 0, 0]).count() >= 64 * 64);
+    assert!(px.iter().any(|p| p[0] > 100 && p[1] > 80));
+}
+
+#[test]
+fn without_far_glow_a_model_of_shapes_drawn_without_lighting_gets_no_far_shape() {
+    let (out, files) = generate_lights("no-card", false);
+    assert!(!files.iter().any(|f| f.ends_with("_g.dds")), "{files:?}");
+    // only the rock
+    assert_eq!(shapes(&out)[0].triangles.len(), 1);
 }

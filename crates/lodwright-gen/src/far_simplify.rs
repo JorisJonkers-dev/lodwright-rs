@@ -177,12 +177,29 @@ fn position_key(vertex: [f32; 3], offset: [f32; 3]) -> [u32; 3] {
 /// left has an alpha property: such a model may be an effect or glass, and the property alone does not tell, so it
 /// gets no far shape. In a model with a shape without one, all those shapes are kept, because many solid models carry
 /// the property on most of their shapes.
-pub(crate) fn far_parts_from_full_model(parts: Vec<Part>, limits: FarLimits) -> Option<Vec<Part>> {
-    let shapes: Vec<Part> = parts
+///
+/// With `glow_cards` (far glow on) a shape drawn without lighting that names a texture is kept as a glow card: it
+/// gives off the light its texture shows, so in a far block it is black and glows with that texture. The glow cards
+/// of a model are kept even when no other shape is (the light strips on a casino front are such a model).
+pub(crate) fn far_parts_from_full_model(
+    parts: Vec<Part>,
+    limits: FarLimits,
+    glow_cards: bool,
+) -> Option<Vec<Part>> {
+    let card = |part: &Part| glow_cards && part.unlit && part.glow_map.is_some();
+    let mut shapes: Vec<Part> = parts
         .into_iter()
-        .filter(|part| !part.triangles.is_empty() && !part.unlit)
+        .filter(|part| !part.triangles.is_empty() && (!part.unlit || card(part)))
         .collect();
-    if shapes.iter().all(|part| part.alpha) {
+    // lit shapes that all have an alpha property may be glass or an effect: only the glow cards are kept then
+    if shapes
+        .iter()
+        .filter(|part| !card(part))
+        .all(|part| part.alpha)
+    {
+        shapes.retain(|part| card(part));
+    }
+    if shapes.is_empty() {
         return None;
     }
     let mut owners: HashMap<[u32; 3], usize> = HashMap::new();
@@ -321,8 +338,9 @@ mod tests {
 
     #[test]
     fn a_corner_two_shapes_share_stays_in_both() {
-        let far = far_parts_from_full_model(vec![grid(0, 16, false), grid(16, 16, false)], LIMITS)
-            .unwrap();
+        let far =
+            far_parts_from_full_model(vec![grid(0, 16, false), grid(16, 16, false)], LIMITS, false)
+                .unwrap();
         assert_eq!(far.len(), 2);
         let every_row: BTreeSet<u32> = (0..=16).collect();
         assert_eq!(rows_at(&far[0], 16.0), every_row);
@@ -338,32 +356,37 @@ mod tests {
     fn a_shape_drawn_without_lighting_is_left_out() {
         let mut bulb = grid(20, 8, false);
         bulb.unlit = true;
-        let far = far_parts_from_full_model(vec![grid(0, 8, false), bulb.clone()], LIMITS).unwrap();
+        let far = far_parts_from_full_model(vec![grid(0, 8, false), bulb.clone()], LIMITS, false)
+            .unwrap();
         assert_eq!(far.len(), 1);
         assert!(!far[0].unlit);
         // a beam: nothing but shapes drawn without lighting, one of them without an alpha property
         let mut beam = grid(0, 8, true);
         beam.unlit = true;
-        assert_eq!(far_parts_from_full_model(vec![beam, bulb], LIMITS), None);
+        assert_eq!(
+            far_parts_from_full_model(vec![beam, bulb], LIMITS, false),
+            None
+        );
     }
 
     #[test]
     fn a_model_keeps_its_alpha_shapes_unless_it_has_no_other() {
         let far =
-            far_parts_from_full_model(vec![grid(0, 8, false), grid(20, 8, true)], LIMITS).unwrap();
+            far_parts_from_full_model(vec![grid(0, 8, false), grid(20, 8, true)], LIMITS, false)
+                .unwrap();
         assert_eq!(
             far.iter().map(|p| p.alpha).collect::<Vec<_>>(),
             [false, true]
         );
         assert_eq!(
-            far_parts_from_full_model(vec![grid(0, 8, true)], LIMITS),
+            far_parts_from_full_model(vec![grid(0, 8, true)], LIMITS, false),
             None
         );
     }
 
     #[test]
     fn the_kept_vertices_are_only_those_the_triangles_use() {
-        let far = far_parts_from_full_model(vec![grid(0, 16, false)], LIMITS).unwrap();
+        let far = far_parts_from_full_model(vec![grid(0, 16, false)], LIMITS, false).unwrap();
         let used: BTreeSet<u16> = far[0].triangles.iter().flatten().copied().collect();
         assert_eq!(used.len(), far[0].vertices.len());
         assert_eq!(far[0].uv.len(), far[0].vertices.len());

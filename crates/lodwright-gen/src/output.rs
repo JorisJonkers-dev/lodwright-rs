@@ -145,7 +145,7 @@ fn write_output_with(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_plain_relative, linked_folder, write_output_file};
+    use super::{is_plain_relative, linked_folder, write_output_file, write_output_stream};
     use crate::GenError;
 
     fn temp(name: &str) -> std::path::PathBuf {
@@ -174,6 +174,34 @@ mod tests {
         assert_eq!((record.path.as_str(), record.bytes), ("a/b/c.txt", 3));
         assert!(!out.join("a/b/c.tmp").exists());
         assert_eq!(linked_folder(&out, "a/b/c.txt"), None);
+    }
+
+    #[test]
+    fn a_streamed_file_has_the_record_of_the_same_bytes_written_at_once() {
+        let out = temp("stream");
+        let bytes: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+        let streamed =
+            write_output_stream(&out, "s/a.bin", |f| std::io::Write::write_all(f, &bytes)).unwrap();
+        let whole = write_output_file(&out, "w/a.bin", &bytes).unwrap();
+        assert_eq!(
+            (streamed.bytes, &streamed.digest),
+            (whole.bytes, &whole.digest)
+        );
+        assert_eq!(std::fs::read(out.join("s/a.bin")).unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_failed_stream_leaves_the_previous_file_and_no_temp_file() {
+        let out = temp("stream-fail");
+        write_output_file(&out, "a.bsa", b"previous").unwrap();
+        let err = write_output_stream(&out, "a.bsa", |f| {
+            std::io::Write::write_all(f, b"half")?;
+            Err(std::io::Error::other("stopped"))
+        })
+        .unwrap_err();
+        assert!(matches!(err, GenError::Io { .. }), "{err}");
+        assert_eq!(std::fs::read(out.join("a.bsa")).unwrap(), b"previous");
+        assert!(!out.join("a.tmp").exists());
     }
 
     #[test]

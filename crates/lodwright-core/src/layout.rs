@@ -152,6 +152,30 @@ pub fn atlas_page_paths(world: &str, page: usize) -> Result<[String; 2], Error> 
     ])
 }
 
+/// Path of the glow atlas of atlas page `page`: the same layout as the page's atlas, written only when far glow is on
+/// and a texture on the page has a glow map.
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn atlas_page_glow_path(world: &str, page: usize) -> Result<String, Error> {
+    check_world_name(world)?;
+    let w = world.to_ascii_lowercase();
+    Ok(format!(
+        "textures/landscape/lod/{w}/blocks/{w}.{}_g.dds",
+        atlas_name(page)
+    ))
+}
+
+/// The glow atlas path an object block NIF carries in its texture set's glow slot for atlas page `page`, written like
+/// [`nif_atlas_page_paths`].
+///
+/// # Errors
+/// [`Error::BadWorldName`] when `world` is not a usable name.
+pub fn nif_atlas_page_glow_path(world: &str, page: usize) -> Result<String, Error> {
+    let [diffuse, _] = nif_atlas_page_paths(world, page)?;
+    Ok(format!("{}_g.dds", diffuse.trim_end_matches(".dds")))
+}
+
 // source: game-lod-object-block-nif
 /// The two paths an object block NIF carries for the atlas and the normal atlas, as the game's own files write
 /// them.
@@ -287,6 +311,18 @@ mod tests {
         assert_eq!(
             super::nif_atlas_paths("Mojave").unwrap()[0],
             "Data\\Textures\\Landscape\\LOD\\Mojave\\Blocks\\Mojave.Buildings.dds"
+        );
+    }
+
+    #[test]
+    fn a_glow_atlas_sits_beside_its_page_with_a_g_suffix() {
+        assert_eq!(
+            super::atlas_page_glow_path("W", 0).unwrap(),
+            "textures/landscape/lod/w/blocks/w.buildings_g.dds"
+        );
+        assert_eq!(
+            super::nif_atlas_page_glow_path("W", 1).unwrap(),
+            "Data\\Textures\\Landscape\\LOD\\W\\Blocks\\W.Buildings01_g.dds"
         );
     }
 

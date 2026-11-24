@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: GPL-3.0-only
+//! Far glow (`objects.far_glow`): a glow atlas beside the object atlas, named in the glow slot of the far blocks with an
+//! emissive material, on synthetic models. Off, the output is the same bytes as for models without glow maps.
+
+use std::collections::HashMap;
+
+use lodwright_core::objects::Instance;
+use lodwright_core::plugin::Placement;
+use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, decode_image, encode};
+use lodwright_gen::{Assets, Surfaces, generate_objects_with_progress};
+use lodwright_nif::{
+    AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriStripsData,
+    NifFile, ObjectNet, read_object_shapes,
+};
+
+const BLOCK: &str = "meshes/landscape/lod/mojave/blocks/mojave.level4.x0.y0.nif";
+const GLOW: &str = "textures/landscape/lod/mojave/blocks/mojave.buildings_g.dds";
+
+struct Memory(HashMap<String, Vec<u8>>);
+
+impl Assets for Memory {
+    fn read(&self, path: &str) -> Option<Vec<u8>> {
+        self.0
+            .get(&path.to_ascii_lowercase().replace('\\', "/"))
+            .cloned()
+    }
+}
+
+fn av(properties: Vec<i32>) -> AvObject {
+    AvObject {
+        net: ObjectNet {
+            name: -1,
+            extra_data: vec![],
+            controller: -1,
+        },
+        flags: 14,
+        translation: [0.0; 3],
+        rotation: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        scale: 1.0,
+        properties,
+        collision_object: -1,
+    }
+}
+
+/// A one-triangle LOD model whose texture set names `diffuse` and, in slot 2, `glow` (empty for none).
+fn model(diffuse: &str, glow: &str) -> Vec<u8> {
+    let shape = NiTriShape {
+        av: av(vec![3]),
+        data: 2,
+        skin_instance: -1,
+        material_names: vec![],
+        material_extra_data: vec![],
+        active_material: 0,
+        material_needs_update: 0,
+        shader_property: -1,
+        alpha_property: -1,
+    };
+    let data = NiTriStripsData {
+        geometry: GeometryData {
+            group_id: 0,
+            num_vertices: 3,
+            keep_flags: 0,
+            compress_flags: 0,
+            vertices: Some(vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]),
+            vector_flags: 1,
+            material_crc: 0,
+            normals: None,
+            tangents: None,
+            center: [0.0; 3],
+            radius: 0.0,
+            vertex_colors: None,
+            uv_sets: vec![vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]],
+            consistency: 0,
+            additional_data: -1,
+        },
+        num_triangles: 1,
+        strips: Some(vec![vec![0, 1, 2]]),
+    };
+    let mut lighting = Vec::new();
+    for v in [u32::MAX, 0, u32::MAX] {
+        lighting.extend_from_slice(&v.to_le_bytes());
+    }
+    lighting.extend_from_slice(&[0; 42]);
+    lighting[34..38].copy_from_slice(&4_u32.to_le_bytes());
+    let mut set = 6_u32.to_le_bytes().to_vec();
+    for p in [diffuse, "", glow] {
+        set.extend_from_slice(&u32::try_from(p.len()).unwrap().to_le_bytes());
+        set.extend_from_slice(p.as_bytes());
+    }
+    set.extend_from_slice(&[0; 12]);
+    let types: Vec<Vec<u8>> = [
+        &b"NiNode"[..],
+        b"NiTriStrips",
+        b"NiTriStripsData",
+        b"BSShaderPPLightingProperty",
+        b"BSShaderTextureSet",
+    ]
+    .iter()
+    .map(|t| t.to_vec())
+    .collect();
+    let bodies = vec![
+        Body::Node(NiNode {
+            av: av(vec![]),
+            children: vec![1],
+            effects: vec![],
+        }),
+        Body::TriStrips(shape),
+        Body::TriStripsData(data),
+        Body::Opaque(lighting),
+        Body::Opaque(set),
+    ];
+    NifFile {
+        header: Header {
+            user_version: 11,
+            bethesda: Some((
+                34,
+                ExportInfo {
+                    author: vec![0],
+                    unknown_int: 0,
+                    process_script: vec![0],
+                    export_script: vec![0],
+                    max_filepath: vec![],
+                },
+            )),
+            block_types: types,
+            strings: vec![],
+            groups: vec![],
+        },
+        blocks: bodies
+            .into_iter()
+            .enumerate()
+            .map(|(i, body)| Block {
+                type_index: u16::try_from(i).unwrap(),
+                body,
+            })
+            .collect(),
+        roots: vec![0],
+    }
+    .write()
+    .unwrap()
+}
+
+fn texture(size: u32, rgb: [u8; 3]) -> Vec<u8> {
+    let px: Vec<u8> = (0..size * size)
+        .flat_map(|_| [rgb[0], rgb[1], rgb[2], 255])
+        .collect();
+    encode(
+        &Image::new(size, size, px).unwrap(),
+        &EncodeOptions {
+            format: Format::Bc1,
+            mips: true,
+            filter: Filter::Box,
+            quality: Quality::Fast,
+        },
+    )
+    .unwrap()
+}
+
+/// A lit wall (with a glow map unless `wall_glow` is empty) and a rock without one.
+fn assets(wall_glow: &str) -> Memory {
+    let mut m = HashMap::new();
+    m.insert(
+        "meshes/a/wall_lod.nif".to_owned(),
+        model("Data\\Textures\\a\\wall.dds", wall_glow),
+    );
+    m.insert(
+        "meshes/a/rock_lod.nif".to_owned(),
+        model("Data\\Textures\\a\\rock.dds", ""),
+    );
+    m.insert("textures/a/wall.dds".to_owned(), texture(128, [90, 90, 90]));
+    m.insert(
+        "textures/a/wall_g.dds".to_owned(),
+        texture(128, [255, 200, 40]),
+    );
+    m.insert(
+        "textures/a/rock.dds".to_owned(),
+        texture(64, [120, 100, 80]),
+    );
+    Memory(m)
+}
+
+fn instance(model: &str, x: f32, reference: u32) -> Instance {
+    Instance {
+        base: reference,
+        signature: *b"STAT",
+        model: model.to_owned(),
+        placement: Placement {
+            pos: [x, 100.0, 10.0],
+            rot: [0.0; 3],
+            scale: 1.0,
+        },
+        high_priority: false,
+        has_tree_lod: false,
+        reference,
+        reference_plugin: 0,
+        base_plugin: 0,
+        flagged_by: 0,
+        part: false,
+        cell: None,
+    }
+}
+
+fn generate(name: &str, assets: &Memory, glow: bool) -> (std::path::PathBuf, Vec<String>) {
+    let out = std::env::temp_dir().join(format!("lodwright-glow-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out);
+    let list = [
+        instance("a\\wall.nif", 100.0, 1),
+        instance("a\\rock.nif", 300.0, 2),
+    ];
+    let report = generate_objects_with_progress(
+        "Mojave",
+        &list,
+        assets,
+        &out,
+        Surfaces {
+            glow,
+            ..Surfaces::default()
+        },
+        &mut |_, _| {},
+    )
+    .unwrap();
+    let files = report.files.iter().map(|f| f.path.clone()).collect();
+    (out, files)
+}
+
+fn shapes(out: &std::path::Path) -> Vec<lodwright_nif::ObjectShape> {
+    read_object_shapes(&NifFile::read(&std::fs::read(out.join(BLOCK)).unwrap()).unwrap()).unwrap()
+}
+
+#[test]
+fn with_far_glow_the_blocks_name_a_glow_atlas_and_an_emissive_material() {
+    let (out, files) = generate("on", &assets("Data\\Textures\\a\\wall_g.dds"), true);
+    assert!(files.iter().any(|f| f == GLOW), "{files:?}");
+    let shapes = shapes(&out);
+    assert_eq!(shapes.len(), 1);
+    assert_eq!(
+        shapes[0].glow_texture,
+        "Data\\Textures\\Landscape\\LOD\\Mojave\\Blocks\\Mojave.Buildings_g.dds"
+    );
+    assert!(shapes[0].emissive);
+    // the glow atlas is half the atlas, as the normal atlas is, and black but for the wall's glow map
+    let glow = decode_image(&std::fs::read(out.join(GLOW)).unwrap()).unwrap();
+    assert_eq!((glow.width(), glow.height()), (1024, 512));
+    let lit = glow
+        .rgba()
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .filter(|p| p[0] > 200 && p[1] > 150)
+        .count();
+    // the wall's 128 square texture is 64 square at half size; everything else stays black
+    assert_eq!(lit, 64 * 64);
+    assert!(
+        glow.rgba()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| (p[0] > 200 && p[1] > 150) || p[..3] == [0, 0, 0])
+    );
+}
+
+#[test]
+fn without_far_glow_the_output_is_the_same_bytes_as_for_models_without_glow_maps() {
+    let (with_maps, files) = generate("off-maps", &assets("Data\\Textures\\a\\wall_g.dds"), false);
+    let (without, other) = generate("off-none", &assets(""), false);
+    assert_eq!(files, other);
+    assert!(!files.iter().any(|f| f.ends_with("_g.dds")), "{files:?}");
+    for f in &files {
+        assert_eq!(
+            std::fs::read(with_maps.join(f)).unwrap(),
+            std::fs::read(without.join(f)).unwrap(),
+            "{f}"
+        );
+    }
+    let shapes = shapes(&with_maps);
+    assert_eq!(
+        (shapes[0].glow_texture.as_str(), shapes[0].emissive),
+        ("", false)
+    );
+}
+
+#[test]
+fn far_glow_on_models_without_glow_maps_writes_no_glow_atlas_and_the_same_blocks() {
+    let (on, files) = generate("on-none", &assets(""), true);
+    let (off, other) = generate("off-none-2", &assets(""), false);
+    assert_eq!(files, other);
+    for f in &files {
+        assert_eq!(
+            std::fs::read(on.join(f)).unwrap(),
+            std::fs::read(off.join(f)).unwrap(),
+            "{f}"
+        );
+    }
+}
+
+#[test]
+fn a_glow_map_that_cannot_be_read_leaves_its_page_without_a_glow_atlas() {
+    let (out, files) = generate("missing", &assets("Data\\Textures\\a\\gone_g.dds"), true);
+    assert!(!files.iter().any(|f| f.ends_with("_g.dds")), "{files:?}");
+    assert_eq!(shapes(&out)[0].glow_texture, "");
+}

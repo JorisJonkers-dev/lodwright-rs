@@ -1363,6 +1363,7 @@ mod tests {
             indices: &[0, 1, 2, 0, 2, 3],
             segment_triangles,
             textures: [&paths[0], &paths[1]],
+            glow: None,
         })
         .unwrap();
         std::fs::write(blocks.join("w.level4.x0.y0.nif"), nif.write().unwrap()).unwrap();
@@ -1652,6 +1653,7 @@ mod tests {
             indices: &[0, 1, 2],
             segment_triangles: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             textures: ["a.dds", "b.dds"],
+            glow: None,
         })
         .unwrap();
         let path = root.join("meshes/landscape/lod/w/blocks/w.level4.x0.y0.nif");
@@ -1676,6 +1678,7 @@ mod tests {
             indices: &[0, 1, 2],
             segment_triangles: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             textures: ["a.dds", "b.dds"],
+            glow: None,
         })
         .unwrap();
         if on_root {

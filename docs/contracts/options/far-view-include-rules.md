@@ -18,7 +18,8 @@ marks visible from far into object LOD:
 A reference is taken when its winning base object matches a rule, it is enabled at the start, and it has no enable
 parent. A far block cannot follow what a script enables. Matching references that start disabled (persistent ones too)
 or have an enable parent are left out and counted in one `include_rule_reference_not_enabled` warning per world.
-References that the game's own rule already takes are not added twice. The exclusion rules (`exclude_plugins`,
+References that the game's own rule already takes are not added twice, and not counted (an initially disabled
+persistent reference marked visible from far is one of them). The exclusion rules (`exclude_plugins`,
 `only_plugins`, `exclude_records`, `exclude_models`) apply afterwards, so an exclusion always wins over an include
 rule. References are added in load order, which keeps the output deterministic.
 

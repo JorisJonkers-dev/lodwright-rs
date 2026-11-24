@@ -32,6 +32,8 @@ const SHIPPED_SINCE: &str = "0.16.0";
 const LAND_LIGHT_SINCE: &str = "0.17.0";
 /// The release that adds `output.pack`.
 const PACK_SINCE: &str = "0.15.0";
+/// The release that adds `objects.far_glow`.
+const FAR_GLOW_SINCE: &str = "0.18.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -145,6 +147,13 @@ pub fn request_defaults() -> Defaults {
             ..option(&doc, key, OptionKind::Switch)
         });
     }
+    // off by default and not written while off: the default comes from the request type
+    options.push(OptionInfo {
+        default: Value::Bool(objects.far_glow),
+        tier: 3,
+        since: FAR_GLOW_SINCE.to_owned(),
+        ..option(&doc, "objects.far_glow", OptionKind::Switch)
+    });
     options.push(option(&doc, "trees.enabled", OptionKind::Switch));
     // off by default and not written while off: the default comes from the request type
     options.push(OptionInfo {
@@ -346,11 +355,14 @@ mod tests {
                     || o.since == "0.14.0"
                     || o.since == "0.15.0"
                     || o.since == "0.16.0"
-                    || o.since == "0.17.0"))));
+                    || o.since == "0.17.0"
+                    || o.since == "0.18.0"))));
         let scales = d.option("terrain.texture_scales").unwrap();
         assert_eq!((scales.tier, scales.kind), (3, OptionKind::Map));
         let drop = d.option("objects.drop_under_water").unwrap();
         assert_eq!((drop.tier, drop.default.clone()), (3, Value::Bool(false)));
+        let glow = d.option("objects.far_glow").unwrap();
+        assert_eq!((glow.tier, glow.default.clone()), (3, Value::Bool(false)));
         assert_eq!(d.option("limits.threads").unwrap().default, Value::Null);
         assert_eq!(
             d.option("terrain.water").unwrap().default,

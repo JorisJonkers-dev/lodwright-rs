@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
-use lodwright_gen::{Assets, FarLimits, ObjectReport, Surfaces, generate_objects_with_progress};
+use lodwright_gen::{
+    Assets, FarLimits, ObjectReport, RuleShapes, Surfaces, generate_objects_with_progress,
+};
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriShapeData,
     NifFile, ObjectNet,
@@ -50,8 +52,13 @@ fn grid_model(size: u16, alpha: bool) -> Vec<u8> {
 }
 
 /// The same model with the height of its first vertex given.
-#[allow(clippy::too_many_lines, reason = "one literal NIF")]
 fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Vec<u8> {
+    grid_model_full(size, alpha, first_height, false)
+}
+
+/// The same model; `unlit` also gives the shape a `BSShaderNoLightingProperty`, as light beams and glows have.
+#[allow(clippy::too_many_lines, reason = "one literal NIF")]
+fn grid_model_full(size: u16, alpha: bool, first_height: f32, unlit: bool) -> Vec<u8> {
     let row = size + 1;
     let mut vertices: Vec<[f32; 3]> = (0..row)
         .flat_map(|j| (0..row).map(move |i| [f32::from(i) * 4.0, f32::from(j) * 4.0, 0.0]))
@@ -81,7 +88,12 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
         effects: vec![],
     };
     let shape = NiTriShape {
-        av: av(if alpha { vec![3, 5] } else { vec![3] }),
+        av: av(match (alpha, unlit) {
+            (false, false) => vec![3],
+            (true, false) => vec![3, 5],
+            (false, true) => vec![3, 6],
+            (true, true) => vec![3, 5, 6],
+        }),
         data: 2,
         skin_instance: -1,
         material_names: vec![],
@@ -133,6 +145,7 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
         b"BSShaderPPLightingProperty",
         b"BSShaderTextureSet",
         b"NiAlphaProperty",
+        b"BSShaderNoLightingProperty",
     ]
     .iter()
     .map(|t| t.to_vec())
@@ -178,6 +191,10 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
             Block {
                 type_index: 5,
                 body: Body::Opaque(alpha_property()),
+            },
+            Block {
+                type_index: 6,
+                body: Body::Opaque(vec![0; 16]),
             },
         ],
         roots: vec![0],
@@ -247,6 +264,17 @@ fn run(
     full_models: Option<FarLimits>,
     threads: usize,
 ) -> (ObjectReport, std::path::PathBuf) {
+    run_with_rules(name, list, assets, full_models, None, threads)
+}
+
+fn run_with_rules(
+    name: &str,
+    list: &[Instance],
+    assets: &Memory,
+    full_models: Option<FarLimits>,
+    rule_shapes: Option<RuleShapes<'_>>,
+    threads: usize,
+) -> (ObjectReport, std::path::PathBuf) {
     let out = std::env::temp_dir().join(format!(
         "lodwright-full-shapes-{}-{name}",
         std::process::id()
@@ -254,6 +282,7 @@ fn run(
     let _ = std::fs::remove_dir_all(&out);
     let surfaces = Surfaces {
         full_models,
+        rule_shapes,
         threads,
         ..Surfaces::default()
     };
@@ -398,6 +427,198 @@ fn the_bytes_do_not_depend_on_the_thread_count() {
     ];
     let (_, one) = run("threads-1", &list, &store, Some(LIMITS), 1);
     let (_, four) = run("threads-4", &list, &store, Some(LIMITS), 4);
+    assert_eq!(
+        std::fs::read(one.join(BLOCK)).unwrap(),
+        std::fs::read(four.join(BLOCK)).unwrap()
+    );
+}
+
+/// The limits a rule gives the objects of reference 1 only, as an include rule's `generate` does for what it names.
+fn first_reference_only(i: &Instance) -> Option<FarLimits> {
+    (i.reference == 1).then_some(LIMITS)
+}
+
+fn record<'a>(
+    report: &'a ObjectReport,
+    kind: &str,
+) -> Option<&'a lodwright_contract::WarningRecord> {
+    report.records.iter().find(|r| r.kind == kind)
+}
+
+#[test]
+fn a_rule_gives_a_shape_to_what_it_names_and_to_no_other_model() {
+    let store = assets(&[
+        ("meshes/a/lamp.nif", grid_model(16, false)),
+        ("meshes/a/house.nif", grid_model(12, false)),
+    ]);
+    let list = [
+        instance("a\\Lamp.nif", 100.0, 1, false),
+        instance("a\\House.nif", 300.0, 2, false),
+    ];
+    let (report, out) = run_with_rules("rule", &list, &store, None, Some(&first_reference_only), 1);
+    let (_, lamp_alone) = run(
+        "rule-lamp-alone",
+        &[instance("a\\Lamp.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    // the block holds the lamp's shape and nothing of the house
+    assert_eq!(
+        std::fs::read(out.join(BLOCK)).unwrap(),
+        std::fs::read(lamp_alone.join(BLOCK)).unwrap()
+    );
+    assert_eq!(
+        record(&report, "far_model_simplified").unwrap().subjects,
+        ["meshes/a/lamp.nif"]
+    );
+    let missing = record(&report, "far_model_without_lod_model").unwrap();
+    assert_eq!(missing.subjects, ["meshes/a/house.nif"]);
+    assert_eq!(missing.count, 1);
+}
+
+#[test]
+fn another_object_of_the_same_model_that_no_rule_names_stays_out() {
+    let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
+    let list = [
+        instance("a\\Lamp.nif", 100.0, 1, false),
+        instance("a\\Lamp.nif", 300.0, 2, false),
+    ];
+    let (report, out) = run_with_rules(
+        "same-model",
+        &list,
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    let (_, one) = run(
+        "same-model-one",
+        &[instance("a\\Lamp.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    assert_eq!(block_triangles(&out), block_triangles(&one));
+    let missing = record(&report, "far_model_without_lod_model").unwrap();
+    assert_eq!(missing.subjects, ["meshes/a/lamp.nif"]);
+    assert_eq!(missing.count, 1);
+    // with the switch for every object on as well, both are drawn
+    let (_, both) = run_with_rules(
+        "same-model-both",
+        &list,
+        &store,
+        Some(LIMITS),
+        Some(&first_reference_only),
+        1,
+    );
+    assert_eq!(block_triangles(&both), 2 * block_triangles(&one));
+}
+
+#[test]
+fn a_rule_that_names_nothing_changes_no_byte() {
+    let store = assets(&[
+        ("meshes/a/house.nif", grid_model(12, false)),
+        ("meshes/a/tower.nif", grid_model(16, false)),
+        ("meshes/a/tower_lod.nif", grid_model(2, false)),
+    ]);
+    let list = [
+        instance("a\\House.nif", 100.0, 7, false),
+        instance("a\\Tower.nif", 300.0, 8, false),
+    ];
+    let (plain, a) = run("no-rule", &list, &store, None, 1);
+    let (ruled, b) = run_with_rules(
+        "rule-names-nothing",
+        &list,
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    assert_eq!(
+        std::fs::read(a.join(BLOCK)).unwrap(),
+        std::fs::read(b.join(BLOCK)).unwrap()
+    );
+    assert_eq!(kinds(&plain), kinds(&ruled));
+}
+
+#[test]
+fn a_rules_limits_win_over_the_switch_for_every_object() {
+    let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
+    let list = [instance("a\\Lamp.nif", 100.0, 1, false)];
+    let fine = |_: &Instance| {
+        Some(FarLimits {
+            keep: 1.0,
+            max_error: 0.0,
+        })
+    };
+    let (_, coarse) = run("limits-switch", &list, &store, Some(LIMITS), 1);
+    let (_, ruled) = run_with_rules("limits-rule", &list, &store, Some(LIMITS), Some(&fine), 1);
+    assert!(block_triangles(&ruled) > block_triangles(&coarse));
+}
+
+#[test]
+fn a_rule_does_not_call_an_unnamed_see_through_object_see_through() {
+    let store = assets(&[("meshes/a/glass.nif", grid_model(8, true))]);
+    let list = [
+        instance("a\\Glass.nif", 100.0, 1, false),
+        instance("a\\Glass.nif", 300.0, 2, false),
+    ];
+    let (report, out) =
+        run_with_rules("glass", &list, &store, None, Some(&first_reference_only), 1);
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(
+        record(&report, "far_model_no_solid_shape").unwrap().count,
+        1
+    );
+    assert_eq!(
+        record(&report, "far_model_without_lod_model")
+            .unwrap()
+            .count,
+        1
+    );
+}
+
+#[test]
+fn a_model_drawn_without_lighting_gets_no_far_shape() {
+    // a light beam: one shape without an alpha property, drawn without lighting
+    let store = assets(&[("meshes/a/beam.nif", grid_model_full(8, false, 0.0, true))]);
+    let (report, out) = run(
+        "unlit",
+        &[instance("a\\Beam.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(kinds(&report), ["far_model_no_solid_shape"]);
+    // the same through a rule's limits
+    let (report, out) = run_with_rules(
+        "unlit-rule",
+        &[instance("a\\Beam.nif", 100.0, 1, false)],
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(kinds(&report), ["far_model_no_solid_shape"]);
+}
+
+#[test]
+fn a_rules_shapes_do_not_depend_on_the_thread_count() {
+    let store = assets(&[
+        ("meshes/a/one.nif", grid_model(16, false)),
+        ("meshes/a/two.nif", grid_model(12, false)),
+    ]);
+    let list = [
+        instance("a\\One.nif", 100.0, 1, false),
+        instance("a\\Two.nif", 300.0, 1, false),
+        instance("a\\Two.nif", 500.0, 2, false),
+    ];
+    let rule = Some(&first_reference_only as RuleShapes<'_>);
+    let (_, one) = run_with_rules("rule-threads-1", &list, &store, None, rule, 1);
+    let (_, four) = run_with_rules("rule-threads-4", &list, &store, None, rule, 4);
     assert_eq!(
         std::fs::read(one.join(BLOCK)).unwrap(),
         std::fs::read(four.join(BLOCK)).unwrap()

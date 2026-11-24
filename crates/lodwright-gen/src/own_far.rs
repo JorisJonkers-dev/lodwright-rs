@@ -529,6 +529,7 @@ fn cut(
         diffuse: Some(key.clone()),
         normal_map: None,
         alpha: false,
+        unlit: false,
     };
     Some((part, key, image))
 }

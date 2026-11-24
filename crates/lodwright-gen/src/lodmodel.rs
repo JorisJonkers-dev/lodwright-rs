@@ -27,6 +27,9 @@ pub struct Part {
     pub normal_map: Option<String>,
     /// The shape has an alpha property.
     pub alpha: bool,
+    /// The shape is drawn without lighting (`BSShaderNoLightingProperty`), as light beams, glows and other effects
+    /// are.
+    pub unlit: bool,
 }
 
 type Mat = [[f32; 3]; 3];
@@ -172,8 +175,15 @@ impl Ctx<'_> {
         }
     }
 
-    fn textures(&self, shape: &NiTriShape) -> (Option<String>, Option<String>, bool) {
+    fn textures(&self, shape: &NiTriShape) -> (Option<String>, Option<String>, bool, bool) {
         let (mut diffuse, mut normal, mut alpha) = (None, None, shape.alpha_property >= 0);
+        let unlit = shape
+            .av
+            .properties
+            .iter()
+            .chain(std::iter::once(&shape.shader_property))
+            .filter_map(|p| usize::try_from(*p).ok())
+            .any(|p| self.name(p) == b"BSShaderNoLightingProperty");
         for p in &shape.av.properties {
             let Ok(p) = usize::try_from(*p) else { continue };
             if self.name(p) == b"NiAlphaProperty" {
@@ -197,7 +207,7 @@ impl Ctx<'_> {
         {
             (diffuse, normal) = texture_set(set_bytes);
         }
-        (diffuse, normal, alpha)
+        (diffuse, normal, alpha, unlit)
     }
 
     fn shape(&mut self, shape: &NiTriShape, xf: &Xf) {
@@ -216,7 +226,7 @@ impl Ctx<'_> {
         };
         let n = vertices.len();
         let turn = |v: &[f32; 3]| apply(&xf.rot, *v);
-        let (diffuse, normal_map, alpha) = self.textures(shape);
+        let (diffuse, normal_map, alpha, unlit) = self.textures(shape);
         self.parts.push(Part {
             // source: game-object-shape-offset
             vertices: vertices
@@ -237,6 +247,7 @@ impl Ctx<'_> {
             diffuse,
             normal_map,
             alpha,
+            unlit,
         });
     }
 

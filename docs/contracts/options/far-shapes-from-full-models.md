@@ -12,7 +12,9 @@ a simplified copy of their full model:
 `keep` is the share of each shape's triangles to keep, above 0 and at most 1. `max_error` is the largest error allowed,
 as a share of the shape's size, from 0 to 1. Simplifying stops at whichever limit it reaches first.
 
-An authored LOD model always wins. A model in which every shape has an alpha property stays out of the far view and is
+An authored LOD model always wins. A shape drawn without lighting (`BSShaderNoLightingProperty`: light beams, glow
+cards and other effects) is left out of the far shape, because a far block is lit and would show it as a pale solid. A
+model in which every other shape has an alpha property, or that has no other shape, stays out of the far view and is
 reported as `far_model_no_solid_shape`, because it may be an effect or glass. A model with at least one shape without
 that property keeps all its shapes, because many solid models carry the property on most shapes; a glass shape in such a
 model is therefore simplified and drawn too. A corner that two shapes of a model share stays in place, so no crack opens

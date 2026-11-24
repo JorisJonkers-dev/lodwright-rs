@@ -718,7 +718,192 @@ fn rule(models: &str, plugin: Option<&str>) -> lodwright_contract::IncludeRule {
         models: models.to_owned(),
         plugin: plugin.map(str::to_owned),
         record_type: Some("STAT".to_owned()),
+        generate: None,
     }
+}
+
+/// A full model that the simplifier can read: one untextured triangle, 100 units on a side.
+fn triangle_model() -> Vec<u8> {
+    use lodwright_nif::{
+        AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape,
+        NiTriShapeData, NifFile, ObjectNet,
+    };
+    let av = || AvObject {
+        net: ObjectNet {
+            name: -1,
+            extra_data: vec![],
+            controller: -1,
+        },
+        flags: 14,
+        translation: [0.0; 3],
+        rotation: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        scale: 1.0,
+        properties: vec![],
+        collision_object: -1,
+    };
+    NifFile {
+        header: Header {
+            user_version: 11,
+            bethesda: Some((
+                34,
+                ExportInfo {
+                    author: vec![0],
+                    unknown_int: 0,
+                    process_script: vec![0],
+                    export_script: vec![0],
+                    max_filepath: vec![],
+                },
+            )),
+            block_types: vec![
+                b"NiNode".to_vec(),
+                b"NiTriShape".to_vec(),
+                b"NiTriShapeData".to_vec(),
+            ],
+            strings: vec![],
+            groups: vec![],
+        },
+        blocks: vec![
+            Block {
+                type_index: 0,
+                body: Body::Node(NiNode {
+                    av: av(),
+                    children: vec![1],
+                    effects: vec![],
+                }),
+            },
+            Block {
+                type_index: 1,
+                body: Body::TriShape(NiTriShape {
+                    av: av(),
+                    data: 2,
+                    skin_instance: -1,
+                    material_names: vec![],
+                    material_extra_data: vec![],
+                    active_material: 0,
+                    material_needs_update: 0,
+                    shader_property: -1,
+                    alpha_property: -1,
+                }),
+            },
+            Block {
+                type_index: 2,
+                body: Body::TriShapeData(NiTriShapeData {
+                    geometry: GeometryData {
+                        group_id: 0,
+                        num_vertices: 3,
+                        keep_flags: 0,
+                        compress_flags: 0,
+                        vertices: Some(vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]),
+                        vector_flags: 1,
+                        material_crc: 0,
+                        normals: None,
+                        tangents: None,
+                        center: [0.0; 3],
+                        radius: 0.0,
+                        vertex_colors: None,
+                        uv_sets: vec![vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]],
+                        consistency: 0,
+                        additional_data: -1,
+                    },
+                    num_triangles: 1,
+                    num_triangle_points: 3,
+                    triangles: Some(vec![[0, 1, 2]]),
+                    match_groups: vec![],
+                }),
+            },
+        ],
+        roots: vec![0],
+    }
+    .write()
+    .unwrap()
+}
+
+/// The include job with readable full models for the lamp and for `Base.esm`'s parking model (marked visible from
+/// far, no LOD model either), so a far shape can be made of both.
+fn include_job_with_models(name: &str) -> (GenerateRequest, PathBuf) {
+    let (job, out) = include_job(name);
+    let data = PathBuf::from(&job.request.data_folder);
+    for m in ["lights/streetlamp.nif", "arch/parking.nif"] {
+        std::fs::write(data.join("meshes").join(m), triangle_model()).unwrap();
+    }
+    (job, out)
+}
+
+/// (kind, plugin, count, subjects) of the far-model records of a run.
+fn far_records(out: &std::path::Path) -> Vec<(String, Option<String>, u64, Vec<String>)> {
+    warnings_file(out)
+        .warnings
+        .into_iter()
+        .filter(|w| w.kind.starts_with("far_model"))
+        .map(|w| (w.kind, w.plugin, w.count, w.subjects))
+        .collect()
+}
+
+#[test]
+fn a_rule_with_generate_gives_far_shapes_to_its_objects_only() {
+    let shapes = lodwright_contract::FullModelShapes {
+        keep: 1.0,
+        max_error: 0.0,
+    };
+    let (mut job, out) = include_job_with_models("include-generate");
+    let mut lamps = rule("lights/street*", Some("lamps.esp"));
+    lamps.generate = Some(shapes);
+    job.request.inclusion.include_rules = vec![lamps];
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    let records = far_records(&out);
+    // the lamp is drawn from its full model; the parking model, which only a far-view flag names, stays out as before
+    assert!(
+        records.contains(&(
+            "far_model_simplified".to_owned(),
+            None,
+            1,
+            vec!["meshes/lights/streetlamp.nif".to_owned()]
+        )),
+        "{records:?}"
+    );
+    assert!(
+        records.contains(&(
+            "far_model_without_lod_model".to_owned(),
+            Some("Base.esm".to_owned()),
+            2,
+            vec!["meshes/arch/parking.nif".to_owned()]
+        )),
+        "{records:?}"
+    );
+    assert!(
+        !records
+            .iter()
+            .any(|r| r.0 == "far_model_simplified" && r.3.iter().any(|s| s.contains("parking"))),
+        "{records:?}"
+    );
+    // the same rule without generate draws nothing new, and the switch for every object draws both
+    let (mut plain, plain_out) = include_job_with_models("include-generate-plain");
+    plain.request.inclusion.include_rules = vec![rule("lights/street*", Some("lamps.esp"))];
+    done(generate(&plain, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert!(
+        !far_records(&plain_out)
+            .iter()
+            .any(|r| r.0 == "far_model_simplified"),
+        "{:?}",
+        far_records(&plain_out)
+    );
+    let (mut every, every_out) = include_job_with_models("include-generate-every");
+    every.request.inclusion.include_rules = vec![rule("lights/street*", Some("lamps.esp"))];
+    every.request.objects.shapes_from_full_models = Some(shapes);
+    done(generate(&every, &mut NoProgress, &CancelToken::new()).unwrap());
+    let simplified: Vec<Vec<String>> = far_records(&every_out)
+        .into_iter()
+        .filter(|r| r.0 == "far_model_simplified")
+        .map(|r| r.3)
+        .collect();
+    assert_eq!(
+        simplified,
+        [vec![
+            "meshes/arch/parking.nif".to_owned(),
+            "meshes/lights/streetlamp.nif".to_owned()
+        ]]
+    );
 }
 
 /// The lamp lines of a run: (kind, plugin, count) of the records that name the lamp model or the include rules.

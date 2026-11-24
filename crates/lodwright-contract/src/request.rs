@@ -193,6 +193,14 @@ pub struct FullModelShapes {
     pub max_error: f32,
 }
 
+impl FullModelShapes {
+    /// Whether `keep` is above 0 and at most 1 and `max_error` is from 0 to 1.
+    #[must_use]
+    pub fn is_valid(self) -> bool {
+        self.keep > 0.0 && self.keep <= 1.0 && (0.0..=1.0).contains(&self.max_error)
+    }
+}
+
 /// One world's models whose far shape is taken from the far blocks the games ship.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ShippedShapeRule {
@@ -253,7 +261,7 @@ pub struct Inclusion {
 }
 
 /// One rule of `inclusion.include_rules`: which placed objects to take into object LOD.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct IncludeRule {
     /// The model path (relative to `meshes`, any case, either separator) as a pattern; `*` matches any run of
     /// characters.
@@ -264,6 +272,11 @@ pub struct IncludeRule {
     /// Only base objects of this record type: four capital letters or digits, such as `STAT`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record_type: Option<String>,
+    /// Draw the objects this rule matches that have no LOD model with a simplified copy of their full model, at
+    /// these limits. Only the objects the rule matches get such a shape; other objects follow
+    /// `objects.shapes_from_full_models`. Not set by default; written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generate: Option<FullModelShapes>,
 }
 
 /// Resource limits.
@@ -377,7 +390,7 @@ impl Request {
             );
         }
         if let Some(shapes) = self.objects.shapes_from_full_models
-            && !(shapes.keep > 0.0 && shapes.keep <= 1.0 && (0.0..=1.0).contains(&shapes.max_error))
+            && !shapes.is_valid()
         {
             return Err(
                 "objects.shapes_from_full_models needs keep above 0 and at most 1, and max_error from 0 to 1".into(),
@@ -475,6 +488,11 @@ fn check_inclusion(inclusion: &Inclusion) -> Result<(), String> {
             return Err(format!(
                 "include_rules record_type {kind:?} is not a four-letter record type"
             ));
+        }
+        if rule.generate.is_some_and(|shapes| !shapes.is_valid()) {
+            return Err(
+                "an include_rules generate needs keep above 0 and at most 1, and max_error from 0 to 1".into(),
+            );
         }
     }
     Ok(())
@@ -619,6 +637,7 @@ mod tests {
             models: models.into(),
             plugin: None,
             record_type: record_type.map(Into::into),
+            generate: None,
         };
         let mut r = base();
         r.inclusion.include_rules.push(rule(" ", None));
@@ -646,6 +665,25 @@ mod tests {
         r.inclusion.include_rules.clear();
         assert_eq!(r.digest(), before);
         assert!(!serde_json::to_string(&r).unwrap().contains("include_rules"));
+        // a rule without generate keeps the digest it had before the key existed; with one it changes
+        let mut r = base();
+        r.inclusion.include_rules.push(rule("lights/*", None));
+        let without = r.digest();
+        assert!(!serde_json::to_string(&r).unwrap().contains("generate"));
+        r.inclusion.include_rules[0].generate = Some(super::FullModelShapes {
+            keep: 0.25,
+            max_error: 0.05,
+        });
+        assert_eq!(r.validate(), Ok(()));
+        assert_ne!(r.digest(), without);
+        for (keep, max_error) in [(0.0, 0.05), (1.5, 0.05), (0.25, -0.1), (0.25, f32::NAN)] {
+            r.inclusion.include_rules[0].generate =
+                Some(super::FullModelShapes { keep, max_error });
+            assert!(
+                r.validate().unwrap_err().contains("generate"),
+                "{keep} {max_error}"
+            );
+        }
         let mut r = base();
         r.limits.threads = Some(0);
         assert!(r.validate().unwrap_err().contains("threads"));

@@ -172,13 +172,15 @@ fn position_key(vertex: [f32; 3], offset: [f32; 3]) -> [u32; 3] {
 }
 
 /// The far shapes of a full model, simplified. A corner that two shapes share stays where it is, so no crack opens
-/// between them. `None` when every shape has an alpha property: such a model may be an effect or glass, and the
-/// property alone does not tell, so it gets no far shape. In a model with a shape without one, all shapes are kept,
-/// because many solid models carry the property on most of their shapes.
+/// between them. A shape drawn without lighting (a light beam, a glow card) is an effect and is left out: drawn in a
+/// far block, which is lit, it would show as a pale solid. `None` when no other shape is left, or when every shape
+/// left has an alpha property: such a model may be an effect or glass, and the property alone does not tell, so it
+/// gets no far shape. In a model with a shape without one, all those shapes are kept, because many solid models carry
+/// the property on most of their shapes.
 pub(crate) fn far_parts_from_full_model(parts: Vec<Part>, limits: FarLimits) -> Option<Vec<Part>> {
     let shapes: Vec<Part> = parts
         .into_iter()
-        .filter(|part| !part.triangles.is_empty())
+        .filter(|part| !part.triangles.is_empty() && !part.unlit)
         .collect();
     if shapes.iter().all(|part| part.alpha) {
         return None;
@@ -261,6 +263,7 @@ fn simplify_part(part: Part, locked: &[bool], limits: FarLimits) -> Option<Part>
         diffuse: part.diffuse,
         normal_map: part.normal_map,
         alpha: part.alpha,
+        unlit: part.unlit,
     })
 }
 
@@ -295,6 +298,7 @@ mod tests {
             diffuse: Some("a.dds".to_owned()),
             normal_map: None,
             alpha,
+            unlit: false,
         }
     }
 
@@ -326,6 +330,19 @@ mod tests {
             "{} triangles",
             far[0].triangles.len()
         );
+    }
+
+    #[test]
+    fn a_shape_drawn_without_lighting_is_left_out() {
+        let mut bulb = grid(20, 8, false);
+        bulb.unlit = true;
+        let far = far_parts_from_full_model(vec![grid(0, 8, false), bulb.clone()], LIMITS).unwrap();
+        assert_eq!(far.len(), 1);
+        assert!(!far[0].unlit);
+        // a beam: nothing but shapes drawn without lighting, one of them without an alpha property
+        let mut beam = grid(0, 8, true);
+        beam.unlit = true;
+        assert_eq!(far_parts_from_full_model(vec![beam, bulb], LIMITS), None);
     }
 
     #[test]

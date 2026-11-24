@@ -91,6 +91,26 @@
     "output_dir"
   ],
   "$defs": {
+    "FullModelShapes": {
+      "description": "How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.",
+      "type": "object",
+      "properties": {
+        "keep": {
+          "description": "Share of each shape's triangles to keep, above 0 and at most 1.",
+          "type": "number",
+          "format": "float"
+        },
+        "max_error": {
+          "description": "Largest error allowed, as a share of the shape's size, from 0 to 1.",
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "keep",
+        "max_error"
+      ]
+    },
     "Inclusion": {
       "description": "Which objects enter object LOD, beyond the game's own rule (visible when distant).",
       "type": "object",
@@ -219,6 +239,17 @@
           "description": "Write object LOD.",
           "type": "boolean",
           "default": true
+        },
+        "shapes_from_full_models": {
+          "description": "Draw objects that have no LOD model with a simplified copy of their full model. Off by default, because the\ngame's own LOD is the standard; written only when set.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FullModelShapes"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "shapes_from_shipped_blocks": {
           "description": "Objects whose far shape is taken from the far blocks the games ship, by world and model. Only enabled\nreferences without an enable parent are taken. Empty by default; written only when set.",

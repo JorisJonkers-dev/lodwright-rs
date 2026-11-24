@@ -19,6 +19,7 @@ use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
 use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, LARGEST_ATLAS, Rect, pack_pages};
 use crate::error::GenError;
+use crate::far_simplify::{FarLimits, far_parts_from_full_model};
 use crate::lodmodel::{Part, parse_lod_model};
 use crate::own_far::{self, OwnSource};
 use crate::terrain::{FileRecord, write_file};
@@ -76,6 +77,8 @@ pub struct Surfaces<'a> {
     pub threads: usize,
     /// The shipped far blocks to take the shapes of the references only they draw from (`own_far`); `None` takes none.
     pub own: Option<OwnSource<'a>>,
+    /// Draw objects that have no LOD model with a simplified copy of their full model; `None` leaves them out.
+    pub full_models: Option<FarLimits>,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -415,6 +418,10 @@ fn blit(canvas: &mut [u8], width: u32, src: &Image, r: &Rect) {
 
 /// The records and lines for the objects whose LOD model is missing or cannot be read: one per plugin that marks them
 /// visible from far (the objects are counted, the models listed in full in the record), not one per object.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the state of one generation step"
+)]
 fn far_model_records(
     report: &mut ObjectReport,
     world: &str,
@@ -422,6 +429,7 @@ fn far_model_records(
     instances: &[&Instance],
     models: &BTreeMap<String, Option<Model>>,
     unreadable: &BTreeSet<String>,
+    no_solid_shape: &BTreeSet<String>,
     assets: &dyn Assets,
 ) {
     // (kind, plugin index) -> full model path -> objects
@@ -435,6 +443,8 @@ fn far_model_records(
         let full = full_model_path(&i.model);
         let kind = if unreadable.contains(&lod) {
             "far_model_unreadable"
+        } else if no_solid_shape.contains(&lod) {
+            "far_model_no_solid_shape"
         } else if *full_found
             .entry(full.clone())
             .or_insert_with(|| assets.read(&full).is_some())
@@ -465,6 +475,7 @@ fn far_model_records(
         let what = match kind {
             "far_model_unreadable" => "their LOD models cannot be read",
             "far_model_not_found" => "neither a LOD model nor the full model is in the load order",
+            "far_model_no_solid_shape" => "every shape of their full models has an alpha property",
             _ => "no LOD model exists for them in the game or any mod",
         };
         let message = format!(
@@ -481,6 +492,80 @@ fn far_model_records(
         ));
         report.warnings.push(message);
     }
+}
+
+/// Fills in the models without a LOD model with simplified copies of their full models, and returns the LOD paths of
+/// those whose full model has no solid shape. A static collection whose parts are drawn keeps its parts: a copy of its
+/// own model would draw it twice.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the state of one generation step"
+)]
+fn shapes_from_full_models(
+    report: &mut ObjectReport,
+    world: &str,
+    instances: &[&Instance],
+    models: &mut BTreeMap<String, Option<Model>>,
+    unreadable: &BTreeSet<String>,
+    full_of: &BTreeMap<String, String>,
+    assets: &dyn Assets,
+    limits: FarLimits,
+    threads: usize,
+) -> BTreeSet<String> {
+    let with_parts: BTreeSet<u32> = instances
+        .iter()
+        .filter(|i| i.part)
+        .map(|i| i.reference)
+        .collect();
+    let wanted: BTreeSet<String> = instances
+        .iter()
+        .filter(|i| i.part || !with_parts.contains(&i.reference))
+        .map(|i| lod_model_path(&i.model))
+        .filter(|lod| models.get(lod).is_some_and(Option::is_none) && !unreadable.contains(lod))
+        .collect();
+    let wanted: Vec<String> = wanted.into_iter().collect();
+    let made = par_map(&wanted, threads, |lod| {
+        let bytes = assets.read(full_of.get(lod)?)?;
+        let parts = parse_lod_model(&bytes).ok()?;
+        if parts
+            .iter()
+            .filter(|part| !part.triangles.is_empty())
+            .all(|part| part.alpha)
+        {
+            return Some(None);
+        }
+        // a model that cannot be simplified stays an ordinary model without a LOD model
+        far_parts_from_full_model(parts, limits).map(Some)
+    });
+    let (mut simplified, mut no_solid_shape) = (BTreeSet::new(), BTreeSet::new());
+    for (lod, result) in wanted.into_iter().zip(made) {
+        match result {
+            Some(Some(parts)) => {
+                simplified.insert(full_of[&lod].clone());
+                models.insert(lod, Some(Model { parts }));
+            }
+            Some(None) => {
+                no_solid_shape.insert(lod);
+            }
+            None => {}
+        }
+    }
+    if !simplified.is_empty() {
+        let message = format!(
+            "{} models without a LOD model are drawn from far as simplified copies of their full models",
+            simplified.len()
+        );
+        report.records.push(WarningRecord::new(
+            "far_model_simplified",
+            Some(world),
+            None,
+            simplified,
+            None,
+            message.clone(),
+        ));
+        report.warnings.push(message);
+    }
+    no_solid_shape
 }
 
 /// Generate the object LOD of one world into `out`.
@@ -666,6 +751,20 @@ pub fn generate_objects_with_atlas_limit(
                     .is_none_or(Option::is_none))
         })
         .collect();
+    let no_solid_shape = match surfaces.full_models {
+        Some(limits) => shapes_from_full_models(
+            &mut report,
+            world,
+            &instances,
+            &mut models,
+            &unreadable,
+            &full_of,
+            assets,
+            limits,
+            surfaces.threads,
+        ),
+        None => BTreeSet::new(),
+    };
     far_model_records(
         &mut report,
         world,
@@ -673,6 +772,7 @@ pub fn generate_objects_with_atlas_limit(
         &instances,
         &models,
         &unreadable,
+        &no_solid_shape,
         assets,
     );
     let instances: Vec<&Instance> = instances.into_iter().chain(stand_ins.iter()).collect();

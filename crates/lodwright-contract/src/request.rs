@@ -178,6 +178,19 @@ pub struct ObjectsRequest {
     /// references without an enable parent are taken. Empty by default; written only when set.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shapes_from_shipped_blocks: Vec<ShippedShapeRule>,
+    /// Draw objects that have no LOD model with a simplified copy of their full model. Off by default, because the
+    /// game's own LOD is the standard; written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shapes_from_full_models: Option<FullModelShapes>,
+}
+
+/// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FullModelShapes {
+    /// Share of each shape's triangles to keep, above 0 and at most 1.
+    pub keep: f32,
+    /// Largest error allowed, as a share of the shape's size, from 0 to 1.
+    pub max_error: f32,
 }
 
 /// One world's models whose far shape is taken from the far blocks the games ship.
@@ -196,6 +209,7 @@ impl Default for ObjectsRequest {
             drop_under_terrain: false,
             drop_under_water: false,
             shapes_from_shipped_blocks: Vec::new(),
+            shapes_from_full_models: None,
         }
     }
 }
@@ -343,6 +357,13 @@ impl Request {
                 "objects.shapes_from_shipped_blocks needs a world and at least one model in each rule".into(),
             );
         }
+        if let Some(shapes) = self.objects.shapes_from_full_models
+            && !(shapes.keep > 0.0 && shapes.keep <= 1.0 && (0.0..=1.0).contains(&shapes.max_error))
+        {
+            return Err(
+                "objects.shapes_from_full_models needs keep above 0 and at most 1, and max_error from 0 to 1".into(),
+            );
+        }
         for l in &self.terrain.levels {
             if !TERRAIN_LEVELS.contains(&l.level) {
                 return Err(format!("terrain level {} is not 4, 8, 16 or 32", l.level));
@@ -452,6 +473,36 @@ mod tests {
         assert_eq!(back, r);
         r.objects.shapes_from_shipped_blocks[0].models.clear();
         assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn full_model_shapes_are_left_out_of_the_document_when_off_and_checked_when_set() {
+        let mut r = Request::new("/d", &["A.esm"], "/o");
+        let off = r.digest();
+        assert!(
+            !serde_json::to_string(&r)
+                .unwrap()
+                .contains("shapes_from_full_models")
+        );
+        r.objects.shapes_from_full_models = Some(super::FullModelShapes {
+            keep: 0.25,
+            max_error: 0.01,
+        });
+        r.validate().unwrap();
+        assert_ne!(r.digest(), off);
+        let back: Request = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+        for (keep, max_error) in [
+            (0.0, 0.01),
+            (1.5, 0.01),
+            (f32::NAN, 0.01),
+            (0.5, -0.1),
+            (0.5, 2.0),
+            (0.5, f32::NAN),
+        ] {
+            r.objects.shapes_from_full_models = Some(super::FullModelShapes { keep, max_error });
+            assert!(r.validate().is_err(), "keep {keep}, max_error {max_error}");
+        }
     }
 
     #[test]

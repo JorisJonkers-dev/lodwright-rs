@@ -819,6 +819,12 @@ pub fn generate(
                     bounds: &own_bounds,
                     read: &read_own,
                 }),
+                full_models: request.objects.shapes_from_full_models.map(|shapes| {
+                    lodwright_gen::FarLimits {
+                        keep: shapes.keep,
+                        max_error: shapes.max_error,
+                    }
+                }),
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

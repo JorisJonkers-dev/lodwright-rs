@@ -69,9 +69,18 @@ pub fn write_output_stream(
         what: rel.to_owned(),
         source,
     };
-    let file = std::fs::File::open(&target).map_err(io)?;
-    let len = file.metadata().map_err(io)?.len();
-    let digest = lodwright_contract::sha256_digest_of_reader(len, file).map_err(io)?;
+    // a file whose digest cannot be read back is not left behind as if it were written
+    let digest = std::fs::File::open(&target).and_then(|file| {
+        let len = file.metadata()?.len();
+        Ok((len, lodwright_contract::sha256_digest_of_reader(len, file)?))
+    });
+    let (len, digest) = match digest {
+        Ok(d) => d,
+        Err(e) => {
+            let _ = std::fs::remove_file(&target);
+            return Err(io(e));
+        }
+    };
     Ok(FileRecord {
         path: rel.to_owned(),
         bytes: len,

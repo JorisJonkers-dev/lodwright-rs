@@ -12,7 +12,8 @@ use crate::worldspace::{absolute, master_table};
 
 /// Visible When Distant, on bases and references.
 pub const VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
-/// High Priority LOD, on references.
+/// High Priority LOD, on references and on statics (bit 16; on activators and doors the same bit means Random Anim
+/// Start, so only a static's bit counts).
 pub const HIGH_PRIORITY_LOD: u32 = 0x0001_0000;
 // source: game-lod-object-rules-disabled-persistent
 /// Initially Disabled, on references. Such a reference is not in the world when the game starts and is left out of LOD,
@@ -36,7 +37,8 @@ pub struct Instance {
     pub model: String,
     /// Where it stands, in world units and radians.
     pub placement: Placement,
-    /// The reference is flagged high priority.
+    /// The reference or its static base is flagged high priority: the object also goes to the block's `high` file,
+    /// which the game keeps drawn much farther away than the normal one.
     pub high_priority: bool,
     /// The base carries has-tree-LOD.
     pub has_tree_lod: bool,
@@ -314,6 +316,11 @@ pub fn base_bounds(plugins: &[(String, Plugin)]) -> Result<HashMap<u32, [i16; 6]
     Ok(out)
 }
 
+/// High Priority LOD set on a static base (on other base types bit 16 means something else).
+fn static_high_priority(base: &BaseObject) -> bool {
+    base.signature == *b"STAT" && base.flags & HIGH_PRIORITY_LOD != 0
+}
+
 #[allow(clippy::too_many_lines)] // one pass over the load order, then one over the references
 fn gather(
     plugins: &[(String, Plugin)],
@@ -402,7 +409,8 @@ fn gather(
         } else {
             reference_plugin
         };
-        let high_priority = flags & HIGH_PRIORITY_LOD != 0;
+        // source: oracle-high-priority-on-static
+        let high_priority = flags & HIGH_PRIORITY_LOD != 0 || static_high_priority(base);
         let has_tree_lod = base.flags & HAS_TREE_LOD != 0;
         if let Some(model) = &base.model {
             out.push((
@@ -439,7 +447,8 @@ fn gather(
                         signature: *b"STAT",
                         model: model.clone(),
                         placement: compose(&placement, inner),
-                        high_priority,
+                        // a part is a static of its own: its flag counts as well as the collection's reference's
+                        high_priority: high_priority || static_high_priority(part_base),
                         has_tree_lod,
                         reference: id,
                         reference_plugin,
@@ -461,8 +470,8 @@ fn gather(
 #[cfg(test)]
 mod tests {
     use super::{
-        INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT, references_with_model,
-        visible_instances,
+        HIGH_PRIORITY_LOD, INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT,
+        references_with_model, visible_instances,
     };
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
@@ -508,6 +517,91 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn high_priority_on_a_static_base_counts_as_on_the_reference() {
+        let p = plugin(
+            &[],
+            vec![
+                stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD),
+                stat(0x101, "b.nif", VISIBLE_WHEN_DISTANT),
+            ],
+            vec![
+                refr(0x200, 0x100, 0, 1.0),
+                refr(0x201, 0x101, HIGH_PRIORITY_LOD, 2.0),
+                refr(0x202, 0x101, 0, 3.0),
+            ],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let high: Vec<(u32, bool)> = out.iter().map(|i| (i.reference, i.high_priority)).collect();
+        assert_eq!(high, vec![(0x200, true), (0x201, true), (0x202, false)]);
+    }
+
+    #[test]
+    fn a_part_of_a_collection_counts_its_own_static_flag() {
+        let mut data = Vec::new();
+        for v in [0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0] {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        let mut scol = Record::new(*b"SCOL", 0x102)
+            .with_subrecord(*b"MODL", b"set.nif\0".to_vec())
+            .with_subrecord(*b"ONAM", 0x100_u32.to_le_bytes().to_vec())
+            .with_subrecord(*b"DATA", data.clone())
+            .with_subrecord(*b"ONAM", 0x101_u32.to_le_bytes().to_vec())
+            .with_subrecord(*b"DATA", data);
+        scol.flags = VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD;
+        let mut world = Group::new(1, 0x0000_0A00_u32.to_le_bytes());
+        world = world.with(refr(0x200, 0x102, 0, 1.0));
+        let bytes = PluginBuilder::new()
+            .group(
+                Group::new(0, *b"STAT")
+                    .with(stat(0x100, "high.nif", HIGH_PRIORITY_LOD))
+                    .with(stat(0x101, "low.nif", 0)),
+            )
+            .group(Group::new(0, *b"SCOL").with(scol))
+            .group(world)
+            .build();
+        let p = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let parts: Vec<(&str, bool)> = out
+            .iter()
+            .filter(|i| i.part)
+            .map(|i| (i.model.as_str(), i.high_priority))
+            .collect();
+        // the part whose static is flagged is high priority; the collection's own bit 16 is not read
+        assert_eq!(parts, vec![("high.nif", true), ("low.nif", false)]);
+        assert!(out.iter().filter(|i| !i.part).all(|i| !i.high_priority));
+    }
+
+    #[test]
+    fn bit_16_on_an_activator_is_not_high_priority() {
+        let mut acti = Record::new(*b"ACTI", 0x100).with_subrecord(*b"MODL", b"a.nif\0".to_vec());
+        acti.flags = VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD;
+        let mut world = Group::new(1, 0x0000_0A00_u32.to_le_bytes());
+        world = world.with(refr(0x200, 0x100, 0, 1.0));
+        let bytes = PluginBuilder::new()
+            .group(Group::new(0, *b"ACTI").with(acti))
+            .group(world)
+            .build();
+        let p = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+        assert!(!out[0].high_priority);
     }
 
     #[test]

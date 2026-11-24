@@ -1,0 +1,10 @@
+[[source]]
+id = "oracle-high-priority-on-static"
+fact = "xLODGen puts an object into the high-priority block file (<world>.level4.high.x<X>.y<Y>.nif) as well as the normal one when bit 16 (0x10000, High Priority LOD) is set on the reference or on the static (STAT) it places; the game draws the high-priority blocks out to fBlockLoadDistance and the normal ones only to fBlockLoadDistanceLow."
+url = "oracle:xlodgen-output"
+licence = "Block names and which references are found in which block file of the owner's own xLODGen output, compared as numbers; no content is recorded"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read on a 140-plugin Tale of Two Wastelands load order (issue 420). A landmark check of 2405 visible-when-distant references of WastelandNV (one in 40, plus every reference whose reference or static carries bit 16) against the xLODGen output found 146 in high block files; every one of them has bit 16 on the reference (8, the vanilla casinos, Helios One tower and others) or on its static (138, set by TTW Fallout 3 LOD.esp on overpass sections, ramps, curves, road pieces, greenhouses, hedgerows, craters), and none of the others is in a high file. xEdit's record definitions (TES5Edit/TES5Edit Core/wbDefinitionsFNV.pas, MPL-2.0, read for the flag names only) name bit 16 High Priority LOD on references and leave it unnamed on statics; on activators and doors bit 16 is Random Anim Start, so only a static's bit is read. The load distances are the [TerrainManager] settings of the same profile's Fallout.ini; that the high blocks are drawn farther is seen in pictures of the same view with both outputs (overpasses about 60,000 units away shown by xLODGen's blocks, missing from blocks without the high file). Not second-read."

@@ -106,6 +106,17 @@ pub struct BaseObject {
     pub bounds: Option<[i16; 6]>,
 }
 
+// source: fnv-enable-parent
+/// The enable parent of a reference (`XESP`): the reference is enabled while its parent is, or while its parent is not
+/// when `opposite` is set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnableParent {
+    /// `FormID` of the parent reference as stored in this plugin.
+    pub form_id: u32,
+    /// The reference takes the opposite of its parent's state (bit 0 of the flags word).
+    pub opposite: bool,
+}
+
 /// A placed reference.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlacedRef {
@@ -117,8 +128,8 @@ pub struct PlacedRef {
     pub flags: u32,
     /// Where it stands.
     pub placement: Placement,
-    /// The reference has an enable parent (`XESP`).
-    pub enable_parent: bool,
+    /// The reference's enable parent (`XESP`), when it has one.
+    pub enable_parent: Option<EnableParent>,
     /// The grid of the exterior cell whose temporary children hold the reference; `None` for persistent references
     /// and references outside an exterior cell (`game-object-block-cell`).
     pub cell: Option<(i32, i32)>,
@@ -612,10 +623,16 @@ fn placement_at(bytes: &[u8], at: usize) -> Option<Placement> {
 
 // source: fnv-object-records
 fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, Error> {
-    let (mut base, mut placement, mut scale, mut enable_parent) = (None, None, 1.0, false);
+    let (mut base, mut placement, mut scale, mut enable_parent) = (None, None, 1.0, None);
     for (signature, payload) in subrecords(data)? {
         match &signature {
-            b"XESP" => enable_parent = true,
+            // source: fnv-enable-parent
+            b"XESP" if payload.len() >= 4 => {
+                enable_parent = Some(EnableParent {
+                    form_id: le_u32(payload, 0),
+                    opposite: payload.get(4).is_some_and(|f| f & 1 != 0),
+                });
+            }
             b"NAME" if payload.len() >= 4 => base = Some(le_u32(payload, 0)),
             b"DATA" if payload.len() >= 24 => placement = placement_at(payload, 0),
             b"XSCL" => scale = le_f32(payload, 0).unwrap_or(1.0),

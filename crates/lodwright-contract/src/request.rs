@@ -245,6 +245,25 @@ pub struct Inclusion {
     /// patterns; `*` matches any run of characters.
     #[serde(default)]
     pub exclude_models: Vec<String>,
+    /// Take objects that nothing marks visible from far into object LOD when they match one of these rules. Only
+    /// references enabled at the start and without an enable parent are taken; the exclusion rules above still win.
+    /// Empty by default and written only when set, so a request without rules keeps its digest.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include_rules: Vec<IncludeRule>,
+}
+
+/// One rule of `inclusion.include_rules`: which placed objects to take into object LOD.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct IncludeRule {
+    /// The model path (relative to `meshes`, any case, either separator) as a pattern; `*` matches any run of
+    /// characters.
+    pub models: String,
+    /// Only objects whose reference or base object comes from this plugin (file name, any case).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
+    /// Only base objects of this record type: four capital letters or digits, such as `STAT`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_type: Option<String>,
 }
 
 /// Resource limits.
@@ -394,13 +413,7 @@ impl Request {
         if (1..levels.len()).any(|i| levels[..i].contains(&levels[i])) {
             return Err("a terrain level is listed twice".into());
         }
-        for id in &self.inclusion.exclude_records {
-            if id.len() != 8 || u32::from_str_radix(id, 16).is_err() {
-                return Err(format!(
-                    "exclude_records entry {id:?} is not eight hex digits"
-                ));
-            }
-        }
+        check_inclusion(&self.inclusion)?;
         if let Some(offset) = self.terrain.drop_under_water {
             let (low, high) = DROP_UNDER_WATER_RANGE;
             if !offset.is_finite() || !(low..=high).contains(&offset) {
@@ -440,9 +453,36 @@ impl Request {
     }
 }
 
+/// The checks of `inclusion` that need no load order.
+fn check_inclusion(inclusion: &Inclusion) -> Result<(), String> {
+    for id in &inclusion.exclude_records {
+        if id.len() != 8 || u32::from_str_radix(id, 16).is_err() {
+            return Err(format!(
+                "exclude_records entry {id:?} is not eight hex digits"
+            ));
+        }
+    }
+    for rule in &inclusion.include_rules {
+        if rule.models.trim().is_empty() {
+            return Err("an include_rules entry has an empty models pattern".into());
+        }
+        if let Some(kind) = &rule.record_type
+            && (kind.len() != 4
+                || !kind
+                    .bytes()
+                    .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_'))
+        {
+            return Err(format!(
+                "include_rules record_type {kind:?} is not a four-letter record type"
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{LevelRequest, Request};
+    use super::{IncludeRule, LevelRequest, Request};
 
     fn base() -> Request {
         Request::new("/data", &["FalloutNV.esm"], "/out")
@@ -575,6 +615,32 @@ mod tests {
         let mut r = base();
         r.inclusion.exclude_records.push("xyz".into());
         assert!(r.validate().unwrap_err().contains("hex"));
+        let rule = |models: &str, record_type: Option<&str>| IncludeRule {
+            models: models.into(),
+            plugin: None,
+            record_type: record_type.map(Into::into),
+        };
+        let mut r = base();
+        r.inclusion.include_rules.push(rule(" ", None));
+        assert!(r.validate().unwrap_err().contains("empty models"));
+        let mut r = base();
+        r.inclusion
+            .include_rules
+            .push(rule("lights/*", Some("stat")));
+        assert!(r.validate().unwrap_err().contains("record type"));
+        let mut r = base();
+        r.inclusion
+            .include_rules
+            .push(rule("lights/*", Some("STAT")));
+        assert!(r.validate().is_ok());
+        // no rules: the field is not written, so the request keeps its digest
+        let mut r = base();
+        let before = r.digest();
+        r.inclusion.include_rules.push(rule("lights/*", None));
+        assert_ne!(r.digest(), before);
+        r.inclusion.include_rules.clear();
+        assert_eq!(r.digest(), before);
+        assert!(!serde_json::to_string(&r).unwrap().contains("include_rules"));
         let mut r = base();
         r.limits.threads = Some(0);
         assert!(r.validate().unwrap_err().contains("threads"));

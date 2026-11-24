@@ -43,7 +43,7 @@ pub use error::GenError;
 pub use far_simplify::{
     FarLimits, FarMesh, FarSimplifyError, SimplifiedFarMesh, simplify_far_mesh,
 };
-pub use filter::{filter_instances, glob};
+pub use filter::{IncludeRules, filter_instances, glob};
 pub use images::{
     ShippedPatch, diffuse_image, normal_image, normal_image_with_alpha, patch_image, specular_alpha,
 };

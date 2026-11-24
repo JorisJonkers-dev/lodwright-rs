@@ -744,9 +744,48 @@ pub fn generate(
             }
             progress.report(&run.start(Step::Objects, Some(world.name())));
             clock.begin("objects.collect", Some(world.name()));
-            let instances =
+            let mut instances =
                 lodwright_core::objects::visible_instances(&loaded.plugins, world.form_id())
                     .map_err(|e| load_order_error(&e))?;
+            let include = lodwright_gen::IncludeRules::new(
+                &request.inclusion.include_rules,
+                &request.plugins,
+            )
+            .map_err(|e| {
+                Error::new(
+                    "request_invalid",
+                    "the request's inclusion rules are not valid",
+                )
+                .with_detail(e)
+            })?;
+            if !include.is_empty() {
+                let matched = lodwright_core::objects::references_where(
+                    &loaded.plugins,
+                    world.form_id(),
+                    &|b| {
+                        b.model
+                            .as_deref()
+                            .is_some_and(|m| include.matches_base(m, b.signature))
+                    },
+                )
+                .map_err(|e| load_order_error(&e))?;
+                let held = include.take(&mut instances, matched.taken, &matched.held_back);
+                if held > 0 {
+                    let text = format!(
+                        "the include rules match {held} references in {} that start disabled or have an enable parent; a far block cannot follow what a script enables, so they are left out",
+                        world.name()
+                    );
+                    records.push(WarningRecord::new(
+                        "include_rule_reference_not_enabled",
+                        Some(world.name()),
+                        None,
+                        std::iter::empty::<String>(),
+                        Some(held as u64),
+                        text.clone(),
+                    ));
+                    add_warnings(&mut doc, vec![text]);
+                }
+            }
             let instances =
                 lodwright_gen::filter_instances(instances, &request.inclusion, &request.plugins)
                     .map_err(|e| {

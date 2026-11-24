@@ -674,6 +674,132 @@ fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_
     );
 }
 
+// ---- include rules: objects nothing marks visible from far, taken by the request's rules (#385) ----
+
+/// `Base.esm` plus `Lamps.esp`, which adds a lamp nothing marks visible from far (full model, no LOD model) and
+/// places it five times: enabled, initially disabled, persistent and disabled, with an enable parent, and enabled.
+fn include_job(name: &str) -> (GenerateRequest, PathBuf) {
+    use lodwright_testkit::plugin::{Group, PluginBuilder};
+    use lodwright_testkit::world::record_group;
+    const INITIALLY_DISABLED: u32 = 0x0800;
+    const PERSISTENT: u32 = 0x0400;
+    let (mut job, out) = far_model_job(name);
+    let data = PathBuf::from(&job.request.data_folder);
+    std::fs::create_dir_all(data.join("meshes/lights")).unwrap();
+    std::fs::write(data.join("meshes/lights/streetlamp.nif"), b"not a model").unwrap();
+    let flagged = |id: u32, x: f32, flags: u32| {
+        let mut r = refr(id, 0x0100_0200, x);
+        r.flags = flags;
+        r
+    };
+    // XESP: the parent's form id and a flags word
+    let parent = [0x0100_0D00_u32.to_le_bytes(), [0; 4]].concat();
+    let refs = Group::new(1, 0xB00_u32.to_le_bytes())
+        .with(flagged(0x0100_0D00, 60.0, 0))
+        .with(flagged(0x0100_0D01, 70.0, INITIALLY_DISABLED))
+        .with(flagged(0x0100_0D02, 80.0, INITIALLY_DISABLED | PERSISTENT))
+        .with(flagged(0x0100_0D03, 90.0, 0).with_subrecord(*b"XESP", parent))
+        .with(flagged(0x0100_0D04, 100.0, 0));
+    let lamps = PluginBuilder::new()
+        .master("Base.esm")
+        .group(record_group(
+            *b"STAT",
+            vec![stat(0x0100_0200, "lights\\StreetLamp.nif", 0)],
+        ))
+        .group(refs)
+        .build();
+    std::fs::write(data.join("Lamps.esp"), lamps).unwrap();
+    job.request.plugins.push("Lamps.esp".to_owned());
+    (job, out)
+}
+
+fn rule(models: &str, plugin: Option<&str>) -> lodwright_contract::IncludeRule {
+    lodwright_contract::IncludeRule {
+        models: models.to_owned(),
+        plugin: plugin.map(str::to_owned),
+        record_type: Some("STAT".to_owned()),
+    }
+}
+
+/// The lamp lines of a run: (kind, plugin, count) of the records that name the lamp model or the include rules.
+fn lamp_records(out: &std::path::Path) -> Vec<(String, Option<String>, u64)> {
+    warnings_file(out)
+        .warnings
+        .into_iter()
+        .filter(|w| {
+            w.kind.starts_with("include_rule")
+                || w.subjects.iter().any(|s| s.contains("streetlamp"))
+        })
+        .map(|w| (w.kind, w.plugin, w.count))
+        .collect()
+}
+
+#[test]
+fn without_include_rules_an_object_nothing_marks_visible_from_far_stays_out_unreported() {
+    let (job, out) = include_job("include-none");
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    assert_eq!(lamp_records(&out), vec![]);
+}
+
+#[test]
+fn an_include_rule_takes_the_enabled_references_and_reports_the_held_back_ones() {
+    let (mut job, out) = include_job("include-rule");
+    job.request.inclusion.include_rules = vec![rule("lights/street*", Some("lamps.esp"))];
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    // the two enabled lamps reach the far-model step (which reports them: they have no LOD model); the disabled one,
+    // the persistent disabled one and the one with an enable parent are held back and counted
+    assert_eq!(
+        lamp_records(&out),
+        vec![
+            (
+                "far_model_without_lod_model".to_owned(),
+                Some("Lamps.esp".to_owned()),
+                2
+            ),
+            ("include_rule_reference_not_enabled".to_owned(), None, 3),
+        ]
+    );
+}
+
+#[test]
+fn an_exclusion_rule_beats_an_include_rule_and_a_rule_for_another_plugin_takes_nothing() {
+    let (mut job, out) = include_job("include-excluded");
+    job.request.inclusion.include_rules = vec![rule("lights/*", None)];
+    job.request.inclusion.exclude_models = vec!["lights/streetlamp.nif".to_owned()];
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(
+        lamp_records(&out),
+        vec![("include_rule_reference_not_enabled".to_owned(), None, 3)]
+    );
+    let (mut job, out) = include_job("include-other-plugin");
+    job.request.inclusion.include_rules = vec![rule("lights/*", Some("Mod.esp"))];
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(lamp_records(&out), vec![]);
+}
+
+#[test]
+fn an_include_rule_for_a_plugin_outside_the_load_order_is_a_request_error() {
+    let (mut job, _) = include_job("include-bad");
+    job.request.inclusion.include_rules = vec![rule("lights/*", Some("Gone.esp"))];
+    let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
+    assert!(format!("{err:?}").contains("Gone.esp"), "{err:?}");
+}
+
+#[test]
+fn include_rules_give_the_same_bytes_on_every_run() {
+    let run = |name: &str| {
+        let (mut job, out) = include_job(name);
+        job.request.inclusion.include_rules = vec![rule("lights/*", None)];
+        done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+        output_bytes(&out)
+    };
+    let first = run("include-det-a");
+    assert_ne!(first.len(), 0);
+    assert_eq!(run("include-det-b"), first);
+}
+
 /// Every file of `out` except the manifest (whose request digest covers the thread limit), with its bytes.
 fn output_bytes(out: &std::path::Path) -> Vec<(String, Vec<u8>)> {
     files_on_disk(out)

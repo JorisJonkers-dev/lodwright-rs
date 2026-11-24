@@ -258,6 +258,10 @@ pub fn advice_for(kind: &str) -> &'static str {
              their own. Their far shapes are simplified copies. An authored LOD model, where a mod ships one, is used \
              instead."
         }
+        "include_rule_reference_not_enabled" => {
+            "Nothing is wrong: an include rule matches these references, but they start disabled or wait for an enable \
+             parent. A far block cannot follow what a script enables, so they stay out of the far view."
+        }
         "far_model_no_solid_shape" => {
             "Every shape of these models has an alpha property, so they may be effects or glass. No far shape is made \
              from them and the objects stay out of the far view. Install a mod that ships a LOD model if you want them \

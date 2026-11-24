@@ -169,6 +169,36 @@ pub fn references_of_models(
         m.strip_prefix("meshes/").map_or(m.clone(), str::to_owned)
     };
     let wanted: std::collections::HashSet<String> = models.iter().map(|m| key(m)).collect();
+    Ok(references_where(plugins, world, &|base| {
+        base.model
+            .as_deref()
+            .is_some_and(|m| wanted.contains(&key(m)))
+    })?
+    .taken)
+}
+
+/// What [`references_where`] found: the references a far block can draw, and those it leaves out because they start
+/// disabled or have an enable parent.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Matched {
+    /// Enabled at the start and without an enable parent.
+    pub taken: Vec<Instance>,
+    /// Initially disabled (persistent ones too) or with an enable parent: a far block cannot follow what a script
+    /// enables.
+    pub held_back: Vec<Instance>,
+}
+
+/// The references in world `world` (absolute `FormID`) whose winning base object passes `accept`, whether or not
+/// anything marks them visible from far, in load order. Deleted references are left out; static collections are not
+/// expanded.
+///
+/// # Errors
+/// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
+pub fn references_where(
+    plugins: &[(String, Plugin)],
+    world: u32,
+    accept: &dyn Fn(&BaseObject) -> bool,
+) -> Result<Matched, Error> {
     // the winning record of a reference decides whether it has an enable parent
     let mut enable_parent: HashMap<u32, bool> = HashMap::new();
     for (index, (_, plugin)) in plugins.iter().enumerate() {
@@ -184,17 +214,20 @@ pub fn references_of_models(
             }
         }
     }
-    Ok(gather(plugins, world, false, false, &|base, flags| {
-        flags & INITIALLY_DISABLED == 0
-            && base
-                .model
-                .as_deref()
-                .is_some_and(|m| wanted.contains(&key(m)))
-    })?
-    .into_iter()
-    .map(|(instance, _, _)| instance)
-    .filter(|i| !enable_parent.get(&i.reference).copied().unwrap_or(false))
-    .collect())
+    let mut out = Matched::default();
+    for (instance, flags, _) in gather(plugins, world, false, true, &|base, _| accept(base))? {
+        if flags & INITIALLY_DISABLED != 0
+            || enable_parent
+                .get(&instance.reference)
+                .copied()
+                .unwrap_or(false)
+        {
+            out.held_back.push(instance);
+        } else {
+            out.taken.push(instance);
+        }
+    }
+    Ok(out)
 }
 
 /// The object bounds (`OBND`) of every base object by absolute `FormID`, as the winning record states them.
@@ -551,6 +584,28 @@ mod tests {
             found.iter().map(|i| i.reference).collect::<Vec<_>>(),
             vec![0x200]
         );
+    }
+
+    #[test]
+    fn references_where_splits_enabled_references_from_disabled_and_parented_ones() {
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a/lamp.nif", 0), stat(0x101, "a/wall.nif", 0)],
+            vec![
+                refr(0x200, 0x100, 0, 1.0),
+                refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                with_enable_parent(refr(0x203, 0x100, 0, 4.0)),
+                refr(0x204, 0x101, 0, 5.0),
+            ],
+        );
+        let found = super::references_where(&[("A.esm".to_owned(), p)], 0x0000_0A00, &|b| {
+            b.model.as_deref() == Some("a/lamp.nif")
+        })
+        .unwrap();
+        let ids = |v: &[super::Instance]| v.iter().map(|i| i.reference).collect::<Vec<_>>();
+        assert_eq!(ids(&found.taken), vec![0x200]);
+        assert_eq!(ids(&found.held_back), vec![0x201, 0x202, 0x203]);
     }
 
     #[test]

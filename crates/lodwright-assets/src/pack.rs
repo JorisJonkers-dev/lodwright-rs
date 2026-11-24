@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! BSA version 104 writer: name hashes, record order, per-file zlib compression and the limits of the format.
 //!
-//! The archive is built in memory from files that are already generated ([`PackEntry`]); the result reads back
-//! through [`crate::Archive`]. Output is a pure function of the set of entries: it does not depend on the order
+//! The archive is built in memory from files that are already generated ([`PackEntry`], [`write`]), or streamed to
+//! a writer with one file in memory at a time ([`PackSource`], [`write_streamed`]); the result reads back through
+//! [`crate::Archive`]. Output is a pure function of the set of entries: it does not depend on the order
 //! the entries are given in, nor on how many threads produced them.
 //!
 //! Derived from: the UESP archive-format pages (rows `bsa-v104-header`, `bsa-v104-folder-records`,
@@ -188,29 +189,77 @@ fn content_flags<'a>(paths: impl Iterator<Item = &'a str>) -> u16 {
     flags
 }
 
-/// A validated entry: normalised folder and file name, hashes, the bytes as they will be stored.
+/// One file to pack whose bytes are read only when the archive needs them ([`write_streamed`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackSource {
+    /// Relative path, `folder\name` or `folder/name`, any case. Normalised to lower case with backslashes.
+    pub path: String,
+    /// The file's length in bytes; the bytes read later must have exactly this length.
+    pub len: u64,
+    /// Whether to store the file zlib-compressed (a performance choice of the caller, not a format fact).
+    pub compress: bool,
+}
+
+/// Why a streamed archive was not written.
+#[derive(Debug)]
+pub enum StreamError {
+    /// The writer refused the set of files (see [`PackError`]).
+    Pack(PackError),
+    /// A file could not be read, had another length than it was given with, or the spool or the archive could not
+    /// be written.
+    Io {
+        /// What was being done.
+        what: String,
+        /// The cause.
+        source: std::io::Error,
+    },
+}
+
+impl fmt::Display for StreamError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pack(e) => e.fmt(f),
+            Self::Io { what, source } => write!(f, "{what}: {source}"),
+        }
+    }
+}
+
+impl std::error::Error for StreamError {}
+
+impl From<PackError> for StreamError {
+    fn from(e: PackError) -> Self {
+        Self::Pack(e)
+    }
+}
+
+/// A validated file: normalised folder and file name, hash, and where it came from.
 struct Placed<'a> {
     folder: String,
     name: String,
     file_hash: u64,
-    entry: &'a PackEntry,
+    /// Its place in the caller's list.
+    at: usize,
+    path: &'a str,
+    compress: bool,
 }
 
-fn validate(entries: &[PackEntry]) -> Result<Vec<Placed<'_>>, PackError> {
-    if entries.is_empty() {
+fn validate<'a>(
+    entries: impl ExactSizeIterator<Item = (&'a str, bool)>,
+) -> Result<Vec<Placed<'a>>, PackError> {
+    if entries.len() == 0 {
         return Err(PackError::Empty);
     }
     let mut seen: BTreeMap<String, &str> = BTreeMap::new();
     let mut placed = Vec::with_capacity(entries.len());
-    for entry in entries {
+    for (at, (path, compress)) in entries.enumerate() {
         let bad = |reason| PackError::BadPath {
-            path: entry.path.clone(),
+            path: path.to_owned(),
             reason,
         };
-        if !entry.path.is_ascii() {
+        if !path.is_ascii() {
             return Err(bad("the name is not ASCII"));
         }
-        let full = normalise(&entry.path);
+        let full = normalise(path);
         let (folder, name) = full
             .rsplit_once('\\')
             .ok_or_else(|| bad("the path has no folder part"))?;
@@ -223,17 +272,19 @@ fn validate(entries: &[PackEntry]) -> Result<Vec<Placed<'_>>, PackError> {
         if folder.len() > MAX_NAME_LEN || name.len() > MAX_NAME_LEN {
             return Err(bad("a name is longer than 254 bytes"));
         }
-        if let Some(first) = seen.insert(full.clone(), &entry.path) {
+        if let Some(first) = seen.insert(full.clone(), path) {
             return Err(PackError::CaseCollision {
                 first: first.to_owned(),
-                second: entry.path.clone(),
+                second: path.to_owned(),
             });
         }
         placed.push(Placed {
             folder: folder.to_owned(),
             name: name.to_owned(),
             file_hash: name_hash(name, true),
-            entry,
+            at,
+            path,
+            compress,
         });
     }
     Ok(placed)
@@ -300,49 +351,15 @@ fn group<'a>(placed: &'a [Placed<'a>]) -> Result<Folders<'a>, PackError> {
     Ok(folders)
 }
 
-/// Write a v104 archive holding `entries`.
-///
-/// Folders ascend by folder hash and the files of a folder by file hash (unsigned), so the result does not
-/// depend on the order of `entries`. Each file is compressed (zlib, level 6) or stored as asked. The archive is
-/// marked compressed by default when more than half of the files are compressed; the others carry the invert bit.
-/// Flag 0x100 (embedded names) is never set.
-///
-/// # Errors
-/// [`PackError`]: no entry, a path the format cannot hold, two paths that are one after case folding, equal
-/// hashes of different names, a file over [`MAX_FILE_SIZE`], or an archive over [`MAX_ARCHIVE_SIZE`].
-pub fn write(entries: &[PackEntry]) -> Result<Vec<u8>, PackError> {
-    let placed = validate(entries)?;
-
-    let folders = group(&placed)?;
-
-    // Per-file stored bytes in record order.
-    let ordered: Vec<&Placed<'_>> = folders
-        .values()
-        .flat_map(|(_, f)| f.iter().copied())
-        .collect();
-    let compressed_count = ordered.iter().filter(|p| p.entry.compress).count();
-    let default_compressed = compressed_count * 2 > ordered.len();
-    let blocks: Vec<Vec<u8>> = ordered
-        .iter()
-        .map(|p| {
-            if p.entry.compress {
-                let mut block = Vec::new();
-                block.extend_from_slice(
-                    &u32::try_from(p.entry.data.len())
-                        .unwrap_or(u32::MAX)
-                        .to_le_bytes(),
-                );
-                block.extend_from_slice(&miniz_oxide::deflate::compress_to_vec_zlib(
-                    &p.entry.data,
-                    ZLIB_LEVEL,
-                ));
-                block
-            } else {
-                p.entry.data.clone()
-            }
-        })
-        .collect();
-
+/// The header, folder and file records and the file names of an archive whose files, in record order, have these
+/// stored lengths.
+fn index_bytes(
+    folders: &Folders<'_>,
+    ordered: &[&Placed<'_>],
+    stored_len: &[u64],
+    default_compressed: bool,
+    paths: &[&str],
+) -> Result<Vec<u8>, PackError> {
     let folder_names_len: u64 = folders.values().map(|(n, _)| n.len() as u64 + 1).sum();
     let file_names_len: u64 = ordered.iter().map(|p| p.name.len() as u64 + 1).sum();
     let index_len = u64::from(HEADER_LEN)
@@ -351,13 +368,12 @@ pub fn write(entries: &[PackEntry]) -> Result<Vec<u8>, PackError> {
         + folder_names_len
         + 16 * ordered.len() as u64
         + file_names_len;
-    let paths: Vec<&str> = ordered.iter().map(|p| p.entry.path.as_str()).collect();
     check_limits(
         ordered.len() as u64,
         folders.len() as u64,
         index_len,
-        blocks.iter().enumerate().map(|(i, b)| (i, b.len() as u64)),
-        &paths,
+        stored_len.iter().copied().enumerate(),
+        paths,
     )?;
     // Every limit above is checked, so these conversions hold.
     let u32_of = |n: u64| u32::try_from(n).unwrap_or(u32::MAX);
@@ -367,54 +383,186 @@ pub fn write(entries: &[PackEntry]) -> Result<Vec<u8>, PackError> {
         flags |= FLAG_COMPRESSED;
     }
     let content = content_flags(ordered.iter().map(|p| p.name.as_str()));
-    let mut out = Vec::with_capacity(usize::try_from(index_len).unwrap_or(0));
-    out.extend_from_slice(b"BSA\0");
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    out.extend_from_slice(&HEADER_LEN.to_le_bytes());
-    out.extend_from_slice(&flags.to_le_bytes());
-    out.extend_from_slice(&u32_of(folders.len() as u64).to_le_bytes());
-    out.extend_from_slice(&u32_of(ordered.len() as u64).to_le_bytes());
-    out.extend_from_slice(&u32_of(folder_names_len).to_le_bytes());
-    out.extend_from_slice(&u32_of(file_names_len).to_le_bytes());
-    out.extend_from_slice(&content.to_le_bytes());
-    out.extend_from_slice(&0_u16.to_le_bytes());
+    let mut index = Vec::with_capacity(usize::try_from(index_len).unwrap_or(0));
+    index.extend_from_slice(b"BSA\0");
+    index.extend_from_slice(&VERSION.to_le_bytes());
+    index.extend_from_slice(&HEADER_LEN.to_le_bytes());
+    index.extend_from_slice(&flags.to_le_bytes());
+    index.extend_from_slice(&u32_of(folders.len() as u64).to_le_bytes());
+    index.extend_from_slice(&u32_of(ordered.len() as u64).to_le_bytes());
+    index.extend_from_slice(&u32_of(folder_names_len).to_le_bytes());
+    index.extend_from_slice(&u32_of(file_names_len).to_le_bytes());
+    index.extend_from_slice(&content.to_le_bytes());
+    index.extend_from_slice(&0_u16.to_le_bytes());
 
     // source: bsa-v104-folder-records
     let mut block_at = u64::from(HEADER_LEN) + 16 * folders.len() as u64;
-    for (hash, (name, files)) in &folders {
-        out.extend_from_slice(&hash.to_le_bytes());
-        out.extend_from_slice(&u32_of(files.len() as u64).to_le_bytes());
-        out.extend_from_slice(&u32_of(block_at + file_names_len).to_le_bytes());
+    for (hash, (name, files)) in folders {
+        index.extend_from_slice(&hash.to_le_bytes());
+        index.extend_from_slice(&u32_of(files.len() as u64).to_le_bytes());
+        index.extend_from_slice(&u32_of(block_at + file_names_len).to_le_bytes());
         block_at += 1 + name.len() as u64 + 1 + 16 * files.len() as u64;
     }
     let mut data_at = index_len;
     let mut next = 0_usize;
     for (name, files) in folders.values() {
-        out.push(u8::try_from(name.len() + 1).unwrap_or(u8::MAX));
-        out.extend_from_slice(name.as_bytes());
-        out.push(0);
+        index.push(u8::try_from(name.len() + 1).unwrap_or(u8::MAX));
+        index.extend_from_slice(name.as_bytes());
+        index.push(0);
         for file in files {
             // source: bsa-v104-file-records
-            let block = &blocks[next];
-            let mut size = u32_of(block.len() as u64);
-            if file.entry.compress != default_compressed {
+            let len = stored_len[next];
+            let mut size = u32_of(len);
+            if file.compress != default_compressed {
                 size |= SIZE_INVERT;
             }
-            out.extend_from_slice(&file.file_hash.to_le_bytes());
-            out.extend_from_slice(&size.to_le_bytes());
-            out.extend_from_slice(&u32_of(data_at).to_le_bytes());
-            data_at += block.len() as u64;
+            index.extend_from_slice(&file.file_hash.to_le_bytes());
+            index.extend_from_slice(&size.to_le_bytes());
+            index.extend_from_slice(&u32_of(data_at).to_le_bytes());
+            data_at += len;
             next += 1;
         }
     }
-    for file in &ordered {
-        out.extend_from_slice(file.name.as_bytes());
-        out.push(0);
+    for file in ordered {
+        index.extend_from_slice(file.name.as_bytes());
+        index.push(0);
     }
-    for block in &blocks {
-        out.extend_from_slice(block);
+    Ok(index)
+}
+
+/// Write a v104 archive holding `entries`, in memory.
+///
+/// Folders ascend by folder hash and the files of a folder by file hash (unsigned), so the result does not
+/// depend on the order of `entries`. Each file is compressed (zlib, level 6) or stored as asked. The archive is
+/// marked compressed by default when more than half of the files are compressed; the others carry the invert bit.
+/// Flag 0x100 (embedded names) is never set. The bytes are those [`write_streamed`] writes for the same files.
+///
+/// # Errors
+/// [`PackError`]: no entry, a path the format cannot hold, two paths that are one after case folding, equal
+/// hashes of different names, a file over [`MAX_FILE_SIZE`], or an archive over [`MAX_ARCHIVE_SIZE`].
+pub fn write(entries: &[PackEntry]) -> Result<Vec<u8>, PackError> {
+    let sources: Vec<PackSource> = entries
+        .iter()
+        .map(|e| PackSource {
+            path: e.path.clone(),
+            len: e.data.len() as u64,
+            compress: e.compress,
+        })
+        .collect();
+    let mut out = Vec::new();
+    let mut spool = std::io::Cursor::new(Vec::new());
+    match write_streamed(
+        &sources,
+        &mut |at| Ok(entries[at].data.clone()),
+        &mut spool,
+        &mut out,
+    ) {
+        Ok(_) => Ok(out),
+        Err(StreamError::Pack(e)) => Err(e),
+        // memory cannot fail to read or write, and every length is the length of its bytes
+        Err(StreamError::Io { .. }) => Err(PackError::Empty),
     }
-    Ok(out)
+}
+
+/// Write a v104 archive holding `sources` to `out`, the same bytes as [`write`], holding at most one file and its
+/// compressed copy in memory at a time.
+///
+/// `read(i)` returns the bytes of `sources[i]`; it is called once for each compressed file (in the first pass, which
+/// writes the compressed copies to `spool`) and once for each stored file (while its bytes are written). `spool` is
+/// scratch space the caller provides (a temporary file); it may be left with data in it. Returns the archive's
+/// length.
+///
+/// # Errors
+/// [`StreamError::Pack`] for what [`write`] refuses; [`StreamError::Io`] when `read` fails, returns another length
+/// than the source gave, or `spool` or `out` cannot be written.
+pub fn write_streamed<S, W>(
+    sources: &[PackSource],
+    read: &mut dyn FnMut(usize) -> std::io::Result<Vec<u8>>,
+    spool: &mut S,
+    out: &mut W,
+) -> Result<u64, StreamError>
+where
+    S: std::io::Read + std::io::Write + std::io::Seek,
+    W: std::io::Write,
+{
+    use std::io::{Read as _, SeekFrom};
+    let io = |what: String| move |source| StreamError::Io { what, source };
+    let placed = validate(sources.iter().map(|s| (s.path.as_str(), s.compress)))?;
+    let folders = group(&placed)?;
+
+    // Files in record order.
+    let ordered: Vec<&Placed<'_>> = folders
+        .values()
+        .flat_map(|(_, f)| f.iter().copied())
+        .collect();
+    let compressed_count = ordered.iter().filter(|p| p.compress).count();
+    let default_compressed = compressed_count * 2 > ordered.len();
+    let read_checked = |read: &mut dyn FnMut(usize) -> std::io::Result<Vec<u8>>,
+                        p: &Placed<'_>|
+     -> Result<Vec<u8>, StreamError> {
+        let data = read(p.at).map_err(io(format!("cannot read {}", p.path)))?;
+        if data.len() as u64 != sources[p.at].len {
+            return Err(StreamError::Io {
+                what: format!("cannot pack {}", p.path),
+                source: std::io::Error::other(format!(
+                    "it has {} bytes, not the {} it was listed with",
+                    data.len(),
+                    sources[p.at].len
+                )),
+            });
+        }
+        Ok(data)
+    };
+
+    // First pass: the stored length of every file; compressed copies go to the spool, in record order.
+    spool
+        .seek(SeekFrom::Start(0))
+        .map_err(io("cannot use the spool".to_owned()))?;
+    let mut stored_len: Vec<u64> = Vec::with_capacity(ordered.len());
+    for p in &ordered {
+        if p.compress {
+            let data = read_checked(read, p)?;
+            let packed = miniz_oxide::deflate::compress_to_vec_zlib(&data, ZLIB_LEVEL);
+            drop(data);
+            let raw = u32::try_from(sources[p.at].len).unwrap_or(u32::MAX);
+            spool
+                .write_all(&raw.to_le_bytes())
+                .and_then(|()| spool.write_all(&packed))
+                .map_err(io(format!("cannot spool {}", p.path)))?;
+            stored_len.push(4 + packed.len() as u64);
+        } else {
+            stored_len.push(sources[p.at].len);
+        }
+    }
+
+    let paths: Vec<&str> = ordered.iter().map(|p| p.path).collect();
+    let index = index_bytes(&folders, &ordered, &stored_len, default_compressed, &paths)?;
+    out.write_all(&index)
+        .map_err(io("cannot write the archive".to_owned()))?;
+    let index_len = index.len() as u64;
+    drop(index);
+
+    // Second pass: the data blocks in record order, stored files from their source, compressed ones from the spool.
+    spool
+        .seek(SeekFrom::Start(0))
+        .map_err(io("cannot use the spool".to_owned()))?;
+    for (p, len) in ordered.iter().zip(&stored_len) {
+        if p.compress {
+            let copied = std::io::copy(&mut std::io::Read::by_ref(spool).take(*len), out)
+                .map_err(io(format!("cannot copy {} into the archive", p.path)))?;
+            if copied != *len {
+                return Err(StreamError::Io {
+                    what: format!("cannot copy {} into the archive", p.path),
+                    source: std::io::ErrorKind::UnexpectedEof.into(),
+                });
+            }
+        } else {
+            let data = read_checked(read, p)?;
+            out.write_all(&data)
+                .map_err(io(format!("cannot write {} into the archive", p.path)))?;
+        }
+    }
+    Ok(index_len + stored_len.iter().sum::<u64>())
 }
 
 #[cfg(test)]

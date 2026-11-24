@@ -44,6 +44,46 @@ pub fn linked_folder(out: &Path, rel: &str) -> Option<PathBuf> {
 /// # Errors
 /// [`GenError::LinkInOutput`] for a path that is not plain or that passes a link, [`GenError::Io`] for a failed write.
 pub fn write_output_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileRecord, GenError> {
+    write_output_with(out, rel, |file| file.write_all(bytes))?;
+    Ok(FileRecord {
+        path: rel.to_owned(),
+        bytes: bytes.len() as u64,
+        digest: sha256_digest(bytes),
+    })
+}
+
+/// Write `rel` under `out` as [`write_output_file`] does, with the content from `write_content`, which writes it to the fresh
+/// file; nothing is held in memory here. The record's digest is read back from the written file, a part at a time,
+/// and equals [`sha256_digest`] of the whole content.
+///
+/// # Errors
+/// As [`write_output_file`]; [`GenError::Io`] also when `write_content` fails (the `.tmp` file is then removed and the target
+/// left as it was).
+pub fn write_output_stream(
+    out: &Path,
+    rel: &str,
+    write_content: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+) -> Result<FileRecord, GenError> {
+    let target = write_output_with(out, rel, write_content)?;
+    let io = |source| GenError::Io {
+        what: rel.to_owned(),
+        source,
+    };
+    let file = std::fs::File::open(&target).map_err(io)?;
+    let len = file.metadata().map_err(io)?.len();
+    let digest = lodwright_contract::sha256_digest_of_reader(len, file).map_err(io)?;
+    Ok(FileRecord {
+        path: rel.to_owned(),
+        bytes: len,
+        digest,
+    })
+}
+
+fn write_output_with(
+    out: &Path,
+    rel: &str,
+    write_content: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+) -> Result<PathBuf, GenError> {
     let refused = || GenError::LinkInOutput {
         what: rel.to_owned(),
     };
@@ -93,14 +133,14 @@ pub fn write_output_file(out: &Path, rel: &str, bytes: &[u8]) -> Result<FileReco
         .create_new(true)
         .open(&temp)
         .map_err(io)?;
-    file.write_all(bytes).map_err(io)?;
+    if let Err(e) = write_content(&mut file).and_then(|()| file.flush()) {
+        drop(file);
+        let _ = std::fs::remove_file(&temp);
+        return Err(io(e));
+    }
     drop(file);
     std::fs::rename(&temp, &target).map_err(io)?;
-    Ok(FileRecord {
-        path: rel.to_owned(),
-        bytes: bytes.len() as u64,
-        digest: sha256_digest(bytes),
-    })
+    Ok(target)
 }
 
 #[cfg(test)]

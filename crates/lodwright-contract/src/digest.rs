@@ -41,6 +41,28 @@ impl Sha256Stream {
     }
 }
 
+/// `sha256:<hex>` of the `len` bytes `reader` gives, read a part at a time: the same as [`sha256_digest`] of those
+/// bytes as one slice.
+///
+/// # Errors
+/// When `reader` fails or ends before `len` bytes.
+pub fn sha256_digest_of_reader(
+    len: u64,
+    mut reader: impl std::io::Read,
+) -> std::io::Result<String> {
+    let mut stream = Sha256Stream::new();
+    stream.0.update(len.to_le_bytes());
+    let mut buf = vec![0_u8; 1 << 20];
+    let mut left = len;
+    while left > 0 {
+        let want = usize::try_from(left.min(buf.len() as u64)).unwrap_or(buf.len());
+        reader.read_exact(&mut buf[..want])?;
+        stream.0.update(&buf[..want]);
+        left -= want as u64;
+    }
+    Ok(stream.finish())
+}
+
 /// The digest of a normalised argument set: the version tag of the normal form, then each `key=value` line.
 /// Callers pass the lines already normalised (case folded, order fixed by the caller where order is meaning,
 /// for example the load order).
@@ -65,6 +87,16 @@ mod tests {
             sha256_digest(b""),
             "sha256:af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc"
         );
+    }
+
+    #[test]
+    fn a_reader_read_in_parts_gives_the_digest_of_the_whole_slice() {
+        let bytes: Vec<u8> = (0..3_000_000_u32).map(|i| (i % 251) as u8).collect();
+        assert_eq!(
+            super::sha256_digest_of_reader(bytes.len() as u64, bytes.as_slice()).unwrap(),
+            sha256_digest(&bytes)
+        );
+        assert!(super::sha256_digest_of_reader(10, &b"short"[..]).is_err());
     }
 
     #[test]

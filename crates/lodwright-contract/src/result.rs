@@ -259,8 +259,8 @@ pub fn advice_for(kind: &str) -> &'static str {
              instead."
         }
         "include_rule_reference_not_enabled" => {
-            "Nothing is wrong: an include rule matches these references, but they start disabled or wait for an enable \
-             parent. A far block cannot follow what a script enables, so they stay out of the far view."
+            "Nothing is wrong: an include rule matches these references, but they are disabled when the game starts, \
+             themselves or through their enable parent. The far view shows what stands at the start."
         }
         "far_model_no_solid_shape" => {
             "Every shape of these models has an alpha property or is drawn without lighting, so they may be effects or \

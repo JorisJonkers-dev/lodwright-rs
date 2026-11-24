@@ -12,7 +12,8 @@ use crate::worldspace::{absolute, master_table};
 
 /// Visible When Distant, on bases and references.
 pub const VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
-/// High Priority LOD, on references.
+/// High Priority LOD, on references and on statics (bit 16; on activators and doors the same bit means Random Anim
+/// Start, so only a static's bit counts).
 pub const HIGH_PRIORITY_LOD: u32 = 0x0001_0000;
 // source: game-lod-object-rules-disabled-persistent
 /// Initially Disabled, on references. Such a reference is not in the world when the game starts and is left out of LOD,
@@ -36,7 +37,8 @@ pub struct Instance {
     pub model: String,
     /// Where it stands, in world units and radians.
     pub placement: Placement,
-    /// The reference is flagged high priority.
+    /// The reference or its static base is flagged high priority: the object also goes to the block's `high` file,
+    /// which the game keeps drawn much farther away than the normal one.
     pub high_priority: bool,
     /// The base carries has-tree-LOD.
     pub has_tree_lod: bool,
@@ -402,7 +404,9 @@ fn gather(
         } else {
             reference_plugin
         };
-        let high_priority = flags & HIGH_PRIORITY_LOD != 0;
+        // source: oracle-high-priority-on-static
+        let high_priority = flags & HIGH_PRIORITY_LOD != 0
+            || (base.signature == *b"STAT" && base.flags & HIGH_PRIORITY_LOD != 0);
         let has_tree_lod = base.flags & HAS_TREE_LOD != 0;
         if let Some(model) = &base.model {
             out.push((
@@ -461,8 +465,8 @@ fn gather(
 #[cfg(test)]
 mod tests {
     use super::{
-        INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT, references_with_model,
-        visible_instances,
+        HIGH_PRIORITY_LOD, INITIALLY_DISABLED, PERSISTENT, VISIBLE_WHEN_DISTANT,
+        references_with_model, visible_instances,
     };
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
@@ -508,6 +512,48 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn high_priority_on_a_static_base_counts_as_on_the_reference() {
+        let p = plugin(
+            &[],
+            vec![
+                stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD),
+                stat(0x101, "b.nif", VISIBLE_WHEN_DISTANT),
+            ],
+            vec![
+                refr(0x200, 0x100, 0, 1.0),
+                refr(0x201, 0x101, HIGH_PRIORITY_LOD, 2.0),
+                refr(0x202, 0x101, 0, 3.0),
+            ],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let high: Vec<(u32, bool)> = out.iter().map(|i| (i.reference, i.high_priority)).collect();
+        assert_eq!(high, vec![(0x200, true), (0x201, true), (0x202, false)]);
+    }
+
+    #[test]
+    fn bit_16_on_an_activator_is_not_high_priority() {
+        let mut acti = Record::new(*b"ACTI", 0x100).with_subrecord(*b"MODL", b"a.nif\0".to_vec());
+        acti.flags = VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD;
+        let mut world = Group::new(1, 0x0000_0A00_u32.to_le_bytes());
+        world = world.with(refr(0x200, 0x100, 0, 1.0));
+        let bytes = PluginBuilder::new()
+            .group(Group::new(0, *b"ACTI").with(acti))
+            .group(world)
+            .build();
+        let p = read_with(
+            &bytes,
+            ReadOptions {
+                objects: true,
+                ..ReadOptions::default()
+            },
+        )
+        .unwrap();
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        assert_eq!(out.len(), 1);
+        assert!(!out[0].high_priority);
     }
 
     #[test]

@@ -4,7 +4,9 @@
 
 Object LOD is one level (`fnv-lod-levels`), stored as `.nif` block files (not `.bto`), named
 `<world>.level4.x<X>.y<Y>.nif` in `meshes\landscape\lod\<world>\blocks\`; objects flagged high priority also go to
-`<world>.level4.high.x<X>.y<Y>.nif` (`fnv-lod-object-block-names`, `fnv-lod-folders`). The standard file contains the
+`<world>.level4.high.x<X>.y<Y>.nif` (`fnv-lod-object-block-names`, `fnv-lod-folders`). High priority is bit 16 of the reference or of the
+static it places (`oracle-high-priority-on-static`); the game keeps the high file drawn out to `fBlockLoadDistance`,
+the normal one only to `fBlockLoadDistanceLow`, so a large object that should be seen from very far needs the flag. The standard file contains the
 object plus objects of surrounding cells, which means a block covers more than the cell of the object (same row).
 
 Terrain level 4 uses the identical `level4` name (`fnv-lod-terrain-names`). Public text does not say whether these are

@@ -111,6 +111,33 @@
         "max_error"
       ]
     },
+    "IncludeRule": {
+      "description": "One rule of `inclusion.include_rules`: which placed objects to take into object LOD.",
+      "type": "object",
+      "properties": {
+        "models": {
+          "description": "The model path (relative to `meshes`, any case, either separator) as a pattern; `*` matches any run of\ncharacters.",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "Only objects whose reference or base object comes from this plugin (file name, any case).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "record_type": {
+          "description": "Only base objects of this record type: four capital letters or digits, such as `STAT`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "models"
+      ]
+    },
     "Inclusion": {
       "description": "Which objects enter object LOD, beyond the game's own rule (visible when distant).",
       "type": "object",
@@ -137,6 +164,13 @@
           "default": [],
           "items": {
             "type": "string"
+          }
+        },
+        "include_rules": {
+          "description": "Take objects that nothing marks visible from far into object LOD when they match one of these rules. Only\nreferences enabled at the start and without an enable parent are taken; the exclusion rules above still win.\nEmpty by default and written only when set, so a request without rules keeps its digest.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IncludeRule"
           }
         },
         "only_plugins": {

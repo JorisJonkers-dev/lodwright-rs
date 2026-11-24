@@ -1,75 +1,87 @@
 # lodwright-rs
 
-A Linux-native, clean-room generator of terrain and object LOD (level of detail) data for Fallout: New Vegas and
-Tale of Two Wastelands, written in Rust. The existing generators are Windows-only; this one is built from public
-file-format documentation, our own measurements and synthetic tests.
+`lodwright` builds the distant land of Fallout: New Vegas and Tale of Two Wastelands: the far terrain, its water,
+the far objects and the trees you see past the loaded cells (LOD, level of detail). It reads your load order and your
+data folder and writes LOD that matches that load order, so mods that change the world also change what you see in
+the distance. It is written in Rust, clean-room, and builds natively for Linux, Windows and macOS; the existing
+generators are Windows-only.
 
-**Systems.** Built and tested on Linux and macOS (Apple silicon) on every pull request, and linked into the Toolbox's
-`raul` on Linux, Windows and macOS, which builds it from the pinned source. Each release attaches the binary for Linux
-x86-64 and for macOS (one universal binary for Apple silicon and Intel); the OCI package is Linux only.
+Most players use it through [raul](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox), which has it built in.
+On its own it is a command line program and a library.
 
 **Licence: GPL-3.0-only**, with two files translated from xEdit kept under MPL-2.0 ([docs/LICENSING.md](docs/LICENSING.md)).
-The clean-room rule is in [docs/clean-room.md](docs/clean-room.md).
 
-## Clean-room rule
+## What it does for your game
 
-Format facts come from public format documents, the MPL-2.0 xEdit source, public readmes, Microsoft's DDS
-documentation, the game's own data formats on the owner's machine, and black-box output of an existing generator
-run on the owner's own data. Decompiled or leaked code and unlicensed source are never read. Every fact the code
-relies on is recorded in `provenance/sources.toml` and `provenance/LOG.md` (CI checks the record). Game data and
-reference output never go in this repository; test fixtures are synthetic.
+The game ships a far view made for the unmodded world. With mods, that far view no longer matches: new buildings are
+missing at a distance, changed land shows its old shape, and Tale of Two Wastelands' worlds get no fitting far view at
+all. lodwright generates it again for exactly the plugins you play with.
 
-## Status
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/docs/images/lod-modded-black-mountain.jpg" alt="Black Mountain from above: without a generated far view the dishes are missing; with lodwright's they are there" width="100%">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/docs/images/lod-modded-strip.jpg" alt="The Strip from above: without a generated far view casinos and buildings are missing; with lodwright's they are there" width="100%">
+  <br><em>A 312-mod Tale of Two Wastelands load order without (left) and with (right) the far view lodwright generated
+  for it: Black Mountain's dishes and the Strip's casinos and buildings are back.</em>
+</p>
 
-Working end to end for terrain and object LOD of a world: `lodwright generate` reads a load order and the data folder
-(archives and loose files), and writes terrain block meshes with water planes, terrain diffuse and normal maps (land
-texture layers, vertex colours, heights), the world settings file, object LOD blocks with their atlas pair, tree LOD
-(billboard atlas, type list and block files, from billboard textures that mods ship), and a manifest. Output matches
-the game's own tree in file names, counts and structure; against the game's own blocks of the main world, all 295
-object blocks have the same vertex and triangle counts (99.98 percent of vertices in place) and the water planes
-cover the same ground to 0.91 to 0.99 (see `docs/gap-list.md` for the measurements). A second run keeps the terrain
-blocks whose inputs did not change. `lodwright verify` checks a folder against the formats and can compare it with
-another tree. A request document (`lodwright schema request`) is how a caller drives a run.
+On the plain game, the far view it generates is meant to look like the game's own, and it is checked against it:
 
-Not done: loading in the game (owner only, docs/owner-runbook.md section 6), the game's own water outline (ours is
-our own design), and reuse of unchanged object and tree blocks. The gap list has each item with its state.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/docs/images/lod-plain-hoover.jpg" alt="Hoover Dam and Lake Mead from above: the game's own far view and lodwright's look the same" width="100%">
+  <br><em>Hoover Dam and Lake Mead on the plain game: the game's own far view (left) and lodwright's (right).</em>
+</p>
 
-## Speed
+Recent work that shows in the pictures:
 
-On a 133-plugin load order, xLODGen averages about 37 minutes (mean of 38 min 19 s and 35 min 54 s) and lodwright takes
-64 seconds on 16 threads: **up to 35 times faster**.
+- **Far objects as the game's own.** All 295 object blocks of the main world have the game's vertex and triangle
+  counts (99.98 percent of vertices in place). Far-object textures keep their own size on several atlases, and a
+  block over the 16-bit limits is written as several shapes instead of losing objects.
+- **Objects without a far model** can be drawn from a simplified full model, and include rules take chosen objects
+  into the far view (0.17.0).
+- **Far land lit as the near land is.** The game's own far-land tiles are kept where no mod changed the land, and a
+  composed tile is darkened to match the land near the player.
+- **Far water.** Lakes and rivers are drawn at a distance, with water walls at block borders so no gaps show.
+- **Speed.** On a 133-plugin load order, xLODGen averages about 37 minutes and lodwright takes 64 seconds on 16
+  threads; step-by-step figures are in [docs/performance.md](docs/performance.md).
 
-What enabled it (lodwright's own output stayed byte-identical through these changes):
+What is still open, with measurements, is in [docs/gap-list.md](docs/gap-list.md).
 
-- All cores by default, within a memory budget (#378).
-- Atlas pages encoded on threads (#379).
-- Texture decoding and normal maps on threads (#381).
-- The base load order assembled once per run, and land textures decoded on threads (#382).
-- Mip levels and resizes on threads, and tree bases found once (#383).
-- Block-border triangles no longer scored and then discarded (#384).
+## Used from raul
 
-The step-by-step figures are in [docs/performance.md](docs/performance.md).
+raul's LOD page runs lodwright for the active profile: it reads the profile's active plugins and its staged data
+folder, generates terrain, objects and trees, and keeps the output as one Mod, `Generated LOD (<profile>)`, in the
+mod list. A new run replaces it and keeps its place. The LOD settings page sets the options of the request raul
+sends.
 
-## Packages
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/crates/raul-gui/tests/snapshots/lod/lod-generated.png" alt="raul's LOD page after a run: what was read and written, and every block generated" width="49%">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/crates/raul-gui/tests/snapshots/lod-settings/lod-settings-defaults.png" alt="raul's LOD settings page: worlds, terrain, land textures, water, objects and trees" width="49%">
+</p>
 
-The `lodwright` program is published on each release as an OCI package on ghcr.io:
+The same from raul's command line: `raul lod plan`, `raul lod generate` and `raul lod settings`.
 
-`ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu`
-
-where `<version>` is the release tag without the leading `v`. The package is a `tar.gz` archive with the binary and
-`LICENSE`. The package is an OCI artifact with one layer; the layer is that archive, and its digest equals the
-"Archive SHA-256" in the release notes.
-
-Verify it with:
+## On its own
 
 ```sh
-gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs
+lodwright plan --data <Data folder> --load-order plugins.txt              # what a run would build
+lodwright generate --data <Data folder> --load-order plugins.txt --out <folder>
+lodwright verify <folder> [--reference <another folder>]                  # check the output's formats
+lodwright landmarks --request FILE --landmarks FILE                       # are named landmarks drawn?
+lodwright --help                                                          # every command
 ```
 
-This needs `gh` 2.49 or newer (older versions, such as the 2.46 of Debian 13, have no `attestation` command) and
-a GitHub token: run `gh auth login` or set `GH_TOKEN`, even though the package and its attestation are public.
+`generate` reads archives and loose files, writes terrain blocks with water, terrain textures, the world settings
+file, object blocks with their atlases, tree LOD and a manifest. A second run keeps the terrain blocks whose inputs did
+not change. A request document (`lodwright schema request`) is how a program drives a run; the contracts are in
+[docs/contracts.md](docs/contracts.md). Programs can also link the `lodwright-api` crate, as raul does.
 
-### Pulling and verifying without a login or docker
+Each [release](https://github.com/JorisJonkers-dev/lodwright-rs/releases/latest) attaches the binary for Linux
+x86-64 and for macOS (one universal binary), with `SHA256SUMS` and the contract schemas, and publishes an OCI package
+for Linux: `ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu`. Check it with
+`gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:<version>-x86_64-unknown-linux-gnu --repo JorisJonkers-dev/lodwright-rs`
+(GitHub CLI 2.49 or newer and a login: run `gh auth login` or set `GH_TOKEN`, even though the package is public).
+
+#### Pulling and verifying without a login or docker
 
 The package is public, so an anonymous token is enough. With `curl`, `python3` and `sha256sum` (replace `<version>`):
 
@@ -96,29 +108,27 @@ gh attestation verify oci://ghcr.io/jorisjonkers-dev/lodwright-rs:$TAG --bundle 
 
 `gh` exits 0 when the bundle verifies. The unauthenticated GitHub API allows 60 requests an hour per address.
 
-To republish an existing tag, for example after the package was renamed, run the release workflow by hand on `main` with the tag and `publish` set: `gh workflow run release.yml -R JorisJonkers-dev/lodwright-rs --ref main -f tag=vX.Y.Z -f publish=true`. The run builds the assets of that tag, uploads them to its GitHub release and pushes the package again. Without `publish=true` it is a dry run that pushes nothing.
+## Why a separate project
 
-## Place in the stack
+lodwright is one of the Components raul is made of, next to [nv-rs](https://github.com/JorisJonkers-dev/nv-rs),
+[nvmod-rs](https://github.com/JorisJonkers-dev/nvmod-rs), [loot-rs](https://github.com/JorisJonkers-dev/loot-rs) and
+[ttwright-rs](https://github.com/JorisJonkers-dev/ttwright-rs). Each does one job, is tested on its own and releases
+on its own schedule; raul links them into one program and ships one tested set. lodwright in particular is checked
+without raul: its output is compared block by block with the game's own far view.
 
-lodwright-rs is a Component of [Raul's Trusty Toolbox](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox).
-The Toolbox (`raul`) pins, fetches and verifies the lodwright release, writes the request document and runs
-`lodwright` as a process (ADR-0007 there). lodwright owns its Contracts (plan, request, result, manifest, verify and
-events, see [docs/contracts.md](docs/contracts.md)); the Toolbox keeps the registry of which versions each Known-good
-set speaks (ADR-0009 there). The CLI works alone and never fetches or starts another tool.
+## Clean-room rule
 
-## Scope
-
-Heightfield reader, block-aligned raster and terrain planning (done), then terrain meshes on disk, terrain
-textures, object and tree LOD. Out of scope: running the game, and shipping or reading anyone's game data from this
-repository.
+Format facts come from public format documents, the MPL-2.0 xEdit source, public readmes, Microsoft's DDS
+documentation, the game's own data formats on a contributor's machine, and black-box output of an existing generator
+run on the contributor's own data. Decompiled or leaked code and unlicensed source are never read. Every fact the
+code relies on is recorded in `provenance/` (CI checks the record). Game data and reference output never go in this
+repository; test fixtures are synthetic. The rule is in [docs/clean-room.md](docs/clean-room.md).
 
 ## Where to read next
 
-- [docs/owner-runbook.md](docs/owner-runbook.md): what the owner runs on real data, and what to report back.
 - [docs/gap-list.md](docs/gap-list.md): what full generation needs and what exists.
-- [docs/RELEASE-TEST.md](docs/RELEASE-TEST.md): the checklist a release passes on real data before it is cut.
+- [docs/design.md](docs/design.md): pipeline, crates, interfaces, open questions.
+- [docs/RELEASE-TEST.md](docs/RELEASE-TEST.md): the checklist a release passes on real data.
+- [docs/TESTING.md](docs/TESTING.md): synthetic fixtures, properties and the `verify` design.
 - [docs/LICENSING.md](docs/LICENSING.md): which crate carries which licence.
-- [docs/design.md](docs/design.md): pipeline, crates, first-slice interfaces, open questions.
-- [docs/clean-room.md](docs/clean-room.md): who may read what; provenance rules; what CI enforces.
-- [docs/TESTING.md](docs/TESTING.md): synthetic fixtures only, properties, oracle plan, `verify` design.
 - [docs/PRACTICES.md](docs/PRACTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md).

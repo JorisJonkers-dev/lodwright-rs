@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.3...v0.17.0) (2026-11-24)
+
+
+### Features
+
+* **gen:** add a simplifier for far shapes of models without a LOD model ([#404](https://github.com/JorisJonkers-dev/lodwright-rs/issues/404)) ([4957bde](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4957bdeb992b1be8e8b9f349f232161a96f3b82d))
+* **objects:** a generate option on each include rule draws only its objects from full models ([#408](https://github.com/JorisJonkers-dev/lodwright-rs/issues/408)) ([cddad5c](https://github.com/JorisJonkers-dev/lodwright-rs/commit/cddad5c038e383b712b323218f5d6ba4d9f225ff))
+* **objects:** draw objects without a LOD model from simplified full models ([#405](https://github.com/JorisJonkers-dev/lodwright-rs/issues/405)) ([9468316](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9468316a30fed1e2c87a5d0b59fe2f8c2bf61f4c))
+* **objects:** include rules take chosen objects into the far view ([#407](https://github.com/JorisJonkers-dev/lodwright-rs/issues/407)) ([7a01f62](https://github.com/JorisJonkers-dev/lodwright-rs/commit/7a01f6270d9d68695f07f6430bd5829f2fa1da5d)), closes [#385](https://github.com/JorisJonkers-dev/lodwright-rs/issues/385)
+* **verify:** report far-object error per level and atlas use ([#402](https://github.com/JorisJonkers-dev/lodwright-rs/issues/402)) ([ff03873](https://github.com/JorisJonkers-dev/lodwright-rs/commit/ff0387390e495492383cab4bcda99b4d73273f37))
+
 ## [0.16.3](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.2...v0.16.3) (2026-11-23)
 
 

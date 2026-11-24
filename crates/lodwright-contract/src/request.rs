@@ -161,6 +161,7 @@ impl Default for TerrainRequest {
 }
 
 /// Object LOD settings.
+#[allow(clippy::struct_excessive_bools)] // each one is a switch of the request
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ObjectsRequest {
     /// Write object LOD.
@@ -183,6 +184,11 @@ pub struct ObjectsRequest {
     /// game's own LOD is the standard; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shapes_from_full_models: Option<FullModelShapes>,
+    /// Also take references that nothing marks visible from far when their model has a far model
+    /// (`<model>_lod.nif`) and their base is not drawn as a tree billboard; only references that stand when the game
+    /// starts are taken. Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_model_without_flag: bool,
 }
 
 /// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
@@ -219,6 +225,7 @@ impl Default for ObjectsRequest {
             drop_under_water: false,
             shapes_from_shipped_blocks: Vec::new(),
             shapes_from_full_models: None,
+            far_model_without_flag: false,
         }
     }
 }

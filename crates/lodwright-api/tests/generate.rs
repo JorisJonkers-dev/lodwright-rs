@@ -719,7 +719,6 @@ fn rule(models: &str, plugin: Option<&str>) -> lodwright_contract::IncludeRule {
         plugin: plugin.map(str::to_owned),
         record_type: Some("STAT".to_owned()),
         generate: None,
-        replace_lod_model: false,
     }
 }
 

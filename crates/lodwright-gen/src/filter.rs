@@ -39,8 +39,6 @@ pub struct IncludeRules {
     rules: Vec<(String, Option<usize>, Option<[u8; 4]>)>,
     /// The `generate` limits of each rule, by the rule's place in `rules`.
     generate: Vec<Option<FarLimits>>,
-    /// Whether each rule's `generate` replaces an authored LOD model.
-    replace: Vec<bool>,
 }
 
 impl IncludeRules {
@@ -51,7 +49,6 @@ impl IncludeRules {
     pub fn new(rules: &[IncludeRule], plugins: &[String]) -> Result<Self, String> {
         let mut out = Vec::with_capacity(rules.len());
         let mut generate = Vec::with_capacity(rules.len());
-        let mut replace = Vec::with_capacity(rules.len());
         for rule in rules {
             let plugin = match &rule.plugin {
                 Some(name) => Some(
@@ -71,7 +68,6 @@ impl IncludeRules {
                 None => None,
             };
             out.push((model_key(&rule.models), plugin, kind));
-            replace.push(rule.replace_lod_model && rule.generate.is_some());
             generate.push(rule.generate.map(|shapes| FarLimits {
                 keep: shapes.keep,
                 max_error: shapes.max_error,
@@ -80,7 +76,6 @@ impl IncludeRules {
         Ok(Self {
             rules: out,
             generate,
-            replace,
         })
     }
 
@@ -119,20 +114,6 @@ impl IncludeRules {
             .iter()
             .enumerate()
             .find_map(|(at, limits)| limits.filter(|_| self.rule_matches(at, instance)))
-    }
-
-    /// Whether the first rule with `generate` that matches `instance` also replaces an authored LOD model.
-    #[must_use]
-    pub fn replaces_lod_model_for(&self, instance: &Instance) -> bool {
-        (0..self.rules.len())
-            .find(|&at| self.generate[at].is_some() && self.rule_matches(at, instance))
-            .is_some_and(|at| self.replace[at])
-    }
-
-    /// Whether any rule replaces authored LOD models.
-    #[must_use]
-    pub fn replaces(&self) -> bool {
-        self.replace.iter().any(|r| *r)
     }
 
     fn rule_matches(&self, at: usize, instance: &Instance) -> bool {
@@ -316,7 +297,6 @@ mod tests {
             plugin: plugin.map(str::to_owned),
             record_type: record_type.map(str::to_owned),
             generate: None,
-            replace_lod_model: false,
         }
     }
 
@@ -366,29 +346,6 @@ mod tests {
             none.generate_for(&inst("lights/streetlamp.nif", 1, 1, 1)),
             None
         );
-    }
-
-    #[test]
-    fn a_rule_replaces_lod_models_only_with_generate_and_only_for_what_it_matches_first() {
-        let plugins = ["A.esm".to_owned()];
-        let shapes = lodwright_contract::FullModelShapes {
-            keep: 0.25,
-            max_error: 0.05,
-        };
-        let mut casinos = rule("strip/*_wl.nif", None, None);
-        casinos.generate = Some(shapes);
-        casinos.replace_lod_model = true;
-        let mut no_generate = rule("walls/*", None, None);
-        no_generate.replace_lod_model = true;
-        let mut later = rule("*", None, None);
-        later.generate = Some(shapes);
-        let rules = IncludeRules::new(&[casinos, no_generate, later], &plugins).unwrap();
-        assert!(rules.replaces());
-        assert!(rules.replaces_lod_model_for(&inst("strip/lucky38_wl.nif", 1, 0, 0)));
-        // the first generating rule that matches decides: a wall falls to the later rule, which does not replace
-        assert!(!rules.replaces_lod_model_for(&inst("walls/wall.nif", 1, 0, 0)));
-        let plain = IncludeRules::new(&[rule("*", None, None)], &plugins).unwrap();
-        assert!(!plain.replaces());
     }
 
     #[test]

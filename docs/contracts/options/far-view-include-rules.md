@@ -42,12 +42,6 @@ An authored LOD model always wins over both. Shapes drawn without lighting (ligh
 solid shape is reported as `far_model_no_solid_shape`. A rule without `generate` keeps the request digest it had before the key
 existed.
 
-`replace_lod_model` (with `generate`, off by default, written only when on) draws the rule's objects from their
-simplified full model even when they have an authored LOD model. Use it for models whose LOD model lacks what the full
-model has, such as the glow maps of lit buildings with `objects.far_glow`. A model is replaced only when such a rule is
-the first generating rule to match every drawn object that uses it. Otherwise, or when the full model cannot be
-simplified, the authored LOD model stays.
-
 With no rules, the request digest and every block digest are the same as before the option existed. With rules, the
 request digest changes, so the affected blocks are rebuilt.
 

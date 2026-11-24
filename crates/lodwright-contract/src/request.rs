@@ -287,12 +287,6 @@ pub struct IncludeRule {
     /// `objects.shapes_from_full_models`. Not set by default; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generate: Option<FullModelShapes>,
-    /// With `generate`: draw the objects this rule matches from their simplified full model even when they have an
-    /// authored LOD model, for models whose LOD model lacks what the full model has (the glow maps of lit buildings).
-    /// A model is replaced only when such a rule matches every drawn object that uses it; otherwise its LOD model
-    /// stays. Off by default; written only when on.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub replace_lod_model: bool,
 }
 
 /// Resource limits.
@@ -654,7 +648,6 @@ mod tests {
             plugin: None,
             record_type: record_type.map(Into::into),
             generate: None,
-            replace_lod_model: false,
         };
         let mut r = base();
         r.inclusion.include_rules.push(rule(" ", None));

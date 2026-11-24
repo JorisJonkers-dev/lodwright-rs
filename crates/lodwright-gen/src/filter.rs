@@ -4,6 +4,8 @@
 use lodwright_contract::{IncludeRule, Inclusion};
 use lodwright_core::objects::Instance;
 
+use crate::far_simplify::FarLimits;
+
 /// Whether `text` matches `pattern`, where `*` matches any run of characters (including none).
 #[must_use]
 pub fn glob(pattern: &str, text: &str) -> bool {
@@ -35,6 +37,8 @@ fn model_key(model: &str) -> String {
 #[derive(Debug, Clone, Default)]
 pub struct IncludeRules {
     rules: Vec<(String, Option<usize>, Option<[u8; 4]>)>,
+    /// The `generate` limits of each rule, by the rule's place in `rules`.
+    generate: Vec<Option<FarLimits>>,
 }
 
 impl IncludeRules {
@@ -44,6 +48,7 @@ impl IncludeRules {
     /// A message when a rule names a plugin that is not in the load order or a record type that is not four bytes.
     pub fn new(rules: &[IncludeRule], plugins: &[String]) -> Result<Self, String> {
         let mut out = Vec::with_capacity(rules.len());
+        let mut generate = Vec::with_capacity(rules.len());
         for rule in rules {
             let plugin = match &rule.plugin {
                 Some(name) => Some(
@@ -63,8 +68,15 @@ impl IncludeRules {
                 None => None,
             };
             out.push((model_key(&rule.models), plugin, kind));
+            generate.push(rule.generate.map(|shapes| FarLimits {
+                keep: shapes.keep,
+                max_error: shapes.max_error,
+            }));
         }
-        Ok(Self { rules: out })
+        Ok(Self {
+            rules: out,
+            generate,
+        })
     }
 
     /// Whether there are no rules.
@@ -85,13 +97,30 @@ impl IncludeRules {
     /// Whether `instance` matches a rule: its model, its base's record type and the plugin of its reference or base.
     #[must_use]
     pub fn matches(&self, instance: &Instance) -> bool {
-        let model = model_key(&instance.model);
-        self.rules.iter().any(|(p, plugin, kind)| {
-            kind.is_none_or(|k| k == instance.signature)
-                && plugin
-                    .is_none_or(|i| i == instance.reference_plugin || i == instance.base_plugin)
-                && glob(p, &model)
-        })
+        (0..self.rules.len()).any(|at| self.rule_matches(at, instance))
+    }
+
+    /// Whether any rule has `generate` set.
+    #[must_use]
+    pub fn generates(&self) -> bool {
+        self.generate.iter().any(Option::is_some)
+    }
+
+    /// The `generate` limits of the first rule, in request order, that has them and matches `instance`; `None` when
+    /// no such rule matches it.
+    #[must_use]
+    pub fn generate_for(&self, instance: &Instance) -> Option<FarLimits> {
+        self.generate
+            .iter()
+            .enumerate()
+            .find_map(|(at, limits)| limits.filter(|_| self.rule_matches(at, instance)))
+    }
+
+    fn rule_matches(&self, at: usize, instance: &Instance) -> bool {
+        let (p, plugin, kind) = &self.rules[at];
+        kind.is_none_or(|k| k == instance.signature)
+            && plugin.is_none_or(|i| i == instance.reference_plugin || i == instance.base_plugin)
+            && glob(p, &model_key(&instance.model))
     }
 
     /// Add to `visible` the references of `candidates` that match a rule and are not in it yet, in the candidates'
@@ -267,6 +296,7 @@ mod tests {
             models: models.to_owned(),
             plugin: plugin.map(str::to_owned),
             record_type: record_type.map(str::to_owned),
+            generate: None,
         }
     }
 
@@ -288,6 +318,34 @@ mod tests {
         assert!(!rules.matches(&activator));
         assert!(rules.matches_base("Lights/StreetLamp02.nif", *b"STAT"));
         assert!(!rules.matches_base("lights/streetlamp02.nif", *b"ACTI"));
+    }
+
+    #[test]
+    fn generate_limits_come_from_the_first_matching_rule_that_has_them() {
+        let shapes = |keep| lodwright_contract::FullModelShapes {
+            keep,
+            max_error: 0.05,
+        };
+        let plugins = ["A.esm".to_owned(), "Lamps.esp".to_owned()];
+        let mut plain = rule("lights/*", None, None);
+        plain.generate = None;
+        let mut lamps = rule("lights/street*", Some("Lamps.esp"), None);
+        lamps.generate = Some(shapes(0.25));
+        let mut all_lights = rule("lights/*", None, None);
+        all_lights.generate = Some(shapes(0.5));
+        let rules = IncludeRules::new(&[plain, lamps, all_lights], &plugins).unwrap();
+        assert!(rules.generates());
+        let keep = |i: &Instance| rules.generate_for(i).map(|l| l.keep);
+        assert_eq!(keep(&inst("lights/streetlamp.nif", 1, 1, 1)), Some(0.25));
+        // another plugin's lamp falls through to the later rule; a model no generating rule names gets none
+        assert_eq!(keep(&inst("lights/streetlamp.nif", 1, 0, 0)), Some(0.5));
+        assert_eq!(keep(&inst("walls/wall.nif", 1, 1, 1)), None);
+        let none = IncludeRules::new(&[rule("lights/*", None, None)], &plugins).unwrap();
+        assert!(!none.generates());
+        assert_eq!(
+            none.generate_for(&inst("lights/streetlamp.nif", 1, 1, 1)),
+            None
+        );
     }
 
     #[test]

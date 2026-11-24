@@ -840,6 +840,7 @@ pub fn generate(
                 world.water_height(cell.0, cell.1)
             };
             let phase = |name: &str| clock.begin(&format!("objects.{name}"), Some(world.name()));
+            let rule_shapes = |i: &lodwright_core::objects::Instance| include.generate_for(i);
             let surfaces = lodwright_gen::Surfaces {
                 ground: request
                     .objects
@@ -864,6 +865,9 @@ pub fn generate(
                         max_error: shapes.max_error,
                     }
                 }),
+                rule_shapes: include
+                    .generates()
+                    .then_some(&rule_shapes as lodwright_gen::RuleShapes<'_>),
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

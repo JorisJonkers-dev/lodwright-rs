@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
-use lodwright_gen::{Assets, FarLimits, ObjectReport, Surfaces, generate_objects_with_progress};
+use lodwright_gen::{
+    Assets, FarLimits, ObjectReport, RuleShapes, Surfaces, generate_objects_with_progress,
+};
 use lodwright_nif::{
     AvObject, Block, Body, ExportInfo, GeometryData, Header, NiNode, NiTriShape, NiTriShapeData,
     NifFile, ObjectNet,
@@ -247,6 +249,17 @@ fn run(
     full_models: Option<FarLimits>,
     threads: usize,
 ) -> (ObjectReport, std::path::PathBuf) {
+    run_with_rules(name, list, assets, full_models, None, threads)
+}
+
+fn run_with_rules(
+    name: &str,
+    list: &[Instance],
+    assets: &Memory,
+    full_models: Option<FarLimits>,
+    rule_shapes: Option<RuleShapes<'_>>,
+    threads: usize,
+) -> (ObjectReport, std::path::PathBuf) {
     let out = std::env::temp_dir().join(format!(
         "lodwright-full-shapes-{}-{name}",
         std::process::id()
@@ -254,6 +267,7 @@ fn run(
     let _ = std::fs::remove_dir_all(&out);
     let surfaces = Surfaces {
         full_models,
+        rule_shapes,
         threads,
         ..Surfaces::default()
     };
@@ -401,5 +415,151 @@ fn the_bytes_do_not_depend_on_the_thread_count() {
     assert_eq!(
         std::fs::read(one.join(BLOCK)).unwrap(),
         std::fs::read(four.join(BLOCK)).unwrap()
+    );
+}
+
+/// The limits a rule gives the objects of reference 1 only, as an include rule's `generate` does for what it names.
+fn first_reference_only(i: &Instance) -> Option<FarLimits> {
+    (i.reference == 1).then_some(LIMITS)
+}
+
+fn record<'a>(
+    report: &'a ObjectReport,
+    kind: &str,
+) -> Option<&'a lodwright_contract::WarningRecord> {
+    report.records.iter().find(|r| r.kind == kind)
+}
+
+#[test]
+fn a_rule_gives_a_shape_to_what_it_names_and_to_no_other_model() {
+    let store = assets(&[
+        ("meshes/a/lamp.nif", grid_model(16, false)),
+        ("meshes/a/house.nif", grid_model(12, false)),
+    ]);
+    let list = [
+        instance("a\\Lamp.nif", 100.0, 1, false),
+        instance("a\\House.nif", 300.0, 2, false),
+    ];
+    let (report, out) = run_with_rules("rule", &list, &store, None, Some(&first_reference_only), 1);
+    let (_, lamp_alone) = run(
+        "rule-lamp-alone",
+        &[instance("a\\Lamp.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    // the block holds the lamp's shape and nothing of the house
+    assert_eq!(
+        std::fs::read(out.join(BLOCK)).unwrap(),
+        std::fs::read(lamp_alone.join(BLOCK)).unwrap()
+    );
+    assert_eq!(
+        record(&report, "far_model_simplified").unwrap().subjects,
+        ["meshes/a/lamp.nif"]
+    );
+    let missing = record(&report, "far_model_without_lod_model").unwrap();
+    assert_eq!(missing.subjects, ["meshes/a/house.nif"]);
+    assert_eq!(missing.count, 1);
+}
+
+#[test]
+fn another_object_of_the_same_model_that_no_rule_names_stays_out() {
+    let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
+    let list = [
+        instance("a\\Lamp.nif", 100.0, 1, false),
+        instance("a\\Lamp.nif", 300.0, 2, false),
+    ];
+    let (report, out) = run_with_rules(
+        "same-model",
+        &list,
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    let (_, one) = run(
+        "same-model-one",
+        &[instance("a\\Lamp.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    assert_eq!(block_triangles(&out), block_triangles(&one));
+    let missing = record(&report, "far_model_without_lod_model").unwrap();
+    assert_eq!(missing.subjects, ["meshes/a/lamp.nif"]);
+    assert_eq!(missing.count, 1);
+    // with the switch for every object on as well, both are drawn
+    let (_, both) = run_with_rules(
+        "same-model-both",
+        &list,
+        &store,
+        Some(LIMITS),
+        Some(&first_reference_only),
+        1,
+    );
+    assert_eq!(block_triangles(&both), 2 * block_triangles(&one));
+}
+
+#[test]
+fn a_rule_that_names_nothing_changes_no_byte() {
+    let store = assets(&[
+        ("meshes/a/house.nif", grid_model(12, false)),
+        ("meshes/a/tower.nif", grid_model(16, false)),
+        ("meshes/a/tower_lod.nif", grid_model(2, false)),
+    ]);
+    let list = [
+        instance("a\\House.nif", 100.0, 7, false),
+        instance("a\\Tower.nif", 300.0, 8, false),
+    ];
+    let (plain, a) = run("no-rule", &list, &store, None, 1);
+    let (ruled, b) = run_with_rules(
+        "rule-names-nothing",
+        &list,
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    assert_eq!(
+        std::fs::read(a.join(BLOCK)).unwrap(),
+        std::fs::read(b.join(BLOCK)).unwrap()
+    );
+    assert_eq!(kinds(&plain), kinds(&ruled));
+}
+
+#[test]
+fn a_rules_limits_win_over_the_switch_for_every_object() {
+    let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
+    let list = [instance("a\\Lamp.nif", 100.0, 1, false)];
+    let fine = |_: &Instance| {
+        Some(FarLimits {
+            keep: 1.0,
+            max_error: 0.0,
+        })
+    };
+    let (_, coarse) = run("limits-switch", &list, &store, Some(LIMITS), 1);
+    let (_, ruled) = run_with_rules("limits-rule", &list, &store, Some(LIMITS), Some(&fine), 1);
+    assert!(block_triangles(&ruled) > block_triangles(&coarse));
+}
+
+#[test]
+fn a_rule_does_not_call_an_unnamed_see_through_object_see_through() {
+    let store = assets(&[("meshes/a/glass.nif", grid_model(8, true))]);
+    let list = [
+        instance("a\\Glass.nif", 100.0, 1, false),
+        instance("a\\Glass.nif", 300.0, 2, false),
+    ];
+    let (report, out) =
+        run_with_rules("glass", &list, &store, None, Some(&first_reference_only), 1);
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(
+        record(&report, "far_model_no_solid_shape").unwrap().count,
+        1
+    );
+    assert_eq!(
+        record(&report, "far_model_without_lod_model")
+            .unwrap()
+            .count,
+        1
     );
 }

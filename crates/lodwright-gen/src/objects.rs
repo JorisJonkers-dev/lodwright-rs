@@ -56,6 +56,9 @@ pub struct ObjectReport {
 /// A height at a world position (x, y), or `None` where there is none.
 pub type HeightAt<'a> = &'a dyn Fn(f32, f32) -> Option<f32>;
 
+/// The far-shape limits a caller's rule gives one object, or `None` when no rule gives it any.
+pub type RuleShapes<'a> = &'a dyn Fn(&Instance) -> Option<FarLimits>;
+
 /// The surfaces under which object faces are left out; `None` keeps every face (the default).
 #[derive(Clone, Copy, Default)]
 pub struct Surfaces<'a> {
@@ -79,6 +82,10 @@ pub struct Surfaces<'a> {
     pub own: Option<OwnSource<'a>>,
     /// Draw objects that have no LOD model with a simplified copy of their full model; `None` leaves them out.
     pub full_models: Option<FarLimits>,
+    /// The limits for a simplified full model that a caller's rule gives one object (the `generate` of an include
+    /// rule), whatever `full_models` says; `None` for an object no such rule names. Only the objects it answers for
+    /// get such a shape: another object with the same model and no LOD model stays out unless `full_models` is set.
+    pub rule_shapes: Option<RuleShapes<'a>>,
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -430,6 +437,7 @@ fn far_model_records(
     models: &BTreeMap<String, Option<Model>>,
     unreadable: &BTreeSet<String>,
     no_solid_shape: &BTreeSet<String>,
+    withheld: &dyn Fn(&Instance) -> bool,
     assets: &dyn Assets,
 ) {
     // (kind, plugin index) -> full model path -> objects
@@ -437,13 +445,17 @@ fn far_model_records(
     let mut full_found: BTreeMap<String, bool> = BTreeMap::new();
     for i in instances {
         let lod = lod_model_path(&i.model);
-        if models.get(&lod).is_none_or(Option::is_some) {
-            continue;
+        // a withheld object is reported as it would be without the shape that was made for other objects only
+        let withheld = withheld(i);
+        match models.get(&lod) {
+            None => continue,
+            Some(Some(_)) if !withheld => continue,
+            _ => {}
         }
         let full = full_model_path(&i.model);
         let kind = if unreadable.contains(&lod) {
             "far_model_unreadable"
-        } else if no_solid_shape.contains(&lod) {
+        } else if no_solid_shape.contains(&lod) && !withheld {
             "far_model_no_solid_shape"
         } else if *full_found
             .entry(full.clone())
@@ -495,8 +507,10 @@ fn far_model_records(
 }
 
 /// Fills in the models without a LOD model with simplified copies of their full models, and returns the LOD paths of
-/// those whose full model has no solid shape. A static collection whose parts are drawn keeps its parts: a copy of its
-/// own model would draw it twice.
+/// those whose full model has no solid shape, and of those made for some of their objects only. `limits_of` gives the
+/// limits for one object, or `None` for an object that gets no such shape; a model takes the limits of the first object
+/// a rule names (`rule_shapes`), else of the first other object. A static collection whose parts are drawn keeps its
+/// parts: a copy of its own model would draw it twice.
 #[allow(
     clippy::too_many_arguments,
     reason = "the state of one generation step"
@@ -509,22 +523,48 @@ fn shapes_from_full_models(
     unreadable: &BTreeSet<String>,
     full_of: &BTreeMap<String, String>,
     assets: &dyn Assets,
-    limits: FarLimits,
-    threads: usize,
-) -> BTreeSet<String> {
+    surfaces: &Surfaces<'_>,
+) -> (BTreeSet<String>, BTreeSet<String>) {
     let with_parts: BTreeSet<u32> = instances
         .iter()
         .filter(|i| i.part)
         .map(|i| i.reference)
         .collect();
-    let wanted: BTreeSet<String> = instances
+    let candidates: Vec<&&Instance> = instances
         .iter()
         .filter(|i| i.part || !with_parts.contains(&i.reference))
-        .map(|i| lod_model_path(&i.model))
-        .filter(|lod| models.get(lod).is_some_and(Option::is_none) && !unreadable.contains(lod))
+        .filter(|i| {
+            let lod = lod_model_path(&i.model);
+            models.get(&lod).is_some_and(Option::is_none) && !unreadable.contains(&lod)
+        })
         .collect();
-    let wanted: Vec<String> = wanted.into_iter().collect();
-    let made = par_map(&wanted, threads, |lod| {
+    let mut wanted: BTreeMap<String, FarLimits> = BTreeMap::new();
+    if let Some(rule_shapes) = surfaces.rule_shapes {
+        for i in &candidates {
+            if let Some(limits) = rule_shapes(i) {
+                wanted.entry(lod_model_path(&i.model)).or_insert(limits);
+            }
+        }
+    }
+    if let Some(limits) = surfaces.full_models {
+        for i in &candidates {
+            wanted.entry(lod_model_path(&i.model)).or_insert(limits);
+        }
+    }
+    // the models made for some of their objects only: with `full_models` set every object may have one
+    let mut partial: BTreeSet<String> = BTreeSet::new();
+    if surfaces.full_models.is_none()
+        && let Some(rule_shapes) = surfaces.rule_shapes
+    {
+        for i in instances {
+            let lod = lod_model_path(&i.model);
+            if wanted.contains_key(&lod) && rule_shapes(i).is_none() {
+                partial.insert(lod);
+            }
+        }
+    }
+    let wanted: Vec<(String, FarLimits)> = wanted.into_iter().collect();
+    let made = par_map(&wanted, surfaces.threads, |(lod, limits)| {
         let bytes = assets.read(full_of.get(lod)?)?;
         let parts = parse_lod_model(&bytes).ok()?;
         if parts
@@ -535,10 +575,10 @@ fn shapes_from_full_models(
             return Some(None);
         }
         // a model that cannot be simplified stays an ordinary model without a LOD model
-        far_parts_from_full_model(parts, limits).map(Some)
+        far_parts_from_full_model(parts, *limits).map(Some)
     });
     let (mut simplified, mut no_solid_shape) = (BTreeSet::new(), BTreeSet::new());
-    for (lod, result) in wanted.into_iter().zip(made) {
+    for ((lod, _), result) in wanted.into_iter().zip(made) {
         match result {
             Some(Some(parts)) => {
                 simplified.insert(full_of[&lod].clone());
@@ -565,7 +605,7 @@ fn shapes_from_full_models(
         ));
         report.warnings.push(message);
     }
-    no_solid_shape
+    (no_solid_shape, partial)
 }
 
 /// Generate the object LOD of one world into `out`.
@@ -751,19 +791,26 @@ pub fn generate_objects_with_atlas_limit(
                     .is_none_or(Option::is_none))
         })
         .collect();
-    let no_solid_shape = match surfaces.full_models {
-        Some(limits) => shapes_from_full_models(
-            &mut report,
-            world,
-            &instances,
-            &mut models,
-            &unreadable,
-            &full_of,
-            assets,
-            limits,
-            surfaces.threads,
-        ),
-        None => BTreeSet::new(),
+    let (no_solid_shape, partial) =
+        if surfaces.full_models.is_some() || surfaces.rule_shapes.is_some() {
+            shapes_from_full_models(
+                &mut report,
+                world,
+                &instances,
+                &mut models,
+                &unreadable,
+                &full_of,
+                assets,
+                &surfaces,
+            )
+        } else {
+            (BTreeSet::new(), BTreeSet::new())
+        };
+    // an object whose model was made from its full model for other objects only (a rule's `generate`) stays out
+    let withheld = |i: &Instance| {
+        !partial.is_empty()
+            && partial.contains(&lod_model_path(&i.model))
+            && surfaces.rule_shapes.is_some_and(|f| f(i).is_none())
     };
     far_model_records(
         &mut report,
@@ -773,9 +820,14 @@ pub fn generate_objects_with_atlas_limit(
         &models,
         &unreadable,
         &no_solid_shape,
+        &withheld,
         assets,
     );
-    let instances: Vec<&Instance> = instances.into_iter().chain(stand_ins.iter()).collect();
+    let instances: Vec<&Instance> = instances
+        .into_iter()
+        .filter(|i| !withheld(i))
+        .chain(stand_ins.iter())
+        .collect();
     if models.values().all(Option::is_none) {
         report.skipped = instances.len();
         return Ok(report);

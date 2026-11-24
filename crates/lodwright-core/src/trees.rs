@@ -329,7 +329,7 @@ pub fn tree_references(
                     absolute(r.base, &table, own),
                     r.flags,
                     r.placement,
-                    r.enable_parent,
+                    r.enable_parent.is_some(),
                     index,
                 );
                 if refs.insert(id, value).is_none() {

@@ -1,0 +1,10 @@
+[[source]]
+id = "fnv-enable-parent"
+fact = "A REFR's XESP subrecord (Enable Parent) holds the parent reference's FormID (a PLYR, REFR, ACRE, ACHR, PGRE, PMIS or PBEA) as four bytes, then one flags byte (bit 0 'Set Enable State to Opposite of Parent', bit 1 'Pop In') and three unused bytes. A reference with an enable parent takes its parent's enable state, or the opposite state with bit 0 set."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read from the definition of wbXESP in the record definitions (the struct 'Enable Parent': Reference, Flags, three unused bytes). The meaning of the state follows the flag's name; that a disabled parent keeps its children disabled at the start is not measured in the engine here. No code copied. Not second-read."

@@ -115,8 +115,8 @@ fn disabled_at_start(refs: &HashMap<u32, Ref>, id: u32) -> bool {
 /// The instances in world `world` (absolute `FormID`) that are visible when distant: a reference counts when its
 /// base is flagged, or when the reference itself is, and it stands in the world when the game starts. Initially
 /// disabled references and references whose enable parent keeps them disabled at the start do not count, except
-/// initially disabled persistent references, which the game's own blocks hold; the winning record of each reference
-/// decides.
+/// initially disabled persistent references, which the game's own blocks hold whatever their enable parent; the
+/// winning record of each reference decides.
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -144,7 +144,7 @@ pub struct Candidate {
 
 impl Candidate {
     /// Whether generation would take this reference: something marks it visible from far, and it stands in the world
-    /// when the game starts.
+    /// when the game starts or is an initially disabled persistent reference (the game's own blocks hold those).
     #[must_use]
     pub fn is_drawn_by_rule(&self) -> bool {
         self.left_out_because().is_none()
@@ -580,18 +580,33 @@ mod tests {
 
     #[test]
     fn a_persistent_disabled_reference_with_an_enable_parent_is_kept() {
+        // one parent outside the world, one disabled parent in it, one disabled parent with the opposite flag
         let p = plugin(
             &[],
-            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
-            vec![with_enable_parent(refr(
-                0x200,
-                0x100,
-                INITIALLY_DISABLED | PERSISTENT,
-                1.0,
-            ))],
+            vec![
+                stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT),
+                stat(0x101, "m.nif", 0),
+            ],
+            vec![
+                with_enable_parent(refr(0x200, 0x100, INITIALLY_DISABLED | PERSISTENT, 1.0)),
+                with_parent(
+                    refr(0x201, 0x100, INITIALLY_DISABLED | PERSISTENT, 2.0),
+                    0x300,
+                    false,
+                ),
+                with_parent(
+                    refr(0x202, 0x100, INITIALLY_DISABLED | PERSISTENT, 3.0),
+                    0x300,
+                    true,
+                ),
+                refr(0x300, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0),
+            ],
         );
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
-        assert_eq!(out.len(), 1);
+        assert_eq!(
+            out.iter().map(|i| i.reference).collect::<Vec<_>>(),
+            vec![0x200, 0x201, 0x202]
+        );
     }
 
     /// The reference with enable parent `parent` (as stored), taking the opposite state when `opposite` is set.

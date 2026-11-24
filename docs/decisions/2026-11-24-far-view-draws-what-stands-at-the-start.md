@@ -10,10 +10,11 @@ them (`game-lod-object-rules-disabled-persistent`: seven solar reflectors in the
 parents.
 
 From now on a reference enters the far view only when it stands in the world at the start of a game: it is not
-initially disabled, and its enable parent chain does not keep it disabled. A parent with the
-"opposite" flag inverts the state of its parent. The winning record of each reference and each parent decides. A parent
-that is not a reference of the same world (an actor, or a reference elsewhere) counts as enabled. A chain longer than 16
-links or a loop counts as enabled.
+initially disabled, and its enable parent chain does not keep it disabled. The one exception is an initially disabled
+reference that is also persistent: the game's own blocks hold those, so they stay (see the amendment below), whatever
+their enable parent. A parent with the "opposite" flag inverts the state of its parent. The winning record of each
+reference and each parent decides. A parent that is not a reference of the same world (an actor, or a reference
+elsewhere) counts as enabled. A chain is followed to its end (#413); a loop counts as enabled.
 
 The include rules keep their stricter rule: they hold back every reference with an enable parent.
 

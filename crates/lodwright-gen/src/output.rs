@@ -148,7 +148,11 @@ fn write_output_with(
         return Err(io(e));
     }
     drop(file);
-    std::fs::rename(&temp, &target).map_err(io)?;
+    // a file that cannot take its name is not left behind under the temporary one
+    if let Err(e) = std::fs::rename(&temp, &target) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(io(e));
+    }
     Ok(target)
 }
 
@@ -163,6 +167,21 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_write_whose_rename_fails_leaves_no_temporary_file() {
+        let out = temp("rename-fails");
+        // a folder that holds a file stands where the output should go, so the rename is refused
+        std::fs::create_dir_all(out.join("a.bin")).unwrap();
+        std::fs::write(out.join("a.bin").join("keep"), b"x").unwrap();
+        assert!(write_output_file(&out, "a.bin", b"abc").is_err());
+        assert!(
+            !out.join("a.tmp").exists(),
+            "the temporary file was left behind"
+        );
+        assert!(out.join("a.bin").join("keep").exists());
+        let _ = std::fs::remove_dir_all(&out);
     }
 
     #[test]

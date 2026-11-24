@@ -4,7 +4,7 @@
 //! A later plugin's record replaces an earlier one with the same absolute `FormID` as a whole. Base objects are
 //! the statics and the like; references place them. A static collection expands into its parts.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::Error;
 use crate::plugin::{BaseObject, Placement, Plugin};
@@ -89,12 +89,13 @@ type Ref = (
 
 /// Whether reference `id` is disabled when the game starts: initially disabled itself, or enabled through an enable
 /// parent that is disabled then (or, with the opposite flag, one that is enabled then). A parent that is not a
-/// reference of this world (an actor, or a reference elsewhere) counts as enabled. Chains are followed to 16 links; a
-/// loop counts as enabled.
+/// reference of this world (an actor, or a reference elsewhere) counts as enabled. A chain is followed to its end
+/// however long it is; a loop counts as enabled.
 fn disabled_at_start(refs: &HashMap<u32, Ref>, id: u32) -> bool {
     let mut at = id;
     let mut flips = false;
-    for _ in 0..16 {
+    let mut seen: HashSet<u32> = HashSet::new();
+    while seen.insert(at) {
         let Some(&(_, flags, _, _, _, parent)) = refs.get(&at) else {
             return flips;
         };
@@ -619,6 +620,35 @@ mod tests {
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
         let taken: Vec<u32> = out.iter().map(|i| i.reference).collect();
         assert_eq!(taken, [0x201, 0x202, 0x205, 0x206]);
+    }
+
+    #[test]
+    fn a_long_enable_parent_chain_is_followed_to_its_end_and_a_loop_counts_as_enabled() {
+        let marker = stat(0x101, "marker.nif", 0);
+        // 0x200 hangs from a chain of 40 links whose last reference is disabled at the start
+        let mut refs = vec![refr(0x340, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0)];
+        for link in 0x300..0x340 {
+            refs.push(with_parent(
+                refr(link, 0x101, PERSISTENT, 0.0),
+                link + 1,
+                false,
+            ));
+        }
+        refs.push(with_parent(refr(0x200, 0x100, 0, 1.0), 0x300, false));
+        // 0x201 hangs from a loop of 20 references, none of them disabled
+        for link in 0x400..0x414 {
+            let next = if link == 0x413 { 0x400 } else { link + 1 };
+            refs.push(with_parent(refr(link, 0x101, PERSISTENT, 0.0), next, false));
+        }
+        refs.push(with_parent(refr(0x201, 0x100, 0, 2.0), 0x400, false));
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT), marker],
+            refs,
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let taken: Vec<u32> = out.iter().map(|i| i.reference).collect();
+        assert_eq!(taken, [0x201]);
     }
 
     #[test]

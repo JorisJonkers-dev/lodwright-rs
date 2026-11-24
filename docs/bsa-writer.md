@@ -27,9 +27,13 @@ PackEntry   { path: String (relative, forward or back slashes), data: bytes, com
 PackOptions { compressed_by_default: bool }
 ```
 
-- The writer builds the whole archive in memory from already generated files (an archive is at most 4 GiB because
-  offsets are u32, section 5); the packing step (#136) calls it once per archive and streams the result to a temporary file that is
-  renamed into place (the staging rule of `docs/interrupted-runs.md`).
+- `write` builds the whole archive in memory from already generated files (an archive is at most 4 GiB because
+  offsets are u32, section 5). `write_streamed` writes the same bytes to a writer from `PackSource`s (path, length,
+  compress) whose bytes it reads when it needs them, holding one file and its compressed copy at a time: a first pass
+  compresses the files that are stored compressed into a spool file and so learns every stored length, then the index
+  is written, then the data blocks (stored files read again, compressed ones copied from the spool). The packing step
+  (#136, #398) uses it with a spool beside the archive and writes to a temporary file that is renamed into place (the
+  staging rule of `docs/interrupted-runs.md`); the archive's digest is read back from the written file.
 - `compress` per entry comes from the caller's per-kind rule (terrain uncompressed, object textures compressed). This
   is a performance default taken from the guide page that `fnv-archive-loading` cites (`docs/spec/game-pickup.md`);
   no row records it and it is not a format fact. The archive's compressed-by-

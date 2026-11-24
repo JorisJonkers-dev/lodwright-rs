@@ -19,7 +19,7 @@ mod verify;
 
 pub use bands::{Band, BandsDoc, bands, statistics};
 pub use defaults::{Defaults, LevelDefault, OptionInfo, OptionKind};
-pub use digest::{Sha256Stream, arguments_digest, sha256_digest};
+pub use digest::{Sha256Stream, arguments_digest, sha256_digest, sha256_digest_of_reader};
 pub use event::{BlockKind, Event};
 pub use manifest::{MANIFEST_CONTRACT, MANIFEST_FILE, Manifest, ManifestBlock, ManifestFile};
 pub use plan::{

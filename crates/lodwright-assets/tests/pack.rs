@@ -107,3 +107,66 @@ fn damaged_writer_output_never_panics_the_reader_nor_exceeds_the_cap() {
         "some damaged archives still open, so the extract path ran"
     );
 }
+
+/// The streamed writer writes the same bytes as the in-memory one, for any order of the files.
+#[test]
+fn the_streamed_archive_has_the_bytes_of_the_in_memory_one() {
+    let mut entries = tiny();
+    entries.push(PackEntry {
+        path: "textures\\landscape\\lod\\w\\blocks\\w.buildings.dds".into(),
+        data: (0..5000_u32).map(|i| (i % 7) as u8).collect(),
+        compress: true,
+    });
+    let expected = pack::write(&entries).unwrap();
+    for reversed in [false, true] {
+        let mut list = entries.clone();
+        if reversed {
+            list.reverse();
+        }
+        let sources: Vec<pack::PackSource> = list
+            .iter()
+            .map(|e| pack::PackSource {
+                path: e.path.clone(),
+                len: e.data.len() as u64,
+                compress: e.compress,
+            })
+            .collect();
+        let mut reads = vec![0_u32; list.len()];
+        let mut read = |at: usize| {
+            reads[at] += 1;
+            Ok(list[at].data.clone())
+        };
+        let mut spool = Cursor::new(Vec::new());
+        let mut out = Vec::new();
+        let len = pack::write_streamed(&sources, &mut read, &mut spool, &mut out).unwrap();
+        assert_eq!(out, expected);
+        assert_eq!(len, out.len() as u64);
+        // every file is read once: compressed ones for the spool, stored ones while the data is written
+        assert!(reads.iter().all(|n| *n == 1), "{reads:?}");
+    }
+}
+
+/// A file whose bytes are not as long as it was listed with is refused, not packed with wrong offsets.
+#[test]
+fn a_file_that_changed_length_is_refused() {
+    for compress in [false, true] {
+        let sources = vec![pack::PackSource {
+            path: "meshes/a/b.nif".into(),
+            len: 10,
+            compress,
+        }];
+        let mut read = |_: usize| Ok(vec![1_u8; 9]);
+        let err = pack::write_streamed(
+            &sources,
+            &mut read,
+            &mut Cursor::new(Vec::new()),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, lodwright_assets::StreamError::Io { .. }),
+            "{err}"
+        );
+        assert!(err.to_string().contains("not the 10"), "{err}");
+    }
+}

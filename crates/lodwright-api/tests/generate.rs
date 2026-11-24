@@ -679,6 +679,13 @@ fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_
 /// `Base.esm` plus `Lamps.esp`, which adds a lamp nothing marks visible from far (full model, no LOD model) and
 /// places it five times: enabled, initially disabled, persistent and disabled, with an enable parent, and enabled.
 fn include_job(name: &str) -> (GenerateRequest, PathBuf) {
+    // the parent is the disabled lamp, so the parented lamp is disabled too
+    include_job_with_parent(name, 0x0100_0D01, 0)
+}
+
+/// The lamps of [`include_job`], the fourth lamp's enable parent being `parent` with the XESP flags word `flags`
+/// (bit 0: the opposite of the parent's state).
+fn include_job_with_parent(name: &str, parent: u32, flags: u32) -> (GenerateRequest, PathBuf) {
     use lodwright_testkit::plugin::{Group, PluginBuilder};
     use lodwright_testkit::world::record_group;
     const INITIALLY_DISABLED: u32 = 0x0800;
@@ -692,8 +699,8 @@ fn include_job(name: &str) -> (GenerateRequest, PathBuf) {
         r.flags = flags;
         r
     };
-    // XESP: the parent's form id and a flags word; the parent is the disabled lamp, so this one is disabled too
-    let parent = [0x0100_0D01_u32.to_le_bytes(), [0; 4]].concat();
+    // XESP: the parent's form id and a flags word
+    let parent = [parent.to_le_bytes(), flags.to_le_bytes()].concat();
     let refs = Group::new(1, 0xB00_u32.to_le_bytes())
         .with(flagged(0x0100_0D00, 60.0, 0))
         .with(flagged(0x0100_0D01, 70.0, INITIALLY_DISABLED))
@@ -944,6 +951,51 @@ fn an_include_rule_takes_the_enabled_references_and_reports_the_held_back_ones()
                 2
             ),
             ("include_rule_reference_not_enabled".to_owned(), None, 3),
+        ]
+    );
+}
+
+/// An include rule run over [`include_job_with_parent`]: the lamp lines it reports.
+fn include_rule_records_with_parent(
+    name: &str,
+    parent: u32,
+    flags: u32,
+) -> Vec<(String, Option<String>, u64)> {
+    let (mut job, out) = include_job_with_parent(name, parent, flags);
+    job.request.inclusion.include_rules = vec![rule("lights/street*", Some("lamps.esp"))];
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    lamp_records(&out)
+}
+
+#[test]
+fn an_include_rule_takes_a_reference_whose_enable_parent_stands_at_the_start() {
+    // the parent is the enabled lamp: the parented lamp stands too, so three lamps are taken and two held back
+    assert_eq!(
+        include_rule_records_with_parent("include-parent-enabled", 0x0100_0D00, 0),
+        vec![
+            (
+                "far_model_without_lod_model".to_owned(),
+                Some("Lamps.esp".to_owned()),
+                3
+            ),
+            ("include_rule_reference_not_enabled".to_owned(), None, 2),
+        ]
+    );
+}
+
+#[test]
+fn an_include_rule_takes_a_reference_set_opposite_to_its_disabled_enable_parent() {
+    // the parent is the disabled lamp and the opposite flag is set: the parented lamp stands at the start
+    assert_eq!(
+        include_rule_records_with_parent("include-parent-opposite", 0x0100_0D01, 1),
+        vec![
+            (
+                "far_model_without_lod_model".to_owned(),
+                Some("Lamps.esp".to_owned()),
+                3
+            ),
+            ("include_rule_reference_not_enabled".to_owned(), None, 2),
         ]
     );
 }

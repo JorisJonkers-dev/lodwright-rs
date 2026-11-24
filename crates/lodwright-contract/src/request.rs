@@ -174,8 +174,9 @@ pub struct ObjectsRequest {
     /// only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub drop_under_water: bool,
-    /// Objects whose far shape is taken from the far blocks the games ship, by world and model. Only enabled
-    /// references without an enable parent are taken. Empty by default; written only when set.
+    /// Objects whose far shape is taken from the far blocks the games ship, by world and model. Only references
+    /// that stand when the game starts (themselves and through their enable parent) are taken. Empty by default;
+    /// written only when set.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub shapes_from_shipped_blocks: Vec<ShippedShapeRule>,
     /// Draw objects that have no LOD model with a simplified copy of their full model. Off by default, because the
@@ -254,7 +255,8 @@ pub struct Inclusion {
     #[serde(default)]
     pub exclude_models: Vec<String>,
     /// Take objects that nothing marks visible from far into object LOD when they match one of these rules. Only
-    /// references enabled at the start and without an enable parent are taken; the exclusion rules above still win.
+    /// references that stand when the game starts (themselves and through their enable parent) are taken; the
+    /// exclusion rules above still win.
     /// Empty by default and written only when set, so a request without rules keeps its digest.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub include_rules: Vec<IncludeRule>,

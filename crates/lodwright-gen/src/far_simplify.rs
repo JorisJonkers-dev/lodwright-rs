@@ -262,6 +262,7 @@ fn simplify_part(part: Part, locked: &[bool], limits: FarLimits) -> Option<Part>
             .collect(),
         diffuse: part.diffuse,
         normal_map: part.normal_map,
+        glow_map: part.glow_map,
         alpha: part.alpha,
         unlit: part.unlit,
     })
@@ -298,6 +299,7 @@ mod tests {
             triangles,
             diffuse: Some("a.dds".to_owned()),
             normal_map: None,
+            glow_map: None,
             alpha,
             unlit: false,
         }

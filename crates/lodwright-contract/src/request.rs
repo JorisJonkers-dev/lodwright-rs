@@ -194,6 +194,11 @@ pub struct ObjectsRequest {
     /// starts are taken. Off by default; written only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub far_model_without_flag: bool,
+    /// Write a glow atlas beside each object atlas page whose textures have glow maps, name it in the glow slot of
+    /// the far blocks and give them an emissive material, so lit windows, signs and lamps glow from far at night. Off
+    /// by default until proven; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_glow: bool,
 }
 
 /// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
@@ -232,6 +237,7 @@ impl Default for ObjectsRequest {
             shapes_from_full_models: None,
             far_lights: false,
             far_model_without_flag: false,
+            far_glow: false,
         }
     }
 }

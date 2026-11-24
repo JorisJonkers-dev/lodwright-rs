@@ -38,6 +38,15 @@ Recent work that shows in the pictures:
   block over the 16-bit limits is written as several shapes instead of losing objects.
 - **Objects without a far model** can be drawn from a simplified full model, and include rules take chosen objects
   into the far view (0.17.0).
+- **Large far objects stay in view.** Objects a load order marks as high priority on their static (as Tale of Two
+  Wastelands' far-view plugin does for the I-15 overpasses) also go into the blocks the game draws farthest, so they no
+  longer vanish at mid distance.
+
+<p align="center">
+  <img src="docs/images/lod-overpasses-freeside.jpg" alt="North of Freeside from high above: before, the elevated I-15 and the broken overpasses are missing in the distance; after, they are there" width="100%">
+  <br><em>North of Freeside on a modded Tale of Two Wastelands load order: before (left) and after (right).</em>
+</p>
+
 - **Far land lit as the near land is.** The game's own far-land tiles are kept where no mod changed the land, and a
   composed tile is darkened to match the land near the player.
 - **Far water.** Lakes and rivers are drawn at a distance, with water walls at block borders so no gaps show.

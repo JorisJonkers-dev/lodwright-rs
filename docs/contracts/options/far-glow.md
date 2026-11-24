@@ -25,5 +25,12 @@ block type more than the game's (`lodwright verify --reference` reports "block t
 Far shapes from full models (`objects.shapes_from_full_models`, or an include rule's `generate`) keep the glow map of the
 full model, so a building that has no LOD model can glow from its own `_g` maps.
 
+A shape drawn without lighting (`BSShaderNoLightingProperty`) is an effect and is otherwise left out of far shapes made
+from full models. With far glow on, such a shape that names a texture is a glow card: what it shows is light it gives
+off, so its far shape is black in the atlas and its texture, each colour weighted by its alpha (the shape is blended
+by it), is its glow map. A model of glow cards alone gets a far shape too. The lights of the Strip casinos as seen from
+the Mojave are such models (separate light-strip models in front of each casino, not the casino models themselves).
+A map named `_g` that sits in slot 5 of a texture set (the environment mask) is not a glow map and is not read as one.
+
 Turning the option on changes the request digest. Off, the request digest and every written file are the same as before
 the option existed. Off by default until night pictures show that it helps and that nothing gets worse by day.

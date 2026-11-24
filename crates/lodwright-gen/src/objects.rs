@@ -33,6 +33,9 @@ const MAX_VERTICES: usize = 65_535;
 const MAX_TRIANGLES: usize = 65_535;
 /// Key of the flat texture used by shapes without one.
 const NONE: &str = "<none>";
+/// Key prefix of a glow card's texture (far glow on): black, the size of the card's glow texture, which follows the
+/// prefix.
+const CARD: &str = "<glow card>";
 
 /// What object generation produced.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -685,19 +688,19 @@ fn shapes_from_full_models(
         }
     }
     let wanted: Vec<(String, FarLimits)> = wanted.into_iter().collect();
+    let glow = surfaces.glow;
     let made = par_map(&wanted, surfaces.threads, |(lod, limits)| {
         let bytes = assets.read(full_of.get(lod)?)?;
         let parts = parse_lod_model(&bytes).ok()?;
-        // the shapes drawn without lighting are effects and are left out; what is left must have a solid shape
-        if parts
-            .iter()
-            .filter(|part| !part.triangles.is_empty() && !part.unlit)
-            .all(|part| part.alpha)
-        {
+        // the shapes drawn without lighting are effects and are left out (with far glow they are glow cards); what
+        // is left must have a solid shape or be glow cards alone
+        let shapes = || parts.iter().filter(|p| !p.triangles.is_empty());
+        let cards = shapes().any(|p| glow && p.unlit && p.glow_map.is_some());
+        if !cards && shapes().filter(|p| !p.unlit).all(|p| p.alpha) {
             return Some(None);
         }
         // a model that cannot be simplified stays an ordinary model without a LOD model
-        far_parts_from_full_model(parts, *limits).map(Some)
+        far_parts_from_full_model(parts, *limits, glow).map(Some)
     });
     let (mut simplified, mut no_solid_shape) = (BTreeSet::new(), BTreeSet::new());
     for ((lod, _), result) in wanted.into_iter().zip(made) {
@@ -778,12 +781,26 @@ pub fn generate_objects_with_progress(
     )
 }
 
+/// `image` with each colour weighted by its alpha and the alpha full: the light a texture blended by its alpha gives
+/// off.
+fn weighted_by_alpha(image: &Image) -> Image {
+    let mut px = image.rgba().to_vec();
+    for p in px.as_chunks_mut::<4>().0 {
+        let a = u16::from(p[3]);
+        for c in &mut p[..3] {
+            *c = u8::try_from((u16::from(*c) * a + 127) / 255).unwrap_or(u8::MAX);
+        }
+        p[3] = 255;
+    }
+    Image::new(image.width(), image.height(), px).unwrap_or_else(|_| image.clone())
+}
+
 /// The glow atlas of one atlas page at half its size, as the normal atlas is: each texture's glow map in the texture's
 /// rectangle, black where a texture has none or its glow map cannot be read. `None` when no texture on the page has a
 /// glow map that can be read, so such a page gets no glow atlas.
 fn glow_atlas(
     rects: &[(&String, &Rect)],
-    glow_of: &HashMap<String, String>,
+    glow_of: &HashMap<String, (String, bool)>,
     assets: &dyn Assets,
     atlas: &Atlas,
     threads: usize,
@@ -799,7 +816,11 @@ fn glow_atlas(
             w: (r.w / 2).max(1),
             h: (r.h / 2).max(1),
         };
-        let img = glow_of.get(*k).and_then(|g| load_texture(assets, g))?;
+        let (path, by_alpha) = glow_of.get(*k)?;
+        let mut img = load_texture(assets, path)?;
+        if *by_alpha {
+            img = weighted_by_alpha(&img);
+        }
         resize(&img, half.w, half.h, Filter::Box)
             .ok()
             .map(|small| (half, small))
@@ -995,14 +1016,17 @@ pub fn generate_objects_with_atlas_limit(
     }
     // textures: key by the diffuse path of each shape
     phase("textures");
-    let key_of = |p: &Part| {
-        p.diffuse
+    let key_of = |p: &Part| match (&p.glow_map, p.unlit && surfaces.glow) {
+        (Some(g), true) => format!("{CARD}{}", norm_key(g)),
+        _ => p
+            .diffuse
             .as_deref()
-            .map_or_else(|| NONE.to_owned(), norm_key)
+            .map_or_else(|| NONE.to_owned(), norm_key),
     };
     let mut diffuse_keys: BTreeSet<String> = BTreeSet::new();
     let mut normal_of: HashMap<String, String> = HashMap::new();
-    let mut glow_of: HashMap<String, String> = HashMap::new();
+    // a glow map and whether its colour is weighted by its alpha (a glow card's texture is blended by its alpha)
+    let mut glow_of: HashMap<String, (String, bool)> = HashMap::new();
     for model in models.values().flatten() {
         for p in &model.parts {
             let k = key_of(p);
@@ -1012,7 +1036,9 @@ pub fn generate_objects_with_atlas_limit(
             if surfaces.glow
                 && let Some(g) = &p.glow_map
             {
-                glow_of.entry(k.clone()).or_insert_with(|| norm_key(g));
+                glow_of
+                    .entry(k.clone())
+                    .or_insert_with(|| (norm_key(g), p.unlit));
             }
             diffuse_keys.insert(k);
         }
@@ -1028,7 +1054,13 @@ pub fn generate_objects_with_atlas_limit(
             images.insert(k.clone(), image.clone());
         }
     }
-    let decoded = par_map(&keys, surfaces.threads, |k| read_texture(assets, k));
+    let decoded = par_map(&keys, surfaces.threads, |k| match k.strip_prefix(CARD) {
+        // a glow card is black by day: only its glow shows
+        Some(glow) => {
+            read_texture(assets, glow).map(|g| flat(g.width(), g.height(), [0, 0, 0, 255]))
+        }
+        None => read_texture(assets, k),
+    });
     for (k, read) in keys.into_iter().zip(decoded) {
         match read {
             Ok(img) => {

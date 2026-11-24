@@ -772,7 +772,7 @@ pub fn generate(
                 let held = include.take(&mut instances, matched.taken, &matched.held_back);
                 if held > 0 {
                     let text = format!(
-                        "the include rules match {held} references in {} that start disabled or have an enable parent; a far block cannot follow what a script enables, so they are left out",
+                        "the include rules match {held} references in {} that are disabled when the game starts (themselves or through their enable parent); the far view shows what stands at the start, so they are left out",
                         world.name()
                     );
                     records.push(WarningRecord::new(

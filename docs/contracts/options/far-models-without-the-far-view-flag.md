@@ -7,9 +7,13 @@ LOD the references that nothing marks visible from far (neither the reference no
 Distant) when:
 
 - the base's model has a far model, `<model>_lod.nif`, that a loose file or an archive of the load order holds;
-- the base is not flagged has-tree-LOD (such a base is drawn as a tree billboard already);
-- the reference stands when the game starts: not initially disabled (persistent ones included) and not kept disabled by
-  its enable parent chain, as for include rules.
+- the base is not a static, activator or tree flagged has-tree-LOD (such a base is drawn as a tree billboard
+  already);
+- the reference stands when the game starts: not initially disabled (persistent ones included, unlike flagged
+  references, whose persistent disabled ones the game's own blocks hold) and not kept disabled by its enable parent
+  chain, as for include rules.
+
+Any base type with a model counts (statics, activators, doors, containers and the rest), as for flagged references.
 
 A reference the flag or an include rule already takes is not added a second time. Exclusion rules (`inclusion`) apply
 to the added references as to every other. Static collections are not expanded: a collection is taken only when its own

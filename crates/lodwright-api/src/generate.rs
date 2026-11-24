@@ -1026,9 +1026,14 @@ fn far_model_without_flag(
             lodwright_gen::Winner::Missing
         )
     };
+    // has-tree-LOD is the bit only on the base types tree LOD reads (`xedit-tree-lod-selection`); on another type the
+    // same bit means something else
+    let tree_billboard = |b: &lodwright_core::plugin::BaseObject| {
+        [*b"STAT", *b"ACTI", *b"TREE"].contains(&b.signature)
+            && b.flags & lodwright_core::objects::HAS_TREE_LOD != 0
+    };
     let matched = lodwright_core::objects::references_where(plugins, world, &|b| {
-        b.flags & lodwright_core::objects::HAS_TREE_LOD == 0
-            && b.model.as_deref().is_some_and(has_far_model)
+        !tree_billboard(b) && b.model.as_deref().is_some_and(has_far_model)
     })
     .map_err(|e| load_order_error(&e))?;
     let present: std::collections::HashSet<u32> = taken.iter().map(|i| i.reference).collect();

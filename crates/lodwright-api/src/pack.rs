@@ -60,7 +60,7 @@ fn pack_error(e: &PackError) -> Error {
 /// beside it, remove the loose files and return the manifest entries of the three. The marker is written for every load
 /// order: without it the archive loses to an earlier archive that holds the same paths. The stub names `master` (the first plugin of the
 /// load order) with the size of its file, because the game opens a plugin's archives only when it has a master.
-/// `progress` gets the number of files listed. At most one file and its compressed copy are held in memory.
+/// `progress` gets the number of files read into the archive, so it reaches the total only when every file is in. At most one file and its compressed copy are held in memory.
 ///
 /// # Errors
 /// `output_failed` when a file cannot be read, written or removed; `pack_too_large` when the files do not fit one
@@ -80,7 +80,7 @@ pub(crate) fn pack_staging(
         .collect();
     let total = files.len() as u64;
     let mut sources = Vec::with_capacity(files.len());
-    for (i, file) in files.iter().enumerate() {
+    for file in &files {
         let len = std::fs::metadata(stage.join(&file.path))
             .map_err(|e| failed(&format!("cannot read {} to pack it", file.path), e))?
             .len();
@@ -89,7 +89,6 @@ pub(crate) fn pack_staging(
             len,
             compress: compress(&file.path),
         });
-        progress(i as u64 + 1, total);
     }
     // One file and its compressed copy are in memory at a time: compressed copies wait in a spool file beside the
     // archive until the index is written, the stored files are read again as their turn comes.
@@ -104,7 +103,14 @@ pub(crate) fn pack_staging(
     let mut refused = None;
     let archive = lodwright_gen::write_output_stream(stage, &names.archive, |out| {
         let mut out = std::io::BufWriter::with_capacity(1 << 20, out);
-        let mut read = |at: usize| std::fs::read(stage.join(&sources[at].path));
+        // the writer reads every file once, as its turn comes: the count of files read is the progress
+        let mut done = 0;
+        let mut read = |at: usize| {
+            let data = std::fs::read(stage.join(&sources[at].path))?;
+            done += 1;
+            progress(done, total);
+            Ok(data)
+        };
         match pack::write_streamed(&sources, &mut read, &mut spool, &mut out) {
             Ok(_) => std::io::Write::flush(&mut out),
             Err(e) => {
@@ -272,6 +278,32 @@ mod tests {
                 "Lodwright LOD.override"
             ]
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_that_fails_mid_pack_leaves_no_spool_no_temp_file_and_no_full_progress() {
+        let dir =
+            std::env::temp_dir().join(format!("lodwright-pack-unit-mid-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("meshes/a")).unwrap();
+        std::fs::write(dir.join("meshes/a/x.nif"), b"mesh").unwrap();
+        // a folder where a file is listed: its size can be read, its bytes cannot
+        std::fs::create_dir_all(dir.join("meshes/a/y.nif")).unwrap();
+        let files = vec![file("meshes/a/x.nif"), file("meshes/a/y.nif")];
+        let mut seen = Vec::new();
+        let err = pack_staging(&dir, &files, ("Island.esm", 5), |done, of| {
+            seen.push((done, of));
+        })
+        .unwrap_err();
+        assert_eq!(err.code, "output_failed", "{err:?}");
+        assert!(seen.iter().all(|&(done, of)| done < of), "{seen:?}");
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["meshes"]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

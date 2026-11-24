@@ -38,8 +38,8 @@ model:
 - `objects.shapes_from_full_models` gives such a shape to every object without a LOD model. When both are set, a
   model that a `generate` rule names takes that rule's limits.
 
-An authored LOD model always wins over both. Effects whose shapes all have an alpha property are never simplified and
-are reported as `far_model_no_solid_shape`. A rule without `generate` keeps the request digest it had before the key
+An authored LOD model always wins over both. Shapes drawn without lighting (light beams, glows) are left out of such a shape, and a model with no other
+solid shape is reported as `far_model_no_solid_shape`. A rule without `generate` keeps the request digest it had before the key
 existed.
 
 With no rules, the request digest and every block digest are the same as before the option existed. With rules, the

@@ -487,7 +487,9 @@ fn far_model_records(
         let what = match kind {
             "far_model_unreadable" => "their LOD models cannot be read",
             "far_model_not_found" => "neither a LOD model nor the full model is in the load order",
-            "far_model_no_solid_shape" => "every shape of their full models has an alpha property",
+            "far_model_no_solid_shape" => {
+                "every shape of their full models has an alpha property or is drawn without lighting"
+            }
             _ => "no LOD model exists for them in the game or any mod",
         };
         let message = format!(
@@ -567,9 +569,10 @@ fn shapes_from_full_models(
     let made = par_map(&wanted, surfaces.threads, |(lod, limits)| {
         let bytes = assets.read(full_of.get(lod)?)?;
         let parts = parse_lod_model(&bytes).ok()?;
+        // the shapes drawn without lighting are effects and are left out; what is left must have a solid shape
         if parts
             .iter()
-            .filter(|part| !part.triangles.is_empty())
+            .filter(|part| !part.triangles.is_empty() && !part.unlit)
             .all(|part| part.alpha)
         {
             return Some(None);

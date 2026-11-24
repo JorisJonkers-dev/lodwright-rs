@@ -52,8 +52,13 @@ fn grid_model(size: u16, alpha: bool) -> Vec<u8> {
 }
 
 /// The same model with the height of its first vertex given.
-#[allow(clippy::too_many_lines, reason = "one literal NIF")]
 fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Vec<u8> {
+    grid_model_full(size, alpha, first_height, false)
+}
+
+/// The same model; `unlit` also gives the shape a `BSShaderNoLightingProperty`, as light beams and glows have.
+#[allow(clippy::too_many_lines, reason = "one literal NIF")]
+fn grid_model_full(size: u16, alpha: bool, first_height: f32, unlit: bool) -> Vec<u8> {
     let row = size + 1;
     let mut vertices: Vec<[f32; 3]> = (0..row)
         .flat_map(|j| (0..row).map(move |i| [f32::from(i) * 4.0, f32::from(j) * 4.0, 0.0]))
@@ -83,7 +88,12 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
         effects: vec![],
     };
     let shape = NiTriShape {
-        av: av(if alpha { vec![3, 5] } else { vec![3] }),
+        av: av(match (alpha, unlit) {
+            (false, false) => vec![3],
+            (true, false) => vec![3, 5],
+            (false, true) => vec![3, 6],
+            (true, true) => vec![3, 5, 6],
+        }),
         data: 2,
         skin_instance: -1,
         material_names: vec![],
@@ -135,6 +145,7 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
         b"BSShaderPPLightingProperty",
         b"BSShaderTextureSet",
         b"NiAlphaProperty",
+        b"BSShaderNoLightingProperty",
     ]
     .iter()
     .map(|t| t.to_vec())
@@ -180,6 +191,10 @@ fn grid_model_with_first_height(size: u16, alpha: bool, first_height: f32) -> Ve
             Block {
                 type_index: 5,
                 body: Body::Opaque(alpha_property()),
+            },
+            Block {
+                type_index: 6,
+                body: Body::Opaque(vec![0; 16]),
             },
         ],
         roots: vec![0],
@@ -561,5 +576,51 @@ fn a_rule_does_not_call_an_unnamed_see_through_object_see_through() {
             .unwrap()
             .count,
         1
+    );
+}
+
+#[test]
+fn a_model_drawn_without_lighting_gets_no_far_shape() {
+    // a light beam: one shape without an alpha property, drawn without lighting
+    let store = assets(&[("meshes/a/beam.nif", grid_model_full(8, false, 0.0, true))]);
+    let (report, out) = run(
+        "unlit",
+        &[instance("a\\Beam.nif", 100.0, 1, false)],
+        &store,
+        Some(LIMITS),
+        1,
+    );
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(kinds(&report), ["far_model_no_solid_shape"]);
+    // the same through a rule's limits
+    let (report, out) = run_with_rules(
+        "unlit-rule",
+        &[instance("a\\Beam.nif", 100.0, 1, false)],
+        &store,
+        None,
+        Some(&first_reference_only),
+        1,
+    );
+    assert!(!out.join(BLOCK).exists());
+    assert_eq!(kinds(&report), ["far_model_no_solid_shape"]);
+}
+
+#[test]
+fn a_rules_shapes_do_not_depend_on_the_thread_count() {
+    let store = assets(&[
+        ("meshes/a/one.nif", grid_model(16, false)),
+        ("meshes/a/two.nif", grid_model(12, false)),
+    ]);
+    let list = [
+        instance("a\\One.nif", 100.0, 1, false),
+        instance("a\\Two.nif", 300.0, 1, false),
+        instance("a\\Two.nif", 500.0, 2, false),
+    ];
+    let rule = Some(&first_reference_only as RuleShapes<'_>);
+    let (_, one) = run_with_rules("rule-threads-1", &list, &store, None, rule, 1);
+    let (_, four) = run_with_rules("rule-threads-4", &list, &store, None, rule, 4);
+    assert_eq!(
+        std::fs::read(one.join(BLOCK)).unwrap(),
+        std::fs::read(four.join(BLOCK)).unwrap()
     );
 }

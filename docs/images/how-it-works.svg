@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="128" viewBox="0 0 800 128" role="img" aria-label="lodwright-rs reads your load order and builds a far view (land, water, buildings and trees) that matches it">
+<title>lodwright-rs reads your load order and builds a far view (land, water, buildings and trees) that matches it</title>
+<rect width="800" height="128" rx="12" fill="#101215"/>
+<rect x="20.0" y="20" width="226.7" height="88" rx="10" fill="#171A1F" stroke="#2F353F" stroke-width="1.5"/>
+<text x="133.33333333333331" y="47" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#3DD6C6" font-weight="bold" text-anchor="middle">Your load order</text>
+<text x="133.33333333333331" y="71" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#E6E8EB" font-weight="normal" text-anchor="middle">the mods you play</text>
+<text x="133.33333333333331" y="91" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#98A1AC" font-weight="normal" text-anchor="middle">and their files</text>
+<path d="M252.7 64 h24" stroke="#3DD6C6" stroke-width="2.5"/>
+<path d="M276.7 58 l8 6 l-8 6 z" fill="#3DD6C6"/>
+<rect x="286.7" y="20" width="226.7" height="88" rx="10" fill="#171A1F" stroke="#F59E3B" stroke-width="2"/>
+<text x="399.99999999999994" y="47" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#F59E3B" font-weight="bold" text-anchor="middle">lodwright-rs</text>
+<text x="399.99999999999994" y="71" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#E6E8EB" font-weight="normal" text-anchor="middle">builds the far view</text>
+<text x="399.99999999999994" y="91" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#98A1AC" font-weight="normal" text-anchor="middle">on your own PC</text>
+<path d="M519.3 64 h24" stroke="#3DD6C6" stroke-width="2.5"/>
+<path d="M543.3 58 l8 6 l-8 6 z" fill="#3DD6C6"/>
+<rect x="553.3" y="20" width="226.7" height="88" rx="10" fill="#171A1F" stroke="#2F353F" stroke-width="1.5"/>
+<text x="666.6666666666666" y="47" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#3DD6C6" font-weight="bold" text-anchor="middle">A matching horizon</text>
+<text x="666.6666666666666" y="71" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#E6E8EB" font-weight="normal" text-anchor="middle">land, water, buildings</text>
+<text x="666.6666666666666" y="91" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#98A1AC" font-weight="normal" text-anchor="middle">and trees far away</text>
+</svg>

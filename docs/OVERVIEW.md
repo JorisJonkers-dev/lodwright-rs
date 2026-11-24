@@ -3,8 +3,20 @@
 The [README](../README.md) is the short version. This page has what recent work changed, why lodwright is its own
 project, the clean-room rule and where to read next.
 
+lodwright builds the distant land (LOD, level of detail) of Fallout: New Vegas and Tale of Two Wastelands from your
+load order and your data folder. It is written in Rust, clean-room, and builds natively for Linux, Windows and macOS.
+With mods, the game's own far view no longer matches: new buildings are missing at a distance, changed land shows its
+old shape, and Tale of Two Wastelands' worlds get no fitting far view at all.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/docs/images/lod-modded-black-mountain.jpg" alt="Black Mountain from above, side by side: without a generated far view the dishes are missing (left); with lodwright's they are there (right)" width="100%">
+  <br><em>Black Mountain on a 312-mod Tale of Two Wastelands load order: the dishes are back with lodwright's far view (right).</em>
+</p>
+
 ## Recent work
 
+- **Large far objects stay in view.** High Priority LOD is read from the base object as well as the placed reference
+  (#421), so objects such as the I-15 overpasses north of Freeside no longer vanish at mid distance.
 - **Far objects as the game's own.** All 295 object blocks of the main world have the game's vertex and triangle
   counts (99.98 percent of vertices in place). Far-object textures keep their own size on several atlases, and a
   block over the 16-bit limits is written as several shapes instead of losing objects.

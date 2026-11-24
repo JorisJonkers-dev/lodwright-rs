@@ -11,7 +11,7 @@ you see far away. Without it, mods change the world up close while the horizon s
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/JorisJonkers-dev/rauls-trusty-toolbox/main/docs/images/lod-modded-strip.jpg" alt="The Strip from above, side by side: without a generated far view casinos and buildings are missing (left); with lodwright's they are there (right)" width="100%">
-  <br><em>The Strip with 312 mods: the game's far view (left) and lodwright's (right). The casinos are back.</em>
+  <br><em>The Strip on a Tale of Two Wastelands setup with 312 mods: the game's far view (left) and lodwright's (right). The casinos are back.</em>
 </p>
 
 <p align="center">
@@ -46,13 +46,13 @@ tested on its own: its output is compared, piece by piece, with the game's own f
 ## Get it
 
 **[Download raul](https://github.com/JorisJonkers-dev/rauls-trusty-toolbox/releases/latest)**: lodwright is built
-in; open the LOD page and press Generate. lodwright also runs on its own from the command line
+in; open the LOD page (the far view) and press Generate. lodwright also runs on its own from the command line
 ([docs/USAGE.md](docs/USAGE.md)).
 
 ## Learn more
 
 - [Using lodwright](docs/USAGE.md): raul's LOD page, the commands, downloads and checking them.
-- [More detail](docs/OVERVIEW.md): recent work, the clean-room rule, and every other document.
+- [More detail](docs/OVERVIEW.md): recent work, the clean-room rule, and where to read next.
 - [What is still open](docs/gap-list.md) and [speed measurements](docs/performance.md).
 
 Licence: GPL-3.0-only, with two files translated from xEdit kept under MPL-2.0 ([docs/LICENSING.md](docs/LICENSING.md)).

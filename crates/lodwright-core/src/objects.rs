@@ -14,8 +14,10 @@ use crate::worldspace::{absolute, master_table};
 pub const VISIBLE_WHEN_DISTANT: u32 = 0x0000_8000;
 /// High Priority LOD, on references.
 pub const HIGH_PRIORITY_LOD: u32 = 0x0001_0000;
-/// Initially Disabled, on references (such a reference is left out of LOD unless it is also persistent: the game's own
-/// blocks hold the persistent ones and none of the others).
+// source: game-lod-object-rules-disabled-persistent
+/// Initially Disabled, on references. Such a reference is not in the world when the game starts and is left out of LOD,
+/// persistent ones too (the game's own blocks hold its seven persistent disabled references; lodwright draws what stands
+/// at the start, see `docs/decisions/2026-11-24-far-view-draws-what-stands-at-the-start.md`).
 pub const INITIALLY_DISABLED: u32 = 0x0000_0800;
 /// Persistent, on references.
 pub const PERSISTENT: u32 = 0x0000_0400;
@@ -75,12 +77,43 @@ fn compose(outer: &Placement, inner: &Placement) -> Placement {
     }
 }
 
-/// A winning reference: base, flags, placement, plugin index and cell.
-type Ref = (u32, u32, Placement, usize, Option<(i32, i32)>);
+/// A winning reference: base, flags, placement, plugin index, cell and enable parent (absolute `FormID`, opposite).
+type Ref = (
+    u32,
+    u32,
+    Placement,
+    usize,
+    Option<(i32, i32)>,
+    Option<(u32, bool)>,
+);
+
+/// Whether reference `id` is disabled when the game starts: initially disabled itself, or enabled through an enable
+/// parent that is disabled then (or, with the opposite flag, one that is enabled then). A parent that is not a
+/// reference of this world (an actor, or a reference elsewhere) counts as enabled. Chains are followed to 16 links; a
+/// loop counts as enabled.
+fn disabled_at_start(refs: &HashMap<u32, Ref>, id: u32) -> bool {
+    let mut at = id;
+    let mut flips = false;
+    for _ in 0..16 {
+        let Some(&(_, flags, _, _, _, parent)) = refs.get(&at) else {
+            return flips;
+        };
+        if flags & INITIALLY_DISABLED != 0 {
+            return !flips;
+        }
+        let Some((parent, opposite)) = parent else {
+            return flips;
+        };
+        flips ^= opposite;
+        at = parent;
+    }
+    false
+}
 
 /// The instances in world `world` (absolute `FormID`) that are visible when distant: a reference counts when its
-/// base is flagged, or when the reference itself is; initially disabled references do not count, except the persistent
-/// ones (the unmodded game's own blocks hold its seven persistent disabled references and no other disabled one).
+/// base is flagged, or when the reference itself is, and it stands in the world when the game starts. Initially
+/// disabled references (persistent ones too) and references whose enable parent keeps them disabled at the start do
+/// not count; the winning record of each reference decides.
 ///
 /// # Errors
 /// [`Error::MissingMaster`] when a plugin names a master that is not in the load order.
@@ -89,7 +122,7 @@ pub fn visible_instances(plugins: &[(String, Plugin)], world: u32) -> Result<Vec
         base.flags & VISIBLE_WHEN_DISTANT != 0 || flags & VISIBLE_WHEN_DISTANT != 0
     })?
     .into_iter()
-    .map(|(instance, _, _)| instance)
+    .map(|(instance, _, _, _)| instance)
     .collect())
 }
 
@@ -102,15 +135,16 @@ pub struct Candidate {
     pub flags: u32,
     /// The flags of its base object.
     pub base_flags: u32,
+    /// Its enable parent keeps it disabled when the game starts.
+    pub hidden_by_parent: bool,
 }
 
 impl Candidate {
-    /// Whether generation would take this reference: something marks it visible from far, and it is not initially
-    /// disabled unless it is persistent.
+    /// Whether generation would take this reference: something marks it visible from far, and it stands in the world
+    /// when the game starts.
     #[must_use]
     pub fn is_drawn_by_rule(&self) -> bool {
-        (self.base_flags | self.flags) & VISIBLE_WHEN_DISTANT != 0
-            && (self.flags & INITIALLY_DISABLED == 0 || self.flags & PERSISTENT != 0)
+        self.left_out_because().is_none()
     }
 
     /// Why generation leaves this reference out, or `None` when it takes it.
@@ -118,8 +152,10 @@ impl Candidate {
     pub fn left_out_because(&self) -> Option<&'static str> {
         if (self.base_flags | self.flags) & VISIBLE_WHEN_DISTANT == 0 {
             Some("not marked visible from far")
-        } else if self.flags & INITIALLY_DISABLED != 0 && self.flags & PERSISTENT == 0 {
+        } else if self.flags & INITIALLY_DISABLED != 0 {
             Some("initially disabled")
+        } else if self.hidden_by_parent {
+            Some("disabled at the start by its enable parent")
         } else {
             None
         }
@@ -140,11 +176,14 @@ pub fn references_with_model(
     Ok(
         gather(plugins, world, false, true, &|base, _| base.model.is_some())?
             .into_iter()
-            .map(|(instance, flags, base_flags)| Candidate {
-                instance,
-                flags,
-                base_flags,
-            })
+            .map(
+                |(instance, flags, base_flags, hidden_by_parent)| Candidate {
+                    instance,
+                    flags,
+                    base_flags,
+                    hidden_by_parent,
+                },
+            )
             .collect(),
     )
 }
@@ -210,12 +249,12 @@ pub fn references_where(
             .filter(|w| absolute(w.form_id, &table, own) == world)
         {
             for r in &source.refs {
-                enable_parent.insert(absolute(r.form_id, &table, own), r.enable_parent);
+                enable_parent.insert(absolute(r.form_id, &table, own), r.enable_parent.is_some());
             }
         }
     }
     let mut out = Matched::default();
-    for (instance, flags, _) in gather(plugins, world, false, true, &|base, _| accept(base))? {
+    for (instance, flags, _, _) in gather(plugins, world, false, true, &|base, _| accept(base))? {
         if flags & INITIALLY_DISABLED != 0
             || enable_parent
                 .get(&instance.reference)
@@ -261,7 +300,7 @@ fn gather(
     parts: bool,
     keep_disabled: bool,
     accept: &dyn Fn(&BaseObject, u32) -> bool,
-) -> Result<Vec<(Instance, u32, u32)>, Error> {
+) -> Result<Vec<(Instance, u32, u32, bool)>, Error> {
     let mut bases: HashMap<u32, (BaseObject, usize)> = HashMap::new();
     let mut refs: HashMap<u32, Ref> = HashMap::new();
     let mut order: Vec<u32> = Vec::new();
@@ -297,6 +336,8 @@ fn gather(
                         r.placement,
                         index,
                         r.cell,
+                        r.enable_parent
+                            .map(|p| (absolute(p.form_id, &table, own), p.opposite)),
                     ),
                 );
                 if seen.insert(id) {
@@ -307,7 +348,7 @@ fn gather(
     }
     let mut out = Vec::new();
     for id in order {
-        let Some(&(base_id, flags, placement, reference_plugin, cell)) = refs.get(&id) else {
+        let Some(&(base_id, flags, placement, reference_plugin, cell, _)) = refs.get(&id) else {
             continue; // deleted by a later plugin
         };
         let Some((base, base_plugin)) = bases.get(&base_id) else {
@@ -316,8 +357,11 @@ fn gather(
         if !accept(base, flags) {
             continue;
         }
-        // source: oracle-skips-initially-disabled, game-lod-object-rules-disabled-persistent
-        if !keep_disabled && flags & INITIALLY_DISABLED != 0 && flags & PERSISTENT == 0 {
+        // source: oracle-skips-initially-disabled
+        // what stands at the start: initially disabled references (persistent ones too, unlike the game's own blocks)
+        // and references their enable parent keeps disabled are left out
+        let hidden_by_parent = flags & INITIALLY_DISABLED == 0 && disabled_at_start(&refs, id);
+        if !keep_disabled && (flags & INITIALLY_DISABLED != 0 || hidden_by_parent) {
             continue;
         }
         let flagged_by = if base.flags & VISIBLE_WHEN_DISTANT != 0 {
@@ -345,6 +389,7 @@ fn gather(
                 },
                 flags,
                 base.flags,
+                hidden_by_parent,
             ));
         }
         for (part_id, placements) in base.parts.iter().filter(|_| parts) {
@@ -372,6 +417,7 @@ fn gather(
                     },
                     flags,
                     base.flags,
+                    hidden_by_parent,
                 ));
             }
         }
@@ -472,18 +518,19 @@ mod tests {
     }
 
     #[test]
-    fn a_persistent_disabled_reference_still_counts_as_in_the_games_own_blocks() {
+    fn a_persistent_disabled_reference_is_left_out_as_it_is_not_there_at_the_start() {
         let p = plugin(
             &[],
             vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
             vec![
                 refr(0x200, 0x100, INITIALLY_DISABLED | PERSISTENT, 1.0),
                 refr(0x201, 0x100, INITIALLY_DISABLED, 2.0),
+                refr(0x202, 0x100, PERSISTENT, 3.0),
             ],
         );
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].reference, 0x200);
+        assert_eq!(out[0].reference, 0x202);
     }
 
     #[test]
@@ -526,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn a_persistent_disabled_reference_with_an_enable_parent_is_kept() {
+    fn a_persistent_disabled_reference_with_an_enable_parent_is_left_out() {
         let p = plugin(
             &[],
             vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
@@ -538,7 +585,86 @@ mod tests {
             ))],
         );
         let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
-        assert_eq!(out.len(), 1);
+        assert_eq!(out.len(), 0);
+    }
+
+    /// The reference with enable parent `parent` (as stored), taking the opposite state when `opposite` is set.
+    fn with_parent(r: Record, parent: u32, opposite: bool) -> Record {
+        let mut xesp = parent.to_le_bytes().to_vec();
+        xesp.extend_from_slice(&u32::from(opposite).to_le_bytes());
+        r.with_subrecord(*b"XESP", xesp)
+    }
+
+    #[test]
+    fn a_reference_follows_the_start_state_of_its_enable_parent_chain() {
+        let marker = stat(0x101, "marker.nif", 0);
+        let p = plugin(
+            &[],
+            vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT), marker],
+            vec![
+                // parents: one disabled, one enabled, and a disabled one behind an enabled link
+                refr(0x300, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0),
+                refr(0x301, 0x101, PERSISTENT, 0.0),
+                with_parent(refr(0x302, 0x101, PERSISTENT, 0.0), 0x300, false),
+                with_parent(refr(0x200, 0x100, 0, 1.0), 0x300, false),
+                with_parent(refr(0x201, 0x100, 0, 2.0), 0x300, true),
+                with_parent(refr(0x202, 0x100, 0, 3.0), 0x301, false),
+                with_parent(refr(0x203, 0x100, 0, 4.0), 0x301, true),
+                with_parent(refr(0x204, 0x100, 0, 5.0), 0x302, false),
+                with_parent(refr(0x205, 0x100, 0, 6.0), 0x302, true),
+                // a parent that is not a reference of this world counts as enabled
+                with_parent(refr(0x206, 0x100, 0, 7.0), 0x999, false),
+            ],
+        );
+        let out = visible_instances(&[("A.esm".to_owned(), p)], 0x0000_0A00).unwrap();
+        let taken: Vec<u32> = out.iter().map(|i| i.reference).collect();
+        assert_eq!(taken, [0x201, 0x202, 0x205, 0x206]);
+    }
+
+    #[test]
+    fn a_later_plugin_that_disables_an_enable_parent_takes_its_children_out() {
+        let base = plugin(
+            &[],
+            vec![
+                stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT),
+                stat(0x101, "marker.nif", 0),
+            ],
+            vec![
+                refr(0x300, 0x101, PERSISTENT, 0.0),
+                with_parent(refr(0x200, 0x100, 0, 1.0), 0x300, false),
+                refr(0x201, 0x100, 0, 2.0),
+            ],
+        );
+        let patch = plugin(
+            &["Base.esm"],
+            vec![],
+            vec![refr(0x300, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0)],
+        );
+        let plugins = vec![
+            ("Base.esm".to_owned(), base),
+            ("Patch.esp".to_owned(), patch),
+        ];
+        let all: Vec<u32> = visible_instances(&plugins[..1], 0x0000_0A00)
+            .unwrap()
+            .iter()
+            .map(|i| i.reference)
+            .collect();
+        assert_eq!(all, [0x200, 0x201]);
+        let patched: Vec<u32> = visible_instances(&plugins, 0x0000_0A00)
+            .unwrap()
+            .iter()
+            .map(|i| i.reference)
+            .collect();
+        assert_eq!(patched, [0x201]);
+        let listed = references_with_model(&plugins, 0x0000_0A00).unwrap();
+        let child = listed
+            .iter()
+            .find(|c| c.instance.reference == 0x200)
+            .unwrap();
+        assert_eq!(
+            child.left_out_because(),
+            Some("disabled at the start by its enable parent")
+        );
     }
 
     #[test]
@@ -657,7 +783,7 @@ mod tests {
             [
                 (0x200, None),
                 (0x201, Some("initially disabled")),
-                (0x202, None),
+                (0x202, Some("initially disabled")),
                 (0x203, Some("not marked visible from far")),
                 (0x204, None),
             ]

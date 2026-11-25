@@ -541,7 +541,6 @@ mod tests {
 
     #[test]
     fn a_model_that_only_sometimes_stands_beside_a_light_is_no_lamp() {
-        covers(&[ids::objects::selection::FAR_LIGHTS_UNLIT_LAMPS]);
         // 20 copies of a wall, a light beside 3 of them: under the share a lamp model needs
         let mut refs = Vec::new();
         for n in 0..20_u32 {
@@ -560,7 +559,6 @@ mod tests {
 
     #[test]
     fn lights_that_stand_anywhere_beside_a_model_teach_no_spot() {
-        covers(&[ids::objects::selection::FAR_LIGHTS_UNLIT_LAMPS]);
         let spots = [
             [0.0, 0.0, 300.0],
             [200.0, 0.0, 40.0],
@@ -581,7 +579,6 @@ mod tests {
 
     #[test]
     fn a_post_disabled_at_the_start_gets_no_point() {
-        covers(&[ids::objects::selection::FAR_LIGHTS_UNLIT_LAMPS]);
         let mut refs = Vec::new();
         for n in 0..3_u32 {
             #[allow(clippy::cast_precision_loss)]

@@ -189,6 +189,11 @@ pub struct ObjectsRequest {
     /// them by day too; written only when on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub far_lights: bool,
+    /// Also take references that nothing marks visible from far when their model has a far model
+    /// (`<model>_lod.nif`) and their base is not drawn as a tree billboard; only references that stand when the game
+    /// starts are taken. Off by default; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_model_without_flag: bool,
 }
 
 /// How far a full model is simplified into a far shape: it stops at whichever limit it reaches first.
@@ -226,6 +231,7 @@ impl Default for ObjectsRequest {
             shapes_from_shipped_blocks: Vec::new(),
             shapes_from_full_models: None,
             far_lights: false,
+            far_model_without_flag: false,
         }
     }
 }

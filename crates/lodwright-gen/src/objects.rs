@@ -219,7 +219,9 @@ fn full_model_path(model: &str) -> String {
     format!("meshes/{m}")
 }
 
-pub(crate) fn lod_model_path(model: &str) -> String {
+/// The far model of a full model, as the game names it: `meshes/<model without .nif>_lod.nif`, lower case with `/`.
+#[must_use]
+pub fn lod_model_path(model: &str) -> String {
     let m = norm_key(model);
     let m = m.strip_prefix("meshes/").unwrap_or(&m);
     let stem = m.strip_suffix(".nif").unwrap_or(m);

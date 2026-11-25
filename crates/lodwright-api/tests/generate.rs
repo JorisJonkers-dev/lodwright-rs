@@ -713,6 +713,11 @@ fn include_job(name: &str) -> (GenerateRequest, PathBuf) {
 /// The lamps of [`include_job`], the fourth lamp's enable parent being `parent` with the XESP flags word `flags`
 /// (bit 0: the opposite of the parent's state).
 fn include_job_with_parent(name: &str, parent: u32, flags: u32) -> (GenerateRequest, PathBuf) {
+    lamps_job(name, parent, flags, 0)
+}
+
+/// The lamps of [`include_job_with_parent`], the lamp's base carrying the record flags `base_flags`.
+fn lamps_job(name: &str, parent: u32, flags: u32, base_flags: u32) -> (GenerateRequest, PathBuf) {
     use lodwright_testkit::plugin::{Group, PluginBuilder};
     use lodwright_testkit::world::record_group;
     const INITIALLY_DISABLED: u32 = 0x0800;
@@ -738,7 +743,7 @@ fn include_job_with_parent(name: &str, parent: u32, flags: u32) -> (GenerateRequ
         .master("Base.esm")
         .group(record_group(
             *b"STAT",
-            vec![stat(0x0100_0200, "lights\\StreetLamp.nif", 0)],
+            vec![stat(0x0100_0200, "lights\\StreetLamp.nif", base_flags)],
         ))
         .group(refs)
         .build();
@@ -1194,4 +1199,92 @@ fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_
     let nif = lodwright_nif::NifFile::read(&std::fs::read(off_out.join(block)).unwrap()).unwrap();
     assert_eq!(nif.header.strings, Vec::<Vec<u8>>::new());
     assert_eq!(nif.blocks.len(), 7);
+}
+
+// ---- objects.far_model_without_flag: references nothing marks visible from far, taken for their far model (#426) ----
+
+/// The lamps of [`lamps_job`] with a far model next to the lamp's full model. The far model does not read as a model,
+/// so every lamp generation takes is counted in one `far_model_unreadable` record.
+fn far_model_lamps(name: &str, base_flags: u32, on: bool) -> Vec<(String, Option<String>, u64)> {
+    let (mut job, out) = lamps_job(name, 0x0100_0D01, 0, base_flags);
+    let data = PathBuf::from(&job.request.data_folder);
+    std::fs::write(
+        data.join("meshes/lights/streetlamp_lod.nif"),
+        b"not a model",
+    )
+    .unwrap();
+    job.request.objects.far_model_without_flag = on;
+    let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    assert_eq!(result.code, "generated", "{result:?}");
+    lamp_records(&out)
+}
+
+#[test]
+fn far_model_without_flag_takes_the_lamps_that_stand_at_the_start_and_only_with_the_option() {
+    // of the five lamps two stand at the start: the initially disabled one, the persistent disabled one and the one
+    // its disabled enable parent keeps out stay out
+    assert_eq!(
+        far_model_lamps("far-model-on", 0, true),
+        vec![(
+            "far_model_unreadable".to_owned(),
+            Some("Lamps.esp".to_owned()),
+            2
+        )]
+    );
+    assert_eq!(far_model_lamps("far-model-off", 0, false), vec![]);
+}
+
+#[test]
+fn far_model_without_flag_leaves_out_a_base_drawn_as_a_tree_billboard() {
+    const HAS_TREE_LOD: u32 = 0x40;
+    assert_eq!(
+        far_model_lamps("far-model-tree", HAS_TREE_LOD, true),
+        vec![]
+    );
+}
+
+#[test]
+fn far_model_without_flag_does_not_take_a_reference_twice_or_one_without_a_far_model() {
+    // the far-view flag already takes the lamps; the option adds no second copy of them. The parking model of
+    // Base.esm has no far model and stays reported as before.
+    let (mut job, out) = lamps_job("far-model-flagged", 0x0100_0D01, 0, VISIBLE_WHEN_DISTANT);
+    let data = PathBuf::from(&job.request.data_folder);
+    std::fs::write(
+        data.join("meshes/lights/streetlamp_lod.nif"),
+        b"not a model",
+    )
+    .unwrap();
+    job.request.objects.far_model_without_flag = true;
+    done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
+    let records = far_records(&out);
+    assert!(
+        records.contains(&(
+            "far_model_unreadable".to_owned(),
+            Some("Lamps.esp".to_owned()),
+            3,
+            vec!["meshes/lights/streetlamp.nif".to_owned()]
+        )),
+        "{records:?}"
+    );
+    assert!(
+        records.contains(&(
+            "far_model_without_lod_model".to_owned(),
+            Some("Base.esm".to_owned()),
+            2,
+            vec!["meshes/arch/parking.nif".to_owned()]
+        )),
+        "{records:?}"
+    );
+}
+
+#[test]
+fn far_model_without_flag_off_is_not_written_and_keeps_the_request_digest() {
+    let (job, _) = far_model_job("far-model-digest");
+    let mut on = job.request.clone();
+    on.objects.far_model_without_flag = true;
+    let text = serde_json::to_string(&job.request).unwrap();
+    assert!(!text.contains("far_model_without_flag"), "{text}");
+    let back: Request = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.digest(), job.request.digest());
+    assert_ne!(on.digest(), job.request.digest());
 }

@@ -794,6 +794,14 @@ pub fn generate(
                     add_warnings(&mut doc, vec![text]);
                 }
             }
+            if request.objects.far_model_without_flag {
+                instances.extend(far_model_without_flag(
+                    &loaded.plugins,
+                    world.form_id(),
+                    assets,
+                    &instances,
+                )?);
+            }
             let instances =
                 lodwright_gen::filter_instances(instances, &request.inclusion, &request.plugins)
                     .map_err(|e| {
@@ -1014,6 +1022,41 @@ pub fn generate(
     Ok(GenerateOutcome::Done {
         result: Box::new(doc),
     })
+}
+
+/// The references of `world` that `objects.far_model_without_flag` adds to `taken`: nothing marks them visible from
+/// far, their model has a far model (`<model>_lod.nif`) that some source holds, their base is not drawn as a tree
+/// billboard (has-tree-LOD), and they stand when the game starts (themselves and through their enable parent). A
+/// reference `taken` already holds is not added again. Own design, after the behaviour measured on another
+/// generator's output (lodwright #426).
+fn far_model_without_flag(
+    plugins: &[(String, lodwright_core::plugin::Plugin)],
+    world: u32,
+    assets: &lodwright_gen::FolderAssets,
+    taken: &[lodwright_core::objects::Instance],
+) -> Result<Vec<lodwright_core::objects::Instance>, Error> {
+    let has_far_model = |model: &str| {
+        !matches!(
+            assets.winner(&lodwright_gen::lod_model_path(model)),
+            lodwright_gen::Winner::Missing
+        )
+    };
+    // has-tree-LOD is the bit only on the base types tree LOD reads (`xedit-tree-lod-selection`); on another type the
+    // same bit means something else
+    let tree_billboard = |b: &lodwright_core::plugin::BaseObject| {
+        [*b"STAT", *b"ACTI", *b"TREE"].contains(&b.signature)
+            && b.flags & lodwright_core::objects::HAS_TREE_LOD != 0
+    };
+    let matched = lodwright_core::objects::references_where(plugins, world, &|b| {
+        !tree_billboard(b) && b.model.as_deref().is_some_and(has_far_model)
+    })
+    .map_err(|e| load_order_error(&e))?;
+    let present: std::collections::HashSet<u32> = taken.iter().map(|i| i.reference).collect();
+    Ok(matched
+        .taken
+        .into_iter()
+        .filter(|i| !present.contains(&i.reference))
+        .collect())
 }
 
 #[cfg(test)]

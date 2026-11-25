@@ -34,6 +34,8 @@ const LAND_LIGHT_SINCE: &str = "0.17.0";
 const PACK_SINCE: &str = "0.15.0";
 /// The release that adds `objects.far_lights`.
 const FAR_LIGHTS_SINCE: &str = "0.18.0";
+/// The release that adds `objects.far_model_without_flag`.
+const FAR_MODEL_SINCE: &str = "0.18.0";
 
 /// The value at a dotted `key` of `doc`, `null` when the key is left out.
 fn at(doc: &Value, key: &str) -> Value {
@@ -152,6 +154,12 @@ pub fn request_defaults() -> Defaults {
         tier: 3,
         since: FAR_LIGHTS_SINCE.to_owned(),
         ..option(&doc, "objects.far_lights", OptionKind::Switch)
+    });
+    options.push(OptionInfo {
+        default: Value::Bool(objects.far_model_without_flag),
+        tier: 3,
+        since: FAR_MODEL_SINCE.to_owned(),
+        ..option(&doc, "objects.far_model_without_flag", OptionKind::Switch)
     });
     options.push(option(&doc, "trees.enabled", OptionKind::Switch));
     // off by default and not written while off: the default comes from the request type
@@ -359,6 +367,11 @@ mod tests {
         let lights = d.option("objects.far_lights").unwrap();
         assert_eq!(
             (lights.tier, lights.kind, &lights.default),
+            (3, OptionKind::Switch, &Value::Bool(false))
+        );
+        let far_model = d.option("objects.far_model_without_flag").unwrap();
+        assert_eq!(
+            (far_model.tier, far_model.kind, &far_model.default),
             (3, OptionKind::Switch, &Value::Bool(false))
         );
         let scales = d.option("terrain.texture_scales").unwrap();

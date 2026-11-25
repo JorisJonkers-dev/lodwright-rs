@@ -348,6 +348,10 @@ fn gen_error(e: &lodwright_gen::GenError) -> Error {
     }
 }
 
+/// The smallest light radius (game units) that gets a far light point (`objects.far_lights`): street lamps and
+/// building lights, not candles and small fixtures. Own design.
+const FAR_LIGHT_MIN_RADIUS: u32 = 256;
+
 fn load_order_error(e: &impl std::fmt::Display) -> Error {
     Error::new("load_order_invalid", "the load order cannot be read").with_detail(e.to_string())
 }
@@ -853,6 +857,16 @@ pub fn generate(
             };
             let phase = |name: &str| clock.begin(&format!("objects.{name}"), Some(world.name()));
             let rule_shapes = |i: &lodwright_core::objects::Instance| include.generate_for(i);
+            let far_lights = if request.objects.far_lights {
+                lodwright_core::lights::far_light_sources(
+                    &loaded.plugins,
+                    world.form_id(),
+                    FAR_LIGHT_MIN_RADIUS,
+                )
+                .map_err(|e| load_order_error(&e))?
+            } else {
+                Vec::new()
+            };
             let surfaces = lodwright_gen::Surfaces {
                 ground: request
                     .objects
@@ -880,6 +894,7 @@ pub fn generate(
                 rule_shapes: include
                     .generates()
                     .then_some(&rule_shapes as lodwright_gen::RuleShapes<'_>),
+                far_lights: &far_lights,
             };
             let objects = lodwright_gen::generate_objects_with_progress(
                 world.name(),

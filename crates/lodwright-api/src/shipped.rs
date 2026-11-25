@@ -241,6 +241,7 @@ mod tests {
             land_textures: Vec::new(),
             texture_sets: Vec::new(),
             objects: Vec::new(),
+            lights: Vec::new(),
         }
     }
 

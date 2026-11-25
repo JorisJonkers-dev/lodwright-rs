@@ -91,14 +91,14 @@ type Ref = (
 );
 
 /// The start state a reference needs: its flags and its enable parent (absolute `FormID`, opposite).
-type StartState = (u32, Option<(u32, bool)>);
+pub(crate) type StartState = (u32, Option<(u32, bool)>);
 
 /// Whether reference `id` is disabled when the game starts: initially disabled itself, or enabled through an enable
 /// parent that is disabled then (or, with the opposite flag, one that is enabled then). `state` gives a reference's
 /// winning flags and enable parent, in any world of the load order. A parent that is not a reference of any world (an
 /// actor, or a reference in an interior) counts as enabled. A chain is followed to its end however long it is; a loop
 /// counts as enabled.
-fn disabled_at_start(state: &dyn Fn(u32) -> Option<StartState>, id: u32) -> bool {
+pub(crate) fn disabled_at_start(state: &dyn Fn(u32) -> Option<StartState>, id: u32) -> bool {
     let mut at = id;
     let mut flips = false;
     let mut seen: HashSet<u32> = HashSet::new();
@@ -121,7 +121,10 @@ fn disabled_at_start(state: &dyn Fn(u32) -> Option<StartState>, id: u32) -> bool
 /// The winning flags and enable parent of every reference in every world but `world`, for enable parents that stand
 /// in another world than their children (a marker in the Strip that turns on lights seen from the Mojave).
 /// A plugin whose masters are not in the load order is passed over: [`gather`] has refused the load order already.
-fn start_states_elsewhere(plugins: &[(String, Plugin)], world: u32) -> HashMap<u32, StartState> {
+pub(crate) fn start_states_elsewhere(
+    plugins: &[(String, Plugin)],
+    world: u32,
+) -> HashMap<u32, StartState> {
     let mut out: HashMap<u32, StartState> = HashMap::new();
     for (index, (_, plugin)) in plugins.iter().enumerate() {
         let (Ok(table), Ok(own)) = (master_table(plugins, plugin), u32::try_from(index)) else {

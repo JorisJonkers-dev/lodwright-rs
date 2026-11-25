@@ -1,0 +1,10 @@
+[[source]]
+id = "nif-string-extra-data-layout"
+fact = "NiStringExtraData at version 20.2.0.7: the NiExtraData part (name as a string index; the next-extra-data link and the bytes-remaining count exist only before 4.2.2.0), then the data as a string index. A NiAVObject names its extra data in the extra data list of its NiObjectNET part."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read wbDefineNiExtraData, wbDefineNiStringExtraData and wbDefineNiObjectNET in wbDataFormatNif.pas. Field names, order and conditions only; no code was taken. Used for the FarLights marker of the far light points (issue 339). Not second-read."

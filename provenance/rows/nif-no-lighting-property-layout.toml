@@ -1,0 +1,10 @@
+[[source]]
+id = "nif-no-lighting-property-layout"
+fact = "BSShaderNoLightingProperty at user version 2 of 34: the NiObjectNET part (name, extra data list, controller), NiShadeProperty flags (u16, while user version 2 is at most 34), BSShaderProperty shader type (u32), shader flags (u32) and second shader flags (u32) and environment map scale (f32, all while user version 2 is at most 34), BSShaderLightingProperty texture clamp mode (u32, same condition), then a sized string file name (u32 length, bytes) and, when user version 2 is above 26, falloff start angle, falloff stop angle, falloff start opacity and falloff stop opacity (f32 each). Shader type 33 is SHADER_NOLIGHTING. Shader flags bit 31 is ZBuffer_Test; second shader flags bit 0 is ZBuffer_Write, bit 5 Vertex_Colors."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDataFormatNif.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read wbDefineNiShadeProperty, wbDefineBSShaderProperty, wbDefineBSShaderLightingProperty and wbDefineBSShaderNoLightingProperty in wbDataFormatNif.pas, and wbBSShaderType, wbBSShaderFlags and wbBSShaderFlags2 in wbDataFormatNifTypes.pas at the same revision. Field names, order and conditions only; no code was taken. Used for the far light points (issue 339). Not second-read."

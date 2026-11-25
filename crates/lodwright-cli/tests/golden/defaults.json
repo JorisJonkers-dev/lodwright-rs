@@ -111,6 +111,13 @@
     },
     {
       "default": false,
+      "key": "objects.far_lights",
+      "kind": "switch",
+      "since": "0.18.0",
+      "tier": 3
+    },
+    {
+      "default": false,
       "key": "objects.far_model_without_flag",
       "kind": "switch",
       "since": "0.18.0",

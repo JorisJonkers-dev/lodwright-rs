@@ -106,6 +106,20 @@ pub struct BaseObject {
     pub bounds: Option<[i16; 6]>,
 }
 
+// source: fnv-light-data
+/// A light base object (`LIGH`): what a placed light gives off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LightBase {
+    /// `FormID` as stored in this plugin.
+    pub form_id: u32,
+    /// Radius of the light in game units.
+    pub radius: u32,
+    /// Colour as red, green, blue.
+    pub color: [u8; 3],
+    /// The light's own flags (flicker, pulse, off by default and others), not the record flags.
+    pub flags: u32,
+}
+
 // source: fnv-enable-parent
 /// The enable parent of a reference (`XESP`): the reference is enabled while its parent is, or while its parent is not
 /// when `opposite` is set.
@@ -172,6 +186,8 @@ pub struct Plugin {
     pub texture_sets: Vec<TextureSet>,
     /// Records with a model that may appear in the distance; only when read with [`ReadOptions::objects`].
     pub objects: Vec<BaseObject>,
+    /// Light base objects; only when read with [`ReadOptions::objects`].
+    pub lights: Vec<LightBase>,
 }
 
 /// What [`read_with`] keeps beyond heights.
@@ -222,6 +238,7 @@ pub fn read_with(bytes: &[u8], options: ReadOptions) -> Result<Plugin, Error> {
         land_textures: walker.land_textures,
         texture_sets: walker.texture_sets,
         objects: walker.objects,
+        lights: walker.lights,
     })
 }
 
@@ -345,6 +362,7 @@ struct Walker {
     land_textures: Vec<LandTexture>,
     texture_sets: Vec<TextureSet>,
     objects: Vec<BaseObject>,
+    lights: Vec<LightBase>,
     worlds: Vec<World>,
     world: Option<usize>,
     cell: Option<CellInfo>,
@@ -594,6 +612,12 @@ impl Walker {
                     self.worlds[world].refs.push(placed);
                 }
             }
+            b"LIGH" if self.options.objects => {
+                let data = record.data()?;
+                if let Some(light) = light_base(record, &data)? {
+                    self.lights.push(light);
+                }
+            }
             sig if self.options.objects && BASE_SIGNATURES.contains(sig) => {
                 let data = record.data()?;
                 if let Some(base) = base_object(*sig, record, &data)? {
@@ -650,6 +674,21 @@ fn placed_ref(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<PlacedRef>, 
             cell: None,
         }
     }))
+}
+
+// source: fnv-light-data
+fn light_base(record: &RawRecord<'_>, data: &[u8]) -> Result<Option<LightBase>, Error> {
+    for (sub, payload) in subrecords(data)? {
+        if &sub == b"DATA" && payload.len() >= 16 {
+            return Ok(Some(LightBase {
+                form_id: record.form_id,
+                radius: le_u32(payload, 4),
+                color: [payload[8], payload[9], payload[10]],
+                flags: le_u32(payload, 12),
+            }));
+        }
+    }
+    Ok(None)
 }
 
 // source: fnv-object-records

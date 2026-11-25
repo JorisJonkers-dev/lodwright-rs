@@ -1,15 +1,15 @@
 {
   "schema": "tally-report.v1",
-  "tool": "tally 0.6.0",
+  "tool": "tally 0.8.0",
   "repo": "lodwright-rs",
   "results": true,
   "totals": {
-    "total": 192,
+    "total": 193,
     "missing": 9,
-    "implemented": 183,
-    "tagged": 177,
-    "passing": 177,
-    "covered": 174,
+    "implemented": 184,
+    "tagged": 178,
+    "passing": 178,
+    "covered": 175,
     "gated": 2,
     "not_applicable": 0,
     "deferred": 3
@@ -17,12 +17,12 @@
   "headline": {
     "title": "All areas",
     "counts": {
-      "total": 192,
+      "total": 193,
       "missing": 9,
-      "implemented": 183,
-      "tagged": 177,
-      "passing": 177,
-      "covered": 174,
+      "implemented": 184,
+      "tagged": 178,
+      "passing": 178,
+      "covered": 175,
       "gated": 2,
       "not_applicable": 0,
       "deferred": 3
@@ -1779,12 +1779,12 @@
       "id": "objects",
       "title": "Object LOD",
       "counts": {
-        "total": 30,
+        "total": 31,
         "missing": 1,
-        "implemented": 29,
-        "tagged": 28,
-        "passing": 28,
-        "covered": 28,
+        "implemented": 30,
+        "tagged": 29,
+        "passing": 29,
+        "covered": 29,
         "gated": 0,
         "not_applicable": 0,
         "deferred": 1
@@ -2078,12 +2078,12 @@
           "title": "Which objects enter the far view",
           "origin": "original",
           "counts": {
-            "total": 14,
+            "total": 15,
             "missing": 1,
-            "implemented": 13,
-            "tagged": 13,
-            "passing": 13,
-            "covered": 13,
+            "implemented": 14,
+            "tagged": 14,
+            "passing": 14,
+            "covered": 14,
             "gated": 0,
             "not_applicable": 0,
             "deferred": 0
@@ -2283,6 +2283,23 @@
               "state": "covered",
               "tests": [
                 "crates/lodwright-api/tests/generate.rs::far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_with_the_option"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.far_lights_unlit_lamps",
+              "title": "objects.far_lights gives every copy of a lamp model a point at its head when the load order lights only some copies",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/lights.rs::a_model_lit_on_a_fifth_of_its_copies_is_a_lamp",
+                "crates/lodwright-core/src/lights.rs::a_turned_post_gets_its_point_where_its_head_overhangs",
+                "crates/lodwright-core/src/lights.rs::every_post_of_a_row_lit_every_other_post_gets_a_point_at_the_head",
+                "crates/lodwright-core/src/lights.rs::two_models_of_one_lamp_give_one_point"
               ],
               "platforms": {
                 "linux": true,

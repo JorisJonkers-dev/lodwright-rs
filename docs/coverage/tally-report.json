@@ -1,0 +1,3439 @@
+{
+  "schema": "tally-report.v1",
+  "tool": "tally 0.6.0",
+  "repo": "lodwright-rs",
+  "results": true,
+  "totals": {
+    "total": 192,
+    "missing": 9,
+    "implemented": 183,
+    "tagged": 177,
+    "passing": 177,
+    "covered": 174,
+    "gated": 2,
+    "not_applicable": 0,
+    "deferred": 3
+  },
+  "headline": {
+    "title": "All areas",
+    "counts": {
+      "total": 192,
+      "missing": 9,
+      "implemented": 183,
+      "tagged": 177,
+      "passing": 177,
+      "covered": 174,
+      "gated": 2,
+      "not_applicable": 0,
+      "deferred": 3
+    }
+  },
+  "areas": [
+    {
+      "id": "cli",
+      "title": "Command line",
+      "counts": {
+        "total": 9,
+        "missing": 0,
+        "implemented": 9,
+        "tagged": 9,
+        "passing": 9,
+        "covered": 9,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 0
+      },
+      "groups": [
+        {
+          "id": "cli.commands",
+          "title": "Commands",
+          "origin": "ours",
+          "counts": {
+            "total": 9,
+            "missing": 0,
+            "implemented": 9,
+            "tagged": 9,
+            "passing": 9,
+            "covered": 9,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "cli.commands.version_and_help",
+              "title": "--version and --help exit 0; --help lists every command and the exit codes",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/src/lib.rs::help_lists_the_doctor_command",
+                "crates/lodwright-cli/src/lib.rs::version_prints_the_package_version",
+                "crates/lodwright-cli/tests/cli.rs::help_exits_zero",
+                "crates/lodwright-cli/tests/cli.rs::version_exits_zero"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.usage_errors",
+              "title": "No arguments, an unknown command or an unknown argument is a usage error with exit code 2 that names the problem",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/src/lib.rs::no_arguments_is_a_usage_error",
+                "crates/lodwright-cli/src/lib.rs::unknown_argument_is_a_usage_error_naming_it",
+                "crates/lodwright-cli/tests/cli.rs::unknown_command_exits_two"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.doctor",
+              "title": "doctor checks that a data folder exists and prints no path",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/src/lib.rs::doctor_accepts_an_existing_folder_and_prints_no_path",
+                "crates/lodwright-cli/src/lib.rs::doctor_fails_for_a_file",
+                "crates/lodwright-cli/tests/cli.rs::doctor_on_a_missing_folder_exits_one",
+                "crates/lodwright-cli/tests/cli.rs::doctor_on_an_existing_folder_exits_zero"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.plan",
+              "title": "plan prints what a run would build, per world and level, as text or JSON, with or without every block",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::json_is_an_alias_of_format_json_and_the_document_passes_the_plan_check",
+                "crates/lodwright-cli/tests/world_commands.rs::plan_prints_json_for_every_world",
+                "crates/lodwright-cli/tests/world_commands.rs::plan_prints_the_text_report_for_one_world",
+                "crates/lodwright-cli/tests/world_commands.rs::plan_reads_a_load_order_file",
+                "crates/lodwright-cli/tests/world_commands.rs::plan_with_blocks_in_json_lists_each_block_with_paths"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.heightmap",
+              "title": "heightmap writes a 16-bit north-up PGM of one world and refuses to write inside a git working tree",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/world_commands.rs::heightmap_refuses_to_write_inside_a_git_working_tree",
+                "crates/lodwright-cli/tests/world_commands.rs::heightmap_scales_between_the_lowest_and_highest_height",
+                "crates/lodwright-cli/tests/world_commands.rs::heightmap_writes_a_16_bit_pgm_north_up"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.generate_command",
+              "title": "generate builds the far view from flags or from a request document and reports counts per kind",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::generate_writes_the_terrain_files_and_reports_counts_per_kind",
+                "crates/lodwright-cli/tests/events.rs::the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lines"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.schema_command",
+              "title": "schema <name> prints the published schema of a contract; a missing or unknown name is a usage error",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::schema_prints_the_generated_schema_for_both_documents",
+                "crates/lodwright-cli/tests/contract_cli.rs::schema_version_one_prints_the_default_document_and_other_numbers_exit_two",
+                "crates/lodwright-cli/tests/request.rs::the_request_schema_is_printed_and_names_its_contract"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.options_parsing",
+              "title": "Options are read in any place; --data is required where a command needs it; a load order file combines with --plugin",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/src/options.rs::a_load_order_file_is_read_and_combined_with_plugins",
+                "crates/lodwright-cli/src/options.rs::every_option_is_read",
+                "crates/lodwright-cli/src/options.rs::plugins_accumulate_in_order_and_defaults_hold"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "cli.commands.probe",
+              "title": "probe reports numbers about one file (a NIF, a DDS or a flat file) and never a byte of its content",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/probe.rs::json_and_text_outputs_equal_their_golden_files",
+                "crates/lodwright-cli/tests/probe.rs::no_byte_of_input_beyond_the_documented_integers_reaches_the_output",
+                "crates/lodwright-core/src/probe/dds.rs::unknown_four_cc_text_is_not_echoed",
+                "crates/lodwright-core/src/probe/nif.rs::free_text_never_reaches_the_report"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contract",
+      "title": "Contracts and events",
+      "counts": {
+        "total": 19,
+        "missing": 0,
+        "implemented": 19,
+        "tagged": 19,
+        "passing": 19,
+        "covered": 19,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 0
+      },
+      "groups": [
+        {
+          "id": "contract.documents",
+          "title": "JSON documents",
+          "origin": "ours",
+          "counts": {
+            "total": 15,
+            "missing": 0,
+            "implemented": 15,
+            "tagged": 15,
+            "passing": 15,
+            "covered": 15,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "contract.documents.name_and_version_checked",
+              "title": "A document names its contract and schema version; a reader refuses another name or an unsupported version",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/schema.rs::a_document_naming_another_contract_is_refused",
+                "crates/lodwright-contract/src/schema.rs::a_plan_with_an_unknown_schema_version_is_refused",
+                "crates/lodwright-contract/src/schema.rs::a_verify_report_naming_the_result_contract_is_refused",
+                "crates/lodwright-contract/src/schema.rs::an_unsupported_schema_version_is_refused",
+                "crates/lodwright-contract/tests/contract.rs::a_golden_plan_with_version_two_is_refused"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.schemas_published",
+              "title": "Each contract's JSON schema is committed under schemas/, equals the generated one and is printed by lodwright schema",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/cli.rs::schema_prints_the_committed_schema_of_every_listed_document",
+                "crates/lodwright-contract/tests/contract.rs::committed_schemas_equal_the_generated_ones",
+                "crates/lodwright-contract/tests/contract.rs::every_committed_schema_belongs_to_a_kind_this_build_speaks"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.unknown_keys_ignored",
+              "title": "A reader ignores keys it does not know",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/event.rs::an_event_line_reads_back_and_ignores_unknown_fields",
+                "crates/lodwright-contract/src/schema.rs::a_result_with_extra_fields_is_accepted",
+                "crates/lodwright-contract/tests/contract.rs::a_plan_with_unknown_fields_is_read_and_the_fields_are_dropped"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.open_enums",
+              "title": "A value an open enum does not know reads as other",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/event.rs::a_kind_this_build_does_not_know_reads_as_other"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.handshake",
+              "title": "lodwright contracts --json and --version --json list every contract this build emits and its versions",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/cli.rs::contracts_json_lists_each_contract_with_its_versions",
+                "crates/lodwright-cli/tests/cli.rs::version_json_lists_the_same_contracts_as_the_handshake",
+                "crates/lodwright-cli/tests/contract_cli.rs::version_json_names_the_tool_and_the_contracts_it_speaks",
+                "crates/lodwright-cli/tests/world_commands.rs::the_contract_the_plan_names_is_one_the_handshake_lists",
+                "crates/lodwright-contract/src/result.rs::the_version_info_and_the_handshake_list_every_contract"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.plan_document",
+              "title": "The plan document lists the worlds, the blocks and the capabilities of this build",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::plan_reports_the_capabilities_of_this_build",
+                "crates/lodwright-contract/tests/contract.rs::the_plan_document_equals_its_golden_file",
+                "crates/lodwright-contract/tests/contract.rs::the_plan_document_with_blocks_equals_its_golden_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.result_document",
+              "title": "The result document carries the status, the counts and the exit code that follows the status",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/result.rs::exit_codes_follow_the_status",
+                "crates/lodwright-contract/src/result.rs::optional_parts_are_omitted_not_zero",
+                "crates/lodwright-contract/tests/contract.rs::the_ok_result_equals_its_golden_file",
+                "crates/lodwright-contract/tests/contract.rs::the_unsupported_result_equals_its_golden_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.request_document",
+              "title": "A request document drives a run; omitted fields take their defaults and each bad value is refused with its name",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::the_request_round_trips_through_json",
+                "crates/lodwright-cli/tests/request.rs::bad_requests_and_unsafe_outputs_are_refused_with_codes",
+                "crates/lodwright-contract/src/request.rs::a_minimal_request_is_valid_and_its_digest_is_stable",
+                "crates/lodwright-contract/src/request.rs::each_bad_value_is_refused_with_its_name",
+                "crates/lodwright-contract/src/request.rs::omitted_fields_take_their_defaults_when_read"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.request_digest_is_stable",
+              "title": "A default request keeps the digest it was released with, wherever the data folder is",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::the_digests_do_not_depend_on_where_the_data_folder_is",
+                "crates/lodwright-contract/tests/contract.rs::a_request_read_from_its_golden_file_keeps_the_released_digest",
+                "crates/lodwright-contract/tests/contract.rs::the_default_request_document_equals_its_golden_file",
+                "crates/lodwright-contract/tests/contract.rs::the_default_request_keeps_its_released_digest"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.new_options_keep_old_digests",
+              "title": "An option added after 0.4.2 is optional, is not written while it holds its default and then changes no digest",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/request.rs::full_model_shapes_are_left_out_of_the_document_when_off_and_checked_when_set"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.digest_function",
+              "title": "Digests are SHA-256 over length-prefixed parts, so a different split gives a different digest",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/digest.rs::a_reader_read_in_parts_gives_the_digest_of_the_whole_slice",
+                "crates/lodwright-contract/src/digest.rs::argument_digest_depends_on_every_line_and_their_order",
+                "crates/lodwright-contract/src/digest.rs::digest_of_nothing_is_the_known_sha256_with_its_length_prefix",
+                "crates/lodwright-contract/src/digest.rs::parts_are_length_prefixed_so_splits_differ"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.manifest_document",
+              "title": "The manifest lists every file with its size and digest, sorted, and round-trips",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/manifest.rs::files_are_sorted_and_the_document_round_trips"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.verify_document",
+              "title": "The verify document names its contract and version and reads back",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/verify.rs::a_new_report_names_its_contract_and_version",
+                "crates/lodwright-contract/src/verify.rs::a_report_without_differences_reads_back",
+                "crates/lodwright-contract/tests/contract.rs::the_verify_document_equals_its_golden_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.defaults_document",
+              "title": "lodwright defaults --json lists every request option with its default, range, tier and the release that added it, read from the code that applies them",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/defaults.rs::every_default_is_the_one_the_request_and_the_terrain_settings_use",
+                "crates/lodwright-api/src/defaults.rs::every_range_is_the_one_validate_checks",
+                "crates/lodwright-api/src/defaults.rs::the_options_are_tiered_and_dated",
+                "crates/lodwright-cli/tests/contract_cli.rs::defaults_prints_every_request_option_with_its_default_and_range"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.documents.documents_on_stdout",
+              "title": "With --json the result or the error document goes to stdout, never to stderr, and holds no data path or plugin content",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/contract_cli.rs::a_failure_with_json_prints_the_error_document_on_stdout_and_no_data_path",
+                "crates/lodwright-cli/tests/contract_cli.rs::generate_without_json_puts_the_reason_on_stderr_and_the_document_on_stdout",
+                "crates/lodwright-cli/tests/contract_cli.rs::no_output_contains_a_data_path_or_plugin_content",
+                "crates/lodwright-cli/tests/contract_cli.rs::result_and_error_documents_reach_stdout_and_never_stderr_in_the_real_binary"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "contract.events",
+          "title": "Progress events",
+          "origin": "ours",
+          "counts": {
+            "total": 4,
+            "missing": 0,
+            "implemented": 4,
+            "tagged": 4,
+            "passing": 4,
+            "covered": 4,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "contract.events.block_lines",
+              "title": "generate --events writes one JSON line per finished block, terrain first, then objects, then trees",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/events.rs::object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_world",
+                "crates/lodwright-cli/tests/request.rs::progress_events_are_one_json_line_per_block_in_the_events_file",
+                "crates/lodwright-contract/src/event.rs::a_block_event_is_one_line_with_the_event_tag_first"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.events.event_kind",
+              "title": "A block line names its kind (terrain, objects, trees); a line without one is a terrain block",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-contract/src/event.rs::a_line_without_a_kind_reads_as_before_and_a_line_with_one_reads_its_kind"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.events.run_wide_progress",
+              "title": "Every event carries run-wide numbers: run_total is 10000 and run_done never decreases",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::every_event_of_a_run_carries_the_run_numbers_and_the_run_total_never_goes_back",
+                "crates/lodwright-cli/tests/events.rs::a_recorded_run_with_terrain_objects_and_trees_has_a_run_number_that_never_goes_back",
+                "crates/lodwright-cli/tests/events.rs::the_events_file_lines_carry_the_same_run_numbers_as_the_callback"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "contract.events.library_progress_and_cancel",
+              "title": "The library reports each step and block through a Progress callback and stops at a cancel token",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/progress.rs::a_clone_of_a_token_sees_the_cancel",
+                "crates/lodwright-api/src/progress.rs::a_finished_block_of_each_step_renders_the_events_line_with_its_kind",
+                "crates/lodwright-api/tests/generate.rs::a_cancel_between_the_terrain_step_and_a_later_step_is_cancelled",
+                "crates/lodwright-api/tests/generate.rs::progress_starts_each_step_and_counts_every_terrain_block"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "formats",
+      "title": "File formats",
+      "counts": {
+        "total": 19,
+        "missing": 0,
+        "implemented": 19,
+        "tagged": 19,
+        "passing": 19,
+        "covered": 19,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 0
+      },
+      "groups": [
+        {
+          "id": "formats.meshes_and_images",
+          "title": "Meshes and textures",
+          "origin": "original",
+          "counts": {
+            "total": 9,
+            "missing": 0,
+            "implemented": 9,
+            "tagged": 9,
+            "passing": 9,
+            "covered": 9,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "formats.meshes_and_images.nif_terrain_blocks",
+              "title": "A terrain block NIF has the measured eight blocks, vertices, triangles, mirrored UVs, a height per vertex and the block origin, and reads back",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-nif/src/terrain.rs::the_additional_data_holds_one_height_per_vertex_after_a_56_byte_header",
+                "crates/lodwright-nif/src/terrain.rs::the_data_block_keeps_vertices_triangles_and_mirrored_uvs",
+                "crates/lodwright-nif/src/terrain.rs::the_file_has_the_eight_measured_blocks_and_reads_back",
+                "crates/lodwright-nif/src/terrain.rs::the_root_translation_is_the_block_origin"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.nif_object_blocks",
+              "title": "An object block NIF has its seven blocks, a segment table covering the triangles and one texture set per shape, and reads back",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-nif/src/object.rs::a_block_of_two_shapes_links_each_shape_to_its_own_blocks_and_reads_back",
+                "crates/lodwright-nif/src/object.rs::an_object_block_has_seven_blocks_a_segment_table_and_reads_back",
+                "crates/lodwright-nif/src/object.rs::each_shape_of_a_block_names_its_own_texture_set"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.nif_round_trip",
+              "title": "Reading what was written gives the same file, writing what was read gives the same bytes, and unknown blocks survive byte for byte",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-nif/tests/round_trip.rs::reading_what_was_written_gives_the_same_file_for_generated_shape_sets",
+                "crates/lodwright-nif/tests/round_trip.rs::unknown_blocks_round_trip_byte_for_byte",
+                "crates/lodwright-nif/tests/round_trip.rs::writing_what_was_read_gives_the_same_bytes_for_generated_shape_sets"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.nif_hostile_input",
+              "title": "A truncated, corrupt or inconsistent NIF is a typed error, never a panic, and an inconsistent block cannot be written",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-nif/tests/errors.rs::a_huge_string_count_does_not_allocate_and_is_a_bad_count",
+                "crates/lodwright-nif/tests/errors.rs::a_vertex_count_that_disagrees_with_the_vertices_cannot_be_written",
+                "crates/lodwright-nif/tests/errors.rs::another_version_is_refused_with_its_number",
+                "crates/lodwright-nif/tests/errors.rs::every_truncation_of_a_valid_file_is_an_error_and_never_a_panic",
+                "crates/lodwright-nif/tests/errors.rs::random_bytes_never_panic_the_reader",
+                "crates/lodwright-nif/tests/errors.rs::single_byte_flips_of_a_valid_file_never_panic_the_reader"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.dds_writer",
+              "title": "DDS files are written as BC1, BC3 or BC5 with a mip chain and the documented header, never with a DX10 header",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-dds/tests/dds.rs::a_file_without_mips_has_no_mip_flag_and_only_the_base_surface",
+                "crates/lodwright-dds/tests/dds.rs::encoded_files_never_carry_a_dx10_header",
+                "crates/lodwright-dds/tests/dds.rs::mip_sizes_and_the_file_length_are_right_for_non_power_of_two_input",
+                "crates/lodwright-dds/tests/dds.rs::the_bc1_header_for_a_fixed_input_equals_the_stored_dump",
+                "crates/lodwright-dds/tests/dds.rs::the_bc3_header_for_a_fixed_input_equals_the_stored_dump",
+                "crates/lodwright-dds/tests/dds.rs::the_bc5_header_for_a_fixed_input_equals_the_stored_dump",
+                "crates/lodwright-dds/tests/dds.rs::the_header_flags_and_caps_follow_the_documented_values"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.dds_quality",
+              "title": "Encoding then decoding keeps a quality floor for BC1, BC3 and BC5 on gradients and noise",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-dds/tests/dds.rs::bc1_keeps_its_quality_floor_on_a_gradient",
+                "crates/lodwright-dds/tests/dds.rs::bc1_keeps_its_quality_floor_on_noise",
+                "crates/lodwright-dds/tests/dds.rs::bc3_keeps_its_quality_floor_on_a_gradient",
+                "crates/lodwright-dds/tests/dds.rs::bc3_keeps_its_quality_floor_on_noise",
+                "crates/lodwright-dds/tests/dds.rs::bc5_keeps_its_quality_floor_on_a_gradient",
+                "crates/lodwright-dds/tests/dds.rs::bc5_keeps_its_quality_floor_on_noise"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.dds_reader",
+              "title": "DDS files are read: BC1, BC3, BC5, BC7 with a DX10 header block by block, and uncompressed 32-bit through its masks",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-dds/tests/bc7.rs::a_bc7_file_with_a_dx10_header_is_decoded_block_by_block",
+                "crates/lodwright-dds/tests/bc7_modes.rs::every_mode_draws_each_subset_in_its_own_colour_where_the_partition_puts_it",
+                "crates/lodwright-dds/tests/bc7_modes.rs::mode_6_interpolates_sixteen_steps_from_black_to_white",
+                "crates/lodwright-dds/tests/bc7_modes.rs::modes_4_and_5_take_colour_and_alpha_from_separate_indices_with_selection_and_rotation",
+                "crates/lodwright-dds/tests/dds.rs::an_uncompressed_32_bit_file_is_read_through_its_masks"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.dds_hostile_input",
+              "title": "A bad header, a size over the cap, random bytes or a bit flip is a typed error, never a panic",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-dds/tests/bc7.rs::a_bc7_file_shorter_than_its_blocks_is_truncated",
+                "crates/lodwright-dds/tests/dds.rs::a_size_over_the_cap_is_refused_when_building_and_when_reading",
+                "crates/lodwright-dds/tests/dds.rs::random_bytes_and_bit_flips_never_panic_decode",
+                "crates/lodwright-dds/tests/dds.rs::reading_refuses_each_kind_of_bad_header"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.meshes_and_images.mip_chains_and_resize",
+              "title": "Mip chains halve rounding down to one pixel; box and Lanczos resizing are the same bytes at any thread count",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-dds/src/resize.rs::a_flat_image_stays_flat_under_both_filters_at_any_ratio",
+                "crates/lodwright-dds/src/resize.rs::mip_sizes_halve_rounding_down_with_a_floor_of_one",
+                "crates/lodwright-dds/src/resize.rs::resizing_and_mip_chains_give_the_same_bytes_at_any_thread_count",
+                "crates/lodwright-dds/src/resize.rs::the_box_filter_averages_a_two_by_two_block",
+                "crates/lodwright-dds/src/resize.rs::the_chain_has_the_expected_sizes_for_a_non_power_of_two_image"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "formats.plugins",
+          "title": "Plugins and archives",
+          "origin": "original",
+          "counts": {
+            "total": 10,
+            "missing": 0,
+            "implemented": 10,
+            "tagged": 10,
+            "passing": 10,
+            "covered": 10,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "formats.plugins.plugin_records",
+              "title": "Plugins are read: header, masters, group tree, compressed records, extended subrecords, worlds, cells, land, land textures and placed references",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/plugin.rs::a_deleted_land_record_is_skipped",
+                "crates/lodwright-core/src/plugin.rs::a_world_with_cells_is_read_with_heights_and_editor_id",
+                "crates/lodwright-core/src/plugin.rs::compressed_land_records_read_the_same_as_plain_ones",
+                "crates/lodwright-core/src/plugin.rs::ltex_and_txst_records_are_read_with_their_subrecords",
+                "crates/lodwright-core/src/plugin.rs::statics_and_placed_references_are_read_with_flags_and_placements"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.plugin_hostile_input",
+              "title": "A truncated, corrupt or absurdly nested plugin is a typed error, never a panic",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/plugin.rs::a_corrupt_compressed_record_is_a_decompress_error",
+                "crates/lodwright-core/src/plugin.rs::a_file_that_does_not_start_with_tes4_is_malformed",
+                "crates/lodwright-core/src/plugin.rs::a_group_that_claims_more_than_its_parent_is_malformed",
+                "crates/lodwright-core/src/plugin.rs::empty_and_tiny_inputs_are_truncated_not_panics",
+                "crates/lodwright-core/src/plugin.rs::every_prefix_of_a_valid_plugin_is_an_error_or_a_plugin_never_a_panic",
+                "crates/lodwright-core/src/plugin.rs::groups_nested_beyond_the_limit_are_rejected",
+                "crates/lodwright-core/src/plugin.rs::random_corruption_never_panics"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.plugin_header_masters",
+              "title": "Plugin headers are read for master order; a master after its dependent is an error",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-plugin-meta/src/lib.rs::a_master_after_its_dependent_is_an_error",
+                "crates/lodwright-plugin-meta/src/lib.rs::masters_are_read_in_header_order"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.archive_reader",
+              "title": "BSA version 104 archives are read, compressed or not, and looked up by name in any case and separator",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/bsa.rs::a_compressed_archive_reads_back_exactly",
+                "crates/lodwright-assets/src/bsa.rs::an_uncompressed_archive_reads_back_exactly",
+                "crates/lodwright-assets/src/bsa.rs::embedded_names_are_skipped_in_both_modes",
+                "crates/lodwright-assets/src/bsa.rs::lookup_ignores_case_and_separator_style",
+                "crates/lodwright-assets/src/bsa.rs::the_stored_size_counts_the_embedded_path"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.archive_hostile_input",
+              "title": "A truncated or corrupt archive, or one claiming huge sizes, is refused without allocating or panicking",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/bsa.rs::a_huge_claimed_size_never_allocates",
+                "crates/lodwright-assets/src/bsa.rs::an_entry_claiming_more_than_the_cap_is_refused_before_inflating",
+                "crates/lodwright-assets/src/bsa.rs::counts_that_exceed_the_archive_are_refused_without_allocating",
+                "crates/lodwright-assets/src/bsa.rs::every_truncation_of_an_archive_is_a_typed_error_or_a_readable_archive",
+                "crates/lodwright-assets/src/bsa.rs::other_versions_are_refused_by_number",
+                "crates/lodwright-assets/src/bsa.rs::random_corruption_never_panics",
+                "crates/lodwright-assets/src/bsa.rs::the_wrong_magic_is_not_an_archive"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.archive_writer",
+              "title": "Version 104 archives are written with the game's name hashes, records in hash order and no embedded names; the same bytes at any thread count",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/pack.rs::name_hashes_match_the_numbers_measured_on_game_archives",
+                "crates/lodwright-assets/src/pack.rs::output_does_not_depend_on_the_order_of_the_input",
+                "crates/lodwright-assets/src/pack.rs::output_is_identical_when_written_from_many_threads",
+                "crates/lodwright-assets/src/pack.rs::records_hold_the_hashes_of_the_names_in_ascending_order",
+                "crates/lodwright-assets/src/pack.rs::round_trip_gives_the_same_names_and_bytes_stored_and_compressed",
+                "crates/lodwright-assets/tests/pack.rs::the_streamed_archive_has_the_bytes_of_the_in_memory_one",
+                "crates/lodwright-assets/tests/pack.rs::the_tiny_archive_matches_its_hex_golden"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.archive_writer_limits",
+              "title": "A path the format cannot hold, two names with one hash, a file over 1 GiB or an archive over 4 GiB is refused with its reason",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/pack.rs::a_file_over_one_gibibyte_is_refused_with_its_path",
+                "crates/lodwright-assets/src/pack.rs::an_archive_over_four_gibibytes_is_refused_and_says_to_split",
+                "crates/lodwright-assets/src/pack.rs::paths_the_format_cannot_hold_are_refused",
+                "crates/lodwright-assets/src/pack.rs::two_different_names_with_one_hash_are_refused",
+                "crates/lodwright-assets/src/pack.rs::two_paths_that_differ_only_in_case_are_refused"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.archive_extraction",
+              "title": "An archive extracts below one folder only, removes the folder when dropped and leaves none when the archive is bad",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/extract.rs::a_bad_archive_leaves_no_folder_behind",
+                "crates/lodwright-assets/src/extract.rs::a_name_that_leaves_the_folder_is_refused",
+                "crates/lodwright-assets/src/extract.rs::every_file_lands_below_the_folder_with_its_bytes",
+                "crates/lodwright-assets/src/extract.rs::the_folder_is_removed_when_the_result_is_dropped"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.asset_resolution",
+              "title": "A loose file beats an archive; a later plugin's archive beats an earlier one; the override marker lets a later archive replace",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/resolve.rs::a_later_plugins_archive_beats_an_earlier_one",
+                "crates/lodwright-assets/src/resolve.rs::a_loose_file_beats_an_archive",
+                "crates/lodwright-assets/src/resolve.rs::archives_of_one_plugin_load_alphanumerically",
+                "crates/lodwright-assets/src/resolve.rs::lookup_ignores_case_and_separators_and_misses_return_none",
+                "crates/lodwright-assets/src/resolve.rs::with_the_marker_the_literal_rule_lets_a_later_archive_replace",
+                "crates/lodwright-assets/src/resolve.rs::without_the_marker_the_literal_rule_keeps_the_earlier_archive"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "formats.plugins.stub_plugin",
+              "title": "The stub plugin has no record, one master and the archive's base name, and is the same bytes every time",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-assets/src/stub.rs::names_that_cannot_be_files_are_refused",
+                "crates/lodwright-assets/src/stub.rs::the_names_share_the_base_and_differ_in_the_extension",
+                "crates/lodwright-assets/src/stub.rs::the_stub_is_the_same_bytes_every_time",
+                "crates/lodwright-assets/tests/stub.rs::the_stub_plugin_matches_its_hex_golden",
+                "crates/lodwright-plugin-meta/tests/stub.rs::the_stub_has_the_one_master_it_was_given_and_is_not_a_master",
+                "crates/lodwright-plugin-meta/tests/stub.rs::the_stub_holds_no_record_and_names_its_author"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "generate",
+      "title": "Generating a far view",
+      "counts": {
+        "total": 50,
+        "missing": 5,
+        "implemented": 45,
+        "tagged": 43,
+        "passing": 43,
+        "covered": 40,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 1
+      },
+      "groups": [
+        {
+          "id": "generate.memory",
+          "title": "Memory budget",
+          "origin": "ours",
+          "counts": {
+            "total": 6,
+            "missing": 1,
+            "implemented": 5,
+            "tagged": 4,
+            "passing": 4,
+            "covered": 4,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "generate.memory.workers_scale_to_the_budget",
+              "title": "Each world's terrain step gets as many workers as the budget leaves room for, never fewer than one",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/budget.rs::the_workers_shrink_to_what_the_budget_leaves_and_never_below_one",
+                "crates/lodwright-api/tests/memory_pressure.rs::a_low_memory_budget_lowers_the_terrain_workers_of_every_world"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.memory.budget_changes_no_byte",
+              "title": "A run under a low budget writes the same files and the same manifest as one without",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/memory_pressure.rs::a_run_under_a_low_memory_budget_builds_every_world",
+                "crates/lodwright-api/tests/memory_pressure.rs::a_run_under_a_low_memory_budget_lists_the_same_files_and_blocks_in_its_manifest",
+                "crates/lodwright-api/tests/memory_pressure.rs::a_run_under_a_low_memory_budget_writes_the_same_files_byte_for_byte"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.memory.preflight_refusal",
+              "title": "A run whose plugins alone suggest more than the budget is refused as memory_limit before anything is read",
+              "origin": "ours",
+              "state": "implemented",
+              "tests": []
+            },
+            {
+              "id": "generate.memory.many_worlds_stay_under_the_cap",
+              "title": "A run over sixty worlds stays under its budget: worlds are walked one at a time",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/memory_budget.rs::a_sixty_world_run_stays_under_its_memory_budget",
+                "crates/lodwright-core/tests/many_worlds_memory.rs::walking_sixty_worlds_one_at_a_time_stays_under_the_cap"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.memory.peak_memory_on_linux",
+              "title": "The result reports the peak memory where the platform says (Linux)",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/budget.rs::the_resident_size_is_read_from_a_status_text"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.memory.memory_cap_option",
+              "title": "A memory cap option bounds the whole run, not only the terrain workers",
+              "origin": "ours",
+              "state": "missing",
+              "tests": []
+            }
+          ]
+        },
+        {
+          "id": "generate.output_safety",
+          "title": "Where a run may write",
+          "origin": "ours",
+          "counts": {
+            "total": 8,
+            "missing": 0,
+            "implemented": 8,
+            "tagged": 8,
+            "passing": 8,
+            "covered": 5,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "generate.output_safety.not_empty_refused",
+              "title": "An output folder that is not empty and has no manifest is refused unless --overwrite is given",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::a_full_output_folder_without_a_manifest_is_refused_unless_overwrite_is_set"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.output_safety.inside_data_folder_refused",
+              "title": "An output folder inside the data folder, or a link into it, is refused",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_output_folder_inside_the_data_folder_is_refused",
+                "crates/lodwright-api/tests/symlinks.rs::a_new_output_folder_under_a_linked_parent_that_points_into_the_data_folder_is_refused",
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_inside_the_data_folder_named_through_a_linked_data_folder_is_refused",
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_that_is_a_link_into_the_data_folder_is_refused",
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_that_is_a_link_to_the_data_folder_itself_is_refused",
+                "crates/lodwright-cli/tests/contract_cli.rs::generate_refuses_an_output_folder_inside_the_data_folder"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.output_safety.git_tree_refused",
+              "title": "An output folder in a git working tree, or a link into one, is refused",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_output_folder_that_is_a_working_tree_root_is_refused",
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_that_is_a_link_inside_a_git_working_tree_is_refused_wherever_it_points",
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.output_safety.links_never_followed",
+              "title": "A link below the output folder is refused and nothing is written through it; a link at a file's path is replaced, never followed",
+              "origin": "ours",
+              "state": "passing",
+              "tests": [
+                "crates/lodwright-api/tests/symlinks.rs::a_link_at_the_path_of_an_output_file_is_replaced_and_its_target_left_alone",
+                "crates/lodwright-api/tests/symlinks.rs::a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target",
+                "crates/lodwright-api/tests/symlinks.rs::nothing_is_written_through_a_linked_folder_inside_the_output_folder",
+                "crates/lodwright-gen/src/output.rs::a_link_at_the_temporary_path_is_removed_not_followed",
+                "crates/lodwright-gen/src/output.rs::a_linked_folder_on_the_path_is_refused_and_found"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": false
+              }
+            },
+            {
+              "id": "generate.output_safety.linked_output_folder_allowed",
+              "title": "An output folder that is a link to a separate folder is written through and stays up to date",
+              "origin": "ours",
+              "state": "passing",
+              "tests": [
+                "crates/lodwright-api/tests/symlinks.rs::an_output_folder_that_is_a_link_to_a_separate_folder_is_written_through_and_stays_up_to_date"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": false
+              }
+            },
+            {
+              "id": "generate.output_safety.untrusted_manifest_paths",
+              "title": "A manifest that lists an absolute path or one with .. is not trusted and never makes a run remove a file outside the output folder",
+              "origin": "ours",
+              "state": "passing",
+              "tests": [
+                "crates/lodwright-api/tests/symlinks.rs::an_old_manifest_entry_outside_the_output_folder_is_never_removed"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": false
+              }
+            },
+            {
+              "id": "generate.output_safety.files_appear_atomically",
+              "title": "Every file is written to a temporary name and renamed, so a failed write leaves the previous file and no temporary file",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/output.rs::a_failed_stream_leaves_the_previous_file_and_no_temp_file",
+                "crates/lodwright-gen/src/output.rs::a_file_is_written_with_its_folders_and_its_record",
+                "crates/lodwright-gen/src/output.rs::a_write_whose_rename_fails_leaves_no_temporary_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.output_safety.plain_relative_paths_only",
+              "title": "Only plain relative paths are written; a path that climbs out of the folder is refused and nothing is written",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/output.rs::a_path_that_climbs_out_is_refused_and_nothing_is_written"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "generate.pack",
+          "title": "Packing the output into an archive",
+          "origin": "ours",
+          "counts": {
+            "total": 9,
+            "missing": 0,
+            "implemented": 9,
+            "tagged": 9,
+            "passing": 9,
+            "covered": 9,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 1
+          },
+          "items": [
+            {
+              "id": "generate.pack.pack_switch",
+              "title": "output.pack leaves one BSA archive, a stub plugin, an empty override marker and the manifest, and nothing loose",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/pack.rs::packing_replaces_the_loose_files_with_the_archive_and_the_stub",
+                "crates/lodwright-api/tests/pack.rs::a_packed_run_leaves_the_archive_the_stub_and_the_manifest_and_no_loose_file",
+                "crates/lodwright-api/tests/pack.rs::the_archive_holds_what_a_loose_run_writes_and_the_stub_reads_as_an_empty_plugin"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_not_in_digests",
+              "title": "The pack switch changes neither the request digest nor a block digest",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/pack.rs::the_switch_changes_neither_the_request_digest_nor_a_block",
+                "crates/lodwright-contract/src/request.rs::the_pack_switch_is_off_by_default_written_only_when_on_and_left_out_of_the_digest"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.packed_output_up_to_date",
+              "title": "A packed output is up to date when the archive, the stub and the marker are intact; a changed archive is rebuilt",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/pack.rs::a_packed_output_is_up_to_date_and_a_changed_archive_is_rebuilt"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_off_goes_loose",
+              "title": "Switching the option off builds the loose files again and the output never holds both forms",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/pack.rs::switching_the_option_off_rebuilds_the_loose_files_and_the_output_never_holds_both"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_failure_is_safe",
+              "title": "A packing step that fails leaves the loose output as it was, with no spool and no temporary file",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/pack.rs::a_file_that_fails_mid_pack_leaves_no_spool_no_temp_file_and_no_full_progress",
+                "crates/lodwright-api/src/pack.rs::an_unreadable_file_fails_before_anything_is_written",
+                "crates/lodwright-api/tests/pack.rs::a_packing_step_that_fails_leaves_the_loose_output_as_it_was"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_same_bytes_at_any_thread_count",
+              "title": "The archive is the same bytes at any thread count",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/pack.rs::the_archive_is_the_same_bytes_for_any_thread_count"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_progress_phase",
+              "title": "A pack phase sits between the last world and the manifest and the run total never goes back",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/pack.rs::the_pack_phase_sits_between_the_worlds_and_the_manifest_and_the_run_total_never_goes_back"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_compression_choice",
+              "title": "Only object and tree textures are stored compressed; a file listed by several worlds is packed once",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/pack.rs::a_file_that_several_worlds_list_is_packed_once",
+                "crates/lodwright-api/src/pack.rs::only_object_and_tree_textures_are_compressed"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.packed_output_verifies",
+              "title": "An archive extracted again is the same files and verifies clean; damage made before packing is found",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/packed_verify.rs::an_extracted_archive_of_a_generated_folder_is_the_same_files_and_verifies_clean",
+                "crates/lodwright-api/tests/packed_verify.rs::verify_of_the_extracted_archive_finds_a_block_that_was_damaged_before_packing"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.pack.pack_by_default",
+              "title": "Packing is the default output form",
+              "origin": "ours",
+              "state": "deferred",
+              "tests": []
+            }
+          ]
+        },
+        {
+          "id": "generate.run",
+          "title": "A generate run",
+          "origin": "ours",
+          "counts": {
+            "total": 15,
+            "missing": 1,
+            "implemented": 14,
+            "tagged": 13,
+            "passing": 13,
+            "covered": 13,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "generate.run.writes_lod_and_manifest",
+              "title": "A run writes the far view and a manifest",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::generate_writes_the_lod_and_a_manifest_and_answers_generated"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.up_to_date",
+              "title": "A run with an unchanged request and unchanged plugins answers up to date and writes nothing",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::a_second_call_with_the_same_request_is_up_to_date",
+                "crates/lodwright-cli/tests/request.rs::a_request_writes_files_and_a_manifest_and_the_second_run_does_nothing"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.rebuilt_for_another_build",
+              "title": "An output written by another version or another build is rebuilt, not reported up to date",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_output_written_by_another_build_of_the_same_version_is_rebuilt",
+                "crates/lodwright-api/tests/generate.rs::an_output_written_by_another_version_is_rebuilt_not_reported_up_to_date"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.terrain_blocks_kept",
+              "title": "Terrain blocks whose inputs did not change are kept; the others are built",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/request.rs::unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.stale_files_removed",
+              "title": "Files the old manifest listed that the new run neither kept nor wrote are removed",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::prune_removes_unlisted_files_and_the_folders_they_leave_empty",
+                "crates/lodwright-cli/tests/request.rs::a_changed_request_replaces_the_old_files_and_a_deleted_file_is_regenerated"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.object_and_tree_blocks_rebuilt",
+              "title": "Object and tree blocks are rebuilt in full whenever a run is not up to date",
+              "origin": "ours",
+              "state": "implemented",
+              "tests": []
+            },
+            {
+              "id": "generate.run.object_and_tree_blocks_reused",
+              "title": "Object and tree blocks are reused when their inputs did not change",
+              "origin": "ours",
+              "state": "missing",
+              "tests": []
+            },
+            {
+              "id": "generate.run.same_bytes_at_any_thread_count",
+              "title": "The output files are the same bytes at any thread count",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::the_output_files_are_the_same_bytes_at_any_thread_count",
+                "crates/lodwright-gen/src/terrain.rs::the_thread_count_does_not_change_a_single_byte",
+                "crates/lodwright-gen/tests/atlas_pages.rs::the_thread_count_does_not_change_a_byte_of_the_object_files"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.threads_option",
+              "title": "A thread count on the command line replaces the one in the request file",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/request.rs::a_thread_count_on_the_command_line_replaces_the_one_in_the_request_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.load_order_file",
+              "title": "A load order file lists the plugins; comments, blank lines and active markers are skipped; plugin names match in any case",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/load.rs::a_load_order_file_skips_comments_blanks_and_active_markers",
+                "crates/lodwright-api/src/load.rs::plugins_are_found_without_regard_to_case"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.inputs_digest",
+              "title": "The inputs digest follows the plugin contents and not the folder they are in",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/load.rs::the_inputs_digest_changes_with_plugin_contents_and_not_with_the_folder"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.warnings_file",
+              "title": "A run with warnings leaves lodwright-warnings.json beside the manifest, one record per plugin and kind",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_in_the_file"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.warnings_capped",
+              "title": "The result's own warning list holds at most twenty lines and the last line counts the rest",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/generate.rs::warnings_are_capped_at_twenty_and_the_last_line_counts_the_rest"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.typed_errors",
+              "title": "A failure is a typed error with a stable code and a copy text that holds no command line",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/error.rs::the_copy_text_names_the_version_the_code_the_summary_and_the_detail",
+                "crates/lodwright-api/src/error.rs::the_copy_text_shows_the_home_folder_as_a_tilde",
+                "crates/lodwright-api/tests/generate.rs::a_missing_plugin_is_a_typed_error_whose_copy_text_has_no_command_line"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.run.step_profile",
+              "title": "The result profiles every step with its time and the files it wrote",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/profile.rs::steps_are_reported_in_order_with_their_world_and_the_files_they_wrote",
+                "crates/lodwright-api/tests/generate.rs::the_result_profiles_every_step_with_its_time_and_the_files_it_wrote"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "generate.staging",
+          "title": "Staging, cancel and resume",
+          "origin": "ours",
+          "counts": {
+            "total": 12,
+            "missing": 3,
+            "implemented": 9,
+            "tagged": 9,
+            "passing": 9,
+            "covered": 9,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "generate.staging.staging_and_swap",
+              "title": "A run builds into <output>.lodwright-staging and replaces the output folder only when every step has finished",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::a_swap_puts_staging_in_place_keeps_the_users_top_level_files_and_drops_the_checkpoint",
+                "crates/lodwright-api/src/staging.rs::a_swap_with_no_previous_output_is_one_rename"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.cancel_keeps_the_output",
+              "title": "A cancelled run leaves the previous output untouched",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::a_cancel_during_a_second_run_leaves_the_previous_output_untouched",
+                "crates/lodwright-api/tests/generate.rs::a_token_cancelled_before_the_call_writes_nothing"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.kill_keeps_the_output",
+              "title": "A run killed over an existing output leaves that output untouched",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/kill_resume.rs::a_run_killed_over_an_existing_output_leaves_that_output_untouched"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.resume_after_cancel",
+              "title": "The next run resumes a cancelled run from its checkpoint and writes what an uninterrupted run writes",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::a_cancel_after_the_first_block_keeps_the_staging_folder_the_next_call_resumes_from",
+                "crates/lodwright-api/tests/generate.rs::a_resumed_run_writes_the_files_an_uninterrupted_run_writes"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.resume_after_kill",
+              "title": "A killed run resumes to the bytes of an uninterrupted run",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/kill_resume.rs::a_killed_run_resumes_to_the_bytes_of_an_uninterrupted_run"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.other_staging_discarded",
+              "title": "A staging folder of another request or other inputs, or without a checkpoint, is removed and the run starts clean",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::staging_of_another_request_or_without_a_checkpoint_is_removed_and_the_same_one_is_kept",
+                "crates/lodwright-api/tests/generate.rs::a_changed_request_discards_the_staging_folder_of_the_interrupted_one",
+                "crates/lodwright-api/tests/generate.rs::a_checkpoint_carries_no_block_of_a_run_with_other_plugins"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.killed_swap_recovered",
+              "title": "A swap killed between its two renames is put back by the next run",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::a_swap_killed_after_the_first_rename_is_put_back_and_one_killed_after_the_second_is_cleaned_up",
+                "crates/lodwright-api/tests/generate.rs::a_swap_killed_between_its_renames_is_restored_by_the_next_call"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.users_files_kept",
+              "title": "A file the user keeps at the top of the output folder survives a regenerate",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::a_swap_leaves_the_generated_files_of_the_previous_form_behind_and_keeps_the_users",
+                "crates/lodwright-api/tests/generate.rs::a_file_the_user_keeps_at_the_top_of_the_output_survives_a_regenerate"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.free_space_checked",
+              "title": "A run that cannot fit is refused before building, with output_no_space",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/staging.rs::a_run_that_cannot_fit_is_refused_with_a_plain_line"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "generate.staging.run_lock",
+              "title": "A lock refuses two runs on one output folder",
+              "origin": "ours",
+              "state": "missing",
+              "tests": []
+            },
+            {
+              "id": "generate.staging.swap_marker",
+              "title": "A swap marker tells the next run which half of a swap it finds",
+              "origin": "ours",
+              "state": "missing",
+              "tests": []
+            },
+            {
+              "id": "generate.staging.fsync_before_swap",
+              "title": "Files, the checkpoint and the folders are synced before the swap",
+              "origin": "ours",
+              "state": "missing",
+              "tests": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "objects",
+      "title": "Object LOD",
+      "counts": {
+        "total": 30,
+        "missing": 1,
+        "implemented": 29,
+        "tagged": 28,
+        "passing": 28,
+        "covered": 28,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 1
+      },
+      "groups": [
+        {
+          "id": "objects.blocks",
+          "title": "Object blocks",
+          "origin": "original",
+          "counts": {
+            "total": 12,
+            "missing": 0,
+            "implemented": 12,
+            "tagged": 11,
+            "passing": 11,
+            "covered": 11,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "objects.blocks.merged_per_block",
+              "title": "Objects are merged per block with their transform, scale and atlas UVs",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::objects_are_merged_per_block_with_transform_scale_and_atlas_uvs",
+                "crates/lodwright-gen/tests/objects.rs::the_shape_offset_is_not_scaled_and_node_rotations_are_ignored"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.block_grid_and_paths",
+              "title": "Object blocks start at the grid anchor and follow the game's tree",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/layout.rs::object_paths_follow_the_games_tree",
+                "crates/lodwright-gen/tests/objects.rs::object_blocks_start_at_the_grid_anchor"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.atlas_pair",
+              "title": "Textures are packed into a BC3 atlas with a half-size normal atlas, deterministically and without overlap",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/atlas.rs::rectangles_never_overlap_and_stay_inside",
+                "crates/lodwright-gen/src/atlas.rs::textures_that_fit_one_atlas_make_one_page_as_pack_does",
+                "crates/lodwright-gen/src/atlas.rs::the_smallest_size_that_fits_is_chosen_and_the_result_is_deterministic",
+                "crates/lodwright-gen/tests/objects.rs::the_atlas_pair_is_written_as_bc3_and_the_normal_atlas_is_half_size"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.atlas_pages",
+              "title": "Textures that do not fit one atlas keep their size on further numbered pages, each with its own shape",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/layout.rs::atlas_pages_after_the_first_are_numbered_with_two_digits",
+                "crates/lodwright-gen/src/atlas.rs::textures_that_do_not_fit_one_atlas_keep_their_size_on_more_pages",
+                "crates/lodwright-gen/tests/atlas_pages.rs::objects_on_a_second_atlas_page_are_drawn_with_their_own_texture",
+                "crates/lodwright-gen/tests/objects.rs::textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its_own_shape"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.uvs_held_at_the_edge",
+              "title": "A UV outside its texture is held at the edge, not wrapped to the far edge",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::a_uv_outside_the_texture_is_held_at_its_edge_not_wrapped_to_the_far_edge"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.blocks_over_the_16_bit_limits",
+              "title": "A block over the 16-bit vertex or triangle limit is written as several shapes and nothing is left out",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_its_vertices_fit",
+                "crates/lodwright-gen/tests/objects.rs::a_block_over_the_16_bit_vertex_limit_is_written_as_several_shapes_and_nothing_is_left_out",
+                "crates/lodwright-gen/tests/objects.rs::a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its_texture_set"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.faces_under_ground_and_water_dropped",
+              "title": "objects.drop_under_terrain and objects.drop_under_water leave out faces that cannot be seen and count them",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/events.rs::a_request_that_drops_faces_under_the_ground_counts_them_in_the_result",
+                "crates/lodwright-gen/tests/objects.rs::a_model_with_every_face_dropped_writes_no_block_and_counts_its_faces",
+                "crates/lodwright-gen/tests/objects.rs::faces_under_water_are_dropped_only_in_cells_that_have_water",
+                "crates/lodwright-gen/tests/objects.rs::faces_wholly_under_the_ground_are_dropped_and_faces_above_or_crossing_it_are_kept"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.lod_models_read",
+              "title": "A model's own LOD model is read, also when bytes follow its footer, and takes the full model's texture when it has none",
+              "origin": "original",
+              "state": "implemented",
+              "tests": []
+            },
+            {
+              "id": "objects.blocks.texture_formats",
+              "title": "An uncompressed 32-bit texture is used as it is, not replaced by a flat colour",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::an_uncompressed_32_bit_texture_is_used_not_replaced_by_a_flat_colour"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.object_warnings",
+              "title": "A missing or unreadable model, and an absent or undecodable texture, are named in warnings of their own kind",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::a_model_that_is_missing_or_unreadable_is_named_in_a_warning",
+                "crates/lodwright-gen/tests/objects.rs::a_texture_that_is_absent_and_one_that_cannot_be_decoded_get_different_warnings"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.objects_output_deterministic",
+              "title": "Nothing is written when no model can be read and the output is deterministic",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/objects.rs::nothing_is_written_when_no_model_can_be_read_and_output_is_deterministic"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.blocks.shipped_block_shapes",
+              "title": "objects.shapes_from_shipped_blocks takes a model's far shape from the blocks the games ship, in the world a rule names",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::shipped_shape_rules_act_only_in_the_world_they_name"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "objects.far_shapes",
+          "title": "Far shapes from full models",
+          "origin": "ours",
+          "counts": {
+            "total": 4,
+            "missing": 0,
+            "implemented": 4,
+            "tagged": 4,
+            "passing": 4,
+            "covered": 4,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 1
+          },
+          "items": [
+            {
+              "id": "objects.far_shapes.full_model_shapes",
+              "title": "objects.shapes_from_full_models draws objects without a LOD model with a simplified copy of their full model, and reports them",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/full_model_shapes.rs::with_the_switch_on_it_is_drawn_with_fewer_triangles_and_reported"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.far_shapes.full_model_rules",
+              "title": "A rule gives a far shape to the models it names and to no other; its limits win over the switch",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/tests/full_model_shapes.rs::a_rule_gives_a_shape_to_what_it_names_and_to_no_other_model",
+                "crates/lodwright-gen/tests/full_model_shapes.rs::a_rules_limits_win_over_the_switch_for_every_object",
+                "crates/lodwright-gen/tests/full_model_shapes.rs::another_object_of_the_same_model_that_no_rule_names_stays_out"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.far_shapes.see_through_models_stay_out",
+              "title": "A model that is see-through, or drawn without lighting, gets no far shape",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/far_simplify.rs::a_model_keeps_its_alpha_shapes_unless_it_has_no_other",
+                "crates/lodwright-gen/src/far_simplify.rs::a_shape_drawn_without_lighting_is_left_out",
+                "crates/lodwright-gen/tests/full_model_shapes.rs::a_model_drawn_without_lighting_gets_no_far_shape"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.far_shapes.simplifier",
+              "title": "The simplifier keeps the requested share of triangles within an error limit, keeps seams closed and locked borders, and gives the same output on every system",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/far_simplify.rs::a_corner_two_shapes_share_stays_in_both",
+                "crates/lodwright-gen/tests/far_simplify.rs::a_flat_grid_keeps_the_requested_share_within_the_error",
+                "crates/lodwright-gen/tests/far_simplify.rs::a_texture_seam_stays_closed_on_both_sides",
+                "crates/lodwright-gen/tests/far_simplify.rs::locked_border_vertices_and_edges_stay",
+                "crates/lodwright-gen/tests/far_simplify.rs::the_error_limit_stops_a_rough_surface_before_the_triangle_target",
+                "crates/lodwright-gen/tests/far_simplify.rs::the_output_is_the_same_on_every_system"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.far_shapes.impostor_trees",
+              "title": "Trees are drawn as impostors by the engine",
+              "origin": "ours",
+              "state": "deferred",
+              "tests": []
+            }
+          ]
+        },
+        {
+          "id": "objects.selection",
+          "title": "Which objects enter the far view",
+          "origin": "original",
+          "counts": {
+            "total": 14,
+            "missing": 1,
+            "implemented": 13,
+            "tagged": 13,
+            "passing": 13,
+            "covered": 13,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "objects.selection.flagged_statics",
+              "title": "Only statics flagged visible when distant become instances; the plugin that sets the flag is the one that counts",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/objects.rs::only_flagged_statics_are_instances_and_a_later_plugin_overrides_a_reference",
+                "crates/lodwright-core/src/objects.rs::the_plugin_that_marks_an_object_visible_from_far_is_the_one_whose_flag_counts"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.high_priority",
+              "title": "High Priority LOD is read from the base object as well as the reference; bit 16 on an activator is not it",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/objects.rs::bit_16_on_an_activator_is_not_high_priority",
+                "crates/lodwright-core/src/objects.rs::high_priority_on_a_static_base_counts_as_on_the_reference"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.disabled_references",
+              "title": "A reference disabled when the game starts is left out; a persistent one still counts, as in the game's own blocks",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/objects.rs::a_disabled_reference_is_left_out_and_a_flagged_reference_counts_for_an_unflagged_base",
+                "crates/lodwright-core/src/objects.rs::a_later_plugin_that_enables_a_disabled_reference_brings_it_back",
+                "crates/lodwright-core/src/objects.rs::a_persistent_disabled_reference_still_counts_as_in_the_games_own_blocks"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.enable_parents",
+              "title": "A reference follows the start state of its enable parent chain, across worlds and plugins",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/objects.rs::a_later_plugin_that_disables_an_enable_parent_takes_its_children_out",
+                "crates/lodwright-core/src/objects.rs::a_long_enable_parent_chain_is_followed_to_its_end_and_a_loop_counts_as_enabled",
+                "crates/lodwright-core/src/objects.rs::a_reference_follows_the_start_state_of_its_enable_parent_chain",
+                "crates/lodwright-core/src/objects.rs::an_enable_parent_in_another_world_decides_the_start_state"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.deleted_references",
+              "title": "A reference a later plugin deletes drops out and a third plugin can place it again",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/objects.rs::a_reference_deleted_by_a_later_plugin_drops_out_and_a_third_plugin_can_place_it_again"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.static_collections",
+              "title": "A static collection keeps its parts and placements; a collection with parts is not also drawn as its own model",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/plugin.rs::a_static_collection_keeps_its_parts_and_placements",
+                "crates/lodwright-gen/tests/full_model_shapes.rs::a_static_collection_with_parts_is_not_also_drawn_as_its_own_model"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.temporary_references",
+              "title": "A temporary reference goes to the block of its cell",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/plugin.rs::temporary_references_keep_their_cell_and_persistent_ones_do_not",
+                "crates/lodwright-gen/tests/objects.rs::a_temporary_reference_goes_to_the_block_of_its_cell"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.exclusion_rules",
+              "title": "inclusion rules exclude objects by plugin, record or model glob, and keep only listed plugins",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_exclusion_rule_beats_an_include_rule_and_a_rule_for_another_plugin_takes_nothing",
+                "crates/lodwright-gen/src/filter.rs::an_exclusion_rule_still_wins_over_an_included_object",
+                "crates/lodwright-gen/src/filter.rs::globs_match_runs_and_anchor_both_ends",
+                "crates/lodwright-gen/src/filter.rs::rules_exclude_by_plugin_record_and_model_and_only_keeps_listed_plugins"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.include_rules",
+              "title": "inclusion.include_rules takes objects nothing marks visible from far into object LOD, by model pattern, plugin and record type",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_include_rule_for_a_plugin_outside_the_load_order_is_a_request_error",
+                "crates/lodwright-api/tests/generate.rs::an_include_rule_takes_the_enabled_references_and_reports_the_held_back_ones",
+                "crates/lodwright-api/tests/generate.rs::include_rules_give_the_same_bytes_on_every_run",
+                "crates/lodwright-api/tests/generate.rs::without_include_rules_an_object_nothing_marks_visible_from_far_stays_out_unreported",
+                "crates/lodwright-gen/src/filter.rs::an_include_rule_matches_by_model_pattern_plugin_and_record_type"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.include_rules_respect_enable_parents",
+              "title": "An include rule takes a reference by the start state of its enable parent",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::an_include_rule_takes_a_reference_set_opposite_to_its_disabled_enable_parent",
+                "crates/lodwright-api/tests/generate.rs::an_include_rule_takes_a_reference_whose_enable_parent_stands_at_the_start"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.rule_generate_option",
+              "title": "An include rule's generate option gives far shapes to its objects only",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::a_rule_with_generate_gives_far_shapes_to_its_objects_only"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.far_model_without_flag",
+              "title": "objects.far_model_without_flag takes unflagged references that have a far model and stand when the game starts",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::far_model_without_flag_does_not_take_a_reference_twice_or_one_without_a_far_model",
+                "crates/lodwright-api/tests/generate.rs::far_model_without_flag_leaves_out_a_base_drawn_as_a_tree_billboard",
+                "crates/lodwright-api/tests/generate.rs::far_model_without_flag_takes_the_lamps_that_stand_at_the_start_and_only_with_the_option"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.far_lights",
+              "title": "objects.far_lights writes the steady lights near drawn objects as one marked unlit light-point shape per block",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/tests/generate.rs::far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_with_the_option"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "objects.selection.terrain_cell_rules",
+              "title": "Inclusion rules per plugin apply to terrain cells",
+              "origin": "original",
+              "state": "missing",
+              "tests": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "terrain",
+      "title": "Terrain LOD",
+      "counts": {
+        "total": 41,
+        "missing": 3,
+        "implemented": 38,
+        "tagged": 38,
+        "passing": 38,
+        "covered": 38,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 0
+      },
+      "groups": [
+        {
+          "id": "terrain.mesh",
+          "title": "Terrain blocks and meshes",
+          "origin": "original",
+          "counts": {
+            "total": 12,
+            "missing": 2,
+            "implemented": 10,
+            "tagged": 10,
+            "passing": 10,
+            "covered": 10,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "terrain.mesh.levels",
+              "title": "Blocks are planned at the four levels 4, 8, 16 and 32 cells; a world gets only the levels its width allows",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/terrain.rs::a_plan_lists_each_block_with_data_with_paths_and_texture_sizes",
+                "crates/lodwright-core/src/terrain.rs::the_defaults_cover_the_four_levels_in_order",
+                "crates/lodwright-gen/src/terrain.rs::a_small_world_gets_only_the_levels_its_width_allows_and_the_settings_say_so"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.adaptive_mesh",
+              "title": "Each block is meshed by greedy insertion under a height tolerance, from source samples only",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/tin.rs::a_lower_tolerance_never_gives_fewer_vertices",
+                "crates/lodwright-core/src/tin.rs::flat_ground_needs_little_more_than_its_border",
+                "crates/lodwright-core/src/tin.rs::the_reported_error_is_the_true_error_and_stays_near_the_tolerance",
+                "crates/lodwright-core/src/tin.rs::vertices_are_source_samples_and_indices_are_valid"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.vertex_cap",
+              "title": "A block never has more than 32767 vertices: the tolerance is raised until it fits",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/tin.rs::the_vertex_cap_is_honoured_by_raising_the_tolerance"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.shared_edge_vertices",
+              "title": "Neighbouring blocks share identical vertices along their common edge",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/tin.rs::a_spike_on_the_block_edge_gets_an_edge_vertex_and_the_neighbour_agrees",
+                "crates/lodwright-core/src/tin.rs::neighbouring_blocks_share_identical_edge_vertices"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.no_triangles_over_holes",
+              "title": "Ground without data gets no triangles",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/tin.rs::ground_without_data_gets_no_triangles_and_no_data_at_all_gives_none"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.block_names_and_paths",
+              "title": "Block files are named from the world, level and block coordinates the game's tree uses",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/layout.rs::a_mesh_path_carries_world_level_and_coordinates",
+                "crates/lodwright-core/src/terrain.rs::plan_blocks_are_sorted_and_negative_blocks_use_multiples_of_the_level",
+                "crates/lodwright-gen/src/terrain.rs::a_world_gives_blocks_textures_and_a_settings_file_at_the_planned_paths"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.grid_starts_at_the_minimum_corner",
+              "title": "The block grid starts at the cell of the world's minimum corner, as the game's own tree does",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/raster.rs::an_anchored_grid_starts_blocks_at_the_anchor_for_every_level",
+                "crates/lodwright-core/src/worldspace.rs::the_grid_anchor_is_the_minimum_corner_cell_unless_the_land_starts_on_the_32_grid",
+                "crates/lodwright-gen/src/terrain.rs::a_corner_on_the_grid_or_no_corner_gives_the_old_names_and_digests"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.skirts",
+              "title": "Skirts under every border vertex close the gap to a neighbouring block of the same or another level",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/terrain.rs::every_border_vertex_has_a_skirt_below_it_at_every_level_pair",
+                "crates/lodwright-core/src/terrain.rs::skirt_triangles_face_away_from_the_block",
+                "crates/lodwright-core/src/terrain.rs::skirts_off_leave_the_mesh_as_it_was",
+                "crates/lodwright-core/src/terrain.rs::the_skirt_vertices_count_against_the_cap"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.faces_under_the_water_dropped",
+              "title": "terrain.drop_under_water leaves out terrain faces the water hides",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/terrain.rs::faces_whose_corners_all_lie_below_the_water_are_dropped",
+                "crates/lodwright-gen/src/terrain.rs::faces_below_the_water_are_dropped_only_with_the_option_and_it_enters_the_digest"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.mesh.unseen_faces_hidden",
+              "title": "Faces that cannot be seen are hidden (optimize unseen)",
+              "origin": "original",
+              "state": "missing",
+              "tests": []
+            },
+            {
+              "id": "terrain.mesh.per_block_quality_tuning",
+              "title": "Per-block quality is tuned against the game's own blocks",
+              "origin": "original",
+              "state": "missing",
+              "tests": []
+            },
+            {
+              "id": "terrain.mesh.empty_world_writes_nothing",
+              "title": "A world with no land writes nothing; a world name that is not a folder name is refused",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/terrain.rs::an_empty_world_writes_nothing"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "terrain.textures",
+          "title": "Terrain textures and settings",
+          "origin": "original",
+          "counts": {
+            "total": 10,
+            "missing": 0,
+            "implemented": 10,
+            "tagged": 10,
+            "passing": 10,
+            "covered": 10,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "terrain.textures.diffuse_from_layers",
+              "title": "The diffuse map blends each cell's land texture layers over its base by opacity, in order",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/diffuse.rs::layers_blend_over_the_base_by_opacity_in_order"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.texture_resolution",
+              "title": "A land texture resolves through its texture set, falls back to its icon, and follows a later plugin's override",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/texture.rs::a_later_ltex_pointing_at_another_set_changes_the_resolved_path",
+                "crates/lodwright-core/src/texture.rs::a_later_plugin_overriding_a_texture_changes_the_resolved_path",
+                "crates/lodwright-core/src/texture.rs::a_texture_resolves_through_its_texture_set",
+                "crates/lodwright-core/src/texture.rs::a_texture_without_a_set_falls_back_to_its_icon"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.normal_maps",
+              "title": "Normal maps follow the heights; flat ground gives the flat normal and gaps do not poison the map",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/images.rs::a_constant_slope_gives_one_constant_normal",
+                "crates/lodwright-gen/src/images.rs::flat_ground_gives_the_flat_normal",
+                "crates/lodwright-gen/src/images.rs::gaps_do_not_poison_the_map"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.default_land_texture",
+              "title": "The default land texture is read from the game's ini",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/diffuse.rs::the_default_land_texture_is_read_from_the_landscape_section_of_an_ini"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.land_light",
+              "title": "terrain.land_light darkens the composed far land the way the near land is lit",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/diffuse.rs::lit_scales_each_texture_by_the_up_component_of_its_normal_map_and_leaves_flat_fills"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.texture_tiling",
+              "title": "terrain.texture_scales sets how often a land texture repeats; unlisted textures repeat once",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/diffuse.rs::a_tile_with_scale_two_repeats_twice_as_often_across_a_quadrant",
+                "crates/lodwright-gen/src/diffuse.rs::scale_one_samples_exactly_as_before_and_unlisted_textures_keep_it",
+                "crates/lodwright-gen/src/terrain.rs::a_tiling_scale_other_than_one_changes_the_digest_of_the_blocks_that_use_the_texture"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.specular_alpha",
+              "title": "terrain.levels[].specular_alpha carries specular in the alpha of the normal maps, written as BC3",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/texture.rs::the_specular_exponent_is_read_and_the_range_spans_the_load_order",
+                "crates/lodwright-gen/src/terrain.rs::a_flat_source_gives_a_uniform_alpha_scaled_over_the_range",
+                "crates/lodwright-gen/src/terrain.rs::a_missing_exponent_everywhere_gives_opaque_alpha_and_never_a_panic",
+                "crates/lodwright-gen/src/terrain.rs::specular_off_writes_bc1_normals_and_the_same_bytes_whatever_the_exponents",
+                "crates/lodwright-gen/src/terrain.rs::specular_on_writes_bc3_normals_and_leaves_the_diffuse_alone",
+                "crates/lodwright-gen/src/terrain.rs::the_exponents_change_the_digest_only_of_levels_that_write_them"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.game_tiles_kept",
+              "title": "terrain.compose_shipped_tiles off: the game's own far-land tile is left to the engine where no mod changed the land",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/shipped.rs::a_tile_is_kept_where_the_game_ships_it_and_no_mod_changed_the_land",
+                "crates/lodwright-api/src/shipped.rs::nothing_is_kept_when_the_games_grid_is_not_ours_shifted_by_whole_blocks",
+                "crates/lodwright-gen/src/terrain.rs::a_tile_the_game_ships_is_left_out_and_the_block_digest_changes"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.missing_texture_warning",
+              "title": "A land texture that is in no folder or archive is its own warning kind and names the path only",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/generate.rs::a_land_texture_that_is_in_no_folder_or_archive_is_its_own_kind_and_names_the_path_only"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.textures.settings_file",
+              "title": "One .lod settings file per world, with the world's bounds and block sizes",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/layout.rs::the_settings_path_is_one_file_per_world",
+                "crates/lodwright-gen/src/terrain.rs::the_settings_file_carries_the_world_bounds"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "terrain.water",
+          "title": "Far water",
+          "origin": "original",
+          "counts": {
+            "total": 8,
+            "missing": 1,
+            "implemented": 7,
+            "tagged": 7,
+            "passing": 7,
+            "covered": 7,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "terrain.water.water_planes",
+              "title": "A cell with ground below its water height gets a flat water plane at that height, unless water is turned off",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/terrain.rs::a_cell_with_ground_below_its_water_gets_a_water_plane_unless_turned_off",
+                "crates/lodwright-gen/src/water.rs::a_cell_below_its_water_gets_one_rectangle_in_its_segment"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_height_per_cell",
+              "title": "A cell's water height comes from its record or its world's default",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_has_water_cell_without_any_default_has_no_height",
+                "crates/lodwright-core/src/worldspace.rs::world_record_fields_and_cell_water_are_read"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.placeholder_water_shape",
+              "title": "A block of default water at or below zero gets the placeholder shape",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/water.rs::a_block_of_default_water_at_or_below_zero_gets_the_placeholder_shape",
+                "crates/lodwright-nif/src/terrain.rs::the_placeholder_shape_comes_between_the_terrain_and_the_water"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_walls",
+              "title": "terrain.water_walls writes a wall on every border side that has water",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/water.rs::a_whole_block_of_water_has_a_wall_on_each_of_its_four_borders",
+                "crates/lodwright-gen/src/water.rs::walls_stand_on_the_block_border_and_not_inside_it"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_at_coarser_levels",
+              "title": "At levels 8 to 32 squares of one water height merge into rectangles",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/water.rs::at_coarser_levels_cells_of_one_water_height_merge_and_other_heights_do_not"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_shared_vertices",
+              "title": "terrain.water_shared_vertices writes a corner two rectangles share once",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/water.rs::shared_corners_are_written_once_and_the_planes_stay_the_same"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_polygons",
+              "title": "terrain.water_polygons writes the water of a block as traced polygons of the same wet squares",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/outline.rs::a_ring_is_joined_through_a_bridge_and_keeps_every_vertex_once",
+                "crates/lodwright-gen/src/outline.rs::every_pattern_of_a_four_by_four_grid_is_covered_exactly",
+                "crates/lodwright-gen/src/outline.rs::random_larger_grids_with_two_heights_are_covered_exactly",
+                "crates/lodwright-gen/src/water.rs::polygons_cover_the_same_ground_with_only_the_corners_of_the_outline"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.water.water_sloped_edges",
+              "title": "The game's own water outline and sloped edges are reproduced",
+              "origin": "original",
+              "state": "missing",
+              "tests": []
+            }
+          ]
+        },
+        {
+          "id": "terrain.worlds",
+          "title": "Worlds and land",
+          "origin": "original",
+          "counts": {
+            "total": 11,
+            "missing": 0,
+            "implemented": 11,
+            "tagged": 11,
+            "passing": 11,
+            "covered": 11,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "terrain.worlds.land_heights",
+              "title": "A land record's VHGT decodes to 33 by 33 heights, exactly for heights on the grid",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/land.rs::arbitrary_heights_decode_within_half_a_step",
+                "crates/lodwright-core/src/land.rs::random_walks_on_the_grid_round_trip_exactly",
+                "crates/lodwright-core/tests/golden_vhgt.rs::a_synthetic_hill_decodes_to_the_stored_heights"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.height_raster",
+              "title": "The heights of a world become one raster of whole blocks with shared edge vertices",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/raster.rs::a_block_crop_returns_exactly_that_blocks_cells",
+                "crates/lodwright-core/src/raster.rs::the_shared_edge_reads_one_value_and_the_larger_cell_wins",
+                "crates/lodwright-core/src/raster.rs::width_and_height_are_whole_blocks_for_random_worlds",
+                "crates/lodwright-core/tests/golden_terrain.rs::a_synthetic_world_plans_to_the_stored_blocks"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.later_plugins_override",
+              "title": "A later plugin overrides cells and the world record through its master index",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_later_plugin_overrides_cells_through_its_master_index",
+                "crates/lodwright-core/src/worldspace.rs::a_plugin_overriding_wrld_replaces_the_record_and_adds_cells"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.missing_master_named",
+              "title": "A missing master is reported by name",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_missing_master_is_reported_by_name"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.world_names",
+              "title": "A world is named by its editor id, or by its form id when it has none",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_single_plugin_gives_its_world_named_by_the_editor_id",
+                "crates/lodwright-core/src/worldspace.rs::a_world_without_an_editor_id_is_named_by_its_form_id"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.world_extent",
+              "title": "The extent follows the declared corners, and a world with land beyond 128 cells gets the 128-cell window of the game's files",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_world_with_land_beyond_128_cells_gets_the_128_cell_window_of_the_game_s_files",
+                "crates/lodwright-core/src/worldspace.rs::bounds_cover_every_cell_including_negative_ones",
+                "crates/lodwright-core/src/worldspace.rs::the_extent_follows_the_declared_corners_as_the_game_s_settings_do"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.flat_cells_without_land",
+              "title": "Cells without land inside the extent are flat at the default land height",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::cells_without_land_inside_the_extent_are_flat_at_the_default_land_height"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.child_worlds",
+              "title": "A child world keeps its own data by default and takes its parent's default heights only when its flag says so and the request asks",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::a_child_names_its_parent_and_keeps_only_its_own_data_by_default",
+                "crates/lodwright-core/src/worldspace.rs::a_flagged_child_takes_the_parents_default_heights_only_when_asked",
+                "crates/lodwright-core/src/worldspace.rs::an_unflagged_child_inherits_nothing_even_when_asked",
+                "crates/lodwright-core/src/worldspace.rs::inheritance_follows_a_chain_and_survives_a_cycle"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.ttw_child_worlds",
+              "title": "Tale of Two Wastelands children resolve their parent through the Fallout 3 master",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::ttw_children_inherit_the_overridden_defaults_when_flagged",
+                "crates/lodwright-core/src/worldspace.rs::ttw_children_resolve_their_parent_through_the_fallout_3_master"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.seam_error",
+              "title": "The seam error between neighbouring cells is measured: zero for matching seams, a step shows",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::matching_seams_have_zero_error_and_a_step_shows_up"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "terrain.worlds.terrain_lod_eligibility",
+              "title": "A world gets terrain LOD only with seventeen cells with land and a display name",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/worldspace.rs::terrain_lod_needs_seventeen_cells_with_land_and_a_display_name"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trees",
+      "title": "Tree LOD",
+      "counts": {
+        "total": 8,
+        "missing": 0,
+        "implemented": 8,
+        "tagged": 7,
+        "passing": 7,
+        "covered": 7,
+        "gated": 0,
+        "not_applicable": 0,
+        "deferred": 0
+      },
+      "groups": [
+        {
+          "id": "trees.lod",
+          "title": "Tree LOD",
+          "origin": "original",
+          "counts": {
+            "total": 8,
+            "missing": 0,
+            "implemented": 8,
+            "tagged": 7,
+            "passing": 7,
+            "covered": 7,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "trees.lod.list_blocks_and_atlas",
+              "title": "A world's trees are written as a list file, one block per cell group and one atlas",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/trees.rs::a_block_and_a_type_list_round_trip_and_have_the_sizes_the_layout_gives",
+                "crates/lodwright-gen/src/trees.rs::trees_are_written_with_a_list_an_atlas_and_one_block_per_cell_group"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.blocks_align_to_the_world_corner",
+              "title": "Tree blocks align to the world corner; cells below it are out of range",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/trees.rs::blocks_align_to_the_world_corner_and_cells_below_it_are_out_of_range"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.only_flagged_bases",
+              "title": "Only flagged bases become tree types; hidden or fallen references leave empty blocks",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-core/src/trees.rs::only_flagged_bases_become_types_and_hidden_or_fallen_references_leave_empty_blocks"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.billboard_names",
+              "title": "Billboard names use the defining plugin, the model stem and the form id without load index",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/trees.rs::billboard_names_use_the_defining_plugin_the_model_stem_and_the_form_id_without_load_index"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.shared_atlas_rectangles",
+              "title": "Identical billboards share one atlas rectangle and the output is repeatable",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/trees.rs::identical_billboards_share_one_atlas_rectangle_and_output_is_repeatable"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.swamp_atlas",
+              "title": "A DLC4 world uses the swamp atlas; a world without billboards writes nothing",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/trees.rs::a_dlc4_world_uses_the_swamp_atlas_and_a_world_without_billboards_writes_nothing"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.settings_bounds",
+              "title": "The settings file overrides the bounds only for the sizes it states",
+              "origin": "original",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/trees.rs::the_settings_file_overrides_the_bounds_only_for_sizes_it_states"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "trees.lod.tree_order_in_block",
+              "title": "The order of trees inside a block is the game's own",
+              "origin": "original",
+              "state": "implemented",
+              "tests": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "title": "Verify and measure",
+      "counts": {
+        "total": 16,
+        "missing": 0,
+        "implemented": 16,
+        "tagged": 14,
+        "passing": 14,
+        "covered": 14,
+        "gated": 2,
+        "not_applicable": 0,
+        "deferred": 1
+      },
+      "groups": [
+        {
+          "id": "verify.folder",
+          "title": "Verifying a folder",
+          "origin": "ours",
+          "counts": {
+            "total": 11,
+            "missing": 0,
+            "implemented": 11,
+            "tagged": 11,
+            "passing": 11,
+            "covered": 11,
+            "gated": 0,
+            "not_applicable": 0,
+            "deferred": 0
+          },
+          "items": [
+            {
+              "id": "verify.folder.structure_checks",
+              "title": "verify checks the formats of terrain blocks, object blocks, tree blocks, textures and settings files, and finds damage",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/world_commands.rs::verify_passes_a_generated_folder_and_fails_a_damaged_one",
+                "crates/lodwright-gen/src/verify.rs::a_generated_terrain_folder_verifies_clean_and_damage_is_found",
+                "crates/lodwright-gen/src/verify.rs::a_settings_file_wider_than_128_cells_is_an_error",
+                "crates/lodwright-gen/src/verify.rs::an_object_block_with_its_origin_on_the_root_node_is_an_error"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.exit_codes",
+              "title": "verify exits 0 clean, 1 with findings, 2 on a usage error and 3 on an unreadable folder",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/cli.rs::help_documents_the_exit_codes_of_verify",
+                "crates/lodwright-cli/tests/cli.rs::verify_against_a_missing_reference_exits_three",
+                "crates/lodwright-cli/tests/cli.rs::verify_against_an_equal_reference_exits_zero",
+                "crates/lodwright-cli/tests/cli.rs::verify_of_a_clean_folder_exits_zero",
+                "crates/lodwright-cli/tests/cli.rs::verify_of_a_file_instead_of_a_folder_exits_three",
+                "crates/lodwright-cli/tests/cli.rs::verify_of_a_missing_folder_exits_three",
+                "crates/lodwright-cli/tests/cli.rs::verify_with_a_difference_from_the_reference_exits_one",
+                "crates/lodwright-cli/tests/cli.rs::verify_with_an_error_in_the_folder_exits_one",
+                "crates/lodwright-cli/tests/cli.rs::verify_without_a_folder_or_with_an_unknown_option_exits_two"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.reference_blocks_by_name",
+              "title": "With --reference, blocks present on both sides are compared by name in lower case",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/verify.rs::blocks_are_measured_against_the_reference_by_name"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.water_iou",
+              "title": "verify measures the water overlap (IoU) of every block with water on either side and fails a block under --water-iou",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/world_commands.rs::a_block_under_the_water_iou_threshold_is_a_difference_and_exits_one"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.terrain_height_difference",
+              "title": "verify compares terrain heights on a 33 by 33 grid and fails a block over --height-tolerance",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/verify_reports.rs::terrain_heights_are_compared_and_a_tolerance_makes_a_difference"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.object_agreement",
+              "title": "verify counts the vertices of an object block with no counterpart in the reference, in any order",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/verify.rs::a_vertex_moved_beyond_the_tolerance_is_unmatched_and_within_it_is_not",
+                "crates/lodwright-gen/src/verify.rs::object_blocks_get_error_numbers_and_their_atlas_its_use",
+                "crates/lodwright-gen/src/verify.rs::the_same_vertices_in_another_order_all_match"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.texture_correlation",
+              "title": "verify reports the Pearson correlation of each block's diffuse and normal map with the reference's",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/correlation.rs::a_block_with_an_unreadable_texture_is_left_out",
+                "crates/lodwright-gen/src/correlation.rs::a_brightness_shift_does_not_change_the_correlation",
+                "crates/lodwright-gen/src/correlation.rs::an_inverted_image_correlates_at_minus_one",
+                "crates/lodwright-gen/src/correlation.rs::blocks_are_matched_by_name_in_lower_case_and_normals_follow_the_diffuse",
+                "crates/lodwright-gen/src/correlation.rs::identical_varying_images_correlate_at_one_in_every_channel",
+                "crates/lodwright-gen/src/correlation.rs::images_of_different_sizes_have_no_correlation",
+                "crates/lodwright-gen/src/correlation.rs::two_flat_images_of_different_colours_correlate_at_zero"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.far_metrics",
+              "title": "verify reports position, UV and silhouette errors of object blocks and the use of each atlas",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-gen/src/metrics.rs::a_block_against_itself_has_no_error",
+                "crates/lodwright-gen/src/metrics.rs::a_missing_half_shows_in_the_silhouette",
+                "crates/lodwright-gen/src/metrics.rs::a_raised_surface_shows_as_its_height_in_position_error",
+                "crates/lodwright-gen/src/metrics.rs::atlas_use_is_the_share_its_triangles_cover",
+                "crates/lodwright-gen/src/metrics.rs::half_the_texture_detail_is_one_step_of_uv_error"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.known_differences",
+              "title": "--known-differences moves listed differences out of the failures and reports a listed path that no longer differs as stale",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/src/known.rs::a_listed_difference_becomes_known_and_a_listed_path_without_one_is_stale",
+                "crates/lodwright-cli/tests/world_commands.rs::a_known_differences_list_accepts_its_blocks_reports_stale_entries_and_prints_levels"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.reports_hold_no_game_data",
+              "title": "A report holds file names and numbers only, never content read from a file",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/verify_reports.rs::no_file_content_reaches_a_report",
+                "crates/lodwright-cli/tests/verify_reports.rs::verify_reports_equal_their_golden_files_for_four_folder_pairs"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.folder.refuses_git_working_trees",
+              "title": "verify refuses a folder or reference inside a git working tree unless --allow-in-repo is given for that run",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/verify_reports.rs::a_folder_inside_a_git_working_tree_is_refused_unless_allowed_for_that_run"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "verify.measure",
+          "title": "Bands and landmarks",
+          "origin": "ours",
+          "counts": {
+            "total": 5,
+            "missing": 0,
+            "implemented": 5,
+            "tagged": 3,
+            "passing": 3,
+            "covered": 3,
+            "gated": 2,
+            "not_applicable": 0,
+            "deferred": 1
+          },
+          "items": [
+            {
+              "id": "verify.measure.bands",
+              "title": "lodwright bands prints the minimum and maximum of every statistic over several verify reports; a zero-width band is an exact match",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-cli/tests/bands.rs::identical_runs_give_zero_width_bands",
+                "crates/lodwright-contract/src/bands.rs::a_changed_run_widens_only_the_statistics_that_changed",
+                "crates/lodwright-contract/src/bands.rs::identical_runs_give_zero_width_bands",
+                "crates/lodwright-contract/src/bands.rs::values_are_rounded_to_three_decimals_so_float_noise_does_not_widen_a_band"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.measure.landmarks",
+              "title": "lodwright landmarks says whether each named landmark is written, missing, excluded, without a far model or unresolved",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/landmarks.rs::a_bad_landmark_line_is_refused_with_its_number",
+                "crates/lodwright-api/src/landmarks.rs::a_landmark_file_gives_references_and_positions_with_their_notes",
+                "crates/lodwright-cli/tests/landmarks.rs::each_landmark_is_written_missing_excluded_without_a_far_model_or_unresolved"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.measure.landmark_baseline",
+              "title": "A landmark baseline passes when nothing is lost and fails when a written landmark is gone",
+              "origin": "ours",
+              "state": "covered",
+              "tests": [
+                "crates/lodwright-api/src/landmarks.rs::a_comparison_fails_for_a_landmark_that_was_written_and_is_not_or_lost_triangles",
+                "crates/lodwright-api/src/landmarks.rs::a_report_reads_back_as_the_baseline_it_was",
+                "crates/lodwright-cli/tests/landmarks.rs::a_baseline_passes_when_nothing_is_lost_and_fails_when_a_written_landmark_is_gone"
+              ],
+              "platforms": {
+                "linux": true,
+                "macos": true,
+                "windows": true
+              }
+            },
+            {
+              "id": "verify.measure.release_test_on_real_data",
+              "title": "A release passes the checklist on the owner's real data (docs/RELEASE-TEST.md)",
+              "origin": "ours",
+              "state": "gated",
+              "tests": []
+            },
+            {
+              "id": "verify.measure.in_game_acceptance",
+              "title": "Generated blocks load and draw in the game",
+              "origin": "ours",
+              "state": "deferred",
+              "tests": []
+            },
+            {
+              "id": "verify.measure.step_timing_guard",
+              "title": "The terrain block and atlas steps stay within a few times their recorded cost",
+              "origin": "ours",
+              "state": "gated",
+              "tests": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

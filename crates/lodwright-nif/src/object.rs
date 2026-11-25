@@ -854,7 +854,7 @@ mod shapes_tests {
 #[cfg(test)]
 mod lights_tests {
     use super::{
-        FAR_LIGHTS_MARKER, FarLightsShape, ObjectBlock, SEGMENTS, object_block_shapes,
+        FAR_LIGHTS_MARKER, FarLightsShape, LIGHT_TYPES, ObjectBlock, SEGMENTS, TYPES,
         object_block_with_lights, read_object_shapes,
     };
     use crate::{Body, NifFile};
@@ -950,14 +950,27 @@ mod lights_tests {
     }
 
     #[test]
-    fn without_light_points_the_block_is_the_one_without_the_option() {
+    fn without_light_points_the_block_has_no_marker_and_no_light_blocks() {
         let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
         let n = [[0.0, 0.0, 1.0]; 3];
         let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
         let i = [0, 1, 2];
         let block = object(&v, &n, &uv, &i);
-        let with = object_block_with_lights(std::slice::from_ref(&block), None).unwrap();
-        let without = object_block_shapes(std::slice::from_ref(&block)).unwrap();
-        assert_eq!(with.write().unwrap(), without.write().unwrap());
+        let nif = object_block_with_lights(std::slice::from_ref(&block), None).unwrap();
+        assert_eq!(nif.header.strings, Vec::<Vec<u8>>::new());
+        assert_eq!(nif.header.block_types.len(), TYPES.len());
+        assert!(
+            nif.header
+                .block_types
+                .iter()
+                .all(|t| !LIGHT_TYPES.contains(&t.as_slice()))
+        );
+        assert_eq!(
+            nif.blocks.len(),
+            7,
+            "root, four blocks of the shape, multibound and its box"
+        );
+        let back = NifFile::read(&nif.write().unwrap()).unwrap();
+        assert_eq!(read_object_shapes(&back).unwrap().len(), 1);
     }
 }

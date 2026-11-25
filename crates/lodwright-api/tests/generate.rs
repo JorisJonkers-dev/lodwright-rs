@@ -1187,6 +1187,10 @@ fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_
         })
         .collect::<Vec<_>>();
     assert_eq!(light_data, vec![12]);
+    // a block with its light shape is a well-formed object block to the verifier
+    let verification = lodwright_gen::verify_folder(&on_out);
+    assert!(verification.object_blocks > 0);
+    assert!(verification.errors.is_empty(), "{:?}", verification.errors);
 
     let (off, off_out) = far_lights_job("far-lights-off");
     done(generate(&off, &mut NoProgress, &CancelToken::new()).unwrap());
@@ -1275,6 +1279,18 @@ fn far_model_without_flag_does_not_take_a_reference_twice_or_one_without_a_far_m
         )),
         "{records:?}"
     );
+}
+
+#[test]
+fn far_lights_off_is_not_written_and_keeps_the_request_digest() {
+    let (job, _) = far_lights_job("far-lights-digest");
+    let mut on = job.request.clone();
+    on.objects.far_lights = true;
+    let text = serde_json::to_string(&job.request).unwrap();
+    assert!(!text.contains("far_lights"), "{text}");
+    let back: Request = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.digest(), job.request.digest());
+    assert_ne!(on.digest(), job.request.digest());
 }
 
 #[test]

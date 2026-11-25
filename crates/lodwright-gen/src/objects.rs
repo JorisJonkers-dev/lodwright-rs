@@ -106,6 +106,8 @@ const FAR_LIGHT_HALF: f32 = 96.0;
 const FAR_LIGHT_DIM: f32 = 1.0;
 /// Light points per block at most: each takes 12 vertices of the shape's 65535 and 12 of its 65535 triangles.
 const FAR_LIGHTS_PER_BLOCK: usize = 5000;
+// every vertex index of a block's light points fits the shape's 16-bit indices
+const _: () = assert!(FAR_LIGHTS_PER_BLOCK * 12 <= u16::MAX as usize);
 
 /// The geometry of a block's far light points.
 #[derive(Default)]
@@ -148,7 +150,10 @@ fn light_points(
         let colour = [c[0], c[1], c[2], 1.0];
         let at = [l.pos[0] - origin.0, l.pos[1] - origin.1, l.pos[2]];
         for quad in &corners {
-            let first = u16::try_from(out.vertices.len()).unwrap_or(u16::MAX);
+            // cannot fail: at most FAR_LIGHTS_PER_BLOCK lights of 12 vertices each (checked above, at compile time)
+            let Ok(first) = u16::try_from(out.vertices.len()) else {
+                return out;
+            };
             for (k, corner) in quad.iter().enumerate() {
                 out.vertices
                     .push([at[0] + corner[0], at[1] + corner[1], at[2] + corner[2]]);

@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "terrain.mesh"
+title = "Terrain blocks and meshes"
+origin = "original"
+notes = "Terrain LOD blocks at levels 4, 8, 16 and 32 (docs/spec/terrain-lod.md, docs/design.md)."
+
+[[item]]
+id = "levels"
+title = "Blocks are planned at the four levels 4, 8, 16 and 32 cells; a world gets only the levels its width allows"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/terrain.rs"]
+
+[[item]]
+id = "adaptive_mesh"
+title = "Each block is meshed by greedy insertion under a height tolerance, from source samples only"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/tin.rs"]
+
+[[item]]
+id = "vertex_cap"
+title = "A block never has more than 32767 vertices: the tolerance is raised until it fits"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/tin.rs"]
+
+[[item]]
+id = "shared_edge_vertices"
+title = "Neighbouring blocks share identical vertices along their common edge"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/tin.rs"]
+
+[[item]]
+id = "no_triangles_over_holes"
+title = "Ground without data gets no triangles"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/tin.rs"]
+
+[[item]]
+id = "block_names_and_paths"
+title = "Block files are named from the world, level and block coordinates the game's tree uses"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/layout.rs"]
+
+[[item]]
+id = "grid_starts_at_the_minimum_corner"
+title = "The block grid starts at the cell of the world's minimum corner, as the game's own tree does"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/raster.rs"]
+
+[[item]]
+id = "skirts"
+title = "Skirts under every border vertex close the gap to a neighbouring block of the same or another level"
+status = "implemented"
+origin = "ours"
+evidence = ["crates/lodwright-core/src/terrain.rs"]
+
+[[item]]
+id = "faces_under_the_water_dropped"
+title = "terrain.drop_under_water leaves out terrain faces the water hides"
+status = "implemented"
+origin = "ours"
+evidence = ["crates/lodwright-core/src/terrain.rs"]
+
+[[item]]
+id = "unseen_faces_hidden"
+title = "Faces that cannot be seen are hidden (optimize unseen)"
+status = "missing"
+
+[[item]]
+id = "per_block_quality_tuning"
+title = "Per-block quality is tuned against the game's own blocks"
+status = "missing"
+
+[[item]]
+id = "empty_world_writes_nothing"
+title = "A world with no land writes nothing; a world name that is not a folder name is refused"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/terrain.rs"]

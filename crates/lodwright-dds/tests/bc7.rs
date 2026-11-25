@@ -2,6 +2,7 @@
 //! Reading BC7 files with a DX10 extension header, built here block by block.
 
 use lodwright_dds::{DdsError, decode, decode_image};
+use lodwright_testkit::{covers, ids};
 
 /// A DDS file with a DX10 extension header naming `dxgi`, followed by `data`.
 fn dx10_file(width: u32, height: u32, dxgi: u32, data: &[u8]) -> Vec<u8> {
@@ -40,6 +41,7 @@ fn solid_block(rgba7: [u8; 4]) -> [u8; 16] {
 
 #[test]
 fn a_bc7_file_with_a_dx10_header_is_decoded_block_by_block() {
+    covers(&[ids::formats::meshes_and_images::DDS_READER]);
     // two blocks side by side: 8 by 4 pixels
     let mut data = Vec::new();
     data.extend_from_slice(&solid_block([100, 50, 25, 127]));
@@ -71,6 +73,7 @@ fn a_dx10_header_with_another_format_is_named_in_the_error() {
 
 #[test]
 fn a_bc7_file_shorter_than_its_blocks_is_truncated() {
+    covers(&[ids::formats::meshes_and_images::DDS_HOSTILE_INPUT]);
     let one_block = solid_block([1, 2, 3, 4]);
     assert_eq!(
         decode_image(&dx10_file(8, 4, 98, &one_block)).unwrap_err(),

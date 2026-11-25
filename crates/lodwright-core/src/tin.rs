@@ -517,6 +517,7 @@ pub fn mesh_block(
 mod tests {
     use super::mesh_block;
     use lodwright_testkit::rng::Rng;
+    use lodwright_testkit::{covers, ids};
 
     fn field(span: usize, f: impl Fn(f32, f32) -> f32) -> Vec<f32> {
         (0..span * span)
@@ -526,6 +527,7 @@ mod tests {
 
     #[test]
     fn flat_ground_needs_little_more_than_its_border() {
+        covers(&[ids::terrain::mesh::ADAPTIVE_MESH]);
         let m = mesh_block(&vec![80.0; 129 * 129], 129, 1.0, 32767).unwrap();
         assert!(m.mesh.vertices.len() < 200, "{}", m.mesh.vertices.len());
         assert!(m.max_error.abs() < f32::EPSILON);
@@ -546,6 +548,7 @@ mod tests {
 
     #[test]
     fn vertices_are_source_samples_and_indices_are_valid() {
+        covers(&[ids::terrain::mesh::ADAPTIVE_MESH]);
         let mut rng = Rng::new(11);
         let h: Vec<f32> = (0..65 * 65).map(|_| rng.below(500) as f32).collect();
         let m = mesh_block(&h, 65, 20.0, 32767).unwrap().mesh;
@@ -559,6 +562,7 @@ mod tests {
 
     #[test]
     fn a_lower_tolerance_never_gives_fewer_vertices() {
+        covers(&[ids::terrain::mesh::ADAPTIVE_MESH]);
         let h = field(129, |x, y| 40.0 * (x / 9.0).sin() + 25.0 * (y / 13.0).cos());
         let mut last = 0;
         for tolerance in [200.0, 50.0, 20.0, 5.0, 1.0, 0.0] {
@@ -570,6 +574,7 @@ mod tests {
 
     #[test]
     fn the_reported_error_is_the_true_error_and_stays_near_the_tolerance() {
+        covers(&[ids::terrain::mesh::ADAPTIVE_MESH]);
         let h = field(65, |x, y| 30.0 * (x / 7.0).sin() * (y / 11.0).cos());
         for tolerance in [2.0, 4.0, 8.0] {
             let m = mesh_block(&h, 65, tolerance, 32767).unwrap();
@@ -583,6 +588,7 @@ mod tests {
 
     #[test]
     fn the_vertex_cap_is_honoured_by_raising_the_tolerance() {
+        covers(&[ids::terrain::mesh::VERTEX_CAP]);
         let mut rng = Rng::new(3);
         let h: Vec<f32> = (0..129 * 129).map(|_| rng.below(300) as f32).collect();
         let m = mesh_block(&h, 129, 0.0, 600).unwrap();
@@ -592,6 +598,7 @@ mod tests {
 
     #[test]
     fn neighbouring_blocks_share_identical_edge_vertices() {
+        covers(&[ids::terrain::mesh::SHARED_EDGE_VERTICES]);
         // two blocks that share their east / west column but differ inside
         let mut rng = Rng::new(9);
         let shared: Vec<f32> = (0..65).map(|_| rng.below(200) as f32).collect();
@@ -617,6 +624,7 @@ mod tests {
 
     #[test]
     fn ground_without_data_gets_no_triangles_and_no_data_at_all_gives_none() {
+        covers(&[ids::terrain::mesh::NO_TRIANGLES_OVER_HOLES]);
         let span = 65;
         let mut h = vec![f32::NAN; span * span];
         for y in 0..33 {
@@ -662,6 +670,7 @@ mod tests {
 
     #[test]
     fn a_spike_on_the_block_edge_gets_an_edge_vertex_and_the_neighbour_agrees() {
+        covers(&[ids::terrain::mesh::SHARED_EDGE_VERTICES]);
         let mut left = vec![0.0_f32; 65 * 65];
         let mut right = vec![0.0_f32; 65 * 65];
         for y in 0..65 {

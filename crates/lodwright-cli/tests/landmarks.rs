@@ -11,6 +11,7 @@ use lodwright_nif::{
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
 use lodwright_testkit::world::{SyntheticWorld, record_group, world_group};
+use lodwright_testkit::{covers, ids};
 use std::path::PathBuf;
 
 const VISIBLE_WHEN_DISTANT: u32 = 0x8000;
@@ -283,6 +284,7 @@ fn statuses(report: &serde_json::Value) -> Vec<(String, String)> {
 
 #[test]
 fn each_landmark_is_written_missing_excluded_without_a_far_model_or_unresolved() {
+    covers(&[ids::verify::measure::LANDMARKS]);
     let (request, out) = generated("report");
     let list = request.with_extension("landmarks.tsv");
     std::fs::write(&list, LIST).unwrap();
@@ -338,6 +340,7 @@ fn each_landmark_is_written_missing_excluded_without_a_far_model_or_unresolved()
 
 #[test]
 fn a_baseline_passes_when_nothing_is_lost_and_fails_when_a_written_landmark_is_gone() {
+    covers(&[ids::verify::measure::LANDMARK_BASELINE]);
     let (request, _out) = generated("baseline");
     let list = request.with_extension("landmarks.tsv");
     std::fs::write(&list, LIST).unwrap();

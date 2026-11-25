@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "objects.selection"
+title = "Which objects enter the far view"
+origin = "original"
+notes = "Selection of placed references for object LOD (docs/spec/object-lod.md)."
+
+[[item]]
+id = "flagged_statics"
+title = "Only statics flagged visible when distant become instances; the plugin that sets the flag is the one that counts"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/objects.rs"]
+
+[[item]]
+id = "high_priority"
+title = "High Priority LOD is read from the base object as well as the reference; bit 16 on an activator is not it"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/objects.rs"]
+
+[[item]]
+id = "disabled_references"
+title = "A reference disabled when the game starts is left out; a persistent one still counts, as in the game's own blocks"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/objects.rs"]
+
+[[item]]
+id = "enable_parents"
+title = "A reference follows the start state of its enable parent chain, across worlds and plugins"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/objects.rs"]
+
+[[item]]
+id = "deleted_references"
+title = "A reference a later plugin deletes drops out and a third plugin can place it again"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/objects.rs"]
+
+[[item]]
+id = "static_collections"
+title = "A static collection keeps its parts and placements; a collection with parts is not also drawn as its own model"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/plugin.rs"]
+
+[[item]]
+id = "temporary_references"
+title = "A temporary reference goes to the block of its cell"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/plugin.rs"]
+
+[[item]]
+id = "exclusion_rules"
+title = "inclusion rules exclude objects by plugin, record or model glob, and keep only listed plugins"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/filter.rs"]
+
+[[item]]
+id = "include_rules"
+title = "inclusion.include_rules takes objects nothing marks visible from far into object LOD, by model pattern, plugin and record type"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-view-include-rules.md"]
+
+[[item]]
+id = "include_rules_respect_enable_parents"
+title = "An include rule takes a reference by the start state of its enable parent"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/decisions/2026-11-24-far-view-draws-what-stands-at-the-start.md"]
+
+[[item]]
+id = "rule_generate_option"
+title = "An include rule's generate option gives far shapes to its objects only"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/decisions/2026-11-24-a-generate-option-on-each-include-rule.md"]
+
+[[item]]
+id = "far_model_without_flag"
+title = "objects.far_model_without_flag takes unflagged references that have a far model and stand when the game starts"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-models-without-the-far-view-flag.md"]
+
+[[item]]
+id = "terrain_cell_rules"
+title = "Inclusion rules per plugin apply to terrain cells"
+status = "missing"

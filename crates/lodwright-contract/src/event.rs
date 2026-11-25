@@ -79,9 +79,11 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::{BlockKind, Event};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_block_event_is_one_line_with_the_event_tag_first() {
+        covers(&[ids::contract::events::BLOCK_LINES]);
         let line = Event::Block {
             kind: Some(BlockKind::Terrain),
             world: "W".into(),
@@ -107,6 +109,7 @@ mod tests {
 
     #[test]
     fn a_line_without_a_kind_reads_as_before_and_a_line_with_one_reads_its_kind() {
+        covers(&[ids::contract::events::EVENT_KIND]);
         let old: Event = serde_json::from_str(
             r#"{"event":"block","world":"W","level":4,"done":1,"of":9,"up_to_date":true}"#,
         )
@@ -146,6 +149,7 @@ mod tests {
 
     #[test]
     fn a_kind_this_build_does_not_know_reads_as_other() {
+        covers(&[ids::contract::documents::OPEN_ENUMS]);
         let event: Event = serde_json::from_str(
             r#"{"event":"block","kind":"water","world":"W","level":4,"done":1,"of":2}"#,
         )
@@ -161,6 +165,7 @@ mod tests {
 
     #[test]
     fn an_event_line_reads_back_and_ignores_unknown_fields() {
+        covers(&[ids::contract::documents::UNKNOWN_KEYS_IGNORED]);
         let event: Event = serde_json::from_str(
             r#"{"event":"block","world":"W","level":4,"done":1,"of":9,"eta":3}"#,
         )

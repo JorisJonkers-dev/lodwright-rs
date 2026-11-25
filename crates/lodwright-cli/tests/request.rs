@@ -5,6 +5,7 @@ use lodwright_cli::run;
 use lodwright_contract::Request;
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 fn temp(name: &str) -> PathBuf {
@@ -42,6 +43,7 @@ fn write_request(dir: &Path, request: &Request) -> PathBuf {
 
 #[test]
 fn a_request_writes_files_and_a_manifest_and_the_second_run_does_nothing() {
+    covers(&[ids::generate::run::UP_TO_DATE]);
     let d = data("run");
     let out = temp("run-out");
     let request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
@@ -78,6 +80,7 @@ fn a_request_writes_files_and_a_manifest_and_the_second_run_does_nothing() {
 
 #[test]
 fn a_changed_request_replaces_the_old_files_and_a_deleted_file_is_regenerated() {
+    covers(&[ids::generate::run::STALE_FILES_REMOVED]);
     let d = data("change");
     let out = temp("change-out");
     let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
@@ -120,6 +123,7 @@ fn a_changed_request_replaces_the_old_files_and_a_deleted_file_is_regenerated() 
 
 #[test]
 fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
+    covers(&[ids::generate::run::TERRAIN_BLOCKS_KEPT]);
     let d = data("reuse");
     let out = temp("reuse-out");
     let level = |level, quality| lodwright_contract::LevelRequest {
@@ -166,6 +170,7 @@ fn unchanged_blocks_are_kept_changed_ones_rebuilt_and_dropped_ones_removed() {
 
 #[test]
 fn bad_requests_and_unsafe_outputs_are_refused_with_codes() {
+    covers(&[ids::contract::documents::REQUEST_DOCUMENT]);
     let d = data("bad");
     let out = temp("bad-out");
     let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());
@@ -225,6 +230,7 @@ fn bad_requests_and_unsafe_outputs_are_refused_with_codes() {
 
 #[test]
 fn the_request_schema_is_printed_and_names_its_contract() {
+    covers(&[ids::cli::commands::SCHEMA_COMMAND]);
     let args: Vec<String> = ["schema", "request"]
         .iter()
         .map(|s| (*s).to_owned())
@@ -237,6 +243,7 @@ fn the_request_schema_is_printed_and_names_its_contract() {
 
 #[test]
 fn progress_events_are_one_json_line_per_block_in_the_events_file() {
+    covers(&[ids::contract::events::BLOCK_LINES]);
     let d = data("events");
     let out = temp("events-out");
     let events = temp("events.ndjson");
@@ -269,6 +276,7 @@ fn progress_events_are_one_json_line_per_block_in_the_events_file() {
 
 #[test]
 fn a_thread_count_on_the_command_line_replaces_the_one_in_the_request_file() {
+    covers(&[ids::generate::run::THREADS_OPTION]);
     let d = data("threads");
     let out = temp("threads-out");
     let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());

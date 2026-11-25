@@ -330,6 +330,7 @@ pub(crate) fn plane(
 #[cfg(test)]
 mod tests {
     use super::plane;
+    use lodwright_testkit::{covers, ids};
 
     fn grid(rows: &[&str]) -> (Vec<Option<u32>>, Vec<f32>, usize) {
         let n = rows.len();
@@ -380,6 +381,7 @@ mod tests {
 
     #[test]
     fn a_ring_is_joined_through_a_bridge_and_keeps_every_vertex_once() {
+        covers(&[ids::terrain::water::WATER_POLYGONS]);
         // outer 4, hole 4
         check(&["####", "#..#", "#..#", "####"], 12.0, 8);
     }
@@ -397,6 +399,7 @@ mod tests {
 
     #[test]
     fn every_pattern_of_a_four_by_four_grid_is_covered_exactly() {
+        covers(&[ids::terrain::water::WATER_POLYGONS]);
         // all 65536 masks: a plane, when returned, adds up to the squares and winds counter-clockwise
         for mask in 0_u32..1 << 16 {
             let keys: Vec<Option<u32>> = (0..16)
@@ -416,6 +419,7 @@ mod tests {
 
     #[test]
     fn random_larger_grids_with_two_heights_are_covered_exactly() {
+        covers(&[ids::terrain::water::WATER_POLYGONS]);
         // xorshift: deterministic, so a failure names its seed
         let mut state = 0x9E37_79B9_7F4A_7C15_u64;
         let mut next = move || {

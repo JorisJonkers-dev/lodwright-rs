@@ -6,6 +6,7 @@ mod common;
 use lodwright_nif::NifFile;
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::nif::ShapeSpec;
+use lodwright_testkit::{covers, ids};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -46,6 +47,7 @@ fn fixed_input() -> Vec<ShapeSpec> {
 
 #[test]
 fn the_writer_output_for_a_fixed_input_equals_the_stored_hex_dump() {
+    covers(&[ids::formats::meshes_and_images::NIF_ROUND_TRIP]);
     let file = common::build(&fixed_input());
     let bytes = file.write().unwrap();
     assert_eq!(NifFile::read(&bytes).unwrap(), file);

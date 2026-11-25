@@ -270,6 +270,7 @@ mod tests {
         write_checkpoint,
     };
     use lodwright_contract::ManifestFile;
+    use lodwright_testkit::{covers, ids};
     use std::path::{Path, PathBuf};
 
     fn temp(name: &str) -> PathBuf {
@@ -290,6 +291,7 @@ mod tests {
 
     #[test]
     fn a_swap_puts_staging_in_place_keeps_the_users_top_level_files_and_drops_the_checkpoint() {
+        covers(&[ids::generate::staging::STAGING_AND_SWAP]);
         let root = temp("swap");
         let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
         std::fs::create_dir_all(out.join("meshes")).unwrap();
@@ -308,6 +310,7 @@ mod tests {
 
     #[test]
     fn a_swap_leaves_the_generated_files_of_the_previous_form_behind_and_keeps_the_users() {
+        covers(&[ids::generate::staging::USERS_FILES_KEPT]);
         let root = temp("swap-form");
         let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
         std::fs::create_dir_all(out.join("meshes")).unwrap();
@@ -328,6 +331,7 @@ mod tests {
 
     #[test]
     fn a_swap_with_no_previous_output_is_one_rename() {
+        covers(&[ids::generate::staging::STAGING_AND_SWAP]);
         let root = temp("swap-first");
         let (out, stage) = (root.join("out"), root.join("out.lodwright-staging"));
         std::fs::create_dir_all(&stage).unwrap();
@@ -339,6 +343,7 @@ mod tests {
     #[test]
     fn a_swap_killed_after_the_first_rename_is_put_back_and_one_killed_after_the_second_is_cleaned_up()
      {
+        covers(&[ids::generate::staging::KILLED_SWAP_RECOVERED]);
         let root = temp("recover");
         let out = root.join("out");
         let old = root.join("out.lodwright-old");
@@ -355,6 +360,7 @@ mod tests {
 
     #[test]
     fn staging_of_another_request_or_without_a_checkpoint_is_removed_and_the_same_one_is_kept() {
+        covers(&[ids::generate::staging::OTHER_STAGING_DISCARDED]);
         let root = temp("resume");
         let stage = root.join("s");
         std::fs::create_dir_all(&stage).unwrap();
@@ -391,6 +397,7 @@ mod tests {
 
     #[test]
     fn prune_removes_unlisted_files_and_the_folders_they_leave_empty() {
+        covers(&[ids::generate::run::STALE_FILES_REMOVED]);
         let root = temp("prune");
         std::fs::create_dir_all(root.join("a/b")).unwrap();
         std::fs::create_dir_all(root.join("keep")).unwrap();
@@ -411,6 +418,7 @@ mod tests {
 
     #[test]
     fn a_run_that_cannot_fit_is_refused_with_a_plain_line() {
+        covers(&[ids::generate::staging::FREE_SPACE_CHECKED]);
         assert!(check_room(10, 10).is_ok());
         let err = check_room(5 * 1024 * 1024, 1024 * 1024).unwrap_err();
         assert_eq!(err.code, "output_no_space");

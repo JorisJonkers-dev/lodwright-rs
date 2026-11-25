@@ -405,6 +405,7 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
 mod tests {
     use super::{ObjectBlock, SEGMENTS, object_block};
     use crate::{Body, NifFile};
+    use lodwright_testkit::{covers, ids};
 
     fn one_segment(k: usize) -> [u32; SEGMENTS] {
         let mut s = [0; SEGMENTS];
@@ -422,6 +423,7 @@ mod tests {
 
     #[test]
     fn an_object_block_has_seven_blocks_a_segment_table_and_reads_back() {
+        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let (v, uv, i) = tri();
         let n = vec![[0.0, 0.0, 1.0]; 3];
         let t = vec![[1.0, 0.0, 0.0]; 3];
@@ -472,6 +474,7 @@ mod tests {
 
     #[test]
     fn segments_must_cover_the_triangles() {
+        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let (v, uv, i) = tri();
         let z = vec![[0.0, 0.0, 1.0]; 3];
         let bad = object_block(&ObjectBlock {
@@ -497,6 +500,7 @@ mod shapes_tests {
 
     #[test]
     fn a_block_of_two_shapes_links_each_shape_to_its_own_blocks_and_reads_back() {
+        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
         let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
         let n = vec![[0.0, 0.0, 1.0]; 3];
@@ -538,6 +542,7 @@ mod shapes_tests {
     // regression: docs/regressions/2026-11-22-second-atlas-page.md
     #[test]
     fn each_shape_of_a_block_names_its_own_texture_set() {
+        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let v = vec![[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
         let uv = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
         let n = vec![[0.0, 0.0, 1.0]; 3];
@@ -657,6 +662,7 @@ mod shapes_tests {
 
     #[test]
     fn a_block_without_a_shape_is_refused() {
+        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         assert!(object_block_shapes(&[]).is_err());
     }
 }

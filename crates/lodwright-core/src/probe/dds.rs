@@ -405,6 +405,7 @@ mod tests {
     use super::probe;
     use crate::probe::Value;
     use lodwright_testkit::dds::{Pixels, build_file};
+    use lodwright_testkit::{covers, ids};
 
     fn json(bytes: &[u8]) -> String {
         probe(bytes).unwrap().to_json()
@@ -493,6 +494,7 @@ mod tests {
 
     #[test]
     fn unknown_four_cc_text_is_not_echoed() {
+        covers(&[ids::cli::commands::PROBE]);
         let mut bytes = build_file(4, 4, 1, &Pixels::Bc1Solid { colour: 0 });
         bytes[84..88].copy_from_slice(b"Q\"\n\x01");
         let json = json(&bytes);

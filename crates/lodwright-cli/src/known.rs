@@ -98,6 +98,7 @@ pub fn apply(doc: &mut VerifyDoc, list: &BTreeMap<String, Entry>) {
 mod tests {
     use super::{apply, parse};
     use lodwright_contract::{VerifyDoc, VerifyFinding};
+    use lodwright_testkit::{covers, ids};
 
     const LIST: &str = "# path\trelease\treason\n\
         meshes/landscape/lod/w/w.level4.x0.y0.nif\t0.7.0\twater outline not built yet\n\
@@ -113,6 +114,7 @@ mod tests {
 
     #[test]
     fn a_list_reads_its_entries_and_skips_comments_and_blank_lines() {
+        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         let list = parse(LIST).unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(
@@ -123,6 +125,7 @@ mod tests {
 
     #[test]
     fn a_line_without_three_fields_or_a_repeated_path_is_refused_with_its_number() {
+        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         assert!(parse("a.nif\t0.7.0\n").unwrap_err().starts_with("line 1:"));
         assert!(
             parse("a.nif\t0.7.0\tx\nA.NIF\t0.7.0\ty\n")
@@ -133,6 +136,7 @@ mod tests {
 
     #[test]
     fn a_listed_difference_becomes_known_and_a_listed_path_without_one_is_stale() {
+        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         let mut doc = VerifyDoc::new();
         doc.differences = vec![
             finding("meshes/landscape/lod/w/w.level4.x0.y0.nif"),

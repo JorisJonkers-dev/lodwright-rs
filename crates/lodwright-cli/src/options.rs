@@ -153,6 +153,7 @@ pub fn parse(args: &[&str], require_data: bool) -> Result<Options, String> {
 #[cfg(test)]
 mod tests {
     use super::{Format, parse as parse_with};
+    use lodwright_testkit::{covers, ids};
 
     fn parse(args: &[&str]) -> Result<super::Options, String> {
         parse_with(args, true)
@@ -160,6 +161,7 @@ mod tests {
 
     #[test]
     fn data_is_required() {
+        covers(&[ids::cli::commands::OPTIONS_PARSING]);
         assert_eq!(
             parse(&["--plugin", "a.esm"]),
             Err("--data <data-folder> is required".into())
@@ -168,6 +170,7 @@ mod tests {
 
     #[test]
     fn plugins_accumulate_in_order_and_defaults_hold() {
+        covers(&[ids::cli::commands::OPTIONS_PARSING]);
         let o = parse(&["--data", "d", "--plugin", "a.esm", "--plugin", "b.esp"]).unwrap();
         assert_eq!(o.plugins, ["a.esm", "b.esp"]);
         assert_eq!(o.format, Format::Text);
@@ -179,6 +182,7 @@ mod tests {
 
     #[test]
     fn every_option_is_read() {
+        covers(&[ids::cli::commands::OPTIONS_PARSING]);
         let o = parse(&[
             "--data",
             "d",
@@ -224,6 +228,7 @@ mod tests {
 
     #[test]
     fn bad_values_and_unknown_options_are_errors() {
+        covers(&[ids::cli::commands::USAGE_ERRORS]);
         assert!(parse(&["--data"]).unwrap_err().contains("needs a value"));
         assert!(
             parse(&["--data", "d", "--format", "xml"])
@@ -245,6 +250,7 @@ mod tests {
 
     #[test]
     fn a_load_order_file_is_read_and_combined_with_plugins() {
+        covers(&[ids::cli::commands::OPTIONS_PARSING]);
         let file = std::env::temp_dir().join(format!("lodwright-order-{}.txt", std::process::id()));
         std::fs::write(&file, "# order\n*a.esm\nb.esm\n").unwrap();
         let o = parse(&[

@@ -56,6 +56,7 @@ pub fn check_master_order(headers: &[(String, Header)]) -> Result<(), String> {
 mod tests {
     use super::{Header, check_master_order, read_header};
     use lodwright_testkit::plugin::PluginBuilder;
+    use lodwright_testkit::{covers, ids};
 
     fn header(masters: &[&str]) -> Header {
         Header {
@@ -66,6 +67,7 @@ mod tests {
 
     #[test]
     fn masters_are_read_in_header_order() {
+        covers(&[ids::formats::plugins::PLUGIN_HEADER_MASTERS]);
         let bytes = PluginBuilder::new().master("A.esm").master("B.esm").build();
         let h = read_header("x.esp", &bytes).unwrap();
         assert_eq!(h.masters, ["A.esm", "B.esm"]);
@@ -73,11 +75,13 @@ mod tests {
 
     #[test]
     fn text_is_not_a_plugin() {
+        covers(&[ids::formats::plugins::PLUGIN_HEADER_MASTERS]);
         assert!(read_header("x.esp", b"just some text, not a plugin").is_err());
     }
 
     #[test]
     fn a_master_after_its_dependent_is_an_error() {
+        covers(&[ids::formats::plugins::PLUGIN_HEADER_MASTERS]);
         let list = vec![
             ("Patch.esp".to_owned(), header(&["base.esm"])),
             ("Base.esm".to_owned(), header(&[])),

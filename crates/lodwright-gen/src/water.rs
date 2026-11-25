@@ -468,9 +468,11 @@ mod tests {
     use super::{Plane, add_walls, rectangles, water_mesh};
     use lodwright_core::land::CellHeights;
     use lodwright_core::worldspace::Worldspace;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn wet_squares_merge_into_rectangles() {
+        covers(&[ids::terrain::water::WATER_AT_COARSER_LEVELS]);
         // 3 by 3: an L shape
         let wet = [true, true, false, true, true, false, true, false, false];
         assert_eq!(rectangles(&wet, 3), vec![(0, 0, 2, 2), (0, 2, 1, 1)]);
@@ -502,6 +504,7 @@ mod tests {
 
     #[test]
     fn a_block_of_default_water_at_or_below_zero_gets_the_placeholder_shape() {
+        covers(&[ids::terrain::water::PLACEHOLDER_WATER_SHAPE]);
         // every cell on the world's default (an XCLW of the largest float), default height -100
         assert_eq!(placeholder_of(-100.0, None), Some(true));
         assert_eq!(placeholder_of(0.0, None), Some(true));
@@ -514,6 +517,7 @@ mod tests {
 
     #[test]
     fn a_cell_below_its_water_gets_one_rectangle_in_its_segment() {
+        covers(&[ids::terrain::water::WATER_PLANES]);
         let span = 4 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         for y in 0..=32 {
@@ -556,6 +560,7 @@ mod tests {
 
     #[test]
     fn walls_stand_on_the_block_border_and_not_inside_it() {
+        covers(&[ids::terrain::water::WATER_WALLS]);
         // level 8, water over the cells 2 and 3 of the south row: only the south side is on the block's border; its
         // wall is one run of two triangles, the sides inside the block (west, east, north of the water) get none
         let (w, samples) = strip(8, 2, 4);
@@ -589,6 +594,7 @@ mod tests {
 
     #[test]
     fn level_4_planes_overlap_their_neighbours_and_the_walls_stand_in_their_cells_segment() {
+        covers(&[ids::terrain::water::WATER_PLANES]);
         // water over cells 1 and 2 of the south row of a level 4 block: the south side of each cell is on the border;
         // the plane reaches 32 units past it and each wall is a run of its own cell's segment
         let (w, samples) = strip(4, 1, 3);
@@ -617,6 +623,7 @@ mod tests {
 
     #[test]
     fn a_whole_block_of_water_has_a_wall_on_each_of_its_four_borders() {
+        covers(&[ids::terrain::water::WATER_WALLS]);
         let full = |level: i32| {
             let mut w = Worldspace::from_cells(
                 1,
@@ -664,6 +671,7 @@ mod tests {
 
     #[test]
     fn shared_corners_are_written_once_and_the_planes_stay_the_same() {
+        covers(&[ids::terrain::water::WATER_SHARED_VERTICES]);
         // water over cells (0,0), (1,0) and (0,1) at one height, an L: two rectangles that meet along an edge
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
@@ -712,6 +720,7 @@ mod tests {
 
     #[test]
     fn at_coarser_levels_cells_of_one_water_height_merge_and_other_heights_do_not() {
+        covers(&[ids::terrain::water::WATER_AT_COARSER_LEVELS]);
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         // ground at 0 over the two cells (0, 0) and (1, 0)
@@ -742,6 +751,7 @@ mod tests {
 
     #[test]
     fn coarser_levels_use_coarser_squares_and_no_segments() {
+        covers(&[ids::terrain::water::WATER_AT_COARSER_LEVELS]);
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         samples[0] = -5.0;
@@ -784,6 +794,7 @@ mod tests {
 
     #[test]
     fn polygons_cover_the_same_ground_with_only_the_corners_of_the_outline() {
+        covers(&[ids::terrain::water::WATER_POLYGONS]);
         let (w, samples) = staircase();
         let rects = water_mesh(&w, &samples, 8, (0, 0), Plane::Shared).unwrap();
         let polygons = water_mesh(&w, &samples, 8, (0, 0), Plane::Polygons).unwrap();

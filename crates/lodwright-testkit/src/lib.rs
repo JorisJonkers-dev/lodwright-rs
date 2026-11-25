@@ -16,3 +16,7 @@ pub mod plugin;
 pub mod probe_nif;
 pub mod rng;
 pub mod world;
+
+// The feature catalogue's ids (catalogue/, docs/TESTING.md "Feature catalogue"): a test says which items it proves with
+// `covers(&[ids::area::group::ITEM])`; an id the catalogue does not have does not compile.
+include!(concat!(env!("OUT_DIR"), "/tally_ids.rs"));

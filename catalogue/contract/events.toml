@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "contract.events"
+title = "Progress events"
+origin = "ours"
+notes = "One JSON line per finished block, and the same events through the library (docs/contracts.md, Progress events)."
+
+[[item]]
+id = "block_lines"
+title = "generate --events writes one JSON line per finished block, terrain first, then objects, then trees"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/event.rs"]
+
+[[item]]
+id = "event_kind"
+title = "A block line names its kind (terrain, objects, trees); a line without one is a terrain block"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/event.rs"]
+
+[[item]]
+id = "run_wide_progress"
+title = "Every event carries run-wide numbers: run_total is 10000 and run_done never decreases"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/progress.rs"]
+
+[[item]]
+id = "library_progress_and_cancel"
+title = "The library reports each step and block through a Progress callback and stops at a cancel token"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/progress.rs"]

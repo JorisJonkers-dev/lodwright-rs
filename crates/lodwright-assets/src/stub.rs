@@ -133,9 +133,11 @@ pub fn stub_plugin(master: &str, master_size: u64) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::{AUTHOR, PackedNames, stub_plugin};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn the_stub_is_the_same_bytes_every_time() {
+        covers(&[ids::formats::plugins::STUB_PLUGIN]);
         assert_eq!(
             stub_plugin("FalloutNV.esm", 7),
             stub_plugin("FalloutNV.esm", 7)
@@ -158,6 +160,7 @@ mod tests {
 
     #[test]
     fn the_names_share_the_base_and_differ_in_the_extension() {
+        covers(&[ids::formats::plugins::STUB_PLUGIN]);
         let names = PackedNames::new("Lodwright LOD").unwrap();
         assert_eq!(names.archive, "Lodwright LOD.bsa");
         assert_eq!(names.plugin, "Lodwright LOD.esp");
@@ -166,6 +169,7 @@ mod tests {
 
     #[test]
     fn names_that_cannot_be_files_are_refused() {
+        covers(&[ids::formats::plugins::STUB_PLUGIN]);
         for bad in [
             "",
             "a/b",

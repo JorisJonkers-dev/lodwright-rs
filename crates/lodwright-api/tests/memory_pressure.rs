@@ -5,6 +5,7 @@
 //! Under a budget too small for more than one worker, each world's terrain step runs on one worker instead of four
 //! (the result says so in a warning), and the output keeps every byte: same files, same bytes, same manifest entries.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, NoProgress, generate};
@@ -126,6 +127,7 @@ fn both_runs(name: &str) -> (PathBuf, PathBuf, Vec<String>) {
 
 #[test]
 fn a_low_memory_budget_lowers_the_terrain_workers_of_every_world() {
+    covers(&[ids::generate::memory::WORKERS_SCALE_TO_THE_BUDGET]);
     let (_, _, warnings) = both_runs("workers");
     let lowered: Vec<&String> = warnings
         .iter()
@@ -136,6 +138,7 @@ fn a_low_memory_budget_lowers_the_terrain_workers_of_every_world() {
 
 #[test]
 fn a_run_under_a_low_memory_budget_writes_the_same_files_byte_for_byte() {
+    covers(&[ids::generate::memory::BUDGET_CHANGES_NO_BYTE]);
     let (free, held, _) = both_runs("bytes");
     let (a, b) = (contents(&free), contents(&held));
     assert_ne!(a.len(), 0);
@@ -150,6 +153,7 @@ fn a_run_under_a_low_memory_budget_writes_the_same_files_byte_for_byte() {
 
 #[test]
 fn a_run_under_a_low_memory_budget_lists_the_same_files_and_blocks_in_its_manifest() {
+    covers(&[ids::generate::memory::BUDGET_CHANGES_NO_BYTE]);
     let (free, held, _) = both_runs("manifest");
     let (a, b) = (manifest(&free), manifest(&held));
     assert_eq!(a.inputs_digest, b.inputs_digest);
@@ -159,6 +163,7 @@ fn a_run_under_a_low_memory_budget_lists_the_same_files_and_blocks_in_its_manife
 
 #[test]
 fn a_run_under_a_low_memory_budget_builds_every_world() {
+    covers(&[ids::generate::memory::BUDGET_CHANGES_NO_BYTE]);
     let (_, held, _) = both_runs("worlds");
     let settings: Vec<String> = contents(&held)
         .into_iter()

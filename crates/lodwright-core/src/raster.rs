@@ -257,6 +257,7 @@ mod tests {
     use crate::land::CellHeights;
     use crate::worldspace::Worldspace;
     use lodwright_testkit::rng::Rng;
+    use lodwright_testkit::{covers, ids};
 
     fn world(cells: &[(i32, i32, f32)]) -> Worldspace {
         Worldspace::from_cells(
@@ -295,6 +296,7 @@ mod tests {
 
     #[test]
     fn an_anchored_grid_starts_blocks_at_the_anchor_for_every_level() {
+        covers(&[ids::terrain::mesh::GRID_STARTS_AT_THE_MINIMUM_CORNER]);
         // minimum corner cell (-6, -5), as BoulderCityWorld
         for level in [4_u32, 8, 16, 32] {
             let grid = BlockGrid::anchored(level, (-6, -5)).unwrap();
@@ -339,6 +341,7 @@ mod tests {
 
     #[test]
     fn the_shared_edge_reads_one_value_and_the_larger_cell_wins() {
+        covers(&[ids::terrain::worlds::HEIGHT_RASTER]);
         let grid = BlockGrid::new(2).unwrap();
         let raster = HeightRaster::build(&world(&[(0, 0, 8.0), (1, 0, 16.0)]), grid)
             .unwrap()
@@ -350,6 +353,7 @@ mod tests {
 
     #[test]
     fn width_and_height_are_whole_blocks_for_random_worlds() {
+        covers(&[ids::terrain::worlds::HEIGHT_RASTER]);
         let mut rng = Rng::new(11);
         for _ in 0..100 {
             let size = [1_u32, 2, 4, 8][usize::try_from(rng.below(4)).unwrap()];
@@ -378,6 +382,7 @@ mod tests {
 
     #[test]
     fn a_block_crop_returns_exactly_that_blocks_cells() {
+        covers(&[ids::terrain::worlds::HEIGHT_RASTER]);
         let grid = BlockGrid::new(2).unwrap();
         let raster = HeightRaster::build(
             &world(&[(0, 0, 8.0), (1, 1, 16.0), (2, 0, 24.0), (3, 1, 32.0)]),

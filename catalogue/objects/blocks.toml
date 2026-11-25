@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "objects.blocks"
+title = "Object blocks"
+origin = "original"
+notes = "Object LOD blocks with their atlases (docs/spec/object-lod.md)."
+
+[[item]]
+id = "merged_per_block"
+title = "Objects are merged per block with their transform, scale and atlas UVs"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lib.rs"]
+
+[[item]]
+id = "block_grid_and_paths"
+title = "Object blocks start at the grid anchor and follow the game's tree"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/layout.rs"]
+
+[[item]]
+id = "atlas_pair"
+title = "Textures are packed into a BC3 atlas with a half-size normal atlas, deterministically and without overlap"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/atlas.rs"]
+
+[[item]]
+id = "atlas_pages"
+title = "Textures that do not fit one atlas keep their size on further numbered pages, each with its own shape"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/atlas.rs"]
+
+[[item]]
+id = "uvs_held_at_the_edge"
+title = "A UV outside its texture is held at the edge, not wrapped to the far edge"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/atlas.rs"]
+
+[[item]]
+id = "blocks_over_the_16_bit_limits"
+title = "A block over the 16-bit vertex or triangle limit is written as several shapes and nothing is left out"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lib.rs"]
+
+[[item]]
+id = "faces_under_ground_and_water_dropped"
+title = "objects.drop_under_terrain and objects.drop_under_water leave out faces that cannot be seen and count them"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/object-faces-under-the-ground-and-the-water.md"]
+
+[[item]]
+id = "lod_models_read"
+title = "A model's own LOD model is read, also when bytes follow its footer, and takes the full model's texture when it has none"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lodmodel.rs"]
+
+[[item]]
+id = "texture_formats"
+title = "An uncompressed 32-bit texture is used as it is, not replaced by a flat colour"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lib.rs"]
+
+[[item]]
+id = "object_warnings"
+title = "A missing or unreadable model, and an absent or undecodable texture, are named in warnings of their own kind"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lib.rs"]
+
+[[item]]
+id = "objects_output_deterministic"
+title = "Nothing is written when no model can be read and the output is deterministic"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/lib.rs"]
+
+[[item]]
+id = "shipped_block_shapes"
+title = "objects.shapes_from_shipped_blocks takes a model's far shape from the blocks the games ship, in the world a rule names"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-shapes-from-shipped-blocks.md"]

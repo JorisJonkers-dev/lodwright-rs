@@ -109,6 +109,7 @@ pub(crate) fn workers(
 mod tests {
     use super::{parse_mem_total_kib, parse_vm_rss_kib, worker_mib, workers};
     use lodwright_core::terrain::TerrainSettings;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn the_default_budget_reads_the_total_memory() {
@@ -126,6 +127,7 @@ mod tests {
 
     #[test]
     fn the_workers_shrink_to_what_the_budget_leaves_and_never_below_one() {
+        covers(&[ids::generate::memory::WORKERS_SCALE_TO_THE_BUDGET]);
         // 100 MiB left after the process and the raster: three workers of 30 MiB fit
         assert_eq!(workers(Some(300), 150, 50, 30, 4), 3);
         assert_eq!(
@@ -143,6 +145,7 @@ mod tests {
 
     #[test]
     fn a_worker_needs_room_for_the_largest_textures() {
+        covers(&[ids::generate::memory::WORKERS_SCALE_TO_THE_BUDGET]);
         // 256 px diffuse and normal, four bytes a pixel, three buffers each, plus the base
         let default = worker_mib(&TerrainSettings::default());
         assert_eq!(
@@ -153,6 +156,7 @@ mod tests {
 
     #[test]
     fn the_resident_size_is_read_from_a_status_text() {
+        covers(&[ids::generate::memory::PEAK_MEMORY_ON_LINUX]);
         assert_eq!(
             parse_vm_rss_kib("Name:\tx\nVmHWM:\t 9 kB\nVmRSS:\t  2049 kB\n"),
             Some(2049)

@@ -13,6 +13,7 @@ use lodwright_nif::{
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
 use lodwright_testkit::world::{SyntheticWorld, world_group};
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 const WORLD: u32 = 0xB00;
@@ -235,6 +236,7 @@ fn lines(events: &Path) -> Vec<(Option<BlockKind>, u32, u64, u64)> {
 
 #[test]
 fn object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_world() {
+    covers(&[ids::contract::events::BLOCK_LINES]);
     let d = data("kinds");
     let out = temp("kinds-out");
     let events = temp("kinds.ndjson");
@@ -274,6 +276,7 @@ fn object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_worl
 
 #[test]
 fn a_recorded_run_with_terrain_objects_and_trees_has_a_run_number_that_never_goes_back() {
+    covers(&[ids::contract::events::RUN_WIDE_PROGRESS]);
     use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, ProgressEvent, Step};
     let d = data("run");
     let out = temp("run-out");
@@ -330,6 +333,7 @@ fn a_recorded_run_with_terrain_objects_and_trees_has_a_run_number_that_never_goe
 
 #[test]
 fn the_events_file_lines_carry_the_same_run_numbers_as_the_callback() {
+    covers(&[ids::contract::events::RUN_WIDE_PROGRESS]);
     let d = data("filerun");
     let out = temp("filerun-out");
     let events = temp("filerun.ndjson");
@@ -382,6 +386,7 @@ fn the_events_file_lines_carry_the_same_run_numbers_as_the_callback() {
 
 #[test]
 fn the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lines() {
+    covers(&[ids::cli::commands::GENERATE_COMMAND]);
     let d = data("request");
     let out = temp("request-out");
     let events = temp("request.ndjson");
@@ -425,6 +430,7 @@ fn the_request_form_with_the_default_workers_writes_the_same_object_and_tree_lin
 
 #[test]
 fn a_request_that_drops_faces_under_the_ground_counts_them_in_the_result() {
+    covers(&[ids::objects::blocks::FACES_UNDER_GROUND_AND_WATER_DROPPED]);
     // the wall in cell (2, 2) stands at height 0 on ground at 16, the one in cell (9, 2) has no land under it
     let d = data("drop");
     let out = temp("drop-out");

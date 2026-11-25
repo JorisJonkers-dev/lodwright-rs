@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "objects.far_shapes"
+title = "Far shapes from full models"
+origin = "ours"
+notes = "Objects without a LOD model drawn from a simplified full model (docs/contracts/options/far-shapes-from-full-models.md)."
+
+[[item]]
+id = "full_model_shapes"
+title = "objects.shapes_from_full_models draws objects without a LOD model with a simplified copy of their full model, and reports them"
+status = "implemented"
+evidence = ["docs/contracts/options/far-shapes-from-full-models.md"]
+
+[[item]]
+id = "full_model_rules"
+title = "A rule gives a far shape to the models it names and to no other; its limits win over the switch"
+status = "implemented"
+evidence = ["docs/decisions/2026-11-24-a-generate-option-on-each-include-rule.md"]
+
+[[item]]
+id = "see_through_models_stay_out"
+title = "A model that is see-through, or drawn without lighting, gets no far shape"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/far_simplify.rs"]
+
+[[item]]
+id = "simplifier"
+title = "The simplifier keeps the requested share of triangles within an error limit, keeps seams closed and locked borders, and gives the same output on every system"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/far_simplify.rs"]
+
+[[item]]
+id = "impostor_trees"
+title = "Trees are drawn as impostors by the engine"
+status = "deferred"
+reason = "Waits for the engine."

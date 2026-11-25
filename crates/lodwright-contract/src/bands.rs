@@ -134,6 +134,7 @@ pub fn bands(docs: &[VerifyDoc]) -> BandsDoc {
 mod tests {
     use super::{bands, statistics};
     use crate::{VerifyDoc, WaterBlock, WaterReport};
+    use lodwright_testkit::{covers, ids};
 
     fn report(iou: f64) -> VerifyDoc {
         let mut doc = VerifyDoc::new();
@@ -156,6 +157,7 @@ mod tests {
 
     #[test]
     fn identical_runs_give_zero_width_bands() {
+        covers(&[ids::verify::measure::BANDS]);
         let b = bands(&[report(0.9), report(0.9), report(0.9)]);
         assert_eq!(b.runs, 3);
         assert_eq!(
@@ -172,6 +174,7 @@ mod tests {
 
     #[test]
     fn a_changed_run_widens_only_the_statistics_that_changed() {
+        covers(&[ids::verify::measure::BANDS]);
         let b = bands(&[report(0.9), report(0.97)]);
         let band = |name: &str| b.bands.iter().find(|x| x.statistic == name).unwrap();
         assert_eq!(
@@ -190,6 +193,7 @@ mod tests {
 
     #[test]
     fn values_are_rounded_to_three_decimals_so_float_noise_does_not_widen_a_band() {
+        covers(&[ids::verify::measure::BANDS]);
         let b = bands(&[report(0.333_333_3), report(0.333_333_4)]);
         let mean = b
             .bands

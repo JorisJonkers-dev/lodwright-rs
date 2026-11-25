@@ -712,6 +712,7 @@ pub(crate) fn absolute(form_id: u32, table: &[u32], own: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use lodwright_testkit::{covers, ids};
     #[test]
     fn the_ground_height_is_read_inside_a_cell_and_absent_outside_the_land() {
         let world = Worldspace::from_cells(
@@ -768,6 +769,7 @@ mod tests {
 
     #[test]
     fn a_single_plugin_gives_its_world_named_by_the_editor_id() {
+        covers(&[ids::terrain::worlds::WORLD_NAMES]);
         let world = SyntheticWorld::new(0x0000_0A00, "Mojave").cell(0, 0, Heights::flat(8.0));
         let plugins = load(&[("A.esm", world_plugin(&[], &world, false))]);
         let worlds = Worldspace::from_load_order(&plugins).unwrap();
@@ -798,6 +800,7 @@ mod tests {
 
     #[test]
     fn a_later_plugin_overrides_cells_through_its_master_index() {
+        covers(&[ids::terrain::worlds::LATER_PLUGINS_OVERRIDE]);
         // plugin 1 refers to world 0xA00 of plugin 0 through master index 0
         let base = SyntheticWorld::new(0x0000_0A00, "Mojave")
             .cell(0, 0, Heights::flat(8.0))
@@ -815,6 +818,7 @@ mod tests {
 
     #[test]
     fn a_world_defined_by_a_late_plugin_gets_that_plugins_index() {
+        covers(&[ids::terrain::worlds::LATER_PLUGINS_OVERRIDE]);
         let a = SyntheticWorld::new(0x0000_0A00, "A").cell(0, 0, Heights::flat(8.0));
         let b = SyntheticWorld::new(0x0100_0B00, "B").cell(0, 0, Heights::flat(8.0));
         let plugins = load(&[
@@ -831,6 +835,7 @@ mod tests {
 
     #[test]
     fn a_missing_master_is_reported_by_name() {
+        covers(&[ids::terrain::worlds::MISSING_MASTER_NAMED]);
         let world = SyntheticWorld::new(0x10, "W").cell(0, 0, Heights::flat(8.0));
         let plugins = load(&[("B.esp", world_plugin(&["Nope.esm"], &world, false))]);
         assert_eq!(
@@ -841,6 +846,7 @@ mod tests {
 
     #[test]
     fn a_world_without_an_editor_id_is_named_by_its_form_id() {
+        covers(&[ids::terrain::worlds::WORLD_NAMES]);
         let world = Worldspace::from_cells(0x0100_0042, "01000042", []);
         assert_eq!(world.name(), "01000042");
         assert_eq!(world.bounds(), None);
@@ -848,6 +854,7 @@ mod tests {
 
     #[test]
     fn the_grid_anchor_is_the_minimum_corner_cell_unless_the_land_starts_on_the_32_grid() {
+        covers(&[ids::terrain::mesh::GRID_STARTS_AT_THE_MINIMUM_CORNER]);
         let flat = |cells: &[(i32, i32)], min: [f32; 2]| {
             Worldspace::from_cells(1, "W", cells.iter().map(|c| (*c, CellHeights::flat(1.0))))
                 .with_declared_bounds(crate::plugin::DeclaredBounds {
@@ -876,6 +883,7 @@ mod tests {
 
     #[test]
     fn terrain_lod_needs_seventeen_cells_with_land_and_a_display_name() {
+        covers(&[ids::terrain::worlds::TERRAIN_LOD_ELIGIBILITY]);
         let cells = |n: i32| (0..n).map(|x| ((x, 0), CellHeights::flat(1.0)));
         assert!(!Worldspace::from_cells(1, "W", cells(16)).has_terrain_lod());
         assert!(Worldspace::from_cells(1, "W", cells(17)).has_terrain_lod());
@@ -901,6 +909,7 @@ mod tests {
 
     #[test]
     fn cells_without_land_inside_the_extent_are_flat_at_the_default_land_height() {
+        covers(&[ids::terrain::worlds::FLAT_CELLS_WITHOUT_LAND]);
         let u = 4096.0;
         // 17 cells with land in the bottom row, the last one beyond the width of the extent
         let land = (-1..16).map(|x| ((x, -1), CellHeights::flat(5.0)));
@@ -932,6 +941,7 @@ mod tests {
 
     #[test]
     fn a_world_with_land_beyond_128_cells_gets_the_128_cell_window_of_the_game_s_files() {
+        covers(&[ids::terrain::worlds::WORLD_EXTENT]);
         // the Capital Wasteland of a Tale of Two Wastelands load order: land from cell -99 to 97 across, -99 to 100
         // up; the game's own settings for it are (-64, -64) to (63, 63), width 128
         let u = 4096.0;
@@ -958,6 +968,7 @@ mod tests {
 
     #[test]
     fn the_extent_follows_the_declared_corners_as_the_game_s_settings_do() {
+        covers(&[ids::terrain::worlds::WORLD_EXTENT]);
         let world = |min: [f32; 2], max: [f32; 2], cells: &[(i32, i32)]| {
             Worldspace::from_cells(1, "W", cells.iter().map(|c| (*c, CellHeights::flat(1.0))))
                 .with_declared_bounds(crate::plugin::DeclaredBounds { min, max })
@@ -1015,6 +1026,7 @@ mod tests {
 
     #[test]
     fn bounds_cover_every_cell_including_negative_ones() {
+        covers(&[ids::terrain::worlds::WORLD_EXTENT]);
         let world = Worldspace::from_cells(
             1,
             "W",
@@ -1038,6 +1050,7 @@ mod tests {
 
     #[test]
     fn matching_seams_have_zero_error_and_a_step_shows_up() {
+        covers(&[ids::terrain::worlds::SEAM_ERROR]);
         let flat = || CellHeights::flat(8.0);
         let level = Worldspace::from_cells(
             1,
@@ -1125,6 +1138,7 @@ mod tests {
 
     #[test]
     fn world_record_fields_and_cell_water_are_read() {
+        covers(&[ids::terrain::water::WATER_HEIGHT_PER_CELL]);
         let world = SyntheticWorld::new(0x0A00, "Mojave")
             .land_data(-2048.0, -4096.0)
             .bounds([-10.0, -20.0], [30.0, 40.0])
@@ -1152,6 +1166,7 @@ mod tests {
 
     #[test]
     fn a_has_water_cell_without_any_default_has_no_height() {
+        covers(&[ids::terrain::water::WATER_HEIGHT_PER_CELL]);
         let world = SyntheticWorld::new(0x0A00, "W")
             .cell(0, 0, Heights::flat(8.0))
             .cell_water(0, 0, true, None);
@@ -1181,6 +1196,7 @@ mod tests {
 
     #[test]
     fn a_child_names_its_parent_and_keeps_only_its_own_data_by_default() {
+        covers(&[ids::terrain::worlds::CHILD_WORLDS]);
         let worlds = Worldspace::from_load_order(&parent_and_child(0x1)).unwrap();
         let child = named(&worlds, "DCworld01");
         assert_eq!(child.parent(), Some(0x0B00));
@@ -1193,6 +1209,7 @@ mod tests {
 
     #[test]
     fn a_flagged_child_takes_the_parents_default_heights_only_when_asked() {
+        covers(&[ids::terrain::worlds::CHILD_WORLDS]);
         let plugins = parent_and_child(0x1);
         let index = WorldIndex::new(&plugins).unwrap();
         let (child_id, _) = index.worlds().find(|(_, n)| *n == "DCworld01").unwrap();
@@ -1208,6 +1225,7 @@ mod tests {
 
     #[test]
     fn an_unflagged_child_inherits_nothing_even_when_asked() {
+        covers(&[ids::terrain::worlds::CHILD_WORLDS]);
         let plugins = parent_and_child(0x8);
         let index = WorldIndex::new(&plugins).unwrap();
         let (child_id, _) = index.worlds().find(|(_, n)| *n == "DCworld01").unwrap();
@@ -1219,6 +1237,7 @@ mod tests {
 
     #[test]
     fn inheritance_follows_a_chain_and_survives_a_cycle() {
+        covers(&[ids::terrain::worlds::CHILD_WORLDS]);
         let root = SyntheticWorld::new(0x0A, "A").land_data(1.0, 2.0);
         let middle = SyntheticWorld::new(0x0B, "B").parent(0x0A, 0x1);
         let leaf = SyntheticWorld::new(0x0C, "C").parent(0x0B, 0x1);
@@ -1297,6 +1316,7 @@ mod tests {
 
     #[test]
     fn ttw_children_resolve_their_parent_through_the_fallout_3_master() {
+        covers(&[ids::terrain::worlds::TTW_CHILD_WORLDS]);
         let worlds = Worldspace::from_load_order(&ttw_load_order()).unwrap();
         assert_eq!(worlds.len(), 2 + 18);
         let dc = named(&worlds, "DCworld07");
@@ -1308,6 +1328,7 @@ mod tests {
 
     #[test]
     fn a_plugin_overriding_wrld_replaces_the_record_and_adds_cells() {
+        covers(&[ids::terrain::worlds::LATER_PLUGINS_OVERRIDE]);
         let worlds = Worldspace::from_load_order(&ttw_load_order()).unwrap();
         let capital = named(&worlds, "Wasteland");
         assert_eq!(capital.form_id(), 0x0100_0B00);
@@ -1319,6 +1340,7 @@ mod tests {
 
     #[test]
     fn ttw_children_inherit_the_overridden_defaults_when_flagged() {
+        covers(&[ids::terrain::worlds::TTW_CHILD_WORLDS]);
         let plugins = ttw_load_order();
         let index = WorldIndex::new(&plugins).unwrap();
         let (id, _) = index.worlds().find(|(_, n)| *n == "DCworld03").unwrap();

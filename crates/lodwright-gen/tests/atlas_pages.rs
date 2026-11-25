@@ -3,6 +3,7 @@
 //! The check follows the references a reader follows (shape, its lighting property, that property's texture set),
 //! then samples the named page at each triangle's UVs.
 
+use lodwright_testkit::{covers, ids};
 use std::collections::HashMap;
 
 use lodwright_core::objects::Instance;
@@ -263,6 +264,7 @@ fn shades_per_shape(out: &std::path::Path, world: &str, block: &str) -> Vec<(Str
 // regression: docs/regressions/2026-11-22-second-atlas-page.md
 #[test]
 fn objects_on_a_second_atlas_page_are_drawn_with_their_own_texture() {
+    covers(&[ids::objects::blocks::ATLAS_PAGES]);
     // with atlases of at most 2048 by 2048, four textures of 1024 by 1024 fill the first; the fifth goes on a second.
     let out = std::env::temp_dir().join(format!("lodwright-atlas-pages-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&out);
@@ -308,6 +310,7 @@ fn objects_on_a_second_atlas_page_are_drawn_with_their_own_texture() {
 
 #[test]
 fn the_thread_count_does_not_change_a_byte_of_the_object_files() {
+    covers(&[ids::generate::run::SAME_BYTES_AT_ANY_THREAD_COUNT]);
     // five 1024 pixel textures on atlases of at most 2048: two pages, each large enough to be encoded in bands
     let run = |threads: usize| {
         let out = std::env::temp_dir().join(format!(

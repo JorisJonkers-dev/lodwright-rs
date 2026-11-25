@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "terrain.worlds"
+title = "Worlds and land"
+origin = "original"
+notes = "Reading worlds, cells and land heights from the load order (docs/design.md, Pipeline 1 and 2)."
+
+[[item]]
+id = "land_heights"
+title = "A land record's VHGT decodes to 33 by 33 heights, exactly for heights on the grid"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/land.rs"]
+
+[[item]]
+id = "height_raster"
+title = "The heights of a world become one raster of whole blocks with shared edge vertices"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/raster.rs"]
+
+[[item]]
+id = "later_plugins_override"
+title = "A later plugin overrides cells and the world record through its master index"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "missing_master_named"
+title = "A missing master is reported by name"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "world_names"
+title = "A world is named by its editor id, or by its form id when it has none"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "world_extent"
+title = "The extent follows the declared corners, and a world with land beyond 128 cells gets the 128-cell window of the game's files"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "flat_cells_without_land"
+title = "Cells without land inside the extent are flat at the default land height"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "child_worlds"
+title = "A child world keeps its own data by default and takes its parent's default heights only when its flag says so and the request asks"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "ttw_child_worlds"
+title = "Tale of Two Wastelands children resolve their parent through the Fallout 3 master"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "seam_error"
+title = "The seam error between neighbouring cells is measured: zero for matching seams, a step shows"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "terrain_lod_eligibility"
+title = "A world gets terrain LOD only with seventeen cells with land and a display name"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]

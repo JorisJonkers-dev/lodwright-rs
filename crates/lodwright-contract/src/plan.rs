@@ -221,6 +221,7 @@ pub fn round_error(value: f32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{Capabilities, round_error};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn every_capability_is_missing_today() {
@@ -247,6 +248,7 @@ mod tests {
 
     #[test]
     fn this_build_writes_every_file_kind() {
+        covers(&[ids::contract::documents::PLAN_DOCUMENT]);
         assert_eq!(Capabilities::current().missing(), Vec::<String>::new());
     }
 
@@ -274,6 +276,7 @@ mod tests {
 
     #[test]
     fn this_build_resumes_after_a_cancel_and_after_a_kill() {
+        covers(&[ids::contract::documents::PLAN_DOCUMENT]);
         let caps = Capabilities::current();
         assert!(caps.resume_after_cancel);
         assert!(caps.resume_after_kill);

@@ -445,9 +445,11 @@ mod tests {
     };
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_block_and_a_type_list_round_trip_and_have_the_sizes_the_layout_gives() {
+        covers(&[ids::trees::lod::LIST_BLOCKS_AND_ATLAS]);
         let mut block = TreeBlock::default();
         let t = |x: f32, r: u32| Tree {
             pos: [x, 2.0, 3.0],
@@ -475,6 +477,7 @@ mod tests {
 
     #[test]
     fn an_empty_block_is_four_zero_bytes_and_truncated_files_are_refused() {
+        covers(&[ids::trees::lod::LIST_BLOCKS_AND_ATLAS]);
         assert_eq!(write_block(&TreeBlock::default()), vec![0, 0, 0, 0]);
         assert!(parse_block(&[1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]).is_err());
         assert!(parse_types(&[2, 0, 0, 0, 0]).is_err());
@@ -482,6 +485,7 @@ mod tests {
 
     #[test]
     fn blocks_align_to_the_world_corner_and_cells_below_it_are_out_of_range() {
+        covers(&[ids::trees::lod::BLOCKS_ALIGN_TO_THE_WORLD_CORNER]);
         assert_eq!(block_of(-2, -2, (-2, -2)), Some((-2, -2)));
         assert_eq!(block_of(5, 5, (-2, -2)), Some((-2, -2)));
         assert_eq!(block_of(6, 6, (-2, -2)), Some((6, 6)));
@@ -528,6 +532,7 @@ mod tests {
 
     #[test]
     fn only_flagged_bases_become_types_and_hidden_or_fallen_references_leave_empty_blocks() {
+        covers(&[ids::trees::lod::ONLY_FLAGGED_BASES]);
         let plugins = vec![("A.esm".to_owned(), tree_plugin())];
         let bases = tree_bases(&plugins).unwrap();
         assert_eq!(

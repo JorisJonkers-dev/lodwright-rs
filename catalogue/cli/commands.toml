@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "cli.commands"
+title = "Commands"
+origin = "ours"
+notes = "The lodwright binary (docs/USAGE.md, lodwright --help)."
+
+[[item]]
+id = "version_and_help"
+title = "--version and --help exit 0; --help lists every command and the exit codes"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "usage_errors"
+title = "No arguments, an unknown command or an unknown argument is a usage error with exit code 2 that names the problem"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "doctor"
+title = "doctor checks that a data folder exists and prints no path"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "plan"
+title = "plan prints what a run would build, per world and level, as text or JSON, with or without every block"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/commands.rs"]
+
+[[item]]
+id = "heightmap"
+title = "heightmap writes a 16-bit north-up PGM of one world and refuses to write inside a git working tree"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/commands.rs"]
+
+[[item]]
+id = "generate_command"
+title = "generate builds the far view from flags or from a request document and reports counts per kind"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/generate.rs"]
+
+[[item]]
+id = "schema_command"
+title = "schema <name> prints the published schema of a contract; a missing or unknown name is a usage error"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "options_parsing"
+title = "Options are read in any place; --data is required where a command needs it; a load order file combines with --plugin"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/options.rs"]
+
+[[item]]
+id = "probe"
+title = "probe reports numbers about one file (a NIF, a DDS or a flat file) and never a byte of its content"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/probe.rs"]

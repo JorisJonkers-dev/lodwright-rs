@@ -7,6 +7,7 @@
     reason = "grid coordinates and the 8-bit test heights fit an f32 exactly"
 )]
 
+use lodwright_testkit::{covers, ids};
 use std::collections::BTreeSet;
 
 use lodwright_gen::{FarLimits, FarMesh, FarSimplifyError, simplify_far_mesh};
@@ -125,6 +126,7 @@ fn digest(triangles: &[[u32; 3]]) -> u64 {
 
 #[test]
 fn a_flat_grid_keeps_the_requested_share_within_the_error() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(32, None, |_, _| 0.0);
     let limits = FarLimits {
         keep: 0.1,
@@ -142,6 +144,7 @@ fn a_flat_grid_keeps_the_requested_share_within_the_error() {
 
 #[test]
 fn the_error_limit_stops_a_rough_surface_before_the_triangle_target() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(32, None, rough);
     let out = simplify_far_mesh(
         grid.mesh(&[]),
@@ -185,6 +188,7 @@ fn a_share_that_lands_on_a_whole_triangle_count_is_not_rounded_up() {
 
 #[test]
 fn a_texture_seam_stays_closed_on_both_sides() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(32, Some(16), |_, _| 0.0);
     let out = simplify_far_mesh(
         grid.mesh(&[]),
@@ -216,6 +220,7 @@ fn a_texture_seam_stays_closed_on_both_sides() {
 
 #[test]
 fn locked_border_vertices_and_edges_stay() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(16, None, rough);
     let row = grid.size + 1;
     let locked: Vec<bool> = (0..row * row)
@@ -251,6 +256,7 @@ fn locked_border_vertices_and_edges_stay() {
 /// CI runs this on Linux, Windows and macOS: a different result on one of them fails here.
 #[test]
 fn the_output_is_the_same_on_every_system() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(32, Some(16), rough);
     let limits = FarLimits {
         keep: 0.25,
@@ -267,6 +273,7 @@ fn the_output_is_the_same_on_every_system() {
 
 #[test]
 fn invalid_input_is_refused() {
+    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(2, None, |_, _| 0.0);
     let limits = FarLimits {
         keep: 0.5,

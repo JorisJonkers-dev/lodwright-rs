@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "terrain.water"
+title = "Far water"
+origin = "original"
+notes = "Water planes in terrain blocks (docs/spec/terrain-lod.md section 7)."
+
+[[item]]
+id = "water_planes"
+title = "A cell with ground below its water height gets a flat water plane at that height, unless water is turned off"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/water.rs"]
+
+[[item]]
+id = "water_height_per_cell"
+title = "A cell's water height comes from its record or its world's default"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "placeholder_water_shape"
+title = "A block of default water at or below zero gets the placeholder shape"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/water.rs"]
+
+[[item]]
+id = "water_walls"
+title = "terrain.water_walls writes a wall on every border side that has water"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/walls-under-the-water-outline.md"]
+
+[[item]]
+id = "water_at_coarser_levels"
+title = "At levels 8 to 32 squares of one water height merge into rectangles"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/water.rs"]
+
+[[item]]
+id = "water_shared_vertices"
+title = "terrain.water_shared_vertices writes a corner two rectangles share once"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/shared-corners-of-the-water-planes.md"]
+
+[[item]]
+id = "water_polygons"
+title = "terrain.water_polygons writes the water of a block as traced polygons of the same wet squares"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/water-planes-as-polygons.md"]
+
+[[item]]
+id = "water_sloped_edges"
+title = "The game's own water outline and sloped edges are reproduced"
+status = "missing"

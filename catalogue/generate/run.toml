@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "generate.run"
+title = "A generate run"
+origin = "ours"
+notes = "What one call of `lodwright generate` (or `lodwright_api::generate`) promises (README, docs/USAGE.md, docs/contracts.md)."
+
+[[item]]
+id = "writes_lod_and_manifest"
+title = "A run writes the far view and a manifest"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "up_to_date"
+title = "A run with an unchanged request and unchanged plugins answers up to date and writes nothing"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "rebuilt_for_another_build"
+title = "An output written by another version or another build is rebuilt, not reported up to date"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "terrain_blocks_kept"
+title = "Terrain blocks whose inputs did not change are kept; the others are built"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/terrain.rs"]
+
+[[item]]
+id = "stale_files_removed"
+title = "Files the old manifest listed that the new run neither kept nor wrote are removed"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "object_and_tree_blocks_rebuilt"
+title = "Object and tree blocks are rebuilt in full whenever a run is not up to date"
+status = "implemented"
+evidence = ["docs/decisions/2026-11-20-object-and-tree-blocks-are-rebuilt-in-full.md"]
+
+[[item]]
+id = "object_and_tree_blocks_reused"
+title = "Object and tree blocks are reused when their inputs did not change"
+status = "missing"
+notes = "They share one atlas per world, so a change anywhere rebuilds the world's objects."
+
+[[item]]
+id = "same_bytes_at_any_thread_count"
+title = "The output files are the same bytes at any thread count"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/par.rs"]
+
+[[item]]
+id = "threads_option"
+title = "A thread count on the command line replaces the one in the request file"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/generate.rs"]
+
+[[item]]
+id = "load_order_file"
+title = "A load order file lists the plugins; comments, blank lines and active markers are skipped; plugin names match in any case"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/load.rs"]
+
+[[item]]
+id = "inputs_digest"
+title = "The inputs digest follows the plugin contents and not the folder they are in"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/load.rs"]
+
+[[item]]
+id = "warnings_file"
+title = "A run with warnings leaves lodwright-warnings.json beside the manifest, one record per plugin and kind"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "warnings_capped"
+title = "The result's own warning list holds at most twenty lines and the last line counts the rest"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "typed_errors"
+title = "A failure is a typed error with a stable code and a copy text that holds no command line"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/error.rs"]
+
+[[item]]
+id = "step_profile"
+title = "The result profiles every step with its time and the files it wrote"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/profile.rs"]

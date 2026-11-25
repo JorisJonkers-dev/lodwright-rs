@@ -92,9 +92,11 @@ impl StepClock {
 mod tests {
     use super::StepClock;
     use lodwright_contract::ManifestFile;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn steps_are_reported_in_order_with_their_world_and_the_files_they_wrote() {
+        covers(&[ids::generate::run::STEP_PROFILE]);
         let clock = StepClock::new();
         clock.begin("read_plugins", None);
         clock.begin("terrain", Some("Island"));

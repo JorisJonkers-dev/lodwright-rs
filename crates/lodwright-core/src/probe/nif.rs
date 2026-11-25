@@ -396,6 +396,7 @@ mod tests {
     use lodwright_testkit::probe_nif::{
         GeometryOptions, NifBuilder, texture_set, tri_shape_data, tri_strips_data,
     };
+    use lodwright_testkit::{covers, ids};
 
     fn field<'a>(value: &'a Value, name: &str) -> &'a Value {
         let Value::Map(fields) = value else {
@@ -505,6 +506,7 @@ mod tests {
 
     #[test]
     fn free_text_never_reaches_the_report() {
+        covers(&[ids::cli::commands::PROBE]);
         let marker = "ZZMARKERZZ";
         let bytes = NifBuilder::new()
             .author(marker)

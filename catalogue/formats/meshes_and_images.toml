@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "formats.meshes_and_images"
+title = "Meshes and textures"
+origin = "original"
+notes = "Terrain and object block NIF files and DDS textures (docs/spec/terrain-lod.md, docs/spec/textures.md)."
+
+[[item]]
+id = "nif_terrain_blocks"
+title = "A terrain block NIF has the measured eight blocks, vertices, triangles, mirrored UVs, a height per vertex and the block origin, and reads back"
+status = "implemented"
+evidence = ["crates/lodwright-nif/src/terrain.rs"]
+
+[[item]]
+id = "nif_object_blocks"
+title = "An object block NIF has its seven blocks, a segment table covering the triangles and one texture set per shape, and reads back"
+status = "implemented"
+evidence = ["crates/lodwright-nif/src/object.rs"]
+
+[[item]]
+id = "nif_round_trip"
+title = "Reading what was written gives the same file, writing what was read gives the same bytes, and unknown blocks survive byte for byte"
+status = "implemented"
+evidence = ["crates/lodwright-nif/src/block.rs"]
+
+[[item]]
+id = "nif_hostile_input"
+title = "A truncated, corrupt or inconsistent NIF is a typed error, never a panic, and an inconsistent block cannot be written"
+status = "implemented"
+evidence = ["crates/lodwright-nif/src/lib.rs"]
+
+[[item]]
+id = "dds_writer"
+title = "DDS files are written as BC1, BC3 or BC5 with a mip chain and the documented header, never with a DX10 header"
+status = "implemented"
+evidence = ["crates/lodwright-dds/src/lib.rs"]
+
+[[item]]
+id = "dds_quality"
+title = "Encoding then decoding keeps a quality floor for BC1, BC3 and BC5 on gradients and noise"
+status = "implemented"
+evidence = ["crates/lodwright-dds/src/lib.rs"]
+
+[[item]]
+id = "dds_reader"
+title = "DDS files are read: BC1, BC3, BC5, BC7 with a DX10 header block by block, and uncompressed 32-bit through its masks"
+status = "implemented"
+evidence = ["crates/lodwright-dds/src/lib.rs"]
+
+[[item]]
+id = "dds_hostile_input"
+title = "A bad header, a size over the cap, random bytes or a bit flip is a typed error, never a panic"
+status = "implemented"
+evidence = ["crates/lodwright-dds/src/lib.rs"]
+
+[[item]]
+id = "mip_chains_and_resize"
+title = "Mip chains halve rounding down to one pixel; box and Lanczos resizing are the same bytes at any thread count"
+status = "implemented"
+evidence = ["crates/lodwright-dds/src/resize.rs"]

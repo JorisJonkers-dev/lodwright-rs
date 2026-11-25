@@ -449,8 +449,10 @@ pub fn blend(base: [u8; 3], layers: &[([u8; 3], f32)]) -> [u8; 3] {
 
 #[cfg(test)]
 mod tests {
+    use lodwright_testkit::{covers, ids};
     #[test]
     fn the_default_land_texture_is_read_from_the_landscape_section_of_an_ini() {
+        covers(&[ids::terrain::textures::DEFAULT_LAND_TEXTURE]);
         let ini = "[Display]\nSDefaultLandDiffuseTexture=Wrong.dds\n[Landscape]\nfLandFriction=2.5\nsdefaultlanddiffusetexture = Landscape\\Mud01.dds \n[Other]\n";
         assert_eq!(
             super::default_land_texture_from_ini(ini).as_deref(),
@@ -479,6 +481,7 @@ mod tests {
 
     #[test]
     fn lit_scales_each_texture_by_the_up_component_of_its_normal_map_and_leaves_flat_fills() {
+        covers(&[ids::terrain::textures::LAND_LIGHT]);
         // a normal map whose vectors lean: (0.2, 0, 0.8) normalises to up 0.97
         let leaning = [153_u8, 128, 230, 255].repeat(16);
         let normal = Image::new(4, 4, leaning).unwrap();
@@ -504,6 +507,7 @@ mod tests {
 
     #[test]
     fn layers_blend_over_the_base_by_opacity_in_order() {
+        covers(&[ids::terrain::textures::DIFFUSE_FROM_LAYERS]);
         assert_eq!(blend([0, 0, 0], &[]), [0, 0, 0]);
         assert_eq!(blend([0, 0, 0], &[([200, 100, 50], 0.5)]), [100, 50, 25]);
         assert_eq!(
@@ -526,6 +530,7 @@ mod tests {
 
     #[test]
     fn a_tile_with_scale_two_repeats_twice_as_often_across_a_quadrant() {
+        covers(&[ids::terrain::textures::TEXTURE_TILING]);
         let once = ramp();
         let twice = ramp().with_scale(2.0);
         for u in [0.1_f32, 0.2, 0.3, 0.45] {
@@ -538,6 +543,7 @@ mod tests {
 
     #[test]
     fn scale_one_samples_exactly_as_before_and_unlisted_textures_keep_it() {
+        covers(&[ids::terrain::textures::TEXTURE_TILING]);
         let plain = ramp();
         let scaled = ramp().with_scale(1.0);
         for u in [0.0_f32, 0.13, 0.5, 0.99] {

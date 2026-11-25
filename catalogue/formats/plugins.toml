@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "formats.plugins"
+title = "Plugins and archives"
+origin = "original"
+notes = "Reading plugins and archives, resolving assets (docs/design.md, docs/spec/game-pickup.md)."
+
+[[item]]
+id = "plugin_records"
+title = "Plugins are read: header, masters, group tree, compressed records, extended subrecords, worlds, cells, land, land textures and placed references"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/plugin.rs"]
+
+[[item]]
+id = "plugin_hostile_input"
+title = "A truncated, corrupt or absurdly nested plugin is a typed error, never a panic"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/plugin.rs"]
+
+[[item]]
+id = "plugin_header_masters"
+title = "Plugin headers are read for master order; a master after its dependent is an error"
+status = "implemented"
+evidence = ["crates/lodwright-plugin-meta/src/lib.rs"]
+
+[[item]]
+id = "archive_reader"
+title = "BSA version 104 archives are read, compressed or not, and looked up by name in any case and separator"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/bsa.rs"]
+
+[[item]]
+id = "archive_hostile_input"
+title = "A truncated or corrupt archive, or one claiming huge sizes, is refused without allocating or panicking"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/bsa.rs"]
+
+[[item]]
+id = "archive_writer"
+title = "Version 104 archives are written with the game's name hashes, records in hash order and no embedded names; the same bytes at any thread count"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/pack.rs"]
+
+[[item]]
+id = "archive_writer_limits"
+title = "A path the format cannot hold, two names with one hash, a file over 1 GiB or an archive over 4 GiB is refused with its reason"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/pack.rs"]
+
+[[item]]
+id = "archive_extraction"
+title = "An archive extracts below one folder only, removes the folder when dropped and leaves none when the archive is bad"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/extract.rs"]
+
+[[item]]
+id = "asset_resolution"
+title = "A loose file beats an archive; a later plugin's archive beats an earlier one; the override marker lets a later archive replace"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/resolve.rs"]
+
+[[item]]
+id = "stub_plugin"
+title = "The stub plugin has no record, one master and the archive's base name, and is the same bytes every time"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/stub.rs"]

@@ -7,6 +7,7 @@ use common::build;
 use lodwright_nif::{Block, Body, NifError, NifFile, names};
 use lodwright_testkit::nif::shape_set;
 use lodwright_testkit::rng::Rng;
+use lodwright_testkit::{covers, ids};
 
 fn sample() -> (NifFile, Vec<u8>) {
     let mut rng = Rng::new(21);
@@ -22,6 +23,7 @@ fn sample() -> (NifFile, Vec<u8>) {
 
 #[test]
 fn every_truncation_of_a_valid_file_is_an_error_and_never_a_panic() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let (_, bytes) = sample();
     for len in 0..bytes.len() {
         assert!(
@@ -59,6 +61,7 @@ fn another_header_string_is_refused() {
 
 #[test]
 fn another_version_is_refused_with_its_number() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let (_, mut bytes) = sample();
     bytes[39..43].copy_from_slice(&0x1401_0003_u32.to_le_bytes());
     assert_eq!(
@@ -113,6 +116,7 @@ fn block_sizes_running_past_the_file_are_refused() {
 
 #[test]
 fn a_huge_string_count_does_not_allocate_and_is_a_bad_count() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let (file, mut bytes) = sample();
     let table: usize = file.header.block_types.iter().map(|t| 4 + t.len()).sum();
     let author = file.header.bethesda.as_ref().unwrap().1.author.len();
@@ -129,6 +133,7 @@ fn a_huge_string_count_does_not_allocate_and_is_a_bad_count() {
 
 #[test]
 fn random_bytes_never_panic_the_reader() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let mut rng = Rng::new(99);
     for _ in 0..2000 {
         let n = rng.below(300) as usize;
@@ -141,6 +146,7 @@ fn random_bytes_never_panic_the_reader() {
 
 #[test]
 fn single_byte_flips_of_a_valid_file_never_panic_the_reader() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let (_, bytes) = sample();
     for i in 0..bytes.len() {
         for bit in [0x01_u8, 0x80] {
@@ -167,6 +173,7 @@ fn a_typed_block_under_another_type_name_cannot_be_written() {
 
 #[test]
 fn a_vertex_count_that_disagrees_with_the_vertices_cannot_be_written() {
+    covers(&[ids::formats::meshes_and_images::NIF_HOSTILE_INPUT]);
     let mut file = build(&shape_set(&mut Rng::new(2), 1));
     for b in &mut file.blocks {
         if let Body::TriShapeData(d) = &mut b.body {

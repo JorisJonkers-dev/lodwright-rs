@@ -463,9 +463,11 @@ mod tests {
     use super::{
         Handshake, ResultDoc, Status, VersionInfo, parse_cpu_ms, parse_vm_hwm_kib, peak_memory_mib,
     };
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn exit_codes_follow_the_status() {
+        covers(&[ids::contract::documents::RESULT_DOCUMENT]);
         let code = |s| ResultDoc::new("0.0.0", s, "c", "r").exit_code();
         assert_eq!(code(Status::Ok), 0);
         assert_eq!(code(Status::Failed), 1);
@@ -474,6 +476,7 @@ mod tests {
 
     #[test]
     fn optional_parts_are_omitted_not_zero() {
+        covers(&[ids::contract::documents::RESULT_DOCUMENT]);
         let text =
             serde_json::to_string(&ResultDoc::new("0.0.0", Status::Failed, "c", "r")).unwrap();
         assert!(!text.contains("peak_memory_mib"));
@@ -483,6 +486,7 @@ mod tests {
 
     #[test]
     fn the_peak_is_read_from_a_status_text() {
+        covers(&[ids::generate::memory::PEAK_MEMORY_ON_LINUX]);
         assert_eq!(
             parse_vm_hwm_kib("Name:\tx\nVmHWM:\t  2049 kB\nVmRSS:\t1 kB\n"),
             Some(2049)
@@ -492,6 +496,7 @@ mod tests {
 
     #[test]
     fn the_peak_of_this_process_is_positive_where_proc_exists() {
+        covers(&[ids::generate::memory::PEAK_MEMORY_ON_LINUX]);
         if std::path::Path::new("/proc/self/status").exists() {
             assert!(peak_memory_mib().is_some_and(|mib| mib > 0));
         }
@@ -499,6 +504,7 @@ mod tests {
 
     #[test]
     fn the_version_info_and_the_handshake_list_every_contract() {
+        covers(&[ids::contract::documents::HANDSHAKE]);
         let info = VersionInfo::current("1.2.3");
         assert_eq!(info.contracts, Handshake::current().contracts);
         assert_eq!(

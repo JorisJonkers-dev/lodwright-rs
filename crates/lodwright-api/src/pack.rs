@@ -174,6 +174,7 @@ fn remove_empty_folders(dir: &Path) {
 mod tests {
     use super::{ARCHIVE_BASE, compress, is_packed, pack_staging};
     use lodwright_contract::ManifestFile;
+    use lodwright_testkit::{covers, ids};
 
     fn file(path: &str) -> ManifestFile {
         ManifestFile {
@@ -185,6 +186,7 @@ mod tests {
 
     #[test]
     fn only_object_and_tree_textures_are_compressed() {
+        covers(&[ids::generate::pack::PACK_COMPRESSION_CHOICE]);
         for (path, expected) in [
             ("textures/landscape/lod/w/diffuse/a.dds", false),
             ("meshes/landscape/lod/w/blocks/a.nif", false),
@@ -198,6 +200,7 @@ mod tests {
 
     #[test]
     fn a_manifest_is_packed_when_it_lists_an_archive_at_the_root() {
+        covers(&[ids::generate::pack::PACKED_OUTPUT_UP_TO_DATE]);
         assert!(is_packed(&[
             file("Lodwright LOD.bsa"),
             file("Lodwright LOD.esp")
@@ -208,6 +211,7 @@ mod tests {
 
     #[test]
     fn packing_replaces_the_loose_files_with_the_archive_and_the_stub() {
+        covers(&[ids::generate::pack::PACK_SWITCH]);
         let dir = std::env::temp_dir().join(format!("lodwright-pack-unit-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("meshes/a")).unwrap();
@@ -249,6 +253,7 @@ mod tests {
     /// Worlds share the tree billboard textures, so a run's list names such a file once per world.
     #[test]
     fn a_file_that_several_worlds_list_is_packed_once() {
+        covers(&[ids::generate::pack::PACK_COMPRESSION_CHOICE]);
         let dir =
             std::env::temp_dir().join(format!("lodwright-pack-unit-shared-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -283,6 +288,7 @@ mod tests {
 
     #[test]
     fn a_file_that_fails_mid_pack_leaves_no_spool_no_temp_file_and_no_full_progress() {
+        covers(&[ids::generate::pack::PACK_FAILURE_IS_SAFE]);
         let dir =
             std::env::temp_dir().join(format!("lodwright-pack-unit-mid-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -309,6 +315,7 @@ mod tests {
 
     #[test]
     fn an_unreadable_file_fails_before_anything_is_written() {
+        covers(&[ids::generate::pack::PACK_FAILURE_IS_SAFE]);
         let dir =
             std::env::temp_dir().join(format!("lodwright-pack-unit-gone-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

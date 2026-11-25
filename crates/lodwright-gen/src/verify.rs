@@ -1327,6 +1327,7 @@ mod tests {
     use lodwright_core::land::CellHeights;
     use lodwright_core::terrain::TerrainSettings;
     use lodwright_core::worldspace::Worldspace;
+    use lodwright_testkit::{covers, ids};
 
     fn temp(name: &str) -> std::path::PathBuf {
         let dir =
@@ -1377,6 +1378,7 @@ mod tests {
 
     #[test]
     fn object_blocks_get_error_numbers_and_their_atlas_its_use() {
+        covers(&[ids::verify::folder::OBJECT_AGREEMENT]);
         let (mine, theirs) = (object_folder("far-a", 7.0), object_folder("far-b", 0.0));
         let compared = compare_blocks(&mine, &theirs);
         let [block] = compared.far_errors.as_slice() else {
@@ -1396,6 +1398,7 @@ mod tests {
 
     #[test]
     fn block_names_parse_with_negative_coordinates_and_the_high_marker() {
+        covers(&[ids::verify::folder::REFERENCE_BLOCKS_BY_NAME]);
         assert_eq!(
             parse_block("w.level32.x-64.y0.nif"),
             Some((32, -64, 0, false))
@@ -1413,6 +1416,7 @@ mod tests {
 
     #[test]
     fn a_generated_terrain_folder_verifies_clean_and_damage_is_found() {
+        covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
         let world = Worldspace::from_cells(
             1,
             "Mojave",
@@ -1455,6 +1459,7 @@ mod tests {
 
     #[test]
     fn water_planes_count_as_equal_within_half_to_twice_the_area() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         assert_eq!(water_difference(0.0, 0.0), None);
         assert_eq!(water_difference(150.0, 100.0), None);
         assert!(water_difference(0.0, 1.0).unwrap().starts_with("no water"));
@@ -1475,12 +1480,14 @@ mod tests {
 
     #[test]
     fn equal_water_planes_have_an_iou_of_one() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         let a = rect(0.0, 0.0, 4096.0, 4096.0);
         assert!((water_iou(&a, &a) - 1.0).abs() < 1e-12);
     }
 
     #[test]
     fn disjoint_water_planes_have_an_iou_of_zero() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         let a = rect(0.0, 0.0, 100.0, 100.0);
         let b = rect(200.0, 0.0, 300.0, 100.0);
         assert!(water_iou(&a, &b).abs() < 1e-12);
@@ -1488,6 +1495,7 @@ mod tests {
 
     #[test]
     fn planes_overlapping_by_half_have_an_iou_of_about_a_third() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         let a = rect(0.0, 0.0, 2.0, 1.0);
         let b = rect(1.0, 0.0, 3.0, 1.0);
         let iou = water_iou(&a, &b);
@@ -1496,12 +1504,14 @@ mod tests {
 
     #[test]
     fn water_on_one_side_only_has_an_iou_of_zero() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         assert!(water_iou(&rect(0.0, 0.0, 1.0, 1.0), &[]).abs() < 1e-12);
         assert!(water_iou(&[], &rect(0.0, 0.0, 1.0, 1.0)).abs() < 1e-12);
     }
 
     #[test]
     fn the_iou_does_not_depend_on_the_triangle_order_or_winding() {
+        covers(&[ids::verify::folder::WATER_IOU]);
         let a = rect(0.0, 0.0, 2.0, 1.0);
         let mut b: Vec<Flat> = rect(1.0, 0.0, 3.0, 1.0)
             .into_iter()
@@ -1516,6 +1526,7 @@ mod tests {
 
     #[test]
     fn the_same_vertices_in_another_order_all_match() {
+        covers(&[ids::verify::folder::OBJECT_AGREEMENT]);
         let a: Vec<[f32; 3]> = (0..50)
             .map(|i| [i as f32 * 3.0, (i % 7) as f32, -(i as f32)])
             .collect();
@@ -1527,6 +1538,7 @@ mod tests {
 
     #[test]
     fn a_vertex_moved_beyond_the_tolerance_is_unmatched_and_within_it_is_not() {
+        covers(&[ids::verify::folder::OBJECT_AGREEMENT]);
         let a = vec![[10.0_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
         let near = vec![[10.04_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
         let far = vec![[10.06_f32, 10.0, 10.0], [20.0, 20.0, 20.0]];
@@ -1698,6 +1710,7 @@ mod tests {
 
     #[test]
     fn an_object_block_with_its_origin_on_the_root_node_is_an_error() {
+        covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
         let (good, bad) = (temp("origin-shape"), temp("origin-root"));
         write_object_at_cell(&good, false);
         write_object_at_cell(&bad, true);
@@ -1733,6 +1746,7 @@ mod tests {
 
     #[test]
     fn a_settings_file_wider_than_128_cells_is_an_error() {
+        covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
         let root = temp("wide-settings");
         let dir = root.join("lodsettings");
         std::fs::create_dir_all(&dir).unwrap();
@@ -1789,12 +1803,14 @@ mod tests {
 
     #[test]
     fn an_object_block_of_a_world_without_a_settings_file_is_not_checked_against_a_grid() {
+        covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
         // a world with no terrain: object blocks and no settings file (#245)
         assert_eq!(grid_errors("oasis", None, "oasis.level4.x-5.y27.nif"), 0);
     }
 
     #[test]
     fn a_block_off_the_grid_of_its_settings_file_is_still_an_error() {
+        covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
         // start (-5, 27): x-5 y27 is on the grid, x-4 is not
         assert_eq!(
             grid_errors("oasis", Some((-5, 27)), "oasis.level4.x-5.y27.nif"),
@@ -1808,6 +1824,7 @@ mod tests {
 
     #[test]
     fn blocks_are_measured_against_the_reference_by_name() {
+        covers(&[ids::verify::folder::REFERENCE_BLOCKS_BY_NAME]);
         let (mine, theirs) = (temp("blocks-mine"), temp("blocks-theirs"));
         write_terrain(&mine, "w.level4.x0.y0.nif", Some((0.0, 8192.0)));
         write_terrain(&theirs, "w.level4.x0.y0.nif", Some((4096.0, 12288.0)));

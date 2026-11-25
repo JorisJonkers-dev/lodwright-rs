@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! A generated folder packed into an archive, extracted again and verified like loose output.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, NoProgress, generate};
@@ -59,6 +60,7 @@ fn entries(out: &Path, manifest: &Manifest) -> Vec<PackEntry> {
 
 #[test]
 fn an_extracted_archive_of_a_generated_folder_is_the_same_files_and_verifies_clean() {
+    covers(&[ids::generate::pack::PACKED_OUTPUT_VERIFIES]);
     let (out, manifest) = generated("clean");
     assert!(manifest.files.len() > 1, "the world has files");
     let loose = lodwright_gen::verify_folder(&out);
@@ -93,6 +95,7 @@ fn an_extracted_archive_of_a_generated_folder_is_the_same_files_and_verifies_cle
 
 #[test]
 fn verify_of_the_extracted_archive_finds_a_block_that_was_damaged_before_packing() {
+    covers(&[ids::generate::pack::PACKED_OUTPUT_VERIFIES]);
     let (out, manifest) = generated("damaged");
     let mut files = entries(&out, &manifest);
     let nif = files

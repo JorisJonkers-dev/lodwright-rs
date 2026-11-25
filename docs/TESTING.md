@@ -27,6 +27,50 @@ at run time, and CI never has it.
 
 Coverage: 80% of lines, enforced by `task test` (cargo-llvm-cov) in the pipeline.
 
+## Feature catalogue
+
+`catalogue/` lists what lodwright promises, one TOML file per group under an area (`catalogue/<area>/<group>.toml`),
+each item with a stable id and a state (`implemented`, `partial`, `missing`, `deferred`, `n/a`; `gated` for what CI
+can never cover). The format is tally's (<https://github.com/JorisJonkers-dev/tally>, `docs/FORMAT.md`). A promise that
+is not built yet is an item with the state `missing`, not an absent one.
+
+Tests say which items they prove, from `lodwright-testkit`:
+
+```rust
+use lodwright_testkit::{covers, ids};
+
+#[test]
+fn a_second_call_with_the_same_request_is_up_to_date() {
+    covers(&[ids::generate::run::UP_TO_DATE]);
+    // ...
+}
+```
+
+A tag names only what the test exercises and asserts on; a feature used only as setup is not tagged. Ignored tests
+are not tagged. `crates/lodwright-testkit/build.rs` writes the `ids` module from the catalogue (through
+`catalogue/tally_ids_gen.rs`, a copy of tally's standard-library-only generator), so a wrong or removed id does not
+compile. To rename an item keep its old full id in `aliases`; to drop one keep it with `retired = "<why>"`.
+
+The pipeline job "Feature catalogue" runs the pinned tally release (`TALLY_VERSION` and its SHA-256 in
+`.github/workflows/pipeline.yml`): ids valid and unique, the generator copy equal to tally's, evidence files exist, tags
+name real ids from inside tests, and no id of the base revision disappears without `retired` or an alias.
+
+Tests run through cargo-nextest with the `ci` profile (`.config/nextest.toml`; `task test` on Linux, the "Build and
+test" jobs on Windows and macOS), with no retries and every skipped test listed, so each run leaves a JUnit file. The
+job reads the three files (`tally ingest`): an item is covered once its tagged tests passed on all three platforms.
+With those results it holds a ratchet: the covered and tagged counts may not drop below the report of the base
+revision (`docs/coverage/tally-report.json` on main). A pull request that changes `docs/coverage/` fails: those files
+are written on main only. A drop that is meant (an item retired or set `n/a`) needs `--allow-drop <n>` on that step in the
+same pull request, removed again afterwards.
+
+On main every push builds and tests on all three platforms; the job then renders `docs/coverage/FEATURES.md`,
+`docs/coverage/tally-report.json` and `docs/coverage/tally.svg`, and when one changed and every job passed, the job
+"Catalogue reports" commits only those files as raul-progress-bot with the skip-ci marker (GitHub's `[skip ci]`). The
+same marker in a squash-merge message skips main's run for that commit, and with it the tests and the reports: keep it
+out of pull request titles and bodies.
+
+Locally, with tally installed: `tally check`, `tally report --depth 2`.
+
 ## Properties for the height and tile math
 
 Property tests use a small seeded generator inside the testkit (no extra dependency at first; `proptest` may be

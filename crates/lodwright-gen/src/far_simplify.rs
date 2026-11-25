@@ -269,6 +269,7 @@ fn simplify_part(part: Part, locked: &[bool], limits: FarLimits) -> Option<Part>
 
 #[cfg(test)]
 mod tests {
+    use lodwright_testkit::{covers, ids};
     use std::collections::BTreeSet;
 
     use super::{FarLimits, far_parts_from_full_model};
@@ -319,6 +320,7 @@ mod tests {
 
     #[test]
     fn a_corner_two_shapes_share_stays_in_both() {
+        covers(&[ids::objects::far_shapes::SIMPLIFIER]);
         let far = far_parts_from_full_model(vec![grid(0, 16, false), grid(16, 16, false)], LIMITS)
             .unwrap();
         assert_eq!(far.len(), 2);
@@ -334,6 +336,7 @@ mod tests {
 
     #[test]
     fn a_shape_drawn_without_lighting_is_left_out() {
+        covers(&[ids::objects::far_shapes::SEE_THROUGH_MODELS_STAY_OUT]);
         let mut bulb = grid(20, 8, false);
         bulb.unlit = true;
         let far = far_parts_from_full_model(vec![grid(0, 8, false), bulb.clone()], LIMITS).unwrap();
@@ -347,6 +350,7 @@ mod tests {
 
     #[test]
     fn a_model_keeps_its_alpha_shapes_unless_it_has_no_other() {
+        covers(&[ids::objects::far_shapes::SEE_THROUGH_MODELS_STAY_OUT]);
         let far =
             far_parts_from_full_model(vec![grid(0, 8, false), grid(20, 8, true)], LIMITS).unwrap();
         assert_eq!(

@@ -7,6 +7,7 @@ use lodwright_core::worldspace::Worldspace;
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+use lodwright_testkit::{covers, ids};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -20,6 +21,7 @@ fn hill(cx: f32, cy: f32) -> Heights {
 
 #[test]
 fn a_synthetic_world_plans_to_the_stored_blocks() {
+    covers(&[ids::terrain::worlds::HEIGHT_RASTER]);
     let world = SyntheticWorld::new(0x0100_0A00, "Testland")
         .cell(0, 0, hill(16.0, 16.0))
         .cell(1, 0, Heights::flat(0.0))

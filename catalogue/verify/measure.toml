@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "verify.measure"
+title = "Bands and landmarks"
+origin = "ours"
+notes = "Tolerance bands over several runs and named landmarks (docs/contracts.md Bands, docs/landmarks.md)."
+
+[[item]]
+id = "bands"
+title = "lodwright bands prints the minimum and maximum of every statistic over several verify reports; a zero-width band is an exact match"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/bands.rs"]
+
+[[item]]
+id = "landmarks"
+title = "lodwright landmarks says whether each named landmark is written, missing, excluded, without a far model or unresolved"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/landmarks.rs"]
+
+[[item]]
+id = "landmark_baseline"
+title = "A landmark baseline passes when nothing is lost and fails when a written landmark is gone"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/landmarks.rs"]
+
+[[item]]
+id = "release_test_on_real_data"
+title = "A release passes the checklist on the owner's real data (docs/RELEASE-TEST.md)"
+status = "implemented"
+gated = "needs the game's data, which CI never has"
+evidence = ["docs/RELEASE-TEST.md"]
+
+[[item]]
+id = "in_game_acceptance"
+title = "Generated blocks load and draw in the game"
+status = "deferred"
+reason = "An owner check in the game; no CI job has the game."
+
+[[item]]
+id = "step_timing_guard"
+title = "The terrain block and atlas steps stay within a few times their recorded cost"
+status = "implemented"
+gated = "runs by hand on the owner's machine: shared runners are too noisy for timing"
+evidence = ["crates/lodwright-api/tests/step_bench.rs"]

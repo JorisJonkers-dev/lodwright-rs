@@ -4,10 +4,12 @@
 use lodwright_core::land::{SIDE, decode_vhgt};
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::land::{Heights, encode_vhgt};
+use lodwright_testkit::{covers, ids};
 use std::path::Path;
 
 #[test]
 fn a_synthetic_hill_decodes_to_the_stored_heights() {
+    covers(&[ids::terrain::worlds::LAND_HEIGHTS]);
     let hill = Heights::from_fn(|x, y| {
         let dx = f32::from(u8::try_from(x).unwrap()) - 16.0;
         let dy = f32::from(u8::try_from(y).unwrap()) - 16.0;

@@ -306,6 +306,7 @@ mod tests {
         encode_atxt, encode_btxt, encode_vclr, encode_vnml, encode_vtxt,
     };
     use lodwright_testkit::rng::Rng;
+    use lodwright_testkit::{covers, ids};
 
     fn pattern(seed: u8) -> Vec<[u8; 3]> {
         (0..33 * 33_u32)
@@ -349,6 +350,7 @@ mod tests {
 
     #[test]
     fn a_layer_header_round_trips() {
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let header = LayerHeader {
             texture: 0x0100_0ABC,
             quadrant: 3,
@@ -375,6 +377,7 @@ mod tests {
 
     #[test]
     fn vtxt_points_land_at_their_positions_and_the_rest_is_zero() {
+        covers(&[ids::terrain::textures::DIFFUSE_FROM_LAYERS]);
         let grid = decode_vtxt(&encode_vtxt(&[(0, 1.0), (18, 0.5), (288, 0.25)])).unwrap();
         assert_eq!(grid.len(), QUADRANT_POINTS);
         assert_eq!((grid[0], grid[18], grid[288]), (1.0, 0.5, 0.25));
@@ -420,6 +423,7 @@ mod tests {
 
     #[test]
     fn an_asymmetric_pattern_lands_on_the_right_quadrant_and_vertex() {
+        covers(&[ids::terrain::textures::DIFFUSE_FROM_LAYERS]);
         // position 1 is column 1 of row 0; position 17 is column 0 of row 1; position 19 is column 2 of row 1
         let points = [(1, 0.2), (17, 0.4), (19, 0.6)];
         for quadrant in 0..4_u8 {

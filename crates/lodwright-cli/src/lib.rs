@@ -982,6 +982,7 @@ fn doctor(folder: &Path, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};
+    use lodwright_testkit::{covers, ids};
 
     fn go(args: &[&str]) -> (u8, String, String) {
         let args: Vec<String> = args.iter().map(ToString::to_string).collect();
@@ -996,6 +997,7 @@ mod tests {
 
     #[test]
     fn version_prints_the_package_version() {
+        covers(&[ids::cli::commands::VERSION_AND_HELP]);
         let (code, out, _) = go(&["--version"]);
         assert_eq!(code, EXIT_OK);
         assert_eq!(out, format!("lodwright {}\n", env!("CARGO_PKG_VERSION")));
@@ -1003,6 +1005,7 @@ mod tests {
 
     #[test]
     fn help_lists_the_doctor_command() {
+        covers(&[ids::cli::commands::VERSION_AND_HELP]);
         let (code, out, _) = go(&["--help"]);
         assert_eq!(code, EXIT_OK);
         assert!(out.contains("doctor <data-folder>"));
@@ -1010,11 +1013,13 @@ mod tests {
 
     #[test]
     fn no_arguments_is_a_usage_error() {
+        covers(&[ids::cli::commands::USAGE_ERRORS]);
         assert_eq!(go(&[]).0, EXIT_USAGE);
     }
 
     #[test]
     fn unknown_argument_is_a_usage_error_naming_it() {
+        covers(&[ids::cli::commands::USAGE_ERRORS]);
         let (code, _, err) = go(&["frobnicate"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(err.contains("frobnicate"));
@@ -1028,6 +1033,7 @@ mod tests {
 
     #[test]
     fn doctor_accepts_an_existing_folder_and_prints_no_path() {
+        covers(&[ids::cli::commands::DOCTOR]);
         let dir = std::env::temp_dir();
         let (code, out, err) = go(&["doctor", dir.to_str().unwrap()]);
         assert_eq!(code, EXIT_OK);
@@ -1045,6 +1051,7 @@ mod tests {
 
     #[test]
     fn doctor_fails_for_a_file() {
+        covers(&[ids::cli::commands::DOCTOR]);
         let file = std::env::current_exe().unwrap();
         assert_eq!(go(&["doctor", file.to_str().unwrap()]).0, EXIT_FAILED);
     }

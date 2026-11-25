@@ -4,6 +4,7 @@
 //! The peak (`peak_memory_mib`, from `VmHWM`) is reported on Linux only; elsewhere the run must still finish and say
 //! nothing about its peak.
 
+use lodwright_testkit::{covers, ids};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -23,6 +24,7 @@ fn temp(name: &str) -> PathBuf {
 
 #[test]
 fn a_sixty_world_run_stays_under_its_memory_budget() {
+    covers(&[ids::generate::memory::MANY_WORLDS_STAY_UNDER_THE_CAP]);
     let data = temp("data");
     std::fs::create_dir_all(&data).unwrap();
     let mut builder = PluginBuilder::new();

@@ -170,6 +170,7 @@ mod tests {
     use super::{find_plugin, load_plugins, load_worlds, parse_load_order};
     use lodwright_testkit::land::Heights;
     use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+    use lodwright_testkit::{covers, ids};
 
     fn temp(name: &str) -> std::path::PathBuf {
         let dir =
@@ -181,6 +182,7 @@ mod tests {
 
     #[test]
     fn a_load_order_file_skips_comments_blanks_and_active_markers() {
+        covers(&[ids::generate::run::LOAD_ORDER_FILE]);
         let text = "# plugins\n\n*FalloutNV.esm\n  *DeadMoney.esm  \nMyMod.esp\n*\n";
         assert_eq!(
             parse_load_order(text),
@@ -190,6 +192,7 @@ mod tests {
 
     #[test]
     fn plugins_are_found_without_regard_to_case() {
+        covers(&[ids::generate::run::LOAD_ORDER_FILE]);
         let dir = temp("case");
         std::fs::write(dir.join("FALLOUTNV.ESM"), b"x").unwrap();
         assert_eq!(
@@ -208,6 +211,7 @@ mod tests {
 
     #[test]
     fn a_missing_plugin_is_named_and_the_path_is_not_echoed() {
+        covers(&[ids::generate::run::LOAD_ORDER_FILE]);
         let dir = temp("missing");
         let err = find_plugin(&dir, "Nope.esm").unwrap_err();
         assert_eq!(err.code, "plugin_not_found");
@@ -253,6 +257,7 @@ mod tests {
 
     #[test]
     fn the_inputs_digest_changes_with_plugin_contents_and_not_with_the_folder() {
+        covers(&[ids::generate::run::INPUTS_DIGEST]);
         let world = SyntheticWorld::new(0xA00, "W").cell(0, 0, Heights::flat(8.0));
         let other = SyntheticWorld::new(0xA00, "W").cell(0, 0, Heights::flat(16.0));
         let (one, two, three) = (temp("d1"), temp("d2"), temp("d3"));

@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "terrain.textures"
+title = "Terrain textures and settings"
+origin = "original"
+notes = "Diffuse and normal maps per block and the world settings file (docs/spec/textures.md, docs/spec/lod-settings.md)."
+
+[[item]]
+id = "diffuse_from_layers"
+title = "The diffuse map blends each cell's land texture layers over its base by opacity, in order"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/diffuse.rs"]
+
+[[item]]
+id = "texture_resolution"
+title = "A land texture resolves through its texture set, falls back to its icon, and follows a later plugin's override"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/texture.rs"]
+
+[[item]]
+id = "normal_maps"
+title = "Normal maps follow the heights; flat ground gives the flat normal and gaps do not poison the map"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/images.rs"]
+
+[[item]]
+id = "default_land_texture"
+title = "The default land texture is read from the game's ini"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/diffuse.rs"]
+
+[[item]]
+id = "land_light"
+title = "terrain.land_light darkens the composed far land the way the near land is lit"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/land-light.md"]
+
+[[item]]
+id = "texture_tiling"
+title = "terrain.texture_scales sets how often a land texture repeats; unlisted textures repeat once"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/land-texture-tiling.md"]
+
+[[item]]
+id = "specular_alpha"
+title = "terrain.levels[].specular_alpha carries specular in the alpha of the normal maps, written as BC3"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/specular-in-the-normal-map-alpha.md"]
+
+[[item]]
+id = "game_tiles_kept"
+title = "terrain.compose_shipped_tiles off: the game's own far-land tile is left to the engine where no mod changed the land"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-land-tiles-the-game-ships.md"]
+
+[[item]]
+id = "missing_texture_warning"
+title = "A land texture that is in no folder or archive is its own warning kind and names the path only"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "settings_file"
+title = "One .lod settings file per world, with the world's bounds and block sizes"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/lod.rs"]

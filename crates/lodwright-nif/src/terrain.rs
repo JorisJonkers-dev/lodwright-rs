@@ -443,6 +443,7 @@ pub fn terrain_block(block: &TerrainBlock<'_>) -> Result<NifFile> {
 mod tests {
     use super::{TerrainBlock, terrain_block};
     use crate::NifFile;
+    use lodwright_testkit::{covers, ids};
 
     fn quad(heights: [f32; 4]) -> (Vec<[f32; 3]>, Vec<u16>) {
         (
@@ -481,6 +482,7 @@ mod tests {
 
     #[test]
     fn the_file_has_the_eight_measured_blocks_and_reads_back() {
+        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, i) = quad([1.0, 2.0, 3.0, 4.0]);
         let bytes = terrain_block(&block(&v, &i)).unwrap().write().unwrap();
         let back = NifFile::read(&bytes).unwrap();
@@ -494,6 +496,7 @@ mod tests {
 
     #[test]
     fn the_data_block_keeps_vertices_triangles_and_mirrored_uvs() {
+        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, i) = quad([1.0, 2.0, 3.0, 4.0]);
         let back = NifFile::read(&terrain_block(&block(&v, &i)).unwrap().write().unwrap()).unwrap();
         let crate::Body::TriShapeData(d) = &back.blocks[4].body else {
@@ -509,6 +512,7 @@ mod tests {
 
     #[test]
     fn the_additional_data_holds_one_height_per_vertex_after_a_56_byte_header() {
+        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, i) = quad([5.0, 6.0, 7.0, 8.0]);
         let file = terrain_block(&block(&v, &i)).unwrap();
         let crate::Body::Opaque(b) = &file.blocks[5].body else {
@@ -521,6 +525,7 @@ mod tests {
 
     #[test]
     fn the_root_translation_is_the_block_origin() {
+        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, i) = quad([0.0; 4]);
         let file = terrain_block(&block(&v, &i)).unwrap();
         let crate::Body::Opaque(b) = &file.blocks[0].body else {
@@ -532,6 +537,7 @@ mod tests {
 
     #[test]
     fn a_water_plane_adds_a_shape_and_its_data_and_reads_back() {
+        covers(&[ids::terrain::water::WATER_PLANES]);
         let (v, i) = quad([0.0; 4]);
         let water_v = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
         let mut segments = [0; 16];
@@ -579,6 +585,7 @@ mod tests {
 
     #[test]
     fn the_placeholder_shape_comes_between_the_terrain_and_the_water() {
+        covers(&[ids::terrain::water::PLACEHOLDER_WATER_SHAPE]);
         let (v, i) = quad([0.0; 4]);
         let water_v = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
         let mut one = [0_u32; 16];
@@ -639,6 +646,7 @@ mod tests {
 
     #[test]
     fn bad_meshes_are_refused() {
+        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, _) = quad([0.0; 4]);
         assert!(terrain_block(&block(&v, &[])).is_err());
         assert!(terrain_block(&block(&v, &[0, 1])).is_err());

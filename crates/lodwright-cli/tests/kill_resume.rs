@@ -2,6 +2,7 @@
 //! A `generate` process killed after some blocks leaves the previous output alone, and the next run resumes to the
 //! files an uninterrupted run writes.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -89,6 +90,7 @@ fn kill_after(request: &Path, events: &Path, blocks: usize) -> bool {
 
 #[test]
 fn a_killed_run_resumes_to_the_bytes_of_an_uninterrupted_run() {
+    covers(&[ids::generate::staging::RESUME_AFTER_KILL]);
     let (data, out, request) = setup("killed");
     let (clean_data, clean_out, clean_request) = setup("clean");
     let run = command(&clean_request).output().unwrap();
@@ -131,6 +133,7 @@ fn a_killed_run_resumes_to_the_bytes_of_an_uninterrupted_run() {
 
 #[test]
 fn a_run_killed_over_an_existing_output_leaves_that_output_untouched() {
+    covers(&[ids::generate::staging::KILL_KEEPS_THE_OUTPUT]);
     let (data, out, request) = setup("over");
     assert_eq!(command(&request).output().unwrap().status.code(), Some(0));
     let before = manifest(&out);

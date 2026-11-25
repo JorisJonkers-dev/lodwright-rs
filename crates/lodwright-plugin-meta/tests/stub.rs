@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! The stub plugin of a packed archive reads back as a plugin with no records, no masters, not a master.
 
+use lodwright_testkit::{covers, ids};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -10,6 +11,7 @@ use lodwright_plugin_meta::read_header;
 
 #[test]
 fn the_stub_has_the_one_master_it_was_given_and_is_not_a_master() {
+    covers(&[ids::formats::plugins::STUB_PLUGIN]);
     let header = read_header(
         "Lodwright LOD.esp",
         &stub_plugin("FalloutNV.esm", 14_000_000),
@@ -21,6 +23,7 @@ fn the_stub_has_the_one_master_it_was_given_and_is_not_a_master() {
 
 #[test]
 fn the_stub_holds_no_record_and_names_its_author() {
+    covers(&[ids::formats::plugins::STUB_PLUGIN]);
     let mut plugin = Plugin::new(GameId::FalloutNV, Path::new("Lodwright LOD.esp"));
     plugin
         .parse_reader(

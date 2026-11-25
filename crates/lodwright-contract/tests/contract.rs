@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Golden documents, schema drift and the compatibility rules of the contract.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_contract::{
@@ -79,16 +80,19 @@ fn pretty<T: serde::Serialize>(value: &T) -> String {
 
 #[test]
 fn the_plan_document_equals_its_golden_file() {
+    covers(&[ids::contract::documents::PLAN_DOCUMENT]);
     assert_golden(&golden("plan.json"), &pretty(&sample_plan(false)));
 }
 
 #[test]
 fn the_plan_document_with_blocks_equals_its_golden_file() {
+    covers(&[ids::contract::documents::PLAN_DOCUMENT]);
     assert_golden(&golden("plan_blocks.json"), &pretty(&sample_plan(true)));
 }
 
 #[test]
 fn the_unsupported_result_equals_its_golden_file() {
+    covers(&[ids::contract::documents::RESULT_DOCUMENT]);
     let mut doc = ResultDoc::new(
         "0.0.0-test",
         Status::Unsupported,
@@ -104,6 +108,7 @@ fn the_unsupported_result_equals_its_golden_file() {
 
 #[test]
 fn the_ok_result_equals_its_golden_file() {
+    covers(&[ids::contract::documents::RESULT_DOCUMENT]);
     let mut doc = ResultDoc::new("0.0.0-test", Status::Ok, "ok", "written");
     doc.written = vec![Written {
         world: "Island".into(),
@@ -182,6 +187,7 @@ fn sample_verify() -> VerifyDoc {
 
 #[test]
 fn the_verify_document_equals_its_golden_file() {
+    covers(&[ids::contract::documents::VERIFY_DOCUMENT]);
     assert_golden(&golden("verify.json"), &pretty(&sample_verify()));
 }
 
@@ -198,16 +204,19 @@ const DEFAULT_REQUEST_DIGEST: &str =
 
 #[test]
 fn the_default_request_keeps_its_released_digest() {
+    covers(&[ids::contract::documents::REQUEST_DIGEST_IS_STABLE]);
     assert_eq!(default_request().digest(), DEFAULT_REQUEST_DIGEST);
 }
 
 #[test]
 fn the_default_request_document_equals_its_golden_file() {
+    covers(&[ids::contract::documents::REQUEST_DIGEST_IS_STABLE]);
     assert_golden(&golden("request_default.json"), &pretty(&default_request()));
 }
 
 #[test]
 fn a_request_read_from_its_golden_file_keeps_the_released_digest() {
+    covers(&[ids::contract::documents::REQUEST_DIGEST_IS_STABLE]);
     let request: Request =
         serde_json::from_str(&std::fs::read_to_string(golden("request_default.json")).unwrap())
             .unwrap();
@@ -216,6 +225,7 @@ fn a_request_read_from_its_golden_file_keeps_the_released_digest() {
 
 #[test]
 fn committed_schemas_equal_the_generated_ones() {
+    covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
     for kind in DocumentKind::ALL {
         for &version in kind.versions() {
             let generated = schema_json(kind, version).unwrap();
@@ -227,6 +237,7 @@ fn committed_schemas_equal_the_generated_ones() {
 
 #[test]
 fn every_committed_schema_belongs_to_a_kind_this_build_speaks() {
+    covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .unwrap()
@@ -247,6 +258,7 @@ fn every_committed_schema_belongs_to_a_kind_this_build_speaks() {
 
 #[test]
 fn golden_documents_pass_their_own_schema_check() {
+    covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
     for (name, kind) in [
         ("plan.json", DocumentKind::Plan),
         ("plan_blocks.json", DocumentKind::Plan),
@@ -270,6 +282,7 @@ fn golden_documents_pass_their_own_schema_check() {
 
 #[test]
 fn a_golden_plan_with_version_two_is_refused() {
+    covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
     let mut value: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(golden("plan.json")).unwrap()).unwrap();
     value["schema_version"] = 2.into();
@@ -283,6 +296,7 @@ fn a_golden_plan_with_version_two_is_refused() {
 
 #[test]
 fn a_plan_with_unknown_fields_is_read_and_the_fields_are_dropped() {
+    covers(&[ids::contract::documents::UNKNOWN_KEYS_IGNORED]);
     let mut value: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(golden("plan.json")).unwrap()).unwrap();
     value["added_later"] = "x".into();

@@ -2,6 +2,7 @@
 //! The thread count never changes a byte of an encoded file.
 
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode, encode_with_threads};
+use lodwright_testkit::{covers, ids};
 
 /// A picture with edges, gradients and a transparent corner, from a fixed generator (no data files).
 fn picture(width: u32, height: u32) -> Image {
@@ -29,6 +30,7 @@ fn picture(width: u32, height: u32) -> Image {
 
 #[test]
 fn every_thread_count_gives_the_bytes_of_one_thread() {
+    covers(&[ids::generate::run::SAME_BYTES_AT_ANY_THREAD_COUNT]);
     // sizes that are and are not a multiple of the band height, and one with a partial block row
     for (w, h) in [(256, 256), (200, 330), (64, 1024), (33, 513)] {
         let image = picture(w, h);

@@ -207,6 +207,7 @@ mod tests {
     use lodwright_contract::{IncludeRule, Inclusion};
     use lodwright_core::objects::Instance;
     use lodwright_core::plugin::Placement;
+    use lodwright_testkit::{covers, ids};
 
     fn inst(model: &str, reference: u32, ref_plugin: usize, base_plugin: usize) -> Instance {
         Instance {
@@ -231,6 +232,7 @@ mod tests {
 
     #[test]
     fn globs_match_runs_and_anchor_both_ends() {
+        covers(&[ids::objects::selection::EXCLUSION_RULES]);
         assert!(glob("clutter/*", "clutter/fence/a.nif"));
         assert!(glob("*/fence/*.nif", "clutter/fence/a.nif"));
         assert!(!glob("clutter/*.nif", "xclutter/a.nif"));
@@ -240,6 +242,7 @@ mod tests {
 
     #[test]
     fn rules_exclude_by_plugin_record_and_model_and_only_keeps_listed_plugins() {
+        covers(&[ids::objects::selection::EXCLUSION_RULES]);
         let plugins = vec!["Base.esm".to_owned(), "Mod.esp".to_owned()];
         let list = || {
             vec![
@@ -302,6 +305,7 @@ mod tests {
 
     #[test]
     fn an_include_rule_matches_by_model_pattern_plugin_and_record_type() {
+        covers(&[ids::objects::selection::INCLUDE_RULES]);
         let plugins = ["A.esm".to_owned(), "Lamps.esp".to_owned()];
         let rules = IncludeRules::new(
             &[rule("Lights\\Street*.NIF", Some("lamps.ESP"), Some("STAT"))],
@@ -322,6 +326,7 @@ mod tests {
 
     #[test]
     fn generate_limits_come_from_the_first_matching_rule_that_has_them() {
+        covers(&[ids::objects::selection::RULE_GENERATE_OPTION]);
         let shapes = |keep| lodwright_contract::FullModelShapes {
             keep,
             max_error: 0.05,
@@ -350,6 +355,7 @@ mod tests {
 
     #[test]
     fn an_include_rule_naming_a_plugin_outside_the_load_order_is_refused() {
+        covers(&[ids::objects::selection::INCLUDE_RULES]);
         let err = IncludeRules::new(&[rule("*", Some("Gone.esp"), None)], &["A.esm".to_owned()])
             .unwrap_err();
         assert!(err.contains("Gone.esp"), "{err}");
@@ -359,6 +365,7 @@ mod tests {
 
     #[test]
     fn taking_adds_only_new_matching_references_and_counts_the_held_back_ones() {
+        covers(&[ids::objects::selection::INCLUDE_RULES]);
         let rules = IncludeRules::new(&[rule("lamp*", None, None)], &["A.esm".to_owned()]).unwrap();
         let mut visible = vec![inst("lamp.nif", 1, 0, 0)];
         let candidates = vec![
@@ -380,6 +387,7 @@ mod tests {
 
     #[test]
     fn an_exclusion_rule_still_wins_over_an_included_object() {
+        covers(&[ids::objects::selection::EXCLUSION_RULES]);
         let rules = IncludeRules::new(&[rule("lamp*", None, None)], &["A.esm".to_owned()]).unwrap();
         let mut visible = Vec::new();
         rules.take(&mut visible, vec![inst("lamp.nif", 2, 0, 0)], &[]);

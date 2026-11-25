@@ -419,6 +419,7 @@ impl AtlasCover {
 #[cfg(test)]
 mod tests {
     use super::{AtlasCover, MetricShape, closest_on_triangle, shape_error};
+    use lodwright_testkit::{covers, ids};
 
     /// A flat square of side `size` at height `z`, its UVs over `uv` of the atlas.
     fn square(size: f64, z: f64, uv: f32, atlas: Option<(u32, u32)>) -> MetricShape {
@@ -453,6 +454,7 @@ mod tests {
 
     #[test]
     fn a_block_against_itself_has_no_error() {
+        covers(&[ids::verify::folder::FAR_METRICS]);
         let s = [square(100.0, 5.0, 0.5, Some((1024, 1024)))];
         let e = shape_error(&s, &s).unwrap();
         assert_eq!(
@@ -464,6 +466,7 @@ mod tests {
 
     #[test]
     fn a_raised_surface_shows_as_its_height_in_position_error() {
+        covers(&[ids::verify::folder::FAR_METRICS]);
         let a = [square(100.0, 0.0, 0.5, None)];
         let b = [square(100.0, 7.0, 0.5, None)];
         let e = shape_error(&a, &b).unwrap();
@@ -484,6 +487,7 @@ mod tests {
 
     #[test]
     fn half_the_texture_detail_is_one_step_of_uv_error() {
+        covers(&[ids::verify::folder::FAR_METRICS]);
         let a = [square(100.0, 0.0, 0.25, Some((1024, 1024)))];
         let b = [square(100.0, 0.0, 0.5, Some((1024, 1024)))];
         let e = shape_error(&a, &b).unwrap();
@@ -499,6 +503,7 @@ mod tests {
 
     #[test]
     fn a_missing_half_shows_in_the_silhouette() {
+        covers(&[ids::verify::folder::FAR_METRICS]);
         let a = [square(100.0, 0.0, 0.5, None)];
         let mut half = square(100.0, 0.0, 0.5, None);
         half.triangles.truncate(1);
@@ -515,6 +520,7 @@ mod tests {
 
     #[test]
     fn atlas_use_is_the_share_its_triangles_cover() {
+        covers(&[ids::verify::folder::FAR_METRICS]);
         let mut cover = AtlasCover::new((2048, 1024));
         assert_eq!(cover.used(), 0.0);
         cover.add(&square(1.0, 0.0, 0.5, None));

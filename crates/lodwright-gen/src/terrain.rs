@@ -622,6 +622,7 @@ mod tests {
     use lodwright_core::terrain::TerrainSettings;
     use lodwright_core::worldspace::Worldspace;
     use lodwright_nif::NifFile;
+    use lodwright_testkit::{covers, ids};
 
     fn temp(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("lodwright-gen-{}-{name}", std::process::id()));
@@ -641,6 +642,7 @@ mod tests {
 
     #[test]
     fn a_world_gives_blocks_textures_and_a_settings_file_at_the_planned_paths() {
+        covers(&[ids::terrain::mesh::BLOCK_NAMES_AND_PATHS]);
         let out = temp("paths");
         let report = generate_terrain(
             &world(),
@@ -669,6 +671,7 @@ mod tests {
 
     #[test]
     fn a_cell_with_ground_below_its_water_gets_a_water_plane_unless_turned_off() {
+        covers(&[ids::terrain::water::WATER_PLANES]);
         let mut w = world();
         w.set_cell_water(0, 0, true, Some(150.0));
         for (water, blocks) in [(true, 10), (false, 8)] {
@@ -694,6 +697,7 @@ mod tests {
 
     #[test]
     fn a_tile_the_game_ships_is_left_out_and_the_block_digest_changes() {
+        covers(&[ids::terrain::textures::GAME_TILES_KEPT]);
         let w = world();
         let keep_level_4 = |level: u32, _cell: (i32, i32)| level == 4;
         let run = |keep: bool, tag: &str| {
@@ -760,6 +764,7 @@ mod tests {
 
     #[test]
     fn faces_below_the_water_are_dropped_only_with_the_option_and_it_enters_the_digest() {
+        covers(&[ids::terrain::mesh::FACES_UNDER_THE_WATER_DROPPED]);
         let mut coast = world();
         // water over the low cell (0, 0) at 105: its ground at 100 lies below, the cells beside it at 110 above
         coast.set_cell_water(0, 0, true, Some(105.0));
@@ -798,6 +803,7 @@ mod tests {
 
     #[test]
     fn block_inputs_change_only_where_the_world_changes_and_a_reused_block_is_not_built() {
+        covers(&[ids::generate::run::TERRAIN_BLOCKS_KEPT]);
         let run = |w: &Worldspace, name: &str, reuse: bool| {
             let keep = |_: &str, _: &str| Some(Vec::new());
             generate_terrain(
@@ -869,6 +875,7 @@ mod tests {
 
     #[test]
     fn the_thread_count_does_not_change_a_single_byte() {
+        covers(&[ids::generate::run::SAME_BYTES_AT_ANY_THREAD_COUNT]);
         let (one, four) = (temp("t1"), temp("t4"));
         let a = generate_terrain(
             &world(),
@@ -959,6 +966,7 @@ mod tests {
 
     #[test]
     fn a_small_world_gets_only_the_levels_its_width_allows_and_the_settings_say_so() {
+        covers(&[ids::terrain::mesh::LEVELS]);
         // corners (-6, -5) to (4, 5): width 16, highest level 4
         let out = temp("extent");
         let report = generate_terrain(
@@ -980,6 +988,7 @@ mod tests {
 
     #[test]
     fn a_folder_on_an_anchored_grid_verifies_without_errors() {
+        covers(&[ids::terrain::mesh::GRID_STARTS_AT_THE_MINIMUM_CORNER]);
         let out = temp("anchor-verify");
         generate_terrain(
             &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
@@ -995,6 +1004,7 @@ mod tests {
 
     #[test]
     fn a_corner_on_the_grid_or_no_corner_gives_the_old_names_and_digests() {
+        covers(&[ids::terrain::mesh::GRID_STARTS_AT_THE_MINIMUM_CORNER]);
         let plain = level4_names(&world(), "plain");
         assert_eq!(level4_names(&bounded([0.0, 0.0]), "zero"), plain);
         assert_eq!(
@@ -1027,6 +1037,7 @@ mod tests {
 
     #[test]
     fn the_settings_file_carries_the_world_bounds() {
+        covers(&[ids::terrain::textures::SETTINGS_FILE]);
         let out = temp("settings");
         generate_terrain(
             &world(),
@@ -1043,6 +1054,7 @@ mod tests {
 
     #[test]
     fn an_empty_world_writes_nothing() {
+        covers(&[ids::terrain::mesh::EMPTY_WORLD_WRITES_NOTHING]);
         let out = temp("empty");
         let empty = Worldspace::from_cells(1, "Empty", std::iter::empty());
         let report = generate_terrain(
@@ -1057,6 +1069,7 @@ mod tests {
 
     #[test]
     fn a_world_name_that_is_not_a_folder_is_refused() {
+        covers(&[ids::terrain::mesh::EMPTY_WORLD_WRITES_NOTHING]);
         let out = temp("badname");
         let bad = Worldspace::from_cells(1, "../x", std::iter::empty());
         assert!(
@@ -1066,6 +1079,7 @@ mod tests {
 
     #[test]
     fn a_tiling_scale_other_than_one_changes_the_digest_of_the_blocks_that_use_the_texture() {
+        covers(&[ids::terrain::textures::TEXTURE_TILING]);
         let mut w = world();
         w.set_cell_layers(
             0,
@@ -1187,6 +1201,7 @@ mod tests {
 
     #[test]
     fn specular_off_writes_bc1_normals_and_the_same_bytes_whatever_the_exponents() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let tiles_a = specular_tiles(Some(10), Some((10, 200)));
         let tiles_b = specular_tiles(None, None);
         let (out_a, a) = run_specular(&specular_level(false), &tiles_a, "spec-off-a");
@@ -1199,6 +1214,7 @@ mod tests {
 
     #[test]
     fn specular_on_writes_bc3_normals_and_leaves_the_diffuse_alone() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let tiles = specular_tiles(Some(100), Some((10, 200)));
         let (out_off, off) = run_specular(&specular_level(false), &tiles, "spec-cmp-off");
         let (out_on, on) = run_specular(&specular_level(true), &tiles, "spec-cmp-on");
@@ -1218,6 +1234,7 @@ mod tests {
 
     #[test]
     fn a_missing_exponent_everywhere_gives_opaque_alpha_and_never_a_panic() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let tiles = specular_tiles(None, None);
         let w = specular_world();
         let id = BlockId {
@@ -1236,6 +1253,7 @@ mod tests {
 
     #[test]
     fn a_flat_source_gives_a_uniform_alpha_scaled_over_the_range() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let w = specular_world();
         let id = BlockId {
             level: 4,
@@ -1256,6 +1274,7 @@ mod tests {
 
     #[test]
     fn the_exponents_change_the_digest_only_of_levels_that_write_them() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let w = specular_world();
         let level = |on| Job {
             level: specular_level(on).levels[0],

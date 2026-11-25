@@ -7,6 +7,7 @@ use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::probe_nif::{
     GeometryOptions, NifBuilder, texture_set, tri_shape_data, tri_strips_data,
 };
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -118,6 +119,7 @@ fn cases() -> Vec<Case> {
 
 #[test]
 fn json_and_text_outputs_equal_their_golden_files() {
+    covers(&[ids::cli::commands::PROBE]);
     let dir = folder("golden");
     for case in cases() {
         let file = dir.join(format!("{}.bin", case.name));
@@ -134,6 +136,7 @@ fn json_and_text_outputs_equal_their_golden_files() {
 
 #[test]
 fn no_byte_of_input_beyond_the_documented_integers_reaches_the_output() {
+    covers(&[ids::cli::commands::PROBE]);
     let marker = "ZZMARKERZZ";
     let dir = folder("marker");
     let mut files: Vec<(&str, Vec<u8>)> = vec![];
@@ -178,6 +181,7 @@ fn no_byte_of_input_beyond_the_documented_integers_reaches_the_output() {
 
 #[test]
 fn truncated_and_garbage_input_exits_one_with_a_message_and_never_panics() {
+    covers(&[ids::cli::commands::PROBE]);
     let dir = folder("bad");
     for case in cases() {
         if case.kind == "settings" || case.kind == "dtl" {
@@ -221,6 +225,7 @@ fn truncated_and_garbage_input_exits_one_with_a_message_and_never_panics() {
 
 #[test]
 fn a_file_inside_a_git_working_tree_is_refused_unless_allowed() {
+    covers(&[ids::cli::commands::PROBE]);
     let dir = folder("repo");
     let repo = dir.join("work");
     std::fs::create_dir_all(repo.join(".git")).unwrap();

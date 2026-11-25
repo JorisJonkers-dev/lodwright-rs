@@ -1047,9 +1047,11 @@ fn far_model_without_flag(
 #[cfg(test)]
 mod specular_tests {
     use super::specular_warnings;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn no_exponent_anywhere_warns_once_that_the_alpha_stays_opaque() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let warnings = specular_warnings(&lodwright_gen::LandTiles::empty());
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("stay opaque"));
@@ -1062,6 +1064,7 @@ mod classify_tests {
 
     #[test]
     fn a_land_texture_that_is_in_no_folder_or_archive_is_its_own_kind_and_names_the_path_only() {
+        covers(&[ids::terrain::textures::MISSING_TEXTURE_WARNING]);
         let r = classify(
             Some("WastelandNV"),
             "land texture textures/Landscape/BurntGround01.dds not found",
@@ -1083,6 +1086,7 @@ mod warning_tests {
 
     #[test]
     fn warnings_are_capped_at_twenty_and_the_last_line_counts_the_rest() {
+        covers(&[ids::generate::run::WARNINGS_CAPPED]);
         let mut doc = ResultDoc::new("0.0.0", Status::Ok, "generated", "LOD written");
         add_warnings(&mut doc, (0..15).map(|i| format!("a{i}")).collect());
         assert_eq!(doc.warnings.len(), 15);

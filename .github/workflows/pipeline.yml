@@ -347,15 +347,25 @@ jobs:
             echo "::notice title=Feature catalogue::documentation only: the tests did not run, so no covered count and no ratchet"
           fi
           # Pull requests never carry the generated reports, so none can lower the bar the ratchet measures against.
-          # (The first report files arrive with the pull request that adds this job; once main has them, none may change.)
-          if [ "$GITHUB_EVENT_NAME" = pull_request ] && git cat-file -e "${BASE}:docs/coverage/tally.svg" 2>/dev/null \
-            && git diff --name-only "$BASE" HEAD -- docs/coverage | grep -q .; then
-            echo "::error title=Feature catalogue::docs/coverage/ is generated on main; leave it out of the pull request"; exit 1
+          # Only the picture the README shows may arrive once, with the pull request that adds this job, while main has
+          # none; the report the ratchet measures against never comes from a pull request.
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            changed="$(git diff --name-only "$BASE" HEAD -- docs/coverage)"
+            if git cat-file -e "${BASE}:docs/coverage/tally.svg" 2>/dev/null; then
+              other="$changed"
+            else
+              other="$(grep -vxF docs/coverage/tally.svg <<<"$changed" || true)"
+            fi
+            if [ -n "$other" ]; then
+              echo "::error title=Feature catalogue::docs/coverage/ is generated on main; leave it out of the pull request: $other"; exit 1
+            fi
           fi
           # The ratchet measures against the report of the base revision (main before this change).
           ratchet=()
           if [ ${#args[@]} -gt 0 ] && [ -n "${BASE:-}" ] && git show "${BASE}:docs/coverage/tally-report.json" >"$RUNNER_TEMP/base-report.json" 2>/dev/null; then
             ratchet=(--ratchet "$RUNNER_TEMP/base-report.json")
+          elif [ ${#args[@]} -gt 0 ]; then
+            echo "::notice title=Feature catalogue::no report on the base revision (the first run after this job came): no ratchet this time"
           fi
           if [ -n "${BASE:-}" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
             "$tally" check --base "$BASE" "${args[@]}" "${ratchet[@]}"

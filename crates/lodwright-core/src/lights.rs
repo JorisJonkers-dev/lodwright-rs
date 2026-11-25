@@ -203,6 +203,43 @@ fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
 }
 
+/// The spot of each lamp model (`seen`: per model, every light near one of its copies in the model's frame, with the
+/// light's index; `copies`: per model, its standing copies and how many of them have a light near), and the light whose
+/// radius and colour its points take. A model is a lamp under the thresholds of [`unlit_lamps`].
+fn lamp_spots(
+    seen: &HashMap<u32, Vec<([f32; 3], usize)>>,
+    copies: &HashMap<u32, (usize, usize)>,
+) -> HashMap<u32, ([f32; 3], usize)> {
+    let mut spots: HashMap<u32, ([f32; 3], usize)> = HashMap::new();
+    for (base, lit) in seen {
+        let (total, lit_copies) = copies.get(base).copied().unwrap_or((0, 0));
+        let Some(&(spot, k)) = lit.iter().max_by_key(|(a, _)| {
+            lit.iter()
+                .filter(|(b, _)| distance(*a, *b) <= LAMP_SPOT_TOLERANCE)
+                .count()
+        }) else {
+            continue;
+        };
+        let agree = lit
+            .iter()
+            .filter(|(b, _)| distance(spot, *b) <= LAMP_SPOT_TOLERANCE)
+            .count();
+        #[allow(clippy::cast_precision_loss)] // counts of copies are far below 2^24
+        let (share, agreement) = (
+            lit_copies as f32 / total.max(1) as f32,
+            agree as f32 / lit.len() as f32,
+        );
+        if lit_copies >= LAMP_MIN_LIT
+            && agree >= LAMP_MIN_LIT
+            && share >= LAMP_MIN_SHARE
+            && agreement >= LAMP_MIN_AGREEMENT
+        {
+            spots.insert(*base, (spot, k));
+        }
+    }
+    spots
+}
+
 /// The far light points of lamps that carry no light of their own (issue 339, lamp rows lit every other post).
 ///
 /// A load order often lights only some copies of one lamp model: a row of posts where every second one has a light,
@@ -248,41 +285,21 @@ fn unlit_lamps(
         }
         found
     };
-    // per model: its copies, and the lights seen near each lit copy (in the model's frame)
-    let mut copies: HashMap<u32, usize> = HashMap::new();
+    // per model: its copies, the copies with a light near them, and every such light in the model's frame
+    let mut copies: HashMap<u32, (usize, usize)> = HashMap::new();
     let mut seen: HashMap<u32, Vec<([f32; 3], usize)>> = HashMap::new();
     for (_, base, placement) in fixtures {
-        *copies.entry(*base).or_default() += 1;
-        for k in near(placement.pos) {
+        let found = near(placement.pos);
+        let count = copies.entry(*base).or_default();
+        count.0 += 1;
+        count.1 += usize::from(!found.is_empty());
+        for k in found {
             seen.entry(*base)
                 .or_default()
                 .push((to_local(placement, lights[k].pos), k));
         }
     }
-    // the spot of each lamp model: the seen light that most others agree with
-    let mut spots: HashMap<u32, ([f32; 3], usize)> = HashMap::new();
-    for (base, lit) in &seen {
-        let total = copies.get(base).copied().unwrap_or(0);
-        let Some(&(spot, k)) = lit.iter().max_by_key(|(a, _)| {
-            lit.iter()
-                .filter(|(b, _)| distance(*a, *b) <= LAMP_SPOT_TOLERANCE)
-                .count()
-        }) else {
-            continue;
-        };
-        let agree = lit
-            .iter()
-            .filter(|(b, _)| distance(spot, *b) <= LAMP_SPOT_TOLERANCE)
-            .count();
-        #[allow(clippy::cast_precision_loss)] // counts of copies are far below 2^24
-        let (share, agreement) = (
-            agree as f32 / total.max(1) as f32,
-            agree as f32 / lit.len() as f32,
-        );
-        if agree >= LAMP_MIN_LIT && share >= LAMP_MIN_SHARE && agreement >= LAMP_MIN_AGREEMENT {
-            spots.insert(*base, (spot, k));
-        }
-    }
+    let spots = lamp_spots(&seen, &copies);
     // two models of one lamp (a post and its foot) learn the same spot: a point already given is taken too
     let mut given: HashMap<(i32, i32), Vec<[f32; 3]>> = HashMap::new();
     let mut out = Vec::new();
@@ -555,6 +572,23 @@ mod tests {
         }
         let p = plugin(&[], vec![light(0x100, 300, [9, 9, 9], 0)], refs);
         assert_eq!(points(p).len(), 3);
+    }
+
+    #[test]
+    fn a_model_lit_on_a_fifth_of_its_copies_is_a_lamp() {
+        covers(&[ids::objects::selection::FAR_LIGHTS_UNLIT_LAMPS]);
+        // 20 copies, 4 lit at one spot: exactly the share a lamp model needs, so the other 16 get a point
+        let mut refs = Vec::new();
+        for n in 0..20_u32 {
+            #[allow(clippy::cast_precision_loss)]
+            let x = n as f32 * 1000.0;
+            refs.push(refr_at(0x400 + n, POST, 0, [x, 0.0, 0.0], 0.0));
+            if n < 4 {
+                refs.push(refr_at(0x500 + n, 0x100, 0, [x + 50.0, 0.0, 300.0], 0.0));
+            }
+        }
+        let p = plugin(&[], vec![light(0x100, 300, [9, 9, 9], 0)], refs);
+        assert_eq!(points(p).len(), 20);
     }
 
     #[test]

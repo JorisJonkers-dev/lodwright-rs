@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.18.0...v0.19.0) (2026-11-25)
+
+
+### Features
+
+* **objects:** far light points on every copy of a lamp model when the load order lights only some copies ([#432](https://github.com/JorisJonkers-dev/lodwright-rs/issues/432)) ([27c6861](https://github.com/JorisJonkers-dev/lodwright-rs/commit/27c6861f341572a939431947035409edd3a33000))
+
 ## [0.18.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.17.0...v0.18.0) (2026-11-25)
 
 

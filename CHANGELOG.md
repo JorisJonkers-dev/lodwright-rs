@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.18.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.17.0...v0.18.0) (2026-11-25)
+
+
+### Features
+
+* **objects:** far light points as one marked unlit shape per object block (objects.far_lights) ([#429](https://github.com/JorisJonkers-dev/lodwright-rs/issues/429)) ([6e8036a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/6e8036a5d11ebc45397e05cd2b0bf8a3ebb4ee68))
+* **objects:** optional rule that takes unflagged references with a far model ([#428](https://github.com/JorisJonkers-dev/lodwright-rs/issues/428)) ([4b85a46](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4b85a46eaeab3c5a4c4311b6b938a41c3b3e2989))
+
+
+### Bug Fixes
+
+* **generate:** an output written by another build of the same version is rebuilt ([#423](https://github.com/JorisJonkers-dev/lodwright-rs/issues/423)) ([4f63e45](https://github.com/JorisJonkers-dev/lodwright-rs/commit/4f63e45c49534f7eb352d3db537abc4bab8d8aca))
+* **objects:** follow an enable parent chain to its end ([#413](https://github.com/JorisJonkers-dev/lodwright-rs/issues/413)) ([eecf4b4](https://github.com/JorisJonkers-dev/lodwright-rs/commit/eecf4b4d4fa551f715faf171861391da4f7618c5))
+* **objects:** include rules follow the start state, and enable parents are found in every world ([#416](https://github.com/JorisJonkers-dev/lodwright-rs/issues/416)) ([0534f8f](https://github.com/JorisJonkers-dev/lodwright-rs/commit/0534f8fccc37c60040220da49d6f0df9ef29b8d3))
+* **objects:** keep persistent initially disabled references in the far view ([#417](https://github.com/JorisJonkers-dev/lodwright-rs/issues/417)) ([af7c9c9](https://github.com/JorisJonkers-dev/lodwright-rs/commit/af7c9c9bdf691cf8b257bee01771b2d7bb227c23))
+* **objects:** leave out references that are disabled when the game starts ([#412](https://github.com/JorisJonkers-dev/lodwright-rs/issues/412)) ([32dd4a7](https://github.com/JorisJonkers-dev/lodwright-rs/commit/32dd4a70dca0699eab0352c6d1f6c2d7607ba79f))
+* **objects:** read High Priority LOD from the static as well as the reference ([#421](https://github.com/JorisJonkers-dev/lodwright-rs/issues/421)) ([dfb4885](https://github.com/JorisJonkers-dev/lodwright-rs/commit/dfb48857d1eb2b21ed18f9e7ed4bc0b6641bab6b))
+* **pack:** progress counts the files read into the archive; a digest failure removes the written file ([#418](https://github.com/JorisJonkers-dev/lodwright-rs/issues/418)) ([8a01307](https://github.com/JorisJonkers-dev/lodwright-rs/commit/8a01307f55a2f470b5be17c1e1d0fe5cd71feaee))
+
+
+### Performance Improvements
+
+* **pack:** stream the archive to disk with one file in memory at a time ([#409](https://github.com/JorisJonkers-dev/lodwright-rs/issues/409)) ([8a6987a](https://github.com/JorisJonkers-dev/lodwright-rs/commit/8a6987a4133f009bfb2d282a0016b9573bbb7d87))
+
 ## [0.17.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.16.3...v0.17.0) (2026-11-24)
 
 

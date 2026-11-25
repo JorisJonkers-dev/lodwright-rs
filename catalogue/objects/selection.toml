@@ -82,6 +82,13 @@ origin = "ours"
 evidence = ["docs/contracts/options/far-models-without-the-far-view-flag.md"]
 
 [[item]]
+id = "far_lights"
+title = "objects.far_lights writes the steady lights near drawn objects as one marked unlit light-point shape per block"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-light-points.md"]
+
+[[item]]
 id = "terrain_cell_rules"
 title = "Inclusion rules per plugin apply to terrain cells"
 status = "missing"

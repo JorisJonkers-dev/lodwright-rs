@@ -1190,6 +1190,7 @@ fn lod_files(out: &std::path::Path) -> Vec<String> {
 
 #[test]
 fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_with_the_option() {
+    covers(&[ids::objects::selection::FAR_LIGHTS]);
     let (mut on, on_out) = far_lights_job("far-lights-on");
     on.request.objects.far_lights = true;
     let result = done(generate(&on, &mut NoProgress, &CancelToken::new()).unwrap());

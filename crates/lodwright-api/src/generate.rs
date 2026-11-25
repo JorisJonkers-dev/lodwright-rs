@@ -1061,6 +1061,7 @@ mod specular_tests {
 #[cfg(test)]
 mod classify_tests {
     use super::classify;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_land_texture_that_is_in_no_folder_or_archive_is_its_own_kind_and_names_the_path_only() {
@@ -1083,6 +1084,7 @@ mod classify_tests {
 mod warning_tests {
     use super::add_warnings;
     use lodwright_contract::{ResultDoc, Status};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn warnings_are_capped_at_twenty_and_the_last_line_counts_the_rest() {

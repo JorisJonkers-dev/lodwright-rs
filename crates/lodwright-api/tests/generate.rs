@@ -1175,8 +1175,8 @@ fn far_model_without_flag_takes_the_lamps_that_stand_at_the_start_and_only_with_
 
 #[test]
 fn far_model_without_flag_leaves_out_a_base_drawn_as_a_tree_billboard() {
-    covers(&[ids::objects::selection::FAR_MODEL_WITHOUT_FLAG]);
     const HAS_TREE_LOD: u32 = 0x40;
+    covers(&[ids::objects::selection::FAR_MODEL_WITHOUT_FLAG]);
     assert_eq!(
         far_model_lamps("far-model-tree", HAS_TREE_LOD, true),
         vec![]

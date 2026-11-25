@@ -19,4 +19,8 @@ pub mod world;
 
 // The feature catalogue's ids (catalogue/, docs/TESTING.md "Feature catalogue"): a test says which items it proves with
 // `covers(&[ids::area::group::ITEM])`; an id the catalogue does not have does not compile.
-include!(concat!(env!("OUT_DIR"), "/tally_ids.rs"));
+#[allow(missing_docs)] // generated constants: the id is its own documentation
+mod tally_generated {
+    include!(concat!(env!("OUT_DIR"), "/tally_ids.rs"));
+}
+pub use tally_generated::{Id, covers, ids};

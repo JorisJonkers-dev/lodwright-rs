@@ -715,8 +715,8 @@ mod tests {
 
     #[test]
     fn statics_and_placed_references_are_read_with_flags_and_placements() {
-        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         use super::{ReadOptions, read_with};
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
         let stat = Record::new(*b"STAT", 0x0100_0001)
             .with_subrecord(*b"EDID", b"Wall\0".to_vec())
@@ -758,8 +758,8 @@ mod tests {
     // source: game-object-block-cell
     #[test]
     fn temporary_references_keep_their_cell_and_persistent_ones_do_not() {
-        covers(&[ids::objects::selection::TEMPORARY_REFERENCES]);
         use super::{ReadOptions, read_with};
+        covers(&[ids::objects::selection::TEMPORARY_REFERENCES]);
         let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
         let refr = |id: u32| {
             Record::new(*b"REFR", id)
@@ -803,8 +803,8 @@ mod tests {
 
     #[test]
     fn a_static_collection_keeps_its_parts_and_placements() {
-        covers(&[ids::objects::selection::STATIC_COLLECTIONS]);
         use super::{ReadOptions, read_with};
+        covers(&[ids::objects::selection::STATIC_COLLECTIONS]);
         let mut data = Vec::new();
         for v in [1.0_f32, 2.0, 3.0, 0.0, 0.0, 0.0, 0.5] {
             data.extend_from_slice(&v.to_le_bytes());
@@ -1096,8 +1096,8 @@ mod tests {
 
     #[test]
     fn ltex_and_txst_records_are_read_with_their_subrecords() {
-        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         use lodwright_testkit::world::{ltex_record, record_group, txst_record};
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let bytes = PluginBuilder::new()
             .group(record_group(
                 *b"TXST",

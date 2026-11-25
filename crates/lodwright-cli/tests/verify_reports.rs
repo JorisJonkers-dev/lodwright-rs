@@ -147,8 +147,8 @@ fn verify_reports_equal_their_golden_files_for_four_folder_pairs() {
 
 #[test]
 fn no_file_content_reaches_a_report() {
-    covers(&[ids::verify::folder::REPORTS_HOLD_NO_GAME_DATA]);
     const MARKER: &str = "MARKER-7f3a-never-in-a-report";
+    covers(&[ids::verify::folder::REPORTS_HOLD_NO_GAME_DATA]);
     let mine = generate("marker", 0.0);
     // the marker replaces files verify reads and refuses: a block mesh, a texture and the settings file
     let all = files(&mine);

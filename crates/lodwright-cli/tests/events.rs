@@ -276,8 +276,8 @@ fn object_and_tree_blocks_each_get_a_line_after_the_terrain_blocks_of_their_worl
 
 #[test]
 fn a_recorded_run_with_terrain_objects_and_trees_has_a_run_number_that_never_goes_back() {
-    covers(&[ids::contract::events::RUN_WIDE_PROGRESS]);
     use lodwright_api::{CancelToken, GenerateOutcome, GenerateRequest, ProgressEvent, Step};
+    covers(&[ids::contract::events::RUN_WIDE_PROGRESS]);
     let d = data("run");
     let out = temp("run-out");
     let mut request = Request::new(d.to_str().unwrap(), &["Island.esm"], out.to_str().unwrap());

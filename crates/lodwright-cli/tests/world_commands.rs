@@ -136,7 +136,6 @@ fn plan_reads_a_load_order_file() {
 
 #[test]
 fn plan_failures_name_the_problem_and_exit_one() {
-    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("fail");
     let d = dir.to_str().unwrap();
     let (code, _, err) = go(&["plan", "--data", d, "--plugin", "Missing.esm"]);
@@ -166,7 +165,6 @@ fn plan_failures_name_the_problem_and_exit_one() {
 
 #[test]
 fn plan_usage_errors_exit_two() {
-    covers(&[ids::cli::commands::PLAN]);
     assert_eq!(go(&["plan"]).0, EXIT_USAGE);
     assert_eq!(go(&["plan", "--data", "d", "--bogus"]).0, EXIT_USAGE);
     assert_eq!(go(&["heightmap", "--level"]).0, EXIT_USAGE);
@@ -174,7 +172,6 @@ fn plan_usage_errors_exit_two() {
 
 #[test]
 fn a_plugin_without_worlds_is_reported() {
-    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("empty");
     let flat = lodwright_testkit::plugin::PluginBuilder::new().build();
     std::fs::write(dir.join("Empty.esp"), flat).unwrap();
@@ -256,7 +253,6 @@ fn heightmap_scales_between_the_lowest_and_highest_height() {
 
 #[test]
 fn heightmap_needs_a_single_world_and_an_output_file() {
-    covers(&[ids::cli::commands::HEIGHTMAP]);
     let dir = data_folder("heightfail");
     let d = dir.to_str().unwrap();
     let target = dir.join("x.pgm");
@@ -421,7 +417,6 @@ fn generate_lake(name: &str, water: bool) -> PathBuf {
 
 #[test]
 fn verify_reports_water_iou_and_object_agreement_against_an_equal_reference() {
-    covers(&[ids::verify::folder::OBJECT_AGREEMENT]);
     let (mine, theirs) = (
         generate_lake("equal-a", true),
         generate_lake("equal-b", true),
@@ -559,7 +554,6 @@ fn verify_without_a_reference_prints_no_block_reports() {
 
 #[test]
 fn the_water_iou_threshold_needs_a_reference_and_a_number_from_zero_to_one() {
-    covers(&[ids::verify::folder::WATER_IOU]);
     let dir = std::env::temp_dir();
     let dir = dir.to_str().unwrap();
     assert_eq!(go(&["verify", dir, "--water-iou", "0.9"]).0, EXIT_USAGE);

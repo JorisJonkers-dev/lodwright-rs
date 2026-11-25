@@ -486,7 +486,6 @@ mod tests {
 
     #[test]
     fn the_peak_is_read_from_a_status_text() {
-        covers(&[ids::generate::memory::PEAK_MEMORY_ON_LINUX]);
         assert_eq!(
             parse_vm_hwm_kib("Name:\tx\nVmHWM:\t  2049 kB\nVmRSS:\t1 kB\n"),
             Some(2049)
@@ -496,7 +495,6 @@ mod tests {
 
     #[test]
     fn the_peak_of_this_process_is_positive_where_proc_exists() {
-        covers(&[ids::generate::memory::PEAK_MEMORY_ON_LINUX]);
         if std::path::Path::new("/proc/self/status").exists() {
             assert!(peak_memory_mib().is_some_and(|mib| mib > 0));
         }

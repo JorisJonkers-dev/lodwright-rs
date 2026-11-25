@@ -273,7 +273,6 @@ fn the_output_is_the_same_on_every_system() {
 
 #[test]
 fn invalid_input_is_refused() {
-    covers(&[ids::objects::far_shapes::SIMPLIFIER]);
     let grid = Grid::new(2, None, |_, _| 0.0);
     let limits = FarLimits {
         keep: 0.5,

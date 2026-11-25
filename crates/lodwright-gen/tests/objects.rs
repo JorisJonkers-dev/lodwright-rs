@@ -321,7 +321,6 @@ fn the_atlas_pair_is_written_as_bc3_and_the_normal_atlas_is_half_size() {
 
 #[test]
 fn a_high_priority_reference_goes_to_both_files_and_a_missing_model_is_skipped() {
-    covers(&[ids::objects::selection::HIGH_PRIORITY]);
     let out = temp("high");
     let list = vec![
         instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, true),
@@ -341,7 +340,6 @@ fn a_high_priority_reference_goes_to_both_files_and_a_missing_model_is_skipped()
 
 #[test]
 fn each_block_file_reports_once_in_order_and_the_count_reaches_the_total() {
-    covers(&[ids::contract::events::BLOCK_LINES]);
     let out = temp("progress");
     let list = vec![
         instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, true),
@@ -370,7 +368,6 @@ fn each_block_file_reports_once_in_order_and_the_count_reaches_the_total() {
 
 #[test]
 fn a_world_without_a_usable_model_reports_no_block() {
-    covers(&[ids::objects::blocks::OBJECTS_OUTPUT_DETERMINISTIC]);
     let out = temp("progress-none");
     let mut seen = Vec::new();
     generate_objects_with_progress(
@@ -1010,7 +1007,6 @@ fn textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its
 
 #[test]
 fn a_lod_shape_without_a_texture_takes_the_full_models_texture_and_says_so() {
-    covers(&[ids::objects::blocks::LOD_MODELS_READ]);
     let out = temp("no-texture");
     let mut m = HashMap::new();
     // the LOD model's texture set names no diffuse; the full model names a dark texture
@@ -1083,7 +1079,6 @@ fn flagged(model: &str, reference: u32, plugin: usize) -> Instance {
 #[test]
 fn far_models_with_no_lod_model_are_one_record_per_plugin_with_every_model_and_no_line_per_object()
 {
-    covers(&[ids::objects::blocks::OBJECT_WARNINGS]);
     let out = temp("far-gaps");
     let mut files = assets();
     // the full models of two of the three exist; one LOD model is a file that is not a model
@@ -1199,7 +1194,6 @@ fn a_part_of_a_collection_that_draws_its_own_lod_model_is_not_a_far_model_gap() 
 /// reads such a file) was reported "cannot be read" and its objects were left out of the far view.
 #[test]
 fn a_lod_model_with_bytes_after_its_footer_is_read_and_its_objects_are_drawn() {
-    covers(&[ids::objects::blocks::LOD_MODELS_READ]);
     let out = temp("trailing");
     let mut files = assets();
     let mut tailed = lod_model("Data\\Textures\\a\\wall.dds");

@@ -255,7 +255,6 @@ fn random_bytes_and_bit_flips_never_panic_decode() {
 
 #[test]
 fn encoding_then_decoding_gives_back_every_level_at_random_sizes() {
-    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     let mut rng = Rng::new(5);
     for round in 0..40_u32 {
         let (w, h) = (rng.below(40) + 1, rng.below(40) + 1);

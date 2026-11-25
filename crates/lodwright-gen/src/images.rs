@@ -508,7 +508,6 @@ mod tests {
 
     #[test]
     fn a_cell_without_layers_shows_the_default_land_texture_not_the_flat_earth() {
-        covers(&[ids::terrain::textures::DIFFUSE_FROM_LAYERS]);
         let id = BlockId {
             level: 4,
             x: 0,
@@ -521,7 +520,6 @@ mod tests {
 
     #[test]
     fn a_cell_with_no_record_at_all_is_the_games_flat_grey() {
-        covers(&[ids::terrain::textures::DIFFUSE_FROM_LAYERS]);
         let id = BlockId {
             level: 4,
             x: 0,

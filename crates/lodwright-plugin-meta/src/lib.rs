@@ -75,7 +75,6 @@ mod tests {
 
     #[test]
     fn text_is_not_a_plugin() {
-        covers(&[ids::formats::plugins::PLUGIN_HEADER_MASTERS]);
         assert!(read_header("x.esp", b"just some text, not a plugin").is_err());
     }
 

@@ -181,7 +181,6 @@ fn no_byte_of_input_beyond_the_documented_integers_reaches_the_output() {
 
 #[test]
 fn truncated_and_garbage_input_exits_one_with_a_message_and_never_panics() {
-    covers(&[ids::cli::commands::PROBE]);
     let dir = folder("bad");
     for case in cases() {
         if case.kind == "settings" || case.kind == "dtl" {
@@ -225,7 +224,6 @@ fn truncated_and_garbage_input_exits_one_with_a_message_and_never_panics() {
 
 #[test]
 fn a_file_inside_a_git_working_tree_is_refused_unless_allowed() {
-    covers(&[ids::cli::commands::PROBE]);
     let dir = folder("repo");
     let repo = dir.join("work");
     std::fs::create_dir_all(repo.join(".git")).unwrap();

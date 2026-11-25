@@ -310,7 +310,6 @@ fn kinds(report: &ObjectReport) -> Vec<&str> {
 
 #[test]
 fn with_the_switch_off_a_model_without_a_lod_model_stays_out() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_SHAPES]);
     let store = assets(&[("meshes/a/grid.nif", grid_model(16, false))]);
     let (report, out) = run(
         "off",
@@ -345,7 +344,6 @@ fn with_the_switch_on_it_is_drawn_with_fewer_triangles_and_reported() {
 
 #[test]
 fn an_authored_lod_model_is_used_instead_of_the_full_model() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_SHAPES]);
     let store = assets(&[
         ("meshes/a/grid.nif", grid_model(16, false)),
         ("meshes/a/grid_lod.nif", grid_model(1, false)),
@@ -363,7 +361,6 @@ fn an_authored_lod_model_is_used_instead_of_the_full_model() {
 
 #[test]
 fn a_model_whose_shapes_all_have_an_alpha_property_stays_out_and_is_reported() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_SHAPES]);
     let store = assets(&[("meshes/a/glass.nif", grid_model(8, true))]);
     let (report, out) = run(
         "see-through",
@@ -378,7 +375,6 @@ fn a_model_whose_shapes_all_have_an_alpha_property_stays_out_and_is_reported() {
 
 #[test]
 fn a_solid_model_that_cannot_be_simplified_is_not_called_see_through() {
-    covers(&[ids::objects::far_shapes::SEE_THROUGH_MODELS_STAY_OUT]);
     let store = assets(&[(
         "meshes/a/broken.nif",
         grid_model_with_first_height(8, false, f32::NAN),
@@ -424,7 +420,6 @@ fn a_static_collection_with_parts_is_not_also_drawn_as_its_own_model() {
 
 #[test]
 fn the_bytes_do_not_depend_on_the_thread_count() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_SHAPES]);
     let store = assets(&[
         ("meshes/a/one.nif", grid_model(16, false)),
         ("meshes/a/two.nif", grid_model(12, false)),
@@ -527,7 +522,6 @@ fn another_object_of_the_same_model_that_no_rule_names_stays_out() {
 
 #[test]
 fn a_rule_that_names_nothing_changes_no_byte() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_RULES]);
     let store = assets(&[
         ("meshes/a/house.nif", grid_model(12, false)),
         ("meshes/a/tower.nif", grid_model(16, false)),
@@ -571,7 +565,6 @@ fn a_rules_limits_win_over_the_switch_for_every_object() {
 
 #[test]
 fn a_rule_does_not_call_an_unnamed_see_through_object_see_through() {
-    covers(&[ids::objects::far_shapes::SEE_THROUGH_MODELS_STAY_OUT]);
     let store = assets(&[("meshes/a/glass.nif", grid_model(8, true))]);
     let list = [
         instance("a\\Glass.nif", 100.0, 1, false),
@@ -621,7 +614,6 @@ fn a_model_drawn_without_lighting_gets_no_far_shape() {
 
 #[test]
 fn a_rules_shapes_do_not_depend_on_the_thread_count() {
-    covers(&[ids::objects::far_shapes::FULL_MODEL_RULES]);
     let store = assets(&[
         ("meshes/a/one.nif", grid_model(16, false)),
         ("meshes/a/two.nif", grid_model(12, false)),

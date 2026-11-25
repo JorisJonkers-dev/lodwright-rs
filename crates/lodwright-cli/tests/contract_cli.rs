@@ -212,7 +212,6 @@ fn schema_prints_the_generated_schema_for_both_documents() {
 
 #[test]
 fn schema_rejects_a_missing_or_unknown_document_name() {
-    covers(&[ids::cli::commands::SCHEMA_COMMAND]);
     for args in [
         vec!["schema"],
         vec!["schema", "nope"],
@@ -310,7 +309,6 @@ fn generate_refuses_an_output_folder_inside_the_data_folder() {
 
 #[test]
 fn generate_without_arguments_still_answers_unsupported() {
-    covers(&[ids::cli::commands::GENERATE_COMMAND]);
     let (code, out, _) = go(&["generate", "--json"]);
     assert_eq!(code, EXIT_UNSUPPORTED);
     let doc = json(&out);

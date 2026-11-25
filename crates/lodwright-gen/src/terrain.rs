@@ -803,7 +803,6 @@ mod tests {
 
     #[test]
     fn block_inputs_change_only_where_the_world_changes_and_a_reused_block_is_not_built() {
-        covers(&[ids::generate::run::TERRAIN_BLOCKS_KEPT]);
         let run = |w: &Worldspace, name: &str, reuse: bool| {
             let keep = |_: &str, _: &str| Some(Vec::new());
             generate_terrain(
@@ -988,7 +987,6 @@ mod tests {
 
     #[test]
     fn a_folder_on_an_anchored_grid_verifies_without_errors() {
-        covers(&[ids::terrain::mesh::GRID_STARTS_AT_THE_MINIMUM_CORNER]);
         let out = temp("anchor-verify");
         generate_terrain(
             &bounded([-6.0 * 4096.0, -5.0 * 4096.0]),
@@ -1069,7 +1067,6 @@ mod tests {
 
     #[test]
     fn a_world_name_that_is_not_a_folder_is_refused() {
-        covers(&[ids::terrain::mesh::EMPTY_WORLD_WRITES_NOTHING]);
         let out = temp("badname");
         let bad = Worldspace::from_cells(1, "../x", std::iter::empty());
         assert!(

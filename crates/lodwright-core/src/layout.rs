@@ -270,7 +270,6 @@ mod tests {
 
     #[test]
     fn texture_paths_sit_in_diffuse_and_normals_folders() {
-        covers(&[ids::terrain::mesh::BLOCK_NAMES_AND_PATHS]);
         assert_eq!(
             diffuse_path("W", ID).unwrap(),
             "textures/landscape/lod/w/diffuse/w.n.level4.x-8.y12.dds"
@@ -341,7 +340,6 @@ mod tests {
 
     #[test]
     fn names_that_could_escape_the_folder_are_refused() {
-        covers(&[ids::terrain::mesh::BLOCK_NAMES_AND_PATHS]);
         for bad in ["", "..", ".hidden", "a/b", "a\\b", "a\0b", "../x", "ä"] {
             assert_eq!(
                 check_world_name(bad),

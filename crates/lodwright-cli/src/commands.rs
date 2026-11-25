@@ -336,11 +336,9 @@ pub fn heightmap(options: &Options, out: &mut dyn Write) -> Result<(), Failure> 
 #[cfg(test)]
 mod tests {
     use super::inside_git_tree;
-    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_folder_with_a_git_directory_is_inside_a_tree() {
-        covers(&[ids::verify::folder::REFUSES_GIT_WORKING_TREES]);
         let dir = std::env::temp_dir().join(format!("lodwright-git-{}", std::process::id()));
         std::fs::create_dir_all(dir.join(".git")).unwrap();
         std::fs::create_dir_all(dir.join("sub")).unwrap();

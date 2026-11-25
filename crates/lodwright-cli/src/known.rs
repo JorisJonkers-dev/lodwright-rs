@@ -114,7 +114,6 @@ mod tests {
 
     #[test]
     fn a_list_reads_its_entries_and_skips_comments_and_blank_lines() {
-        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         let list = parse(LIST).unwrap();
         assert_eq!(list.len(), 2);
         assert_eq!(
@@ -125,7 +124,6 @@ mod tests {
 
     #[test]
     fn a_line_without_three_fields_or_a_repeated_path_is_refused_with_its_number() {
-        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         assert!(parse("a.nif\t0.7.0\n").unwrap_err().starts_with("line 1:"));
         assert!(
             parse("a.nif\t0.7.0\tx\nA.NIF\t0.7.0\ty\n")

@@ -537,7 +537,6 @@ mod tests {
 
     #[test]
     fn a_water_plane_adds_a_shape_and_its_data_and_reads_back() {
-        covers(&[ids::terrain::water::WATER_PLANES]);
         let (v, i) = quad([0.0; 4]);
         let water_v = [[0.0, 0.0, 5.0], [128.0, 0.0, 5.0], [0.0, 128.0, 5.0]];
         let mut segments = [0; 16];
@@ -646,7 +645,6 @@ mod tests {
 
     #[test]
     fn bad_meshes_are_refused() {
-        covers(&[ids::formats::meshes_and_images::NIF_TERRAIN_BLOCKS]);
         let (v, _) = quad([0.0; 4]);
         assert!(terrain_block(&block(&v, &[])).is_err());
         assert!(terrain_block(&block(&v, &[0, 1])).is_err());

@@ -1332,7 +1332,6 @@ fn far_lights_off_is_not_written_and_keeps_the_request_digest() {
 
 #[test]
 fn far_model_without_flag_off_is_not_written_and_keeps_the_request_digest() {
-    covers(&[ids::contract::documents::NEW_OPTIONS_KEEP_OLD_DIGESTS]);
     let (job, _) = far_model_job("far-model-digest");
     let mut on = job.request.clone();
     on.objects.far_model_without_flag = true;

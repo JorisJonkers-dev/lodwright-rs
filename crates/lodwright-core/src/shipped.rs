@@ -159,7 +159,6 @@ mod tests {
     use crate::plugin::{LandCell, Plugin, World};
     use crate::texture::{LandTexture, TextureResolver};
     use crate::worldspace::{Inheritance, WorldIndex};
-    use lodwright_testkit::{covers, ids};
 
     fn cell(x: i32, y: i32, height: f32) -> LandCell {
         LandCell {
@@ -227,7 +226,6 @@ mod tests {
 
     #[test]
     fn changed_heights_and_new_land_records_change_their_cells_only() {
-        covers(&[ids::terrain::textures::GAME_TILES_KEPT]);
         assert_eq!(run(vec![cell(1, 0, 5.0)]), vec![(1, 0)]);
         assert_eq!(run(vec![cell(2, 0, 1.0)]), vec![(2, 0)]);
     }

@@ -211,7 +211,6 @@ mod tests {
 
     #[test]
     fn a_missing_plugin_is_named_and_the_path_is_not_echoed() {
-        covers(&[ids::generate::run::LOAD_ORDER_FILE]);
         let dir = temp("missing");
         let err = find_plugin(&dir, "Nope.esm").unwrap_err();
         assert_eq!(err.code, "plugin_not_found");

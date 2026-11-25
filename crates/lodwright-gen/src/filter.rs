@@ -326,7 +326,6 @@ mod tests {
 
     #[test]
     fn generate_limits_come_from_the_first_matching_rule_that_has_them() {
-        covers(&[ids::objects::selection::RULE_GENERATE_OPTION]);
         let shapes = |keep| lodwright_contract::FullModelShapes {
             keep,
             max_error: 0.05,
@@ -355,7 +354,6 @@ mod tests {
 
     #[test]
     fn an_include_rule_naming_a_plugin_outside_the_load_order_is_refused() {
-        covers(&[ids::objects::selection::INCLUDE_RULES]);
         let err = IncludeRules::new(&[rule("*", Some("Gone.esp"), None)], &["A.esm".to_owned()])
             .unwrap_err();
         assert!(err.contains("Gone.esp"), "{err}");
@@ -365,7 +363,6 @@ mod tests {
 
     #[test]
     fn taking_adds_only_new_matching_references_and_counts_the_held_back_ones() {
-        covers(&[ids::objects::selection::INCLUDE_RULES]);
         let rules = IncludeRules::new(&[rule("lamp*", None, None)], &["A.esm".to_owned()]).unwrap();
         let mut visible = vec![inst("lamp.nif", 1, 0, 0)];
         let candidates = vec![

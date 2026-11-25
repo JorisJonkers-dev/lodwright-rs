@@ -818,7 +818,6 @@ mod tests {
 
     #[test]
     fn a_world_defined_by_a_late_plugin_gets_that_plugins_index() {
-        covers(&[ids::terrain::worlds::LATER_PLUGINS_OVERRIDE]);
         let a = SyntheticWorld::new(0x0000_0A00, "A").cell(0, 0, Heights::flat(8.0));
         let b = SyntheticWorld::new(0x0100_0B00, "B").cell(0, 0, Heights::flat(8.0));
         let plugins = load(&[

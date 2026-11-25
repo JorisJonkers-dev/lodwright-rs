@@ -200,7 +200,6 @@ mod tests {
 
     #[test]
     fn a_manifest_is_packed_when_it_lists_an_archive_at_the_root() {
-        covers(&[ids::generate::pack::PACKED_OUTPUT_UP_TO_DATE]);
         assert!(is_packed(&[
             file("Lodwright LOD.bsa"),
             file("Lodwright LOD.esp")

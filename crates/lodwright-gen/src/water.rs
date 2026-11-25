@@ -472,7 +472,6 @@ mod tests {
 
     #[test]
     fn wet_squares_merge_into_rectangles() {
-        covers(&[ids::terrain::water::WATER_AT_COARSER_LEVELS]);
         // 3 by 3: an L shape
         let wet = [true, true, false, true, true, false, true, false, false];
         assert_eq!(rectangles(&wet, 3), vec![(0, 0, 2, 2), (0, 2, 1, 1)]);
@@ -594,7 +593,6 @@ mod tests {
 
     #[test]
     fn level_4_planes_overlap_their_neighbours_and_the_walls_stand_in_their_cells_segment() {
-        covers(&[ids::terrain::water::WATER_PLANES]);
         // water over cells 1 and 2 of the south row of a level 4 block: the south side of each cell is on the border;
         // the plane reaches 32 units past it and each wall is a run of its own cell's segment
         let (w, samples) = strip(4, 1, 3);
@@ -751,7 +749,6 @@ mod tests {
 
     #[test]
     fn coarser_levels_use_coarser_squares_and_no_segments() {
-        covers(&[ids::terrain::water::WATER_AT_COARSER_LEVELS]);
         let span = 8 * 32 + 1;
         let mut samples = vec![f32::NAN; span * span];
         samples[0] = -5.0;

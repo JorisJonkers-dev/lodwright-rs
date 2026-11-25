@@ -664,7 +664,6 @@ mod tests {
 
     #[test]
     fn segments_must_cover_the_triangles() {
-        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let (v, uv, i) = tri();
         let z = vec![[0.0, 0.0, 1.0]; 3];
         let bad = object_block(&ObjectBlock {
@@ -853,7 +852,6 @@ mod shapes_tests {
 
     #[test]
     fn a_block_without_a_shape_is_refused() {
-        covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         assert!(object_block_shapes(&[]).is_err());
     }
 }

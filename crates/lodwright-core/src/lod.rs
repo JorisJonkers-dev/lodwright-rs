@@ -83,11 +83,9 @@ impl LodSettings {
 #[cfg(test)]
 mod tests {
     use super::{LodSettings, SETTINGS_LEN};
-    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_world_of_128_cells_has_the_measured_bytes() {
-        covers(&[ids::terrain::textures::SETTINGS_FILE]);
         let s = LodSettings::for_bounds((-64, -64), (63, 63), 32);
         assert_eq!(
             s.to_bytes(),
@@ -100,7 +98,6 @@ mod tests {
 
     #[test]
     fn parse_inverts_write() {
-        covers(&[ids::terrain::textures::SETTINGS_FILE]);
         let s = LodSettings::for_bounds((-32, -10), (31, 20), 16);
         assert_eq!(LodSettings::parse(&s.to_bytes()), Ok(s));
     }

@@ -477,7 +477,6 @@ mod tests {
 
     #[test]
     fn an_empty_block_is_four_zero_bytes_and_truncated_files_are_refused() {
-        covers(&[ids::trees::lod::LIST_BLOCKS_AND_ATLAS]);
         assert_eq!(write_block(&TreeBlock::default()), vec![0, 0, 0, 0]);
         assert!(parse_block(&[1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]).is_err());
         assert!(parse_types(&[2, 0, 0, 0, 0]).is_err());

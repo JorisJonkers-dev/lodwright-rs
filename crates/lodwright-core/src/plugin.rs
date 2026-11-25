@@ -871,7 +871,6 @@ mod tests {
 
     #[test]
     fn masters_are_read_in_order() {
-        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let bytes = PluginBuilder::new()
             .master("FalloutNV.esm")
             .master("DeadMoney.esm")
@@ -955,7 +954,6 @@ mod tests {
 
     #[test]
     fn extended_size_subrecords_are_honoured() {
-        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let big = vec![9_u8; 70_000];
         let mut data = Vec::new();
         data.extend_from_slice(b"XXXX");

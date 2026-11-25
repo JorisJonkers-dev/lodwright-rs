@@ -100,7 +100,6 @@ fn a_changed_run_gives_a_band_and_the_text_report_equals_its_golden_file() {
 
 #[test]
 fn bands_needs_reports_and_refuses_a_file_that_is_not_one() {
-    covers(&[ids::verify::measure::BANDS]);
     assert_eq!(go(&["bands"]).0, EXIT_USAGE);
     assert_eq!(go(&["bands", "--frobnicate"]).0, EXIT_USAGE);
     let dir = temp("bad");

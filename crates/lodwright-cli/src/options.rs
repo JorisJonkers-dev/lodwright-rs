@@ -161,7 +161,6 @@ mod tests {
 
     #[test]
     fn data_is_required() {
-        covers(&[ids::cli::commands::OPTIONS_PARSING]);
         assert_eq!(
             parse(&["--plugin", "a.esm"]),
             Err("--data <data-folder> is required".into())
@@ -228,7 +227,6 @@ mod tests {
 
     #[test]
     fn bad_values_and_unknown_options_are_errors() {
-        covers(&[ids::cli::commands::USAGE_ERRORS]);
         assert!(parse(&["--data"]).unwrap_err().contains("needs a value"));
         assert!(
             parse(&["--data", "d", "--format", "xml"])

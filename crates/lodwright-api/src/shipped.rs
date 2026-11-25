@@ -331,7 +331,6 @@ mod tests {
     /// the request's plugins: its tiles are not the game's.
     #[test]
     fn the_archive_of_an_earlier_packed_run_is_not_the_games() {
-        covers(&[ids::terrain::textures::GAME_TILES_KEPT]);
         let dir = data_folder("own-archive", 0);
         let tile = |x: i32| {
             format!("textures\\landscape\\lod\\wasteland\\diffuse\\wasteland.n.level4.x{x}.y0.dds")

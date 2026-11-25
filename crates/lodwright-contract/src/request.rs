@@ -536,7 +536,6 @@ mod tests {
 
     #[test]
     fn shipped_shape_rules_are_left_out_of_the_document_when_empty_and_checked_when_set() {
-        covers(&[ids::contract::documents::NEW_OPTIONS_KEEP_OLD_DIGESTS]);
         let mut r = Request::new("/d", &["A.esm"], "/o");
         let empty = serde_json::to_string(&r).unwrap();
         assert!(!empty.contains("shapes_from_shipped_blocks"));

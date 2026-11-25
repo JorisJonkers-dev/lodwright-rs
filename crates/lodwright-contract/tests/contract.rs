@@ -258,7 +258,6 @@ fn every_committed_schema_belongs_to_a_kind_this_build_speaks() {
 
 #[test]
 fn golden_documents_pass_their_own_schema_check() {
-    covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
     for (name, kind) in [
         ("plan.json", DocumentKind::Plan),
         ("plan_blocks.json", DocumentKind::Plan),

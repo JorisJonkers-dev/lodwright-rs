@@ -1062,11 +1062,9 @@ fn far_model_without_flag(
 #[cfg(test)]
 mod specular_tests {
     use super::specular_warnings;
-    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn no_exponent_anywhere_warns_once_that_the_alpha_stays_opaque() {
-        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let warnings = specular_warnings(&lodwright_gen::LandTiles::empty());
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("stay opaque"));

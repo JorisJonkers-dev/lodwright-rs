@@ -145,7 +145,6 @@ mod tests {
 
     #[test]
     fn a_worker_needs_room_for_the_largest_textures() {
-        covers(&[ids::generate::memory::WORKERS_SCALE_TO_THE_BUDGET]);
         // 256 px diffuse and normal, four bytes a pixel, three buffers each, plus the base
         let default = worker_mib(&TerrainSettings::default());
         assert_eq!(

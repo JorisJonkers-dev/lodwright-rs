@@ -545,7 +545,6 @@ mod tests {
 
     #[test]
     fn a_part_of_a_collection_counts_its_own_static_flag() {
-        covers(&[ids::objects::selection::FLAGGED_STATICS]);
         let mut data = Vec::new();
         for v in [0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0] {
             data.extend_from_slice(&v.to_le_bytes());
@@ -1019,7 +1018,6 @@ mod tests {
 
     #[test]
     fn every_reference_with_a_model_is_listed_with_the_reason_it_is_left_out_or_none() {
-        covers(&[ids::verify::measure::LANDMARKS]);
         let p = plugin(
             &[],
             vec![

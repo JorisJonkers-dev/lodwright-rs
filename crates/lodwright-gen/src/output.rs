@@ -188,7 +188,6 @@ mod tests {
 
     #[test]
     fn only_plain_relative_paths_are_accepted() {
-        covers(&[ids::generate::output_safety::PLAIN_RELATIVE_PATHS_ONLY]);
         for good in ["a.nif", "meshes/a/b.nif"] {
             assert!(is_plain_relative(good), "{good}");
         }

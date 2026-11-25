@@ -518,7 +518,6 @@ mod tests {
 
     #[test]
     fn crc32_matches_the_standard_check_value() {
-        covers(&[ids::trees::lod::BILLBOARD_NAMES]);
         assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
     }
 
@@ -622,7 +621,6 @@ mod tests {
 
     #[test]
     fn each_tree_block_reports_once_in_order_and_a_world_without_billboards_reports_none() {
-        covers(&[ids::contract::events::BLOCK_LINES]);
         let mut files = HashMap::new();
         files.insert(
             "textures/terrain/lodgen/a.esm/oak_00000100.dds".to_owned(),

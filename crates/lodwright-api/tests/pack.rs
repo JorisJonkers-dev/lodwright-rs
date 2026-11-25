@@ -224,7 +224,6 @@ fn switching_the_option_off_rebuilds_the_loose_files_and_the_output_never_holds_
 
 #[test]
 fn a_lost_override_marker_is_written_again_and_going_loose_removes_it() {
-    covers(&[ids::generate::pack::PACK_OFF_GOES_LOOSE]);
     let (job, out) = job("marker", "Island", true, 1);
     run(&job);
     let marker = out.join("Lodwright LOD.override");

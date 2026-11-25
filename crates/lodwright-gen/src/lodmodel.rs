@@ -298,7 +298,6 @@ pub fn parse_lod_model(bytes: &[u8]) -> Result<Vec<Part>, String> {
 #[cfg(test)]
 mod tests {
     use super::skyrim_lighting_texture_set;
-    use lodwright_testkit::{covers, ids};
 
     /// The block layout measured on the `DynDOLOD` rock models of Tale of Two Wastelands (numbers only): shader type,
     /// name, extra data count and links, controller, two flag words, UV offset and scale, then the texture set link.
@@ -322,7 +321,6 @@ mod tests {
 
     #[test]
     fn a_skyrim_stream_lighting_property_names_its_texture_set() {
-        covers(&[ids::objects::blocks::LOD_MODELS_READ]);
         assert_eq!(skyrim_lighting_texture_set(&block(&[], 2)), Some(2));
         assert_eq!(skyrim_lighting_texture_set(&block(&[7, 8], 3)), Some(3));
     }

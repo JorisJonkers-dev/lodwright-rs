@@ -271,7 +271,6 @@ mod tests {
 
     #[test]
     fn every_kind_has_a_schema_at_each_version_it_speaks() {
-        covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
         for kind in DocumentKind::ALL {
             for &version in kind.versions() {
                 assert!(schema_json(kind, version).is_ok(), "{}", kind.name());
@@ -344,7 +343,6 @@ mod tests {
 
     #[test]
     fn a_plan_missing_a_required_field_is_refused() {
-        covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
         let doc = json!({"schema_version": 1, "worlds": []});
         assert!(matches!(check_plan(&doc), Err(SchemaError::Invalid(_))));
     }

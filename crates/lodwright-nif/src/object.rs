@@ -176,7 +176,7 @@ fn no_lighting_property(texture: &str) -> Vec<u8> {
 
 /// Build the NIF of one object block as [`object_block_shapes`], with the block's far light points as one more
 /// shape when `lights` is given: a plain `NiTriShape` with vertex colours, an unlit property, an additive alpha
-/// property (source ONE, destination ONE, no alpha test) and a `NiStringExtraData` named [`FAR_LIGHTS_MARKER`].
+/// property (source SRC_ALPHA, destination ONE, no alpha test) and a `NiStringExtraData` named [`FAR_LIGHTS_MARKER`].
 ///
 /// # Errors
 /// As [`object_block_shapes`]; and [`NifError::Inconsistent`] when the light arrays disagree or hold no triangles.
@@ -319,14 +319,15 @@ fn light_blocks(lights: &FarLightsShape<'_>, origin: (f32, f32), at: i32) -> Res
     shape.av.net.extra_data = vec![at + 4];
     shape.data = at + 3;
     // source: nif-alpha-flags
-    // alpha blend on, source and destination ONE (0), no alpha test: the points add their colour to what is behind
+    // alpha blend on, source SRC_ALPHA (6), destination ONE (0), no alpha test: the points add their colour, scaled by
+    // the alpha the engine fades them with by night, to what is behind
     let alpha = crate::block::NiAlphaProperty {
         net: crate::block::ObjectNet {
             name: -1,
             extra_data: Vec::new(),
             controller: -1,
         },
-        flags: 0x0001,
+        flags: 0x000D,
         threshold: 0,
     };
     let data = NiTriShapeData {
@@ -926,7 +927,8 @@ mod lights_tests {
         let Body::AlphaProperty(alpha) = &back.blocks[9].body else {
             panic!("alpha");
         };
-        assert_eq!(alpha.flags, 0x0001);
+        // blend on, source SRC_ALPHA, destination ONE, no alpha test
+        assert_eq!(alpha.flags, 0x000D);
         let Body::Opaque(unlit) = &back.blocks[8].body else {
             panic!("unlit property");
         };

@@ -97,11 +97,14 @@ pub struct Surfaces<'a> {
 /// How near (world units, on the ground plane) a light must stand to an object of its block to get a far light point:
 /// a lamp beside a drawn post or building, not a light alone in the open. Own design.
 pub const FAR_LIGHT_REACH: f32 = 300.0;
-/// Half the size of a far light point (world units): three crossed squares 48 units wide. Own design.
-const FAR_LIGHT_HALF: f32 = 24.0;
-/// A far light point's colour is this share of its light's colour, so rows of lamps do not add up to a white bar.
-const FAR_LIGHT_DIM: f32 = 0.5;
-/// Light points per block at most: each takes 12 vertices of the shape's 65535.
+/// Half the size of a far light point (world units): three crossed squares 192 units wide. Own design: tried in the
+/// engine at 2560x1440, 48-unit squares were a few dim pixels from 10,000 units and read as nothing; 192 units give a
+/// small soft spot at the lamp head.
+const FAR_LIGHT_HALF: f32 = 96.0;
+/// A far light point's colour is this share of its light's colour. Own design: at a half share the points were too
+/// dim to see; the soft round texture already keeps a row of lamps from adding up to a white bar.
+const FAR_LIGHT_DIM: f32 = 1.0;
+/// Light points per block at most: each takes 12 vertices of the shape's 65535 and 12 of its 65535 triangles.
 const FAR_LIGHTS_PER_BLOCK: usize = 5000;
 
 /// The geometry of a block's far light points.
@@ -114,7 +117,9 @@ struct LightPoints {
 }
 
 /// The light points of the lights of `lights` that stand within [`FAR_LIGHT_REACH`] of one of `members`, relative to
-/// `origin`: three crossed squares per light (one flat, two upright), in the lights' given order.
+/// `origin`: three crossed squares per light (one flat, two upright), in the lights' given order. Each square is written
+/// with both windings, so it shows from either side: the engine culls back faces, and a one-sided square seen from
+/// behind leaves only its edge.
 fn light_points(
     lights: &[&FarLightSource],
     members: &[&Instance],
@@ -150,6 +155,7 @@ fn light_points(
                 out.colors.push(colour);
                 out.uv.push(uv[k]);
             }
+            // front, then the same two triangles turned round for the back
             out.indices.extend_from_slice(&[
                 first,
                 first + 1,
@@ -157,6 +163,12 @@ fn light_points(
                 first,
                 first + 2,
                 first + 3,
+                first,
+                first + 2,
+                first + 1,
+                first,
+                first + 3,
+                first + 2,
             ]);
         }
     }
@@ -1235,4 +1247,77 @@ pub fn generate_objects_with_atlas_limit(
     }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FAR_LIGHT_HALF, light_points};
+    use lodwright_core::lights::FarLightSource;
+    use lodwright_core::objects::Instance;
+    use lodwright_core::plugin::Placement;
+
+    fn member(pos: [f32; 3]) -> Instance {
+        Instance {
+            base: 1,
+            signature: *b"STAT",
+            model: "a.nif".to_owned(),
+            placement: Placement {
+                pos,
+                rot: [0.0; 3],
+                scale: 1.0,
+            },
+            high_priority: false,
+            has_tree_lod: false,
+            reference: 2,
+            reference_plugin: 0,
+            base_plugin: 0,
+            flagged_by: 0,
+            part: false,
+            cell: None,
+        }
+    }
+
+    #[test]
+    fn a_light_point_is_three_two_sided_squares_192_units_wide_in_the_light_s_full_colour() {
+        let light = FarLightSource {
+            reference: 3,
+            pos: [1100.0, 2200.0, 300.0],
+            radius: 512,
+            color: [255, 128, 0],
+        };
+        let near = member([1000.0, 2200.0, 0.0]);
+        let p = light_points(&[&light], &[&near], (1000.0, 2000.0));
+        assert_eq!(p.vertices.len(), 12);
+        // the flat square spans 192 units around the light, relative to the block origin
+        let xs: Vec<f32> = p.vertices[..4].iter().map(|v| v[0]).collect();
+        assert_eq!(xs, vec![4.0, 196.0, 196.0, 4.0]);
+        assert_eq!(FAR_LIGHT_HALF * 2.0, 192.0);
+        assert!(p.vertices[..4].iter().all(|v| v[2] == 300.0));
+        assert!(
+            p.colors
+                .iter()
+                .all(|c| *c == [1.0, 128.0 / 255.0, 0.0, 1.0])
+        );
+        // every triangle comes twice, once turned round, so the square shows from both sides
+        assert_eq!(p.indices.len(), 3 * 12);
+        let tris: Vec<[u16; 3]> = p.indices.chunks(3).map(|t| [t[0], t[1], t[2]]).collect();
+        for quad in tris.chunks(4) {
+            let (front, back) = quad.split_at(2);
+            for (f, b) in front.iter().zip(back) {
+                assert_eq!(*b, [f[0], f[2], f[1]]);
+            }
+        }
+    }
+
+    #[test]
+    fn a_light_far_from_every_object_of_the_block_gets_no_point() {
+        let light = FarLightSource {
+            reference: 3,
+            pos: [5000.0, 0.0, 0.0],
+            radius: 512,
+            color: [255, 255, 255],
+        };
+        let p = light_points(&[&light], &[&member([0.0; 3])], (0.0, 0.0));
+        assert!(p.vertices.is_empty() && p.indices.is_empty());
+    }
 }

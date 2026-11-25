@@ -153,7 +153,9 @@ pub fn atlas_page_paths(world: &str, page: usize) -> Result<[String; 2], Error> 
 }
 
 /// The light point texture of the far light points of `world` (`objects.far_lights`): the file path in the output
-/// and the path the blocks name. Own design: the game ships no such file.
+/// and the path the blocks name. Own design: the game ships no such file. The name in the block has no `Data\`
+/// prefix, lower case with `\`, as the game's own glow effects name their textures in an unlit property: tried in
+/// the engine, the prefixed name drew nothing.
 ///
 /// # Errors
 /// [`Error::BadWorldName`] when `world` is not a usable name.
@@ -162,7 +164,7 @@ pub fn far_lights_texture_paths(world: &str) -> Result<[String; 2], Error> {
     let w = world.to_ascii_lowercase();
     Ok([
         format!("textures/landscape/lod/{w}/blocks/{w}.farlights.dds"),
-        format!("Data\\Textures\\Landscape\\LOD\\{world}\\Blocks\\{world}.FarLights.dds"),
+        format!("textures\\landscape\\lod\\{w}\\blocks\\{w}.farlights.dds"),
     ])
 }
 
@@ -244,7 +246,10 @@ pub fn settings_path(world: &str) -> Result<String, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockId, check_world_name, diffuse_path, mesh_path, normal_path, settings_path};
+    use super::{
+        BlockId, check_world_name, diffuse_path, far_lights_texture_paths, mesh_path, normal_path,
+        settings_path,
+    };
     use crate::Error;
 
     const ID: BlockId = BlockId {
@@ -354,5 +359,18 @@ mod tests {
         ] {
             assert_eq!(check_world_name(good), Ok(()));
         }
+    }
+
+    #[test]
+    fn the_far_lights_texture_is_named_in_the_block_without_the_data_prefix() {
+        assert_eq!(
+            far_lights_texture_paths("WastelandNV").unwrap(),
+            [
+                "textures/landscape/lod/wastelandnv/blocks/wastelandnv.farlights.dds".to_owned(),
+                "textures\\landscape\\lod\\wastelandnv\\blocks\\wastelandnv.farlights.dds"
+                    .to_owned(),
+            ]
+        );
+        assert!(far_lights_texture_paths("bad/name").is_err());
     }
 }

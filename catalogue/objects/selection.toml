@@ -89,6 +89,13 @@ origin = "ours"
 evidence = ["docs/contracts/options/far-light-points.md"]
 
 [[item]]
+id = "far_lights_unlit_lamps"
+title = "objects.far_lights gives every copy of a lamp model a point at its head when the load order lights only some copies"
+status = "implemented"
+origin = "ours"
+evidence = ["docs/contracts/options/far-light-points.md"]
+
+[[item]]
 id = "terrain_cell_rules"
 title = "Inclusion rules per plugin apply to terrain cells"
 status = "missing"

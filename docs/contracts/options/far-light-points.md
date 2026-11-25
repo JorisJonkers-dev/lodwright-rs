@@ -10,6 +10,16 @@ disabled by their enable parent chain), whose light reaches at least 256 game un
 pulsing or off by default (`fnv-light-data`), and that stand within 300 units (on the ground plane) of an object drawn in
 the same object block. A light alone in the open gets no point.
 
+Lamps lit only on some posts: a load order often places a light on only some copies of one lamp model (a row of posts
+where every second one carries a light, to keep the number of lights low), while every lamp head is drawn lit near by.
+The far view then gives every copy a point. The rule is learned from the load order alone, per world: a model is a
+lamp when at least 3 of its standing copies, and at least a fifth of them, have such a light within 256 units across
+and 1024 units in height of the copy's origin, and three quarters of those lights stand at one spot of the model's own
+frame (within 24 units, after the copy's rotation and scale are taken out). Every other standing copy of that model
+gets a point at that spot, with the radius and colour of a lit copy's light, unless a light or another such point
+already stands within 64 units of it. A model that stands beside lights only now and then, or with its lights at
+changing spots, teaches nothing.
+
 What is written: in the normal file of each object block that has such lights, one more shape beside the object shapes:
 a plain `NiTriShape` with three crossed squares 192 units wide per light (one flat, two upright, each written with both
 windings so it shows from either side), vertex colours at the light's full colour, a `BSShaderNoLightingProperty`

@@ -19,7 +19,7 @@ tasks:
     cmd: cargo clippy --locked --workspace --all-targets -- -D warnings
 
   test:
-    desc: Tests (cargo-nextest, profile ci: JUnit for the feature catalogue) and the line-coverage gate ({{.COVERAGE_MIN}}%)
+    desc: "Tests through cargo-nextest (profile ci, which writes JUnit for the feature catalogue) and the line-coverage gate ({{.COVERAGE_MIN}}%)"
     cmds:
       - cargo llvm-cov nextest --locked --workspace --profile ci --fail-under-lines {{.COVERAGE_MIN}}
       - cargo test --locked --workspace --doc

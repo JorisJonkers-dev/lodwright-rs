@@ -103,9 +103,11 @@ impl std::error::Error for Error {}
 #[cfg(test)]
 mod tests {
     use super::Error;
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn the_copy_text_names_the_version_the_code_the_summary_and_the_detail() {
+        covers(&[ids::generate::run::TYPED_ERRORS]);
         let text = Error::new("output_failed", "cannot write the manifest")
             .with_detail("disk full")
             .copy_text();
@@ -119,6 +121,7 @@ mod tests {
 
     #[test]
     fn the_copy_text_shows_the_home_folder_as_a_tilde() {
+        covers(&[ids::generate::run::TYPED_ERRORS]);
         let home = "/users/player";
         let text = Error::new("output_failed", "cannot write")
             .with_detail(format!("{home}/out/x.nif"))

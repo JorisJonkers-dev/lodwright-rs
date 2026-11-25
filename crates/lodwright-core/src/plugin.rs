@@ -744,6 +744,7 @@ mod tests {
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
     use lodwright_testkit::rng::Rng;
     use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+    use lodwright_testkit::{covers, ids};
 
     fn two_cell_world() -> SyntheticWorld {
         SyntheticWorld::new(0x0100_0010, "Mojave")
@@ -754,6 +755,7 @@ mod tests {
     #[test]
     fn statics_and_placed_references_are_read_with_flags_and_placements() {
         use super::{ReadOptions, read_with};
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
         let stat = Record::new(*b"STAT", 0x0100_0001)
             .with_subrecord(*b"EDID", b"Wall\0".to_vec())
@@ -796,6 +798,7 @@ mod tests {
     #[test]
     fn temporary_references_keep_their_cell_and_persistent_ones_do_not() {
         use super::{ReadOptions, read_with};
+        covers(&[ids::objects::selection::TEMPORARY_REFERENCES]);
         let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
         let refr = |id: u32| {
             Record::new(*b"REFR", id)
@@ -840,6 +843,7 @@ mod tests {
     #[test]
     fn a_static_collection_keeps_its_parts_and_placements() {
         use super::{ReadOptions, read_with};
+        covers(&[ids::objects::selection::STATIC_COLLECTIONS]);
         let mut data = Vec::new();
         for v in [1.0_f32, 2.0, 3.0, 0.0, 0.0, 0.0, 0.5] {
             data.extend_from_slice(&v.to_le_bytes());
@@ -879,6 +883,7 @@ mod tests {
 
     #[test]
     fn a_world_with_cells_is_read_with_heights_and_editor_id() {
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let plugin = read(&world_plugin(&["FalloutNV.esm"], &two_cell_world(), false)).unwrap();
         assert_eq!(plugin.worlds.len(), 1);
         let world = &plugin.worlds[0];
@@ -893,6 +898,7 @@ mod tests {
 
     #[test]
     fn compressed_land_records_read_the_same_as_plain_ones() {
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let plain = read(&world_plugin(&[], &two_cell_world(), false)).unwrap();
         let packed = read(&world_plugin(&[], &two_cell_world(), true)).unwrap();
         assert_eq!(plain, packed);
@@ -920,6 +926,7 @@ mod tests {
 
     #[test]
     fn a_deleted_land_record_is_skipped() {
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let world = SyntheticWorld::new(0x10, "W").cell(0, 0, Heights::flat(8.0));
         let mut bytes = world_plugin(&[], &world, false);
         let at = bytes.windows(4).position(|w| w == b"LAND").unwrap();
@@ -966,6 +973,7 @@ mod tests {
 
     #[test]
     fn a_file_that_does_not_start_with_tes4_is_malformed() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let mut bytes = world_plugin(&[], &two_cell_world(), false);
         bytes[0] = b'X';
         assert_eq!(
@@ -976,12 +984,14 @@ mod tests {
 
     #[test]
     fn empty_and_tiny_inputs_are_truncated_not_panics() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         assert!(matches!(read(&[]), Err(Error::Truncated { .. })));
         assert!(matches!(read(&[b'T'; 10]), Err(Error::Truncated { .. })));
     }
 
     #[test]
     fn every_prefix_of_a_valid_plugin_is_an_error_or_a_plugin_never_a_panic() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let bytes = world_plugin(&["A.esm"], &two_cell_world(), true);
         for len in 0..bytes.len() {
             let _ = read(&bytes[..len]);
@@ -990,6 +1000,7 @@ mod tests {
 
     #[test]
     fn random_corruption_never_panics() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let original = world_plugin(&["A.esm"], &two_cell_world(), true);
         let mut rng = Rng::new(0x00C0_FFEE);
         for _ in 0..300 {
@@ -1004,6 +1015,7 @@ mod tests {
 
     #[test]
     fn a_group_that_claims_more_than_its_parent_is_malformed() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let mut bytes = world_plugin(&[], &two_cell_world(), false);
         let at = bytes.windows(4).position(|w| w == b"GRUP").unwrap();
         bytes[at + 4..at + 8].copy_from_slice(&u32::MAX.to_le_bytes());
@@ -1015,6 +1027,7 @@ mod tests {
 
     #[test]
     fn a_corrupt_compressed_record_is_a_decompress_error() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let mut bytes = world_plugin(&[], &two_cell_world(), true);
         let at = bytes.windows(4).position(|w| w == b"LAND").unwrap();
         // the stored plain length no longer matches the stream
@@ -1024,6 +1037,7 @@ mod tests {
 
     #[test]
     fn groups_nested_beyond_the_limit_are_rejected() {
+        covers(&[ids::formats::plugins::PLUGIN_HOSTILE_INPUT]);
         let mut group = Group::new(0, *b"STAT");
         for _ in 0..40 {
             group = Group::new(0, *b"STAT").with(group);
@@ -1120,6 +1134,7 @@ mod tests {
     #[test]
     fn ltex_and_txst_records_are_read_with_their_subrecords() {
         use lodwright_testkit::world::{ltex_record, record_group, txst_record};
+        covers(&[ids::formats::plugins::PLUGIN_RECORDS]);
         let bytes = PluginBuilder::new()
             .group(record_group(
                 *b"TXST",

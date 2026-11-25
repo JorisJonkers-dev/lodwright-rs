@@ -10,6 +10,7 @@ use lodwright_core::worldspace::{Inheritance, WorldIndex};
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::plugin::PluginBuilder;
 use lodwright_testkit::world::{SyntheticWorld, world_group};
+use lodwright_testkit::{covers, ids};
 
 const WORLDS: u32 = 60;
 const CELLS_PER_WORLD: i32 = 64;
@@ -38,6 +39,7 @@ fn peak_growth_bytes(work: impl FnOnce()) -> Option<u64> {
 
 #[test]
 fn walking_sixty_worlds_one_at_a_time_stays_under_the_cap() {
+    covers(&[ids::generate::memory::MANY_WORLDS_STAY_UNDER_THE_CAP]);
     let mut builder = PluginBuilder::new();
     for index in 0..WORLDS {
         let mut world = SyntheticWorld::new(0x1000 + index * 0x2000, &format!("World{index:02}"));

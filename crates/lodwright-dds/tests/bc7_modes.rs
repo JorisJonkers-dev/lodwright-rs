@@ -2,6 +2,7 @@
 //! BC7 blocks of every mode, built here field by field from the public bit layout, decoded through `decode_image`.
 
 use lodwright_dds::decode_image;
+use lodwright_testkit::{covers, ids};
 
 /// Per mode: subsets, partition bits, rotation bits, index selection bits, colour bits, alpha bits, p-bit kind
 /// (0 none, 1 per endpoint, 2 shared per subset), index bits, secondary index bits.
@@ -139,6 +140,7 @@ const W4: [u32; 16] = [0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 
 
 #[test]
 fn every_mode_draws_each_subset_in_its_own_colour_where_the_partition_puts_it() {
+    covers(&[ids::formats::meshes_and_images::DDS_READER]);
     for mode in 0..8 {
         let (ns, _, _, _, cb, ab, pk, _, _) = LAYOUT[mode];
         let top = (1 << cb) - 1;
@@ -244,6 +246,7 @@ fn indices_with_anchor_texels_interpolate_by_the_weights_in_every_multi_subset_m
 
 #[test]
 fn mode_6_interpolates_sixteen_steps_from_black_to_white() {
+    covers(&[ids::formats::meshes_and_images::DDS_READER]);
     let primary = ramp(6);
     let block = Block {
         mode: 6,
@@ -271,6 +274,7 @@ fn mode_6_interpolates_sixteen_steps_from_black_to_white() {
 
 #[test]
 fn modes_4_and_5_take_colour_and_alpha_from_separate_indices_with_selection_and_rotation() {
+    covers(&[ids::formats::meshes_and_images::DDS_READER]);
     let primary = ramp(4);
     let secondary = {
         let mut s = [0; 16];

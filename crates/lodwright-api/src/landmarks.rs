@@ -588,6 +588,7 @@ pub fn compare(baseline: &LandmarksDoc, current: &LandmarksDoc, allowed_drop: f6
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lodwright_testkit::{covers, ids};
 
     const LIST: &str = "# a comment\n\
         Tower\tMojave\tarch\\tower.nif\tref:0008D36C\tthe tower\n\
@@ -598,6 +599,7 @@ mod tests {
 
     #[test]
     fn a_landmark_file_gives_references_and_positions_with_their_notes() {
+        covers(&[ids::verify::measure::LANDMARKS]);
         let list = parse_landmarks(LIST).unwrap();
         assert_eq!(list.len(), 4);
         assert_eq!(list[0].place, Place::Reference(0x0008_D36C));
@@ -623,6 +625,7 @@ mod tests {
 
     #[test]
     fn a_bad_landmark_line_is_refused_with_its_number() {
+        covers(&[ids::verify::measure::LANDMARKS]);
         for (text, wants) in [
             ("a\tW\tm.nif", "line 1: needs"),
             ("a\tW\tm.nif\tfoo", "line 1: the place starts"),
@@ -658,6 +661,7 @@ mod tests {
 
     #[test]
     fn a_comparison_fails_for_a_landmark_that_was_written_and_is_not_or_lost_triangles() {
+        covers(&[ids::verify::measure::LANDMARK_BASELINE]);
         let baseline = LandmarksDoc::new(vec![
             entry("kept", Status::Written, 100),
             entry("gone", Status::Written, 100),
@@ -685,6 +689,7 @@ mod tests {
 
     #[test]
     fn a_report_reads_back_as_the_baseline_it_was() {
+        covers(&[ids::verify::measure::LANDMARK_BASELINE]);
         let doc = LandmarksDoc::new(vec![
             entry("a", Status::Written, 3),
             entry("b", Status::NoFarModel, 0),

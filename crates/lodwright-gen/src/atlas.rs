@@ -155,15 +155,18 @@ pub fn pack_pages(textures: &[(String, u32, u32)], largest: (u32, u32)) -> Vec<A
 #[cfg(test)]
 mod tests {
     use super::{LARGEST_ATLAS, Rect, pack, pack_pages};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn textures_that_fit_one_atlas_make_one_page_as_pack_does() {
+        covers(&[ids::objects::blocks::ATLAS_PAIR]);
         let few: Vec<(String, u32, u32)> = (0..40).map(|i| (format!("t{i}"), 512, 512)).collect();
         assert_eq!(pack_pages(&few, LARGEST_ATLAS), vec![pack(&few)]);
     }
 
     #[test]
     fn textures_that_do_not_fit_one_atlas_keep_their_size_on_more_pages() {
+        covers(&[ids::objects::blocks::ATLAS_PAGES]);
         // 300 textures of 1024 by 1024 are 4.7 atlases of the largest size
         let many: Vec<(String, u32, u32)> =
             (0..300).map(|i| (format!("t{i:03}"), 1024, 1024)).collect();
@@ -207,6 +210,7 @@ mod tests {
 
     #[test]
     fn rectangles_never_overlap_and_stay_inside() {
+        covers(&[ids::objects::blocks::ATLAS_PAIR]);
         let textures: Vec<(String, u32, u32)> = (0..60)
             .map(|i| (format!("t{i:02}"), 64 << (i % 3), 64 << ((i / 3) % 2)))
             .collect();
@@ -223,6 +227,7 @@ mod tests {
 
     #[test]
     fn the_smallest_size_that_fits_is_chosen_and_the_result_is_deterministic() {
+        covers(&[ids::objects::blocks::ATLAS_PAIR]);
         let few = vec![("a".to_owned(), 128, 128), ("b".to_owned(), 64, 64)];
         assert_eq!((pack(&few).width, pack(&few).height), (2048, 1024));
         let many: Vec<(String, u32, u32)> = (0..40).map(|i| (format!("t{i}"), 512, 512)).collect();

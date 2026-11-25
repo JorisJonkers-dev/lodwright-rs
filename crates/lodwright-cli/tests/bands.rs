@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! `lodwright bands`: the minimum and maximum of each statistic over the verify reports of several runs.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};
@@ -65,6 +66,7 @@ fn write(dir: &Path, name: &str, doc: &VerifyDoc) -> String {
 
 #[test]
 fn identical_runs_give_zero_width_bands() {
+    covers(&[ids::verify::measure::BANDS]);
     let dir = temp("same");
     let files: Vec<String> = (0..3)
         .map(|i| write(&dir, &format!("run{i}.json"), &report(0.912_345, 0)))

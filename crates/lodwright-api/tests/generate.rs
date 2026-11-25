@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! [`lodwright_api::generate`] called in process: the result, progress, cancel and resume, and the errors.
 
+use lodwright_testkit::{covers, ids};
 use std::path::PathBuf;
 
 use lodwright_api::{
@@ -76,6 +77,7 @@ fn done(outcome: GenerateOutcome) -> lodwright_contract::ResultDoc {
 
 #[test]
 fn generate_writes_the_lod_and_a_manifest_and_answers_generated() {
+    covers(&[ids::generate::run::WRITES_LOD_AND_MANIFEST]);
     let (job, out) = job("done");
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(result.code, "generated");
@@ -88,6 +90,7 @@ fn generate_writes_the_lod_and_a_manifest_and_answers_generated() {
 
 #[test]
 fn the_result_profiles_every_step_with_its_time_and_the_files_it_wrote() {
+    covers(&[ids::generate::run::STEP_PROFILE]);
     let (job, out) = job("profile");
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     let names: Vec<(&str, Option<&str>)> = result
@@ -128,6 +131,7 @@ fn the_result_profiles_every_step_with_its_time_and_the_files_it_wrote() {
 
 #[test]
 fn a_second_call_with_the_same_request_is_up_to_date() {
+    covers(&[ids::generate::run::UP_TO_DATE]);
     let (job, _) = job("again");
     generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
@@ -136,6 +140,7 @@ fn a_second_call_with_the_same_request_is_up_to_date() {
 
 #[test]
 fn an_output_written_by_another_version_is_rebuilt_not_reported_up_to_date() {
+    covers(&[ids::generate::run::REBUILT_FOR_ANOTHER_BUILD]);
     let (job, out) = job("other-version");
     generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();
     let mut m = manifest(&out);
@@ -148,6 +153,7 @@ fn an_output_written_by_another_version_is_rebuilt_not_reported_up_to_date() {
 
 #[test]
 fn an_output_written_by_another_build_of_the_same_version_is_rebuilt() {
+    covers(&[ids::generate::run::REBUILT_FOR_ANOTHER_BUILD]);
     let (job, out) = job("other-build");
     generate(&job, &mut NoProgress, &CancelToken::new()).unwrap();
     let mut m = manifest(&out);
@@ -175,6 +181,7 @@ fn an_output_written_by_another_build_of_the_same_version_is_rebuilt() {
 
 #[test]
 fn progress_starts_each_step_and_counts_every_terrain_block() {
+    covers(&[ids::contract::events::LIBRARY_PROGRESS_AND_CANCEL]);
     let (job, _) = job("progress");
     let mut events: Vec<ProgressEvent> = Vec::new();
     let mut progress = |e: &ProgressEvent| events.push(e.clone());
@@ -210,6 +217,7 @@ fn checkpoint(out: &std::path::Path) -> Manifest {
 
 #[test]
 fn every_event_of_a_run_carries_the_run_numbers_and_the_run_total_never_goes_back() {
+    covers(&[ids::contract::events::RUN_WIDE_PROGRESS]);
     let (job, _) = job("run-progress");
     let mut events: Vec<ProgressEvent> = Vec::new();
     let mut progress = |e: &ProgressEvent| events.push(e.clone());
@@ -257,6 +265,7 @@ fn cancel_at_first_block() -> (CancelToken, impl FnMut(&ProgressEvent)) {
 
 #[test]
 fn a_token_cancelled_before_the_call_writes_nothing() {
+    covers(&[ids::generate::staging::CANCEL_KEEPS_THE_OUTPUT]);
     let (job, out) = job("cancel-first");
     let cancel = CancelToken::new();
     cancel.cancel();
@@ -268,6 +277,7 @@ fn a_token_cancelled_before_the_call_writes_nothing() {
 
 #[test]
 fn a_cancel_after_the_first_block_keeps_the_staging_folder_the_next_call_resumes_from() {
+    covers(&[ids::generate::staging::RESUME_AFTER_CANCEL]);
     let (job, out) = job("resume");
     let (cancel, mut progress) = cancel_at_first_block();
     let outcome = generate(&job, &mut progress, &cancel).unwrap();
@@ -297,6 +307,7 @@ fn a_cancel_after_the_first_block_keeps_the_staging_folder_the_next_call_resumes
 
 #[test]
 fn a_resumed_run_writes_the_files_an_uninterrupted_run_writes() {
+    covers(&[ids::generate::staging::RESUME_AFTER_CANCEL]);
     let (job, out) = job("resume-bytes");
     let (cancel, mut progress) = cancel_at_first_block();
     generate(&job, &mut progress, &cancel).unwrap();
@@ -311,6 +322,7 @@ fn a_resumed_run_writes_the_files_an_uninterrupted_run_writes() {
 
 #[test]
 fn a_cancel_during_a_second_run_leaves_the_previous_output_untouched() {
+    covers(&[ids::generate::staging::CANCEL_KEEPS_THE_OUTPUT]);
     let (mut job, out) = job("changed-resume");
     job.request.terrain.water = false;
     let first = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
@@ -361,6 +373,7 @@ fn a_cancel_during_a_second_run_leaves_the_previous_output_untouched() {
 
 #[test]
 fn a_changed_request_discards_the_staging_folder_of_the_interrupted_one() {
+    covers(&[ids::generate::staging::OTHER_STAGING_DISCARDED]);
     let (mut job, out) = job("changed-request");
     let (cancel, mut progress) = cancel_at_first_block();
     generate(&job, &mut progress, &cancel).unwrap();
@@ -384,6 +397,7 @@ fn a_changed_request_discards_the_staging_folder_of_the_interrupted_one() {
 
 #[test]
 fn a_cancel_between_the_terrain_step_and_a_later_step_is_cancelled() {
+    covers(&[ids::contract::events::LIBRARY_PROGRESS_AND_CANCEL]);
     let (mut job, out) = job("cancel-after-terrain");
     // the terrain step starts and then the cancel is seen before the first block; objects would follow it
     job.request.objects.enabled = true;
@@ -432,6 +446,7 @@ fn a_cancel_on_the_last_event_of_the_last_step_is_cancelled() {
 
 #[test]
 fn a_checkpoint_carries_no_block_of_a_run_with_other_plugins() {
+    covers(&[ids::generate::staging::OTHER_STAGING_DISCARDED]);
     let (job, out) = job("changed-inputs");
     done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert!(
@@ -456,6 +471,7 @@ fn a_checkpoint_carries_no_block_of_a_run_with_other_plugins() {
 
 #[test]
 fn a_swap_killed_between_its_renames_is_restored_by_the_next_call() {
+    covers(&[ids::generate::staging::KILLED_SWAP_RECOVERED]);
     let (job, out) = job("swap-recover");
     done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     let before = manifest(&out);
@@ -470,6 +486,7 @@ fn a_swap_killed_between_its_renames_is_restored_by_the_next_call() {
 
 #[test]
 fn a_file_the_user_keeps_at_the_top_of_the_output_survives_a_regenerate() {
+    covers(&[ids::generate::staging::USERS_FILES_KEPT]);
     let (mut job, out) = job("carry-over");
     done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     std::fs::write(out.join("notes.txt"), b"mine").unwrap();
@@ -480,6 +497,7 @@ fn a_file_the_user_keeps_at_the_top_of_the_output_survives_a_regenerate() {
 
 #[test]
 fn a_missing_plugin_is_a_typed_error_whose_copy_text_has_no_command_line() {
+    covers(&[ids::generate::run::TYPED_ERRORS]);
     let (mut job, _) = job("missing");
     job.request.plugins = vec!["Gone.esm".into()];
     let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
@@ -490,6 +508,7 @@ fn a_missing_plugin_is_a_typed_error_whose_copy_text_has_no_command_line() {
 
 #[test]
 fn an_output_folder_inside_the_data_folder_is_refused() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let (mut job, _) = job("in-data");
     job.request.output_dir = format!("{}/lod", job.request.data_folder);
     let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
@@ -499,6 +518,7 @@ fn an_output_folder_inside_the_data_folder_is_refused() {
 
 #[test]
 fn an_output_folder_that_is_a_working_tree_root_is_refused() {
+    covers(&[ids::generate::output_safety::GIT_TREE_REFUSED]);
     let (job, out) = job("git-root");
     std::fs::create_dir_all(out.join(".git")).unwrap();
     let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
@@ -507,6 +527,7 @@ fn an_output_folder_that_is_a_working_tree_root_is_refused() {
 
 #[test]
 fn a_full_output_folder_without_a_manifest_is_refused_unless_overwrite_is_set() {
+    covers(&[ids::generate::output_safety::NOT_EMPTY_REFUSED]);
     let (mut job, out) = job("full");
     std::fs::create_dir_all(&out).unwrap();
     std::fs::write(out.join("other.txt"), b"x").unwrap();
@@ -519,6 +540,7 @@ fn a_full_output_folder_without_a_manifest_is_refused_unless_overwrite_is_set() 
 
 #[test]
 fn the_request_round_trips_through_json() {
+    covers(&[ids::contract::documents::REQUEST_DOCUMENT]);
     let (job, _) = job("json");
     let text = serde_json::to_string(&job).unwrap();
     let back: GenerateRequest = serde_json::from_str(&text).unwrap();
@@ -606,6 +628,7 @@ fn warnings_file(out: &std::path::Path) -> lodwright_contract::WarningsFile {
 
 #[test]
 fn shipped_shape_rules_act_only_in_the_world_they_name() {
+    covers(&[ids::objects::blocks::SHIPPED_BLOCK_SHAPES]);
     let kinds = |name: &str, rule_world: Option<&str>| {
         let (mut job, out) = far_model_job(name);
         if let Some(world) = rule_world {
@@ -634,6 +657,7 @@ fn shipped_shape_rules_act_only_in_the_world_they_name() {
 
 #[test]
 fn far_models_without_a_lod_model_are_one_warning_per_plugin_and_every_model_is_in_the_file() {
+    covers(&[ids::generate::run::WARNINGS_FILE]);
     let (job, out) = far_model_job("far-warn");
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(result.code, "generated", "{result:?}");
@@ -880,6 +904,7 @@ fn far_records(out: &std::path::Path) -> Vec<(String, Option<String>, u64, Vec<S
 
 #[test]
 fn a_rule_with_generate_gives_far_shapes_to_its_objects_only() {
+    covers(&[ids::objects::selection::RULE_GENERATE_OPTION]);
     let shapes = lodwright_contract::FullModelShapes {
         keep: 1.0,
         max_error: 0.0,
@@ -960,6 +985,7 @@ fn lamp_records(out: &std::path::Path) -> Vec<(String, Option<String>, u64)> {
 
 #[test]
 fn without_include_rules_an_object_nothing_marks_visible_from_far_stays_out_unreported() {
+    covers(&[ids::objects::selection::INCLUDE_RULES]);
     let (job, out) = include_job("include-none");
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
     assert_eq!(result.code, "generated", "{result:?}");
@@ -968,6 +994,7 @@ fn without_include_rules_an_object_nothing_marks_visible_from_far_stays_out_unre
 
 #[test]
 fn an_include_rule_takes_the_enabled_references_and_reports_the_held_back_ones() {
+    covers(&[ids::objects::selection::INCLUDE_RULES]);
     let (mut job, out) = include_job("include-rule");
     job.request.inclusion.include_rules = vec![rule("lights/street*", Some("lamps.esp"))];
     let result = done(generate(&job, &mut NoProgress, &CancelToken::new()).unwrap());
@@ -1002,6 +1029,7 @@ fn include_rule_records_with_parent(
 
 #[test]
 fn an_include_rule_takes_a_reference_whose_enable_parent_stands_at_the_start() {
+    covers(&[ids::objects::selection::INCLUDE_RULES_RESPECT_ENABLE_PARENTS]);
     // the parent is the enabled lamp: the parented lamp stands too, so three lamps are taken and two held back
     assert_eq!(
         include_rule_records_with_parent("include-parent-enabled", 0x0100_0D00, 0),
@@ -1018,6 +1046,7 @@ fn an_include_rule_takes_a_reference_whose_enable_parent_stands_at_the_start() {
 
 #[test]
 fn an_include_rule_takes_a_reference_set_opposite_to_its_disabled_enable_parent() {
+    covers(&[ids::objects::selection::INCLUDE_RULES_RESPECT_ENABLE_PARENTS]);
     // the parent is the disabled lamp and the opposite flag is set: the parented lamp stands at the start
     assert_eq!(
         include_rule_records_with_parent("include-parent-opposite", 0x0100_0D01, 1),
@@ -1034,6 +1063,7 @@ fn an_include_rule_takes_a_reference_set_opposite_to_its_disabled_enable_parent(
 
 #[test]
 fn an_exclusion_rule_beats_an_include_rule_and_a_rule_for_another_plugin_takes_nothing() {
+    covers(&[ids::objects::selection::EXCLUSION_RULES]);
     let (mut job, out) = include_job("include-excluded");
     job.request.inclusion.include_rules = vec![rule("lights/*", None)];
     job.request.inclusion.exclude_models = vec!["lights/streetlamp.nif".to_owned()];
@@ -1050,6 +1080,7 @@ fn an_exclusion_rule_beats_an_include_rule_and_a_rule_for_another_plugin_takes_n
 
 #[test]
 fn an_include_rule_for_a_plugin_outside_the_load_order_is_a_request_error() {
+    covers(&[ids::objects::selection::INCLUDE_RULES]);
     let (mut job, _) = include_job("include-bad");
     job.request.inclusion.include_rules = vec![rule("lights/*", Some("Gone.esp"))];
     let err = generate(&job, &mut NoProgress, &CancelToken::new()).unwrap_err();
@@ -1058,6 +1089,7 @@ fn an_include_rule_for_a_plugin_outside_the_load_order_is_a_request_error() {
 
 #[test]
 fn include_rules_give_the_same_bytes_on_every_run() {
+    covers(&[ids::objects::selection::INCLUDE_RULES]);
     let run = |name: &str| {
         let (mut job, out) = include_job(name);
         job.request.inclusion.include_rules = vec![rule("lights/*", None)];
@@ -1083,6 +1115,7 @@ fn output_bytes(out: &std::path::Path) -> Vec<(String, Vec<u8>)> {
 
 #[test]
 fn the_output_files_are_the_same_bytes_at_any_thread_count() {
+    covers(&[ids::generate::run::SAME_BYTES_AT_ANY_THREAD_COUNT]);
     let mut runs = Vec::new();
     for threads in [1u32, 4, 16] {
         let (mut terrain, out_t) = job(&format!("det-t{threads}"));
@@ -1157,6 +1190,7 @@ fn lod_files(out: &std::path::Path) -> Vec<String> {
 
 #[test]
 fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_with_the_option() {
+    covers(&[ids::objects::selection::FAR_LIGHTS]);
     let (mut on, on_out) = far_lights_job("far-lights-on");
     on.request.objects.far_lights = true;
     let result = done(generate(&on, &mut NoProgress, &CancelToken::new()).unwrap());
@@ -1225,6 +1259,7 @@ fn far_model_lamps(name: &str, base_flags: u32, on: bool) -> Vec<(String, Option
 
 #[test]
 fn far_model_without_flag_takes_the_lamps_that_stand_at_the_start_and_only_with_the_option() {
+    covers(&[ids::objects::selection::FAR_MODEL_WITHOUT_FLAG]);
     // of the five lamps two stand at the start: the initially disabled one, the persistent disabled one and the one
     // its disabled enable parent keeps out stay out
     assert_eq!(
@@ -1241,6 +1276,7 @@ fn far_model_without_flag_takes_the_lamps_that_stand_at_the_start_and_only_with_
 #[test]
 fn far_model_without_flag_leaves_out_a_base_drawn_as_a_tree_billboard() {
     const HAS_TREE_LOD: u32 = 0x40;
+    covers(&[ids::objects::selection::FAR_MODEL_WITHOUT_FLAG]);
     assert_eq!(
         far_model_lamps("far-model-tree", HAS_TREE_LOD, true),
         vec![]
@@ -1249,6 +1285,7 @@ fn far_model_without_flag_leaves_out_a_base_drawn_as_a_tree_billboard() {
 
 #[test]
 fn far_model_without_flag_does_not_take_a_reference_twice_or_one_without_a_far_model() {
+    covers(&[ids::objects::selection::FAR_MODEL_WITHOUT_FLAG]);
     // the far-view flag already takes the lamps; the option adds no second copy of them. The parking model of
     // Base.esm has no far model and stays reported as before.
     let (mut job, out) = lamps_job("far-model-flagged", 0x0100_0D01, 0, VISIBLE_WHEN_DISTANT);

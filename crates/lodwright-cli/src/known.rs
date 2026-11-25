@@ -98,6 +98,7 @@ pub fn apply(doc: &mut VerifyDoc, list: &BTreeMap<String, Entry>) {
 mod tests {
     use super::{apply, parse};
     use lodwright_contract::{VerifyDoc, VerifyFinding};
+    use lodwright_testkit::{covers, ids};
 
     const LIST: &str = "# path\trelease\treason\n\
         meshes/landscape/lod/w/w.level4.x0.y0.nif\t0.7.0\twater outline not built yet\n\
@@ -133,6 +134,7 @@ mod tests {
 
     #[test]
     fn a_listed_difference_becomes_known_and_a_listed_path_without_one_is_stale() {
+        covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
         let mut doc = VerifyDoc::new();
         doc.differences = vec![
             finding("meshes/landscape/lod/w/w.level4.x0.y0.nif"),

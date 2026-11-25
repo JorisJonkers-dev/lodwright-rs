@@ -79,9 +79,11 @@ pub fn arguments_digest(lines: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{Sha256Stream, arguments_digest, sha256_digest};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn digest_of_nothing_is_the_known_sha256_with_its_length_prefix() {
+        covers(&[ids::contract::documents::DIGEST_FUNCTION]);
         // The prefix is eight zero bytes, so this is SHA-256 of eight zero bytes.
         assert_eq!(
             sha256_digest(b""),
@@ -91,6 +93,7 @@ mod tests {
 
     #[test]
     fn a_reader_read_in_parts_gives_the_digest_of_the_whole_slice() {
+        covers(&[ids::contract::documents::DIGEST_FUNCTION]);
         let bytes: Vec<u8> = (0..3_000_000_u32).map(|i| (i % 251) as u8).collect();
         assert_eq!(
             super::sha256_digest_of_reader(bytes.len() as u64, bytes.as_slice()).unwrap(),
@@ -101,6 +104,7 @@ mod tests {
 
     #[test]
     fn parts_are_length_prefixed_so_splits_differ() {
+        covers(&[ids::contract::documents::DIGEST_FUNCTION]);
         let mut a = Sha256Stream::new();
         a.update(b"ab");
         a.update(b"c");
@@ -112,6 +116,7 @@ mod tests {
 
     #[test]
     fn argument_digest_depends_on_every_line_and_their_order() {
+        covers(&[ids::contract::documents::DIGEST_FUNCTION]);
         let one = arguments_digest(&["a=1".into(), "b=2".into()]);
         assert_eq!(one, arguments_digest(&["a=1".into(), "b=2".into()]));
         assert_ne!(one, arguments_digest(&["b=2".into(), "a=1".into()]));

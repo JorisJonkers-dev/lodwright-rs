@@ -8,6 +8,7 @@ use lodwright_dds::{
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::image::{gradient_rgba, noise_rgba};
 use lodwright_testkit::rng::Rng;
+use lodwright_testkit::{covers, ids};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -59,24 +60,28 @@ fn golden_path(name: &str) -> std::path::PathBuf {
 
 #[test]
 fn the_bc1_header_for_a_fixed_input_equals_the_stored_dump() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     let bytes = encode(&gradient(10, 6), &options(Format::Bc1, true)).unwrap();
     assert_golden(&golden_path("header_bc1.txt"), &header_dump(&bytes));
 }
 
 #[test]
 fn the_bc3_header_for_a_fixed_input_equals_the_stored_dump() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     let bytes = encode(&gradient(10, 6), &options(Format::Bc3, true)).unwrap();
     assert_golden(&golden_path("header_bc3.txt"), &header_dump(&bytes));
 }
 
 #[test]
 fn the_bc5_header_for_a_fixed_input_equals_the_stored_dump() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     let bytes = encode(&gradient(10, 6), &options(Format::Bc5, true)).unwrap();
     assert_golden(&golden_path("header_bc5.txt"), &header_dump(&bytes));
 }
 
 #[test]
 fn a_file_without_mips_has_no_mip_flag_and_only_the_base_surface() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     let bytes = encode(&gradient(8, 8), &options(Format::Bc1, false)).unwrap();
     assert_eq!(bytes.len(), HEADER_LEN + 32);
     let flags = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
@@ -86,6 +91,7 @@ fn a_file_without_mips_has_no_mip_flag_and_only_the_base_surface() {
 
 #[test]
 fn the_header_flags_and_caps_follow_the_documented_values() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     let bytes = encode(&gradient(16, 16), &options(Format::Bc3, true)).unwrap();
     let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
     assert_eq!(
@@ -106,6 +112,7 @@ fn the_header_flags_and_caps_follow_the_documented_values() {
 
 #[test]
 fn encoded_files_never_carry_a_dx10_header() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     for format in FORMATS {
         for mips in [false, true] {
             let bytes = encode(&gradient(13, 9), &options(format, mips)).unwrap();
@@ -131,6 +138,7 @@ fn a_dx10_file_is_refused_on_reading() {
 
 #[test]
 fn mip_sizes_and_the_file_length_are_right_for_non_power_of_two_input() {
+    covers(&[ids::formats::meshes_and_images::DDS_WRITER]);
     for format in FORMATS {
         let bytes = encode(&gradient(37, 19), &options(format, true)).unwrap();
         let decoded = decode(&bytes).unwrap();
@@ -158,6 +166,7 @@ fn surface_bytes_round_partial_blocks_up_with_a_minimum_of_one_block() {
 
 #[test]
 fn a_size_over_the_cap_is_refused_when_building_and_when_reading() {
+    covers(&[ids::formats::meshes_and_images::DDS_HOSTILE_INPUT]);
     assert_eq!(
         Image::new(MAX_DIMENSION + 1, 1, vec![]),
         Err(DdsError::BadDimensions {
@@ -175,6 +184,7 @@ fn a_size_over_the_cap_is_refused_when_building_and_when_reading() {
 
 #[test]
 fn reading_refuses_each_kind_of_bad_header() {
+    covers(&[ids::formats::meshes_and_images::DDS_HOSTILE_INPUT]);
     let good = encode(&gradient(8, 8), &options(Format::Bc3, true)).unwrap();
     let patch = |at: usize, v: &[u8]| {
         let mut b = good.clone();
@@ -224,6 +234,7 @@ fn reading_refuses_each_kind_of_bad_header() {
 
 #[test]
 fn random_bytes_and_bit_flips_never_panic_decode() {
+    covers(&[ids::formats::meshes_and_images::DDS_HOSTILE_INPUT]);
     let mut rng = Rng::new(31);
     for _ in 0..500 {
         let n = rng.below(400) as usize;
@@ -293,31 +304,37 @@ fn assert_floor(image: &Image, format: Format, floor: f64) {
 
 #[test]
 fn bc1_keeps_its_quality_floor_on_a_gradient() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&gradient(64, 64), Format::Bc1, GRADIENT_BC1);
 }
 
 #[test]
 fn bc3_keeps_its_quality_floor_on_a_gradient() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&gradient(64, 64), Format::Bc3, GRADIENT_BC3);
 }
 
 #[test]
 fn bc5_keeps_its_quality_floor_on_a_gradient() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&gradient(64, 64), Format::Bc5, GRADIENT_BC5);
 }
 
 #[test]
 fn bc1_keeps_its_quality_floor_on_noise() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&noise(64, 64), Format::Bc1, NOISE_BC1);
 }
 
 #[test]
 fn bc3_keeps_its_quality_floor_on_noise() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&noise(64, 64), Format::Bc3, NOISE_BC3);
 }
 
 #[test]
 fn bc5_keeps_its_quality_floor_on_noise() {
+    covers(&[ids::formats::meshes_and_images::DDS_QUALITY]);
     assert_floor(&noise(64, 64), Format::Bc5, NOISE_BC5);
 }
 
@@ -330,6 +347,7 @@ const NOISE_BC5: f64 = 29.1;
 
 #[test]
 fn an_uncompressed_32_bit_file_is_read_through_its_masks() {
+    covers(&[ids::formats::meshes_and_images::DDS_READER]);
     let mut file = vec![0_u8; 128];
     file[0..4].copy_from_slice(b"DDS ");
     file[4..8].copy_from_slice(&124_u32.to_le_bytes());

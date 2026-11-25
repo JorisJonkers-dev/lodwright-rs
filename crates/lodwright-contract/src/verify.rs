@@ -398,9 +398,11 @@ impl Default for VerifyDoc {
 #[cfg(test)]
 mod tests {
     use super::{VerifyDoc, VerifyFinding};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_new_report_names_its_contract_and_version() {
+        covers(&[ids::contract::documents::VERIFY_DOCUMENT]);
         let doc = VerifyDoc::new();
         assert_eq!(
             (doc.schema_version, doc.contract.as_str()),
@@ -411,6 +413,7 @@ mod tests {
 
     #[test]
     fn a_report_without_differences_reads_back() {
+        covers(&[ids::contract::documents::VERIFY_DOCUMENT]);
         let mut doc = VerifyDoc::new();
         doc.errors.push(VerifyFinding {
             path: "a.nif".into(),

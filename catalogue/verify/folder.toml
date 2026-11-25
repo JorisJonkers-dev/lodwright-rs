@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "verify.folder"
+title = "Verifying a folder"
+origin = "ours"
+notes = "lodwright verify checks an output folder and compares it with a reference (docs/contracts.md, Verify)."
+
+[[item]]
+id = "structure_checks"
+title = "verify checks the formats of terrain blocks, object blocks, tree blocks, textures and settings files, and finds damage"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/verify.rs"]
+
+[[item]]
+id = "exit_codes"
+title = "verify exits 0 clean, 1 with findings, 2 on a usage error and 3 on an unreadable folder"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "reference_blocks_by_name"
+title = "With --reference, blocks present on both sides are compared by name in lower case"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/verify.rs"]
+
+[[item]]
+id = "water_iou"
+title = "verify measures the water overlap (IoU) of every block with water on either side and fails a block under --water-iou"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/verify.rs"]
+
+[[item]]
+id = "terrain_height_difference"
+title = "verify compares terrain heights on a 33 by 33 grid and fails a block over --height-tolerance"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/verify.rs"]
+
+[[item]]
+id = "object_agreement"
+title = "verify counts the vertices of an object block with no counterpart in the reference, in any order"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/verify.rs"]
+
+[[item]]
+id = "texture_correlation"
+title = "verify reports the Pearson correlation of each block's diffuse and normal map with the reference's"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/correlation.rs"]
+
+[[item]]
+id = "far_metrics"
+title = "verify reports position, UV and silhouette errors of object blocks and the use of each atlas"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/metrics.rs"]
+
+[[item]]
+id = "known_differences"
+title = "--known-differences moves listed differences out of the failures and reports a listed path that no longer differs as stale"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/known.rs"]
+
+[[item]]
+id = "reports_hold_no_game_data"
+title = "A report holds file names and numbers only, never content read from a file"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/commands.rs"]
+
+[[item]]
+id = "refuses_git_working_trees"
+title = "verify refuses a folder or reference inside a git working tree unless --allow-in-repo is given for that run"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/commands.rs"]

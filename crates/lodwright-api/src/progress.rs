@@ -402,9 +402,11 @@ impl CancelToken {
 #[cfg(test)]
 mod tests {
     use super::{CancelToken, ProgressEvent, Step};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_clone_of_a_token_sees_the_cancel() {
+        covers(&[ids::contract::events::LIBRARY_PROGRESS_AND_CANCEL]);
         let token = CancelToken::new();
         let clone = token.clone();
         assert!(!clone.is_cancelled());
@@ -434,6 +436,7 @@ mod tests {
 
     #[test]
     fn a_finished_block_of_each_step_renders_the_events_line_with_its_kind() {
+        covers(&[ids::contract::events::LIBRARY_PROGRESS_AND_CANCEL]);
         let lines: Vec<String> = [
             finished(Step::Terrain, 16),
             finished(Step::Objects, 4),

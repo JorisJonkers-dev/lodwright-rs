@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "generate.staging"
+title = "Staging, cancel and resume"
+origin = "ours"
+notes = "A run builds in a staging folder next to the output and swaps it in when finished (docs/contracts.md, docs/interrupted-runs.md)."
+
+[[item]]
+id = "staging_and_swap"
+title = "A run builds into <output>.lodwright-staging and replaces the output folder only when every step has finished"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "cancel_keeps_the_output"
+title = "A cancelled run leaves the previous output untouched"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "kill_keeps_the_output"
+title = "A run killed over an existing output leaves that output untouched"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "resume_after_cancel"
+title = "The next run resumes a cancelled run from its checkpoint and writes what an uninterrupted run writes"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "resume_after_kill"
+title = "A killed run resumes to the bytes of an uninterrupted run"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "other_staging_discarded"
+title = "A staging folder of another request or other inputs, or without a checkpoint, is removed and the run starts clean"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "killed_swap_recovered"
+title = "A swap killed between its two renames is put back by the next run"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "users_files_kept"
+title = "A file the user keeps at the top of the output folder survives a regenerate"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "free_space_checked"
+title = "A run that cannot fit is refused before building, with output_no_space"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/staging.rs"]
+
+[[item]]
+id = "run_lock"
+title = "A lock refuses two runs on one output folder"
+status = "missing"
+
+[[item]]
+id = "swap_marker"
+title = "A swap marker tells the next run which half of a swap it finds"
+status = "missing"
+
+[[item]]
+id = "fsync_before_swap"
+title = "Files, the checkpoint and the folders are synced before the swap"
+status = "missing"

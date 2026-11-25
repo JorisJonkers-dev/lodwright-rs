@@ -15,6 +15,7 @@
 //! have, and the guards resolve links through the same `canonicalize` call on every platform.
 #![cfg(unix)]
 
+use lodwright_testkit::{covers, ids};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
@@ -96,6 +97,7 @@ fn reached_the_output(out: &Path, result: Result<GenerateOutcome, lodwright_api:
 
 #[test]
 fn an_output_folder_that_is_a_link_into_the_data_folder_is_refused() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let root = temp("link-into-data");
     let out = root.join("out");
     let job = job(&root, &out);
@@ -108,6 +110,7 @@ fn an_output_folder_that_is_a_link_into_the_data_folder_is_refused() {
 
 #[test]
 fn an_output_folder_that_is_a_link_to_the_data_folder_itself_is_refused() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let root = temp("link-to-data");
     let out = root.join("out");
     let job = job(&root, &out);
@@ -119,6 +122,7 @@ fn an_output_folder_that_is_a_link_to_the_data_folder_itself_is_refused() {
 
 #[test]
 fn a_new_output_folder_under_a_linked_parent_that_points_into_the_data_folder_is_refused() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let root = temp("new-under-link");
     let link = root.join("link");
     let job = job(&root, &link.join("not-yet/lod"));
@@ -130,6 +134,7 @@ fn a_new_output_folder_under_a_linked_parent_that_points_into_the_data_folder_is
 
 #[test]
 fn an_output_folder_inside_the_data_folder_named_through_a_linked_data_folder_is_refused() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let root = temp("linked-data");
     let mut job = job(&root, &root.join("data/lod"));
     symlink(root.join("data"), root.join("data-link")).unwrap();
@@ -140,6 +145,7 @@ fn an_output_folder_inside_the_data_folder_named_through_a_linked_data_folder_is
 
 #[test]
 fn an_output_folder_that_is_a_link_to_a_separate_folder_is_written_through_and_stays_up_to_date() {
+    covers(&[ids::generate::output_safety::LINKED_OUTPUT_FOLDER_ALLOWED]);
     let root = temp("link-elsewhere");
     let (out, target) = (root.join("out"), root.join("other-disk/lod"));
     std::fs::create_dir_all(&target).unwrap();
@@ -161,6 +167,7 @@ fn an_output_folder_that_is_a_link_to_a_separate_folder_is_written_through_and_s
 
 #[test]
 fn a_link_at_the_path_of_an_output_file_is_replaced_and_its_target_left_alone() {
+    covers(&[ids::generate::output_safety::LINKS_NEVER_FOLLOWED]);
     let path = written_paths("file-link-paths").remove(0);
     let root = temp("file-link");
     let (out, victim) = (root.join("out"), root.join("victim.txt"));
@@ -177,6 +184,7 @@ fn a_link_at_the_path_of_an_output_file_is_replaced_and_its_target_left_alone() 
 
 #[test]
 fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
+    covers(&[ids::generate::output_safety::GIT_TREE_REFUSED]);
     let root = temp("link-into-repo");
     let out = root.join("out");
     let job = job(&root, &out);
@@ -189,6 +197,7 @@ fn an_output_folder_that_is_a_link_into_a_git_working_tree_is_refused() {
 
 #[test]
 fn an_output_folder_that_is_a_link_inside_a_git_working_tree_is_refused_wherever_it_points() {
+    covers(&[ids::generate::output_safety::GIT_TREE_REFUSED]);
     let root = temp("link-in-repo");
     let out = root.join("repo/lod");
     let job = job(&root, &out);
@@ -202,6 +211,7 @@ fn an_output_folder_that_is_a_link_inside_a_git_working_tree_is_refused_wherever
 
 #[test]
 fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
+    covers(&[ids::generate::output_safety::LINKS_NEVER_FOLLOWED]);
     let path = written_paths("dir-link-paths").remove(0);
     let first = path.split('/').next().unwrap().to_owned();
     let root = temp("dir-link");
@@ -217,6 +227,7 @@ fn nothing_is_written_through_a_linked_folder_inside_the_output_folder() {
 
 #[test]
 fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target() {
+    covers(&[ids::generate::output_safety::LINKS_NEVER_FOLLOWED]);
     let path = written_paths("temp-link-paths").remove(0);
     let root = temp("temp-link");
     let (out, victim) = (root.join("out"), root.join("victim.txt"));
@@ -232,6 +243,7 @@ fn a_link_at_the_temporary_path_of_an_output_file_does_not_overwrite_its_target(
 
 #[test]
 fn an_old_manifest_entry_outside_the_output_folder_is_never_removed() {
+    covers(&[ids::generate::output_safety::UNTRUSTED_MANIFEST_PATHS]);
     let root = temp("manifest-escape");
     let (out, victim) = (root.join("out"), root.join("victim.txt"));
     std::fs::write(&victim, b"not LOD").unwrap();

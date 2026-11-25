@@ -5,6 +5,7 @@ use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_UNSUPPORTED, EXIT_USAGE, run};
 use lodwright_contract::{DocumentKind, check_plan, check_result, schema_json};
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -52,6 +53,7 @@ fn json(text: &str) -> serde_json::Value {
 
 #[test]
 fn json_is_an_alias_of_format_json_and_the_document_passes_the_plan_check() {
+    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("alias");
     let d = dir.to_str().unwrap();
     let base = ["plan", "--data", d, "--plugin", "Island.esm"];
@@ -86,6 +88,7 @@ fn json_is_an_alias_of_format_json_and_the_document_passes_the_plan_check() {
 
 #[test]
 fn plan_reports_the_capabilities_of_this_build() {
+    covers(&[ids::contract::documents::PLAN_DOCUMENT]);
     let dir = data_folder("capabilities");
     let (code, out, _) = go(&[
         "plan",
@@ -151,6 +154,7 @@ fn plan_says_the_memory_budget_is_held_while_running_and_a_killed_run_resumes() 
 
 #[test]
 fn schema_version_one_prints_the_default_document_and_other_numbers_exit_two() {
+    covers(&[ids::cli::commands::SCHEMA_COMMAND]);
     let dir = data_folder("version");
     let d = dir.to_str().unwrap();
     let base = ["plan", "--data", d, "--plugin", "Island.esm", "--json"];
@@ -171,6 +175,7 @@ fn schema_version_one_prints_the_default_document_and_other_numbers_exit_two() {
 
 #[test]
 fn the_digests_do_not_depend_on_where_the_data_folder_is() {
+    covers(&[ids::contract::documents::REQUEST_DIGEST_IS_STABLE]);
     let (a, b) = (data_folder("digest-a"), data_folder("digest-b"));
     let run_plan = |dir: &Path| {
         let (_, out, _) = go(&[
@@ -192,6 +197,7 @@ fn the_digests_do_not_depend_on_where_the_data_folder_is() {
 
 #[test]
 fn schema_prints_the_generated_schema_for_both_documents() {
+    covers(&[ids::cli::commands::SCHEMA_COMMAND]);
     for (name, kind) in [
         ("plan", DocumentKind::Plan),
         ("result", DocumentKind::Result),
@@ -219,6 +225,7 @@ fn schema_rejects_a_missing_or_unknown_document_name() {
 
 #[test]
 fn version_json_names_the_tool_and_the_contracts_it_speaks() {
+    covers(&[ids::contract::documents::HANDSHAKE]);
     for args in [["--version", "--json"], ["--json", "-V"]] {
         let (code, out, _) = go(&args);
         assert_eq!(code, EXIT_OK);
@@ -244,6 +251,7 @@ fn version_json_names_the_tool_and_the_contracts_it_speaks() {
 
 #[test]
 fn generate_writes_the_terrain_files_and_reports_counts_per_kind() {
+    covers(&[ids::cli::commands::GENERATE_COMMAND]);
     let dir = data_folder("generate");
     let output = std::env::temp_dir().join(format!(
         "lodwright-contract-{}-generate-out",
@@ -281,6 +289,7 @@ fn generate_writes_the_terrain_files_and_reports_counts_per_kind() {
 
 #[test]
 fn generate_refuses_an_output_folder_inside_the_data_folder() {
+    covers(&[ids::generate::output_safety::INSIDE_DATA_FOLDER_REFUSED]);
     let dir = data_folder("generate-inside");
     let inside = dir.join("lod-out");
     let (code, out, _) = go(&[
@@ -310,6 +319,7 @@ fn generate_without_arguments_still_answers_unsupported() {
 
 #[test]
 fn generate_without_json_puts_the_reason_on_stderr_and_the_document_on_stdout() {
+    covers(&[ids::contract::documents::DOCUMENTS_ON_STDOUT]);
     let (code, out, err) = go(&["generate"]);
     assert_eq!(code, EXIT_UNSUPPORTED);
     assert_eq!(json(&out)["status"], "unsupported");
@@ -318,6 +328,7 @@ fn generate_without_json_puts_the_reason_on_stderr_and_the_document_on_stdout() 
 
 #[test]
 fn a_failure_with_json_prints_the_error_document_on_stdout_and_no_data_path() {
+    covers(&[ids::contract::documents::DOCUMENTS_ON_STDOUT]);
     let dir = data_folder("failure");
     let d = dir.to_str().unwrap();
     let (code, out, err) = go(&["plan", "--data", d, "--plugin", "Missing.esm", "--json"]);
@@ -349,6 +360,7 @@ fn a_failure_without_json_prints_no_document() {
 
 #[test]
 fn result_and_error_documents_reach_stdout_and_never_stderr_in_the_real_binary() {
+    covers(&[ids::contract::documents::DOCUMENTS_ON_STDOUT]);
     let dir = data_folder("process");
     let d = dir.to_str().unwrap();
     for (args, status) in [
@@ -379,6 +391,7 @@ fn result_and_error_documents_reach_stdout_and_never_stderr_in_the_real_binary()
 
 #[test]
 fn no_output_contains_a_data_path_or_plugin_content() {
+    covers(&[ids::contract::documents::DOCUMENTS_ON_STDOUT]);
     let dir = data_folder("leak");
     let d = dir.to_str().unwrap();
     let marker = "ZZMARKERZZ";
@@ -405,6 +418,7 @@ fn no_output_contains_a_data_path_or_plugin_content() {
 
 #[test]
 fn defaults_prints_every_request_option_with_its_default_and_range() {
+    covers(&[ids::contract::documents::DEFAULTS_DOCUMENT]);
     let (code, out, _) = go(&["defaults", "--json"]);
     assert_eq!(code, EXIT_OK);
     let doc: lodwright_contract::Defaults = serde_json::from_str(&out).unwrap();

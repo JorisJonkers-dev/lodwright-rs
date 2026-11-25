@@ -178,6 +178,7 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::{ArchiveListing, ConflictRule, Listing, Location, Resolver};
+    use lodwright_testkit::{covers, ids};
 
     fn archive(name: &str, paths: &[&str], marker: bool) -> ArchiveListing {
         ArchiveListing {
@@ -200,6 +201,7 @@ mod tests {
 
     #[test]
     fn a_loose_file_beats_an_archive() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec!["textures/a.dds".into()],
             archives: vec![archive("A.bsa", &["textures\\a.dds"], false)],
@@ -213,6 +215,7 @@ mod tests {
 
     #[test]
     fn a_later_plugins_archive_beats_an_earlier_one() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec![],
             archives: vec![
@@ -232,6 +235,7 @@ mod tests {
 
     #[test]
     fn archives_of_one_plugin_load_alphanumerically() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec![],
             archives: vec![
@@ -262,6 +266,7 @@ mod tests {
 
     #[test]
     fn without_the_marker_the_literal_rule_keeps_the_earlier_archive() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec![],
             archives: vec![
@@ -280,6 +285,7 @@ mod tests {
 
     #[test]
     fn with_the_marker_the_literal_rule_lets_a_later_archive_replace() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec![],
             archives: vec![
@@ -297,6 +303,7 @@ mod tests {
 
     #[test]
     fn lookup_ignores_case_and_separators_and_misses_return_none() {
+        covers(&[ids::formats::plugins::ASSET_RESOLUTION]);
         let listing = Listing {
             loose: vec![],
             archives: vec![archive("A.bsa", &["Meshes\\Rock.NIF"], false)],

@@ -235,6 +235,7 @@ mod tests {
     use super::{at, request_defaults};
     use lodwright_contract::{OptionKind, Request};
     use lodwright_core::terrain::TerrainSettings;
+    use lodwright_testkit::{covers, ids};
     use serde_json::{Value, json};
 
     fn base() -> Value {
@@ -278,6 +279,7 @@ mod tests {
 
     #[test]
     fn every_default_is_the_one_the_request_and_the_terrain_settings_use() {
+        covers(&[ids::contract::documents::DEFAULTS_DOCUMENT]);
         let defaults = request_defaults();
         let doc = base();
         let levels = TerrainSettings::default().levels;
@@ -314,6 +316,7 @@ mod tests {
 
     #[test]
     fn every_range_is_the_one_validate_checks() {
+        covers(&[ids::contract::documents::DEFAULTS_DOCUMENT]);
         for o in request_defaults().options {
             let accepts = |v: f64| {
                 #[allow(clippy::cast_possible_truncation)] // the bounds are small whole numbers
@@ -351,6 +354,7 @@ mod tests {
 
     #[test]
     fn the_options_are_tiered_and_dated() {
+        covers(&[ids::contract::documents::DEFAULTS_DOCUMENT]);
         let d = request_defaults();
         assert_eq!(d.option("terrain.water").unwrap().tier, 1);
         assert_eq!(d.option("terrain.levels.quality").unwrap().tier, 2);

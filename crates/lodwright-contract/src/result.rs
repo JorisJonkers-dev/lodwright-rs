@@ -463,9 +463,11 @@ mod tests {
     use super::{
         Handshake, ResultDoc, Status, VersionInfo, parse_cpu_ms, parse_vm_hwm_kib, peak_memory_mib,
     };
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn exit_codes_follow_the_status() {
+        covers(&[ids::contract::documents::RESULT_DOCUMENT]);
         let code = |s| ResultDoc::new("0.0.0", s, "c", "r").exit_code();
         assert_eq!(code(Status::Ok), 0);
         assert_eq!(code(Status::Failed), 1);
@@ -474,6 +476,7 @@ mod tests {
 
     #[test]
     fn optional_parts_are_omitted_not_zero() {
+        covers(&[ids::contract::documents::RESULT_DOCUMENT]);
         let text =
             serde_json::to_string(&ResultDoc::new("0.0.0", Status::Failed, "c", "r")).unwrap();
         assert!(!text.contains("peak_memory_mib"));
@@ -499,6 +502,7 @@ mod tests {
 
     #[test]
     fn the_version_info_and_the_handshake_list_every_contract() {
+        covers(&[ids::contract::documents::HANDSHAKE]);
         let info = VersionInfo::current("1.2.3");
         assert_eq!(info.contracts, Handshake::current().contracts);
         assert_eq!(

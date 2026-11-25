@@ -104,9 +104,11 @@ impl Manifest {
 #[cfg(test)]
 mod tests {
     use super::{Manifest, ManifestFile};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn files_are_sorted_and_the_document_round_trips() {
+        covers(&[ids::contract::documents::MANIFEST_DOCUMENT]);
         let m = Manifest::new(
             "1",
             "sha256:a",

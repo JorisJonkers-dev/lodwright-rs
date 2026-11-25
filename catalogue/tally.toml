@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# The feature catalogue of lodwright-rs, read by tally (https://github.com/JorisJonkers-dev/tally, docs/FORMAT.md):
+# what lodwright promises, and which tests prove it.
+[repo]
+package = "lodwright-cli"
+name = "lodwright-rs"
+
+[scan]
+paths = ["crates", "xtask"]
+
+[areas]
+generate = "Generating a far view"
+contract = "Contracts and events"
+terrain = "Terrain LOD"
+objects = "Object LOD"
+trees = "Tree LOD"
+verify = "Verify and measure"
+cli = "Command line"
+formats = "File formats"

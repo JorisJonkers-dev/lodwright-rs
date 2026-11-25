@@ -251,6 +251,7 @@ mod tests {
         settings_path,
     };
     use crate::Error;
+    use lodwright_testkit::{covers, ids};
 
     const ID: BlockId = BlockId {
         level: 4,
@@ -260,6 +261,7 @@ mod tests {
 
     #[test]
     fn a_mesh_path_carries_world_level_and_coordinates() {
+        covers(&[ids::terrain::mesh::BLOCK_NAMES_AND_PATHS]);
         assert_eq!(
             mesh_path("WastelandNV", ID).unwrap(),
             "meshes/landscape/lod/wastelandnv/wastelandnv.level4.x-8.y12.nif"
@@ -290,6 +292,7 @@ mod tests {
 
     #[test]
     fn object_paths_follow_the_games_tree() {
+        covers(&[ids::objects::blocks::BLOCK_GRID_AND_PATHS]);
         assert_eq!(
             super::object_mesh_path("W", 24, -12, false).unwrap(),
             "meshes/landscape/lod/w/blocks/w.level4.x24.y-12.nif"
@@ -311,6 +314,7 @@ mod tests {
 
     #[test]
     fn atlas_pages_after_the_first_are_numbered_with_two_digits() {
+        covers(&[ids::objects::blocks::ATLAS_PAGES]);
         assert_eq!(
             super::atlas_page_paths("W", 0).unwrap(),
             super::atlas_paths("W").unwrap()
@@ -330,6 +334,7 @@ mod tests {
 
     #[test]
     fn the_settings_path_is_one_file_per_world() {
+        covers(&[ids::terrain::textures::SETTINGS_FILE]);
         assert_eq!(settings_path("W").unwrap(), "lodsettings/w.dlodsettings");
     }
 

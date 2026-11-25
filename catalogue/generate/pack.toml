@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "generate.pack"
+title = "Packing the output into an archive"
+origin = "ours"
+notes = "output.pack packs the generated files into one BSA with a stub plugin (docs/contracts.md)."
+
+[[item]]
+id = "pack_switch"
+title = "output.pack leaves one BSA archive, a stub plugin, an empty override marker and the manifest, and nothing loose"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_not_in_digests"
+title = "The pack switch changes neither the request digest nor a block digest"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/request.rs"]
+
+[[item]]
+id = "packed_output_up_to_date"
+title = "A packed output is up to date when the archive, the stub and the marker are intact; a changed archive is rebuilt"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_off_goes_loose"
+title = "Switching the option off builds the loose files again and the output never holds both forms"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_failure_is_safe"
+title = "A packing step that fails leaves the loose output as it was, with no spool and no temporary file"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_same_bytes_at_any_thread_count"
+title = "The archive is the same bytes at any thread count"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_progress_phase"
+title = "A pack phase sits between the last world and the manifest and the run total never goes back"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "pack_compression_choice"
+title = "Only object and tree textures are stored compressed; a file listed by several worlds is packed once"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/pack.rs"]
+
+[[item]]
+id = "packed_output_verifies"
+title = "An archive extracted again is the same files and verifies clean; damage made before packing is found"
+status = "implemented"
+evidence = ["crates/lodwright-assets/src/extract.rs"]
+
+[[item]]
+id = "pack_by_default"
+title = "Packing is the default output form"
+status = "deferred"
+reason = "The engine load check of the archive on the target engine decides (issue 132)."

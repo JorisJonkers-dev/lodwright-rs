@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! `output.pack`: the packing step at the end of a generate.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_api::{
@@ -66,6 +67,7 @@ fn names_in(out: &Path) -> Vec<String> {
 
 #[test]
 fn a_packed_run_leaves_the_archive_the_stub_and_the_manifest_and_no_loose_file() {
+    covers(&[ids::generate::pack::PACK_SWITCH]);
     let (job, out) = job("only", "Island", true, 1);
     let result = run(&job);
     assert_eq!(result.code, "generated");
@@ -105,6 +107,7 @@ fn a_packed_run_leaves_the_archive_the_stub_and_the_manifest_and_no_loose_file()
 
 #[test]
 fn the_archive_holds_what_a_loose_run_writes_and_the_stub_reads_as_an_empty_plugin() {
+    covers(&[ids::generate::pack::PACK_SWITCH]);
     let (loose_job, loose_out) = job("same-loose", "Island", false, 1);
     run(&loose_job);
     let (packed_job, packed_out) = job("same-packed", "Island", true, 1);
@@ -161,6 +164,7 @@ fn the_archive_holds_what_a_loose_run_writes_and_the_stub_reads_as_an_empty_plug
 
 #[test]
 fn the_switch_changes_neither_the_request_digest_nor_a_block() {
+    covers(&[ids::generate::pack::PACK_NOT_IN_DIGESTS]);
     let (loose_job, out) = job("toggle", "Island", false, 1);
     let loose = run(&loose_job);
     let built = loose.blocks.unwrap();
@@ -187,6 +191,7 @@ fn the_switch_changes_neither_the_request_digest_nor_a_block() {
 
 #[test]
 fn a_packed_output_is_up_to_date_and_a_changed_archive_is_rebuilt() {
+    covers(&[ids::generate::pack::PACKED_OUTPUT_UP_TO_DATE]);
     let (job, out) = job("uptodate", "Island", true, 1);
     run(&job);
     assert_eq!(run(&job).code, "up_to_date");
@@ -201,6 +206,7 @@ fn a_packed_output_is_up_to_date_and_a_changed_archive_is_rebuilt() {
 
 #[test]
 fn switching_the_option_off_rebuilds_the_loose_files_and_the_output_never_holds_both() {
+    covers(&[ids::generate::pack::PACK_OFF_GOES_LOOSE]);
     let (job, out) = job("off", "Island", true, 1);
     run(&job);
     let mut loose_job = job.clone();
@@ -237,6 +243,7 @@ fn a_lost_override_marker_is_written_again_and_going_loose_removes_it() {
 
 #[test]
 fn a_packing_step_that_fails_leaves_the_loose_output_as_it_was() {
+    covers(&[ids::generate::pack::PACK_FAILURE_IS_SAFE]);
     let (loose_job, out) = job("fail", "Island", false, 1);
     run(&loose_job);
     let before = (
@@ -285,6 +292,7 @@ fn a_packing_step_that_fails_leaves_the_loose_output_as_it_was() {
 
 #[test]
 fn the_archive_is_the_same_bytes_for_any_thread_count() {
+    covers(&[ids::generate::pack::PACK_SAME_BYTES_AT_ANY_THREAD_COUNT]);
     let (one, out_one) = job("threads-1", "Island", true, 1);
     let (four, out_four) = job("threads-4", "Island", true, 4);
     run(&one);
@@ -301,6 +309,7 @@ fn the_archive_is_the_same_bytes_for_any_thread_count() {
 
 #[test]
 fn the_pack_phase_sits_between_the_worlds_and_the_manifest_and_the_run_total_never_goes_back() {
+    covers(&[ids::generate::pack::PACK_PROGRESS_PHASE]);
     let (job, _) = job("progress", "Island", true, 1);
     let mut events: Vec<ProgressEvent> = Vec::new();
     let mut progress = |e: &ProgressEvent| events.push(e.clone());

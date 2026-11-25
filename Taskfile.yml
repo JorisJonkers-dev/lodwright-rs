@@ -19,8 +19,10 @@ tasks:
     cmd: cargo clippy --locked --workspace --all-targets -- -D warnings
 
   test:
-    desc: Tests and the line-coverage gate ({{.COVERAGE_MIN}}%)
-    cmd: cargo llvm-cov --locked --workspace --fail-under-lines {{.COVERAGE_MIN}}
+    desc: "Tests through cargo-nextest (profile ci, which writes JUnit for the feature catalogue) and the line-coverage gate ({{.COVERAGE_MIN}}%)"
+    cmds:
+      - cargo test --locked --workspace --doc
+      - cargo llvm-cov nextest --locked --workspace --profile ci --fail-under-lines {{.COVERAGE_MIN}}
 
   bench:
     desc: The timing guard of the hot steps (release build, synthetic data); LODWRIGHT_BENCH=print prints the ratios

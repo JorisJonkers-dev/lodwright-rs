@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! The binary itself: exit codes as a process sees them.
 
+use lodwright_testkit::{covers, ids};
 use std::process::Command;
 
 fn lodwright(args: &[&str]) -> std::process::Output {
@@ -12,6 +13,7 @@ fn lodwright(args: &[&str]) -> std::process::Output {
 
 #[test]
 fn version_exits_zero() {
+    covers(&[ids::cli::commands::VERSION_AND_HELP]);
     let out = lodwright(&["--version"]);
     assert_eq!(out.status.code(), Some(0));
     assert!(
@@ -23,28 +25,33 @@ fn version_exits_zero() {
 
 #[test]
 fn help_exits_zero() {
+    covers(&[ids::cli::commands::VERSION_AND_HELP]);
     assert_eq!(lodwright(&["--help"]).status.code(), Some(0));
 }
 
 #[test]
 fn doctor_on_an_existing_folder_exits_zero() {
+    covers(&[ids::cli::commands::DOCTOR]);
     let dir = env!("CARGO_TARGET_TMPDIR");
     assert_eq!(lodwright(&["doctor", dir]).status.code(), Some(0));
 }
 
 #[test]
 fn doctor_on_a_missing_folder_exits_one() {
+    covers(&[ids::cli::commands::DOCTOR]);
     let missing = format!("{}/missing", env!("CARGO_TARGET_TMPDIR"));
     assert_eq!(lodwright(&["doctor", &missing]).status.code(), Some(1));
 }
 
 #[test]
 fn unknown_command_exits_two() {
+    covers(&[ids::cli::commands::USAGE_ERRORS]);
     assert_eq!(lodwright(&["nope"]).status.code(), Some(2));
 }
 
 #[test]
 fn contracts_json_lists_each_contract_with_its_versions() {
+    covers(&[ids::contract::documents::HANDSHAKE]);
     let out = lodwright(&["contracts", "--json"]);
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(
@@ -55,6 +62,7 @@ fn contracts_json_lists_each_contract_with_its_versions() {
 
 #[test]
 fn version_json_lists_the_same_contracts_as_the_handshake() {
+    covers(&[ids::contract::documents::HANDSHAKE]);
     let version = lodwright(&["--version", "--json"]);
     let handshake = lodwright(&["contracts", "--json"]);
     let version: serde_json::Value = serde_json::from_slice(&version.stdout).unwrap();
@@ -64,6 +72,7 @@ fn version_json_lists_the_same_contracts_as_the_handshake() {
 
 #[test]
 fn schema_prints_the_committed_schema_of_every_listed_document() {
+    covers(&[ids::contract::documents::SCHEMAS_PUBLISHED]);
     for kind in ["plan", "result", "request", "manifest", "verify", "events"] {
         let out = lodwright(&["schema", kind]);
         assert_eq!(out.status.code(), Some(0), "{kind}");
@@ -98,6 +107,7 @@ fn path(p: &std::path::Path) -> &str {
 
 #[test]
 fn verify_of_a_clean_folder_exits_zero() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let dir = scratch("clean");
     let out = lodwright(&["verify", path(&dir)]);
     assert_eq!(out.status.code(), Some(0));
@@ -105,6 +115,7 @@ fn verify_of_a_clean_folder_exits_zero() {
 
 #[test]
 fn verify_with_an_error_in_the_folder_exits_one() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let dir = scratch("error");
     std::fs::create_dir_all(dir.join("lodsettings")).unwrap();
     std::fs::write(dir.join("lodsettings/w.dlodsettings"), b"short").unwrap();
@@ -114,6 +125,7 @@ fn verify_with_an_error_in_the_folder_exits_one() {
 
 #[test]
 fn verify_with_a_difference_from_the_reference_exits_one() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let dir = scratch("differs");
     let reference = scratch("differs-reference");
     std::fs::write(reference.join("only-here.txt"), b"x").unwrap();
@@ -132,6 +144,7 @@ fn verify_with_a_difference_from_the_reference_exits_one() {
 
 #[test]
 fn verify_against_an_equal_reference_exits_zero() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let dir = scratch("equal");
     let reference = scratch("equal-reference");
     let out = lodwright(&["verify", path(&dir), "--reference", path(&reference)]);
@@ -140,6 +153,7 @@ fn verify_against_an_equal_reference_exits_zero() {
 
 #[test]
 fn verify_without_a_folder_or_with_an_unknown_option_exits_two() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     assert_eq!(lodwright(&["verify"]).status.code(), Some(2));
     let dir = scratch("usage");
     assert_eq!(
@@ -158,6 +172,7 @@ fn verify_without_a_folder_or_with_an_unknown_option_exits_two() {
 
 #[test]
 fn verify_of_a_missing_folder_exits_three() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let missing = scratch("missing").join("not-here");
     let out = lodwright(&["verify", path(&missing)]);
     assert_eq!(out.status.code(), Some(3));
@@ -166,6 +181,7 @@ fn verify_of_a_missing_folder_exits_three() {
 
 #[test]
 fn verify_of_a_file_instead_of_a_folder_exits_three() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let file = scratch("file").join("a.txt");
     std::fs::write(&file, b"x").unwrap();
     assert_eq!(lodwright(&["verify", path(&file)]).status.code(), Some(3));
@@ -173,6 +189,7 @@ fn verify_of_a_file_instead_of_a_folder_exits_three() {
 
 #[test]
 fn verify_against_a_missing_reference_exits_three() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let dir = scratch("no-reference");
     let missing = dir.join("not-here");
     let out = lodwright(&["verify", path(&dir), "--reference", path(&missing)]);
@@ -181,6 +198,7 @@ fn verify_against_a_missing_reference_exits_three() {
 
 #[test]
 fn help_documents_the_exit_codes_of_verify() {
+    covers(&[ids::verify::folder::EXIT_CODES]);
     let out = String::from_utf8(lodwright(&["--help"]).stdout).unwrap();
     assert!(
         out.contains("verify exits 0 clean, 1 findings, 2 usage error, 3 unreadable folder"),

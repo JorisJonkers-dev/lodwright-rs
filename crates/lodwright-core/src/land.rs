@@ -86,6 +86,7 @@ mod tests {
     use crate::Error;
     use lodwright_testkit::land::{Heights, encode_vhgt};
     use lodwright_testkit::rng::Rng;
+    use lodwright_testkit::{covers, ids};
 
     fn payload(offset: f32, deltas: impl Fn(usize, usize) -> i8) -> Vec<u8> {
         let mut bytes = offset.to_le_bytes().to_vec();
@@ -167,6 +168,7 @@ mod tests {
 
     #[test]
     fn random_walks_on_the_grid_round_trip_exactly() {
+        covers(&[ids::terrain::worlds::LAND_HEIGHTS]);
         let mut rng = Rng::new(0x5EED);
         for _ in 0..200 {
             let base = f32::from(i16::try_from(rng.below(2000)).unwrap() - 1000);
@@ -204,6 +206,7 @@ mod tests {
 
     #[test]
     fn arbitrary_heights_decode_within_half_a_step() {
+        covers(&[ids::terrain::worlds::LAND_HEIGHTS]);
         let mut rng = Rng::new(99);
         for _ in 0..100 {
             let noise: Vec<f32> = (0..SIDE)

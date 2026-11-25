@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "generate.memory"
+title = "Memory budget"
+origin = "ours"
+notes = "limits.memory_mib scales the terrain workers and never changes a byte (docs/contracts.md, Memory budget)."
+
+[[item]]
+id = "workers_scale_to_the_budget"
+title = "Each world's terrain step gets as many workers as the budget leaves room for, never fewer than one"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/budget.rs"]
+
+[[item]]
+id = "budget_changes_no_byte"
+title = "A run under a low budget writes the same files and the same manifest as one without"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/budget.rs"]
+
+[[item]]
+id = "preflight_refusal"
+title = "A run whose plugins alone suggest more than the budget is refused as memory_limit before anything is read"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/budget.rs"]
+
+[[item]]
+id = "many_worlds_stay_under_the_cap"
+title = "A run over sixty worlds stays under its budget: worlds are walked one at a time"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/worldspace.rs"]
+
+[[item]]
+id = "peak_memory_on_linux"
+title = "The result reports the peak memory where the platform says (Linux)"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/result.rs"]
+
+[[item]]
+id = "memory_cap_option"
+title = "A memory cap option bounds the whole run, not only the terrain workers"
+status = "missing"
+notes = "The budget is a target; streaming of large plugins is not built."

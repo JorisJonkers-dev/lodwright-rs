@@ -119,6 +119,7 @@ pub fn compare_textures(folder: &Path, reference: &Path) -> Vec<TextureCorrelati
 mod tests {
     use super::{channel_correlation, compare_textures};
     use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
+    use lodwright_testkit::{covers, ids};
 
     /// An 8 by 8 image whose channels come from `f(x, y, channel)`.
     fn image(f: impl Fn(u32, u32, usize) -> u8) -> Image {
@@ -143,18 +144,21 @@ mod tests {
 
     #[test]
     fn identical_varying_images_correlate_at_one_in_every_channel() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let a = image(ramp);
         close(channel_correlation(&a, &a).unwrap(), [1.0; 3]);
     }
 
     #[test]
     fn an_inverted_image_correlates_at_minus_one() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let (a, b) = (image(ramp), image(|x, y, c| 255 - ramp(x, y, c)));
         close(channel_correlation(&a, &b).unwrap(), [-1.0; 3]);
     }
 
     #[test]
     fn a_brightness_shift_does_not_change_the_correlation() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let (a, b) = (
             image(|x, y, _| ramp(x, y, 0) / 2),
             image(|x, y, _| ramp(x, y, 0) / 2 + 100),
@@ -183,6 +187,7 @@ mod tests {
 
     #[test]
     fn two_flat_images_of_different_colours_correlate_at_zero() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let (a, b) = (image(|_, _, _| 10), image(|_, _, _| 200));
         close(channel_correlation(&a, &b).unwrap(), [0.0; 3]);
     }
@@ -196,6 +201,7 @@ mod tests {
 
     #[test]
     fn images_of_different_sizes_have_no_correlation() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let a = image(ramp);
         let b = Image::new(4, 4, vec![0; 64]).unwrap();
         assert_eq!(channel_correlation(&a, &b), None);
@@ -225,6 +231,7 @@ mod tests {
 
     #[test]
     fn blocks_are_matched_by_name_in_lower_case_and_normals_follow_the_diffuse() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let (mine, theirs) = (folder("mine"), folder("theirs"));
         let a = image(ramp);
         write_dds(&mine, DIFFUSE, &a);
@@ -271,6 +278,7 @@ mod tests {
 
     #[test]
     fn a_block_with_an_unreadable_texture_is_left_out() {
+        covers(&[ids::verify::folder::TEXTURE_CORRELATION]);
         let (mine, theirs) = (folder("u-mine"), folder("u-theirs"));
         write_dds(&mine, &format!("{DIR}w.n.level4.x0.y0.dds"), &image(ramp));
         std::fs::create_dir_all(theirs.join(DIR)).unwrap();

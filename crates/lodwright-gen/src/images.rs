@@ -420,6 +420,7 @@ mod tests {
     use lodwright_core::land::CellHeights;
     use lodwright_core::layout::BlockId;
     use lodwright_core::worldspace::Worldspace;
+    use lodwright_testkit::{covers, ids};
 
     fn world() -> Worldspace {
         // the four by four cells of block (0, 0) at level 4, so every pixel of the block lies in a cell
@@ -471,6 +472,7 @@ mod tests {
 
     #[test]
     fn flat_ground_gives_the_flat_normal() {
+        covers(&[ids::terrain::textures::NORMAL_MAPS]);
         let samples = vec![50.0; 9 * 9];
         let img = normal_image(&samples, 9, 1024.0, 4);
         for p in img.rgba().chunks(4) {
@@ -480,6 +482,7 @@ mod tests {
 
     #[test]
     fn a_constant_slope_gives_one_constant_normal() {
+        covers(&[ids::terrain::textures::NORMAL_MAPS]);
         // height rises with x: 2 units per sample (128 units)
         let span = 9;
         let samples: Vec<f32> = (0..span * span).map(|i| (i % span) as f32 * 2.0).collect();
@@ -496,6 +499,7 @@ mod tests {
 
     #[test]
     fn gaps_do_not_poison_the_map() {
+        covers(&[ids::terrain::textures::NORMAL_MAPS]);
         let mut samples = vec![0.0; 9 * 9];
         samples[40] = f32::NAN;
         let img = normal_image(&samples, 9, 1024.0, 4);

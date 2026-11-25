@@ -340,6 +340,7 @@ mod tests {
     use crate::Error;
     use lodwright_testkit::bsa::BsaBuilder;
     use lodwright_testkit::rng::Rng;
+    use lodwright_testkit::{covers, ids};
     use std::io::Cursor;
 
     const CAP: u64 = 1 << 20;
@@ -372,11 +373,13 @@ mod tests {
 
     #[test]
     fn an_uncompressed_archive_reads_back_exactly() {
+        covers(&[ids::formats::plugins::ARCHIVE_READER]);
         read_back(&build(BsaBuilder::new()));
     }
 
     #[test]
     fn a_compressed_archive_reads_back_exactly() {
+        covers(&[ids::formats::plugins::ARCHIVE_READER]);
         let bytes = build(BsaBuilder::new().compressed());
         read_back(&bytes);
         let archive = Archive::open(&mut Cursor::new(&bytes)).unwrap();
@@ -385,12 +388,14 @@ mod tests {
 
     #[test]
     fn embedded_names_are_skipped_in_both_modes() {
+        covers(&[ids::formats::plugins::ARCHIVE_READER]);
         read_back(&build(BsaBuilder::new().embed_names()));
         read_back(&build(BsaBuilder::new().compressed().embed_names()));
     }
 
     #[test]
     fn the_stored_size_counts_the_embedded_path() {
+        covers(&[ids::formats::plugins::ARCHIVE_READER]);
         // The measured rule: with flag 0x100 the stored size is the path (one length byte and the path), plus the
         // length word and the zlib stream when compressed. The expected sizes are computed here, not by the builder.
         let path = "a\\b.bin";
@@ -468,6 +473,7 @@ mod tests {
 
     #[test]
     fn lookup_ignores_case_and_separator_style() {
+        covers(&[ids::formats::plugins::ARCHIVE_READER]);
         let bytes = build(BsaBuilder::new());
         let archive = Archive::open(&mut Cursor::new(&bytes)).unwrap();
         assert!(archive.find("Textures/Landscape/DIRT.dds").is_some());
@@ -483,6 +489,7 @@ mod tests {
 
     #[test]
     fn the_wrong_magic_is_not_an_archive() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let mut bytes = build(BsaBuilder::new());
         bytes[0] = b'X';
         assert_eq!(
@@ -493,6 +500,7 @@ mod tests {
 
     #[test]
     fn other_versions_are_refused_by_number() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         for version in [103, 105] {
             let bytes = build(BsaBuilder::new().version(version));
             assert_eq!(
@@ -513,6 +521,7 @@ mod tests {
 
     #[test]
     fn every_truncation_of_an_archive_is_a_typed_error_or_a_readable_archive() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let bytes = build(BsaBuilder::new().compressed());
         for len in 0..bytes.len() {
             let mut cursor = Cursor::new(&bytes[..len]);
@@ -556,6 +565,7 @@ mod tests {
 
     #[test]
     fn random_corruption_never_panics() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let original = build(BsaBuilder::new().compressed().embed_names());
         let mut rng = Rng::new(0x00B5_A104);
         for _ in 0..400 {
@@ -575,6 +585,7 @@ mod tests {
 
     #[test]
     fn an_entry_claiming_more_than_the_cap_is_refused_before_inflating() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let bytes = BsaBuilder::new()
             .compressed()
             .file("a\\zeros.bin", &vec![0_u8; 100_000])
@@ -615,6 +626,7 @@ mod tests {
 
     #[test]
     fn a_huge_claimed_size_never_allocates() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let mut bytes = BsaBuilder::new()
             .compressed()
             .file("a\\x.bin", &[1; 10])
@@ -660,6 +672,7 @@ mod tests {
 
     #[test]
     fn counts_that_exceed_the_archive_are_refused_without_allocating() {
+        covers(&[ids::formats::plugins::ARCHIVE_HOSTILE_INPUT]);
         let mut bytes = build(BsaBuilder::new());
         bytes[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
         assert_eq!(

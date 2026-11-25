@@ -154,6 +154,7 @@ mod tests {
     use super::{ExtractError, extract_to_temp, relative};
     use crate::pack::{PackEntry, write};
     use lodwright_testkit::bsa::BsaBuilder;
+    use lodwright_testkit::{covers, ids};
 
     fn pack(files: &[(&str, &[u8], bool)]) -> Vec<u8> {
         let entries: Vec<PackEntry> = files
@@ -169,6 +170,7 @@ mod tests {
 
     #[test]
     fn every_file_lands_below_the_folder_with_its_bytes() {
+        covers(&[ids::formats::plugins::ARCHIVE_EXTRACTION]);
         let bytes = pack(&[
             ("meshes\\landscape\\lod\\w\\blocks\\a.nif", b"mesh", false),
             ("textures\\landscape\\lod\\t.dds", &[9; 300], true),
@@ -187,6 +189,7 @@ mod tests {
 
     #[test]
     fn the_folder_is_removed_when_the_result_is_dropped() {
+        covers(&[ids::formats::plugins::ARCHIVE_EXTRACTION]);
         let bytes = pack(&[("a\\b.txt", b"x", false)]);
         let extracted = extract_to_temp(&bytes, None, 1 << 20).unwrap();
         let path = extracted.path().to_path_buf();
@@ -197,6 +200,7 @@ mod tests {
 
     #[test]
     fn a_bad_archive_leaves_no_folder_behind() {
+        covers(&[ids::formats::plugins::ARCHIVE_EXTRACTION]);
         let parent =
             std::env::temp_dir().join(format!("lodwright-extract-parent-{}", std::process::id()));
         std::fs::create_dir_all(&parent).unwrap();
@@ -214,6 +218,7 @@ mod tests {
 
     #[test]
     fn a_name_that_leaves_the_folder_is_refused() {
+        covers(&[ids::formats::plugins::ARCHIVE_EXTRACTION]);
         for bad in [
             "..\\x.txt",
             "a\\..\\..\\x.txt",

@@ -241,6 +241,7 @@ mod tests {
         DocumentKind, SchemaError, check_plan, check_result, check_verify, schema_file_name,
         schema_json,
     };
+    use lodwright_testkit::{covers, ids};
     use serde_json::json;
 
     #[test]
@@ -279,6 +280,7 @@ mod tests {
 
     #[test]
     fn a_verify_report_naming_the_result_contract_is_refused() {
+        covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
         let doc = json!({"schema_version": 1, "contract": "lodwright-result"});
         assert!(
             check_verify(&doc)
@@ -290,6 +292,7 @@ mod tests {
 
     #[test]
     fn an_unsupported_schema_version_is_refused() {
+        covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
         let error = schema_json(DocumentKind::Plan, 2).unwrap_err();
         assert!(matches!(error, SchemaError::UnsupportedVersion { .. }));
         assert!(error.to_string().contains("not supported"));
@@ -305,6 +308,7 @@ mod tests {
 
     #[test]
     fn a_plan_with_an_unknown_schema_version_is_refused() {
+        covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
         for version in [json!(2), json!(0), json!("1"), json!(-1)] {
             let doc = json!({"schema_version": version});
             assert!(matches!(
@@ -320,6 +324,7 @@ mod tests {
 
     #[test]
     fn a_document_naming_another_contract_is_refused() {
+        covers(&[ids::contract::documents::NAME_AND_VERSION_CHECKED]);
         let doc = json!({"schema_version": 1, "contract": "lodwright-result"});
         assert!(
             check_plan(&doc)
@@ -344,6 +349,7 @@ mod tests {
 
     #[test]
     fn a_result_with_extra_fields_is_accepted() {
+        covers(&[ids::contract::documents::UNKNOWN_KEYS_IGNORED]);
         let doc = json!({
             "schema_version": 1,
             "contract": "lodwright-result",

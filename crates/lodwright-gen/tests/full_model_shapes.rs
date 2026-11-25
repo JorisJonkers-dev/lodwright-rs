@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Far shapes from full models for objects without a LOD model (`objects.shapes_from_full_models`), on synthetic models.
 
+use lodwright_testkit::{covers, ids};
 use std::collections::HashMap;
 
 use lodwright_core::objects::Instance;
@@ -323,6 +324,7 @@ fn with_the_switch_off_a_model_without_a_lod_model_stays_out() {
 
 #[test]
 fn with_the_switch_on_it_is_drawn_with_fewer_triangles_and_reported() {
+    covers(&[ids::objects::far_shapes::FULL_MODEL_SHAPES]);
     let store = assets(&[("meshes/a/grid.nif", grid_model(16, false))]);
     let (report, out) = run(
         "on",
@@ -390,6 +392,7 @@ fn a_solid_model_that_cannot_be_simplified_is_not_called_see_through() {
 
 #[test]
 fn a_static_collection_with_parts_is_not_also_drawn_as_its_own_model() {
+    covers(&[ids::objects::selection::STATIC_COLLECTIONS]);
     let store = assets(&[
         ("meshes/a/collection.nif", grid_model(16, false)),
         ("meshes/a/piece.nif", grid_model(8, false)),
@@ -447,6 +450,7 @@ fn record<'a>(
 
 #[test]
 fn a_rule_gives_a_shape_to_what_it_names_and_to_no_other_model() {
+    covers(&[ids::objects::far_shapes::FULL_MODEL_RULES]);
     let store = assets(&[
         ("meshes/a/lamp.nif", grid_model(16, false)),
         ("meshes/a/house.nif", grid_model(12, false)),
@@ -479,6 +483,7 @@ fn a_rule_gives_a_shape_to_what_it_names_and_to_no_other_model() {
 
 #[test]
 fn another_object_of_the_same_model_that_no_rule_names_stays_out() {
+    covers(&[ids::objects::far_shapes::FULL_MODEL_RULES]);
     let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
     let list = [
         instance("a\\Lamp.nif", 100.0, 1, false),
@@ -544,6 +549,7 @@ fn a_rule_that_names_nothing_changes_no_byte() {
 
 #[test]
 fn a_rules_limits_win_over_the_switch_for_every_object() {
+    covers(&[ids::objects::far_shapes::FULL_MODEL_RULES]);
     let store = assets(&[("meshes/a/lamp.nif", grid_model(16, false))]);
     let list = [instance("a\\Lamp.nif", 100.0, 1, false)];
     let fine = |_: &Instance| {
@@ -581,6 +587,7 @@ fn a_rule_does_not_call_an_unnamed_see_through_object_see_through() {
 
 #[test]
 fn a_model_drawn_without_lighting_gets_no_far_shape() {
+    covers(&[ids::objects::far_shapes::SEE_THROUGH_MODELS_STAY_OUT]);
     // a light beam: one shape without an alpha property, drawn without lighting
     let store = assets(&[("meshes/a/beam.nif", grid_model_full(8, false, 0.0, true))]);
     let (report, out) = run(

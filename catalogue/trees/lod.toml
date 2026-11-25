@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "trees.lod"
+title = "Tree LOD"
+origin = "original"
+notes = "Tree list, blocks and atlas from the billboards mods ship (docs/spec/object-lod.md section 3)."
+
+[[item]]
+id = "list_blocks_and_atlas"
+title = "A world's trees are written as a list file, one block per cell group and one atlas"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/trees.rs"]
+
+[[item]]
+id = "blocks_align_to_the_world_corner"
+title = "Tree blocks align to the world corner; cells below it are out of range"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/trees.rs"]
+
+[[item]]
+id = "only_flagged_bases"
+title = "Only flagged bases become tree types; hidden or fallen references leave empty blocks"
+status = "implemented"
+evidence = ["crates/lodwright-core/src/trees.rs"]
+
+[[item]]
+id = "billboard_names"
+title = "Billboard names use the defining plugin, the model stem and the form id without load index"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/trees.rs"]
+
+[[item]]
+id = "shared_atlas_rectangles"
+title = "Identical billboards share one atlas rectangle and the output is repeatable"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/trees.rs"]
+
+[[item]]
+id = "swamp_atlas"
+title = "A DLC4 world uses the swamp atlas; a world without billboards writes nothing"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/trees.rs"]
+
+[[item]]
+id = "settings_bounds"
+title = "The settings file overrides the bounds only for the sizes it states"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/trees.rs"]
+
+[[item]]
+id = "tree_order_in_block"
+title = "The order of trees inside a block is the game's own"
+status = "partial"
+notes = "Types, positions, scales and form ids agree as sets; the order is open, and the rotation is derived from the form id."
+evidence = ["docs/gap-list.md"]

@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "generate.output_safety"
+title = "Where a run may write"
+origin = "ours"
+notes = "Nothing is written, replaced or removed outside the output folder (docs/contracts.md)."
+
+[[item]]
+id = "not_empty_refused"
+title = "An output folder that is not empty and has no manifest is refused unless --overwrite is given"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "inside_data_folder_refused"
+title = "An output folder inside the data folder, or a link into it, is refused"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "git_tree_refused"
+title = "An output folder in a git working tree, or a link into one, is refused"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "links_never_followed"
+title = "A link below the output folder is refused and nothing is written through it; a link at a file's path is replaced, never followed"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/output.rs"]
+
+[[item]]
+id = "linked_output_folder_allowed"
+title = "An output folder that is a link to a separate folder is written through and stays up to date"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "untrusted_manifest_paths"
+title = "A manifest that lists an absolute path or one with .. is not trusted and never makes a run remove a file outside the output folder"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/generate.rs"]
+
+[[item]]
+id = "files_appear_atomically"
+title = "Every file is written to a temporary name and renamed, so a failed write leaves the previous file and no temporary file"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/output.rs"]
+
+[[item]]
+id = "plain_relative_paths_only"
+title = "Only plain relative paths are written; a path that climbs out of the folder is refused and nothing is written"
+status = "implemented"
+evidence = ["crates/lodwright-gen/src/output.rs"]

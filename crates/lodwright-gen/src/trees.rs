@@ -461,6 +461,7 @@ mod tests {
     use crate::assets::Assets;
     use lodwright_core::trees::{TreeBase, TreeRef, parse_block, parse_types};
     use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode};
+    use lodwright_testkit::{covers, ids};
     use std::collections::HashMap;
 
     struct Memory(HashMap<String, Vec<u8>>);
@@ -522,6 +523,7 @@ mod tests {
 
     #[test]
     fn billboard_names_use_the_defining_plugin_the_model_stem_and_the_form_id_without_load_index() {
+        covers(&[ids::trees::lod::BILLBOARD_NAMES]);
         let b = base(0x0100_3D42, "trees\\Oak01.spt");
         assert_eq!(
             billboard_path("FalloutNV.esm", &b),
@@ -531,6 +533,7 @@ mod tests {
 
     #[test]
     fn the_settings_file_overrides_the_bounds_only_for_sizes_it_states() {
+        covers(&[ids::trees::lod::SETTINGS_BOUNDS]);
         let s = parse_settings("[LOD]\nWidth=150.5\nHeight=0\nShiftZ=-1\nScale=1.5\n");
         assert_eq!(
             (s.width, s.height, s.shift[2], s.scale),
@@ -540,6 +543,7 @@ mod tests {
 
     #[test]
     fn trees_are_written_with_a_list_an_atlas_and_one_block_per_cell_group() {
+        covers(&[ids::trees::lod::LIST_BLOCKS_AND_ATLAS]);
         let mut files = HashMap::new();
         files.insert(
             "textures/terrain/lodgen/a.esm/oak_00000100.dds".to_owned(),
@@ -661,6 +665,7 @@ mod tests {
 
     #[test]
     fn a_dlc4_world_uses_the_swamp_atlas_and_a_world_without_billboards_writes_nothing() {
+        covers(&[ids::trees::lod::SWAMP_ATLAS]);
         let mut files = HashMap::new();
         files.insert(
             "textures/terrain/lodgen/a.esm/oak_00000100.dds".to_owned(),
@@ -701,6 +706,7 @@ mod tests {
 
     #[test]
     fn identical_billboards_share_one_atlas_rectangle_and_output_is_repeatable() {
+        covers(&[ids::trees::lod::SHARED_ATLAS_RECTANGLES]);
         let same = billboard(24, 24, 7);
         let mut files = HashMap::new();
         files.insert(

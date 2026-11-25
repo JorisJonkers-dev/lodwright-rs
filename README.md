@@ -34,6 +34,14 @@ you see far away. Without it, mods change the world up close while the horizon s
 - 🌊 Draws land, lakes and rivers, buildings and trees far away.
 - 🔁 Run it again after you change your mods; far land that did not change is kept.
 
+## What it covers
+
+<p align="center">
+  <img src="docs/coverage/tally.svg" alt="Feature catalogue: items, tagged, passing and covered per area" width="100%">
+</p>
+
+Every promise lodwright makes is listed in a catalogue, and the chart shows how many of them a passing test on Linux, Windows and macOS proves.
+
 ## How it fits together
 
 <p align="center">

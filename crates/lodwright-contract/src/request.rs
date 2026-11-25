@@ -516,6 +516,7 @@ fn check_inclusion(inclusion: &Inclusion) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{IncludeRule, LevelRequest, Request};
+    use lodwright_testkit::{covers, ids};
 
     fn base() -> Request {
         Request::new("/data", &["FalloutNV.esm"], "/out")
@@ -523,6 +524,7 @@ mod tests {
 
     #[test]
     fn a_minimal_request_is_valid_and_its_digest_is_stable() {
+        covers(&[ids::contract::documents::REQUEST_DOCUMENT]);
         let r = base();
         assert_eq!(r.validate(), Ok(()));
         assert_eq!(r.digest(), base().digest());
@@ -550,6 +552,7 @@ mod tests {
 
     #[test]
     fn full_model_shapes_are_left_out_of_the_document_when_off_and_checked_when_set() {
+        covers(&[ids::contract::documents::NEW_OPTIONS_KEEP_OLD_DIGESTS]);
         let mut r = Request::new("/d", &["A.esm"], "/o");
         let off = r.digest();
         assert!(
@@ -580,6 +583,7 @@ mod tests {
 
     #[test]
     fn omitted_fields_take_their_defaults_when_read() {
+        covers(&[ids::contract::documents::REQUEST_DOCUMENT]);
         let r: Request = serde_json::from_str(
             r#"{"schema_version":1,"contract":"lodwright-request","data_folder":"/d","plugins":["A.esm"],"output_dir":"/o"}"#,
         )
@@ -611,6 +615,7 @@ mod tests {
 
     #[test]
     fn each_bad_value_is_refused_with_its_name() {
+        covers(&[ids::contract::documents::REQUEST_DOCUMENT]);
         let level = |f: fn(&mut LevelRequest)| {
             let mut r = base();
             let mut l = LevelRequest {
@@ -718,6 +723,7 @@ mod tests {
 
     #[test]
     fn the_pack_switch_is_off_by_default_written_only_when_on_and_left_out_of_the_digest() {
+        covers(&[ids::generate::pack::PACK_NOT_IN_DIGESTS]);
         let off = base();
         let mut on = base();
         on.output.pack = true;

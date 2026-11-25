@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! The BSA writer against a hex-text golden and the reader.
 
+use lodwright_testkit::{covers, ids};
 use std::fmt::Write as _;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -41,6 +42,7 @@ fn hex_dump(bytes: &[u8]) -> String {
 
 #[test]
 fn the_tiny_archive_matches_its_hex_golden() {
+    covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
     let bytes = pack::write(&tiny()).unwrap();
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/golden/tiny.hex");
     assert_golden(&path, &hex_dump(&bytes));
@@ -111,6 +113,7 @@ fn damaged_writer_output_never_panics_the_reader_nor_exceeds_the_cap() {
 /// The streamed writer writes the same bytes as the in-memory one, for any order of the files.
 #[test]
 fn the_streamed_archive_has_the_bytes_of_the_in_memory_one() {
+    covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
     let mut entries = tiny();
     entries.push(PackEntry {
         path: "textures\\landscape\\lod\\w\\blocks\\w.buildings.dds".into(),

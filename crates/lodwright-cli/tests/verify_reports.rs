@@ -2,6 +2,7 @@
 //! `verify` reports as a caller reads them: golden reports for folder pairs built from synthetic worlds, proof that
 //! no file content reaches a report, and the refusal of a folder inside a git working tree.
 
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};
@@ -97,6 +98,7 @@ fn golden(name: &str) -> PathBuf {
 
 #[test]
 fn verify_reports_equal_their_golden_files_for_four_folder_pairs() {
+    covers(&[ids::verify::folder::REPORTS_HOLD_NO_GAME_DATA]);
     let base = generate("base", 0.0);
     let twin = generate("twin", 0.0);
     let shifted = generate("shifted", 64.0);
@@ -146,6 +148,7 @@ fn verify_reports_equal_their_golden_files_for_four_folder_pairs() {
 #[test]
 fn no_file_content_reaches_a_report() {
     const MARKER: &str = "MARKER-7f3a-never-in-a-report";
+    covers(&[ids::verify::folder::REPORTS_HOLD_NO_GAME_DATA]);
     let mine = generate("marker", 0.0);
     // the marker replaces files verify reads and refuses: a block mesh, a texture and the settings file
     let all = files(&mine);
@@ -177,6 +180,7 @@ fn no_file_content_reaches_a_report() {
 
 #[test]
 fn a_folder_inside_a_git_working_tree_is_refused_unless_allowed_for_that_run() {
+    covers(&[ids::verify::folder::REFUSES_GIT_WORKING_TREES]);
     let root = temp("in-repo");
     std::fs::create_dir_all(root.join(".git")).unwrap();
     let inside = root.join("lod");
@@ -210,6 +214,7 @@ fn a_folder_inside_a_git_working_tree_is_refused_unless_allowed_for_that_run() {
 
 #[test]
 fn terrain_heights_are_compared_and_a_tolerance_makes_a_difference() {
+    covers(&[ids::verify::folder::TERRAIN_HEIGHT_DIFFERENCE]);
     let base = generate("height-base", 0.0);
     let twin = generate("height-twin", 0.0);
     let shifted = generate("height-shifted", 64.0);

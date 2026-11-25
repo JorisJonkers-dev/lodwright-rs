@@ -212,6 +212,7 @@ mod tests {
     use lodwright_core::texture::TextureResolver;
     use lodwright_core::worldspace::{Inheritance, WorldIndex};
     use lodwright_gen::FolderAssets;
+    use lodwright_testkit::{covers, ids};
 
     fn cell(x: i32, y: i32, height: f32) -> LandCell {
         LandCell {
@@ -315,6 +316,7 @@ mod tests {
 
     #[test]
     fn a_tile_is_kept_where_the_game_ships_it_and_no_mod_changed_the_land() {
+        covers(&[ids::terrain::textures::GAME_TILES_KEPT]);
         let dir = data_folder("keep", 0);
         // the game's archive has the tiles of x0 and x4; the mod's archive does not count; x12 has none anywhere
         let (kept, warnings) = keep_for(&dir, Vec::new());
@@ -342,6 +344,7 @@ mod tests {
 
     #[test]
     fn nothing_is_kept_when_the_games_grid_is_not_ours_shifted_by_whole_blocks() {
+        covers(&[ids::terrain::textures::GAME_TILES_KEPT]);
         // the game's settings start at -3: its blocks cover other cells than ours at the same names
         let dir = data_folder("shift", -3);
         let (kept, warnings) = keep_for(&dir, Vec::new());

@@ -401,6 +401,7 @@ mod tests {
     use crate::land::CellHeights;
     use crate::raster::{BlockGrid, HeightRaster};
     use crate::worldspace::Worldspace;
+    use lodwright_testkit::{covers, ids};
 
     fn flat_world(name: &str, cells: &[(i32, i32)]) -> Worldspace {
         Worldspace::from_cells(1, name, cells.iter().map(|c| (*c, CellHeights::flat(80.0))))
@@ -428,6 +429,7 @@ mod tests {
 
     #[test]
     fn the_defaults_cover_the_four_levels_in_order() {
+        covers(&[ids::terrain::mesh::LEVELS]);
         let levels: Vec<u32> = TerrainSettings::default()
             .levels
             .iter()
@@ -449,6 +451,7 @@ mod tests {
 
     #[test]
     fn a_plan_lists_each_block_with_data_with_paths_and_texture_sizes() {
+        covers(&[ids::terrain::mesh::LEVELS]);
         let world = flat_world("Mojave", &[(0, 0), (1, 1), (5, 0)]);
         let plan = plan_world(&world, &TerrainSettings::default()).unwrap();
         assert_eq!(plan.settings_path, "lodsettings/mojave.dlodsettings");
@@ -474,6 +477,7 @@ mod tests {
 
     #[test]
     fn plan_blocks_are_sorted_and_negative_blocks_use_multiples_of_the_level() {
+        covers(&[ids::terrain::mesh::BLOCK_NAMES_AND_PATHS]);
         let world = flat_world("W", &[(-1, -1), (0, 0)]);
         let plan = plan_world(&world, &TerrainSettings::default()).unwrap();
         let level4: Vec<(i32, i32)> = plan
@@ -516,6 +520,7 @@ mod tests {
 
     #[test]
     fn skirts_off_leave_the_mesh_as_it_was() {
+        covers(&[ids::terrain::mesh::SKIRTS]);
         for cells in [4, 8, 16, 32] {
             let plain = mesh_of(cells, false, MAX_VERTICES);
             assert!(plain.vertices.iter().all(|v| v[2] > super::SKIRT_HEIGHT));
@@ -524,6 +529,7 @@ mod tests {
 
     #[test]
     fn every_border_vertex_has_a_skirt_below_it_at_every_level_pair() {
+        covers(&[ids::terrain::mesh::SKIRTS]);
         // the gap between a finer and a coarser block is closed when every border vertex of both reaches the
         // constant skirt height, whatever vertices the neighbour has
         for cells in [4, 8, 16, 32] {
@@ -571,6 +577,7 @@ mod tests {
 
     #[test]
     fn skirt_triangles_face_away_from_the_block() {
+        covers(&[ids::terrain::mesh::SKIRTS]);
         let skirted = mesh_of(4, true, MAX_VERTICES);
         let centre = 4.0 * 4096.0 / 2.0;
         for tri in skirted.indices.as_chunks::<3>().0 {
@@ -612,6 +619,7 @@ mod tests {
 
     #[test]
     fn faces_whose_corners_all_lie_below_the_water_are_dropped() {
+        covers(&[ids::terrain::mesh::FACES_UNDER_THE_WATER_DROPPED]);
         let (mesh, all) = drop_mesh(Some(150.0), 0.0, false);
         assert!(
             mesh.triangle_count() < all,
@@ -657,6 +665,7 @@ mod tests {
 
     #[test]
     fn the_skirt_vertices_count_against_the_cap() {
+        covers(&[ids::terrain::mesh::SKIRTS]);
         let free = mesh_of(4, true, MAX_VERTICES);
         let cap = free.vertices.len() / 2;
         let capped = mesh_of(4, true, cap);

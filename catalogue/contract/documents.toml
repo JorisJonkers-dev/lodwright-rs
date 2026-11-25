@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: GPL-3.0-only
+[group]
+id = "contract.documents"
+title = "JSON documents"
+origin = "ours"
+notes = "Every document is a contract with a schema (docs/contracts.md)."
+
+[[item]]
+id = "name_and_version_checked"
+title = "A document names its contract and schema version; a reader refuses another name or an unsupported version"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/schema.rs"]
+
+[[item]]
+id = "schemas_published"
+title = "Each contract's JSON schema is committed under schemas/, equals the generated one and is printed by lodwright schema"
+status = "implemented"
+evidence = ["schemas/lodwright-request.v1.json"]
+
+[[item]]
+id = "unknown_keys_ignored"
+title = "A reader ignores keys it does not know"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/schema.rs"]
+
+[[item]]
+id = "open_enums"
+title = "A value an open enum does not know reads as other"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/event.rs"]
+
+[[item]]
+id = "handshake"
+title = "lodwright contracts --json and --version --json list every contract this build emits and its versions"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/lib.rs"]
+
+[[item]]
+id = "plan_document"
+title = "The plan document lists the worlds, the blocks and the capabilities of this build"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/plan.rs"]
+
+[[item]]
+id = "result_document"
+title = "The result document carries the status, the counts and the exit code that follows the status"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/result.rs"]
+
+[[item]]
+id = "request_document"
+title = "A request document drives a run; omitted fields take their defaults and each bad value is refused with its name"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/request.rs"]
+
+[[item]]
+id = "request_digest_is_stable"
+title = "A default request keeps the digest it was released with, wherever the data folder is"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/digest.rs"]
+
+[[item]]
+id = "new_options_keep_old_digests"
+title = "An option added after 0.4.2 is optional, is not written while it holds its default and then changes no digest"
+status = "implemented"
+evidence = ["docs/contracts.md"]
+
+[[item]]
+id = "digest_function"
+title = "Digests are SHA-256 over length-prefixed parts, so a different split gives a different digest"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/digest.rs"]
+
+[[item]]
+id = "manifest_document"
+title = "The manifest lists every file with its size and digest, sorted, and round-trips"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/manifest.rs"]
+
+[[item]]
+id = "verify_document"
+title = "The verify document names its contract and version and reads back"
+status = "implemented"
+evidence = ["crates/lodwright-contract/src/verify.rs"]
+
+[[item]]
+id = "defaults_document"
+title = "lodwright defaults --json lists every request option with its default, range, tier and the release that added it, read from the code that applies them"
+status = "implemented"
+evidence = ["crates/lodwright-api/src/defaults.rs"]
+
+[[item]]
+id = "documents_on_stdout"
+title = "With --json the result or the error document goes to stdout, never to stderr, and holds no data path or plugin content"
+status = "implemented"
+evidence = ["crates/lodwright-cli/src/failure.rs"]

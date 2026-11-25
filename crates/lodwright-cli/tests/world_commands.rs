@@ -5,6 +5,7 @@ use lodwright_cli::{EXIT_FAILED, EXIT_OK, EXIT_USAGE, run};
 use lodwright_testkit::golden::assert_golden;
 use lodwright_testkit::land::Heights;
 use lodwright_testkit::world::{SyntheticWorld, world_plugin};
+use lodwright_testkit::{covers, ids};
 use std::path::{Path, PathBuf};
 
 fn go(args: &[&str]) -> (u8, String, String) {
@@ -50,6 +51,7 @@ fn golden(name: &str) -> PathBuf {
 
 #[test]
 fn plan_prints_the_text_report_for_one_world() {
+    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("text");
     let (code, out, err) = go(&[
         "plan",
@@ -69,6 +71,7 @@ fn plan_prints_the_text_report_for_one_world() {
 
 #[test]
 fn plan_prints_json_for_every_world() {
+    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("json");
     let (code, out, _) = go(&[
         "plan",
@@ -96,6 +99,7 @@ fn plan_prints_json_for_every_world() {
 
 #[test]
 fn plan_with_blocks_in_json_lists_each_block_with_paths() {
+    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("jsonblocks");
     let (code, out, _) = go(&[
         "plan",
@@ -115,6 +119,7 @@ fn plan_with_blocks_in_json_lists_each_block_with_paths() {
 
 #[test]
 fn plan_reads_a_load_order_file() {
+    covers(&[ids::cli::commands::PLAN]);
     let dir = data_folder("order");
     let order = dir.join("order.txt");
     std::fs::write(&order, "# order\n*Base.esm\n*Patch.esp\n").unwrap();
@@ -183,6 +188,7 @@ fn a_plugin_without_worlds_is_reported() {
 
 #[test]
 fn heightmap_writes_a_16_bit_pgm_north_up() {
+    covers(&[ids::cli::commands::HEIGHTMAP]);
     let dir = data_folder("pgm");
     let out_file = dir.join("island.pgm");
     let (code, out, err) = go(&[
@@ -211,6 +217,7 @@ fn heightmap_writes_a_16_bit_pgm_north_up() {
 
 #[test]
 fn heightmap_scales_between_the_lowest_and_highest_height() {
+    covers(&[ids::cli::commands::HEIGHTMAP]);
     let dir = data_folder("scale");
     let out_file = dir.join("t.pgm");
     let (code, _, _) = go(&[
@@ -286,6 +293,7 @@ fn heightmap_needs_a_single_world_and_an_output_file() {
 
 #[test]
 fn heightmap_refuses_to_write_inside_a_git_working_tree() {
+    covers(&[ids::cli::commands::HEIGHTMAP]);
     let dir = data_folder("repo");
     let repo = dir.join("work");
     std::fs::create_dir_all(repo.join(".git")).unwrap();
@@ -315,6 +323,7 @@ fn heightmap_refuses_to_write_inside_a_git_working_tree() {
 
 #[test]
 fn the_contract_the_plan_names_is_one_the_handshake_lists() {
+    covers(&[ids::contract::documents::HANDSHAKE]);
     let dir = data_folder("handshake");
     let (_, plan, _) = go(&[
         "plan",
@@ -334,6 +343,7 @@ fn the_contract_the_plan_names_is_one_the_handshake_lists() {
 
 #[test]
 fn verify_passes_a_generated_folder_and_fails_a_damaged_one() {
+    covers(&[ids::verify::folder::STRUCTURE_CHECKS]);
     let data = std::env::temp_dir().join(format!("lodwright-verify-cli-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&data);
     std::fs::create_dir_all(&data).unwrap();
@@ -433,6 +443,7 @@ fn verify_reports_water_iou_and_object_agreement_against_an_equal_reference() {
 
 #[test]
 fn a_block_under_the_water_iou_threshold_is_a_difference_and_exits_one() {
+    covers(&[ids::verify::folder::WATER_IOU]);
     let (mine, theirs) = (generate_lake("dry-a", true), generate_lake("dry-b", false));
     let (code, text, _) = go(&[
         "verify",
@@ -449,6 +460,7 @@ fn a_block_under_the_water_iou_threshold_is_a_difference_and_exits_one() {
 
 #[test]
 fn a_known_differences_list_accepts_its_blocks_reports_stale_entries_and_prints_levels() {
+    covers(&[ids::verify::folder::KNOWN_DIFFERENCES]);
     let (mine, theirs) = (
         generate_lake("known-a", true),
         generate_lake("known-b", false),

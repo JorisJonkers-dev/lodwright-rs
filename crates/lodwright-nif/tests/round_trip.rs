@@ -7,9 +7,11 @@ use common::build;
 use lodwright_nif::{Block, Body, NifError, NifFile};
 use lodwright_testkit::nif::shape_set;
 use lodwright_testkit::rng::Rng;
+use lodwright_testkit::{covers, ids};
 
 #[test]
 fn reading_what_was_written_gives_the_same_file_for_generated_shape_sets() {
+    covers(&[ids::formats::meshes_and_images::NIF_ROUND_TRIP]);
     let mut rng = Rng::new(0x5EED);
     for _ in 0..300 {
         let file = build(&shape_set(&mut rng, 6));
@@ -20,6 +22,7 @@ fn reading_what_was_written_gives_the_same_file_for_generated_shape_sets() {
 
 #[test]
 fn writing_what_was_read_gives_the_same_bytes_for_generated_shape_sets() {
+    covers(&[ids::formats::meshes_and_images::NIF_ROUND_TRIP]);
     let mut rng = Rng::new(0xB17E5);
     for _ in 0..100 {
         let bytes = build(&shape_set(&mut rng, 6)).write().unwrap();
@@ -29,6 +32,7 @@ fn writing_what_was_read_gives_the_same_bytes_for_generated_shape_sets() {
 
 #[test]
 fn unknown_blocks_round_trip_byte_for_byte() {
+    covers(&[ids::formats::meshes_and_images::NIF_ROUND_TRIP]);
     let mut rng = Rng::new(11);
     for round in 0..50_u32 {
         let mut file = build(&shape_set(&mut rng, 3));

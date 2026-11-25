@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Object LOD generation from synthetic models, textures and references.
 
+use lodwright_testkit::{covers, ids};
 use std::collections::HashMap;
 
 use lodwright_core::objects::Instance;
@@ -238,6 +239,7 @@ fn read_block(out: &std::path::Path, rel: &str) -> NifFile {
 
 #[test]
 fn objects_are_merged_per_block_with_transform_scale_and_atlas_uvs() {
+    covers(&[ids::objects::blocks::MERGED_PER_BLOCK]);
     let out = temp("merge");
     let list = vec![
         instance(
@@ -299,6 +301,7 @@ fn objects_are_merged_per_block_with_transform_scale_and_atlas_uvs() {
 
 #[test]
 fn the_atlas_pair_is_written_as_bc3_and_the_normal_atlas_is_half_size() {
+    covers(&[ids::objects::blocks::ATLAS_PAIR]);
     let out = temp("atlas");
     generate_objects(
         "Mojave",
@@ -381,6 +384,7 @@ fn a_world_without_a_usable_model_reports_no_block() {
 
 #[test]
 fn nothing_is_written_when_no_model_can_be_read_and_output_is_deterministic() {
+    covers(&[ids::objects::blocks::OBJECTS_OUTPUT_DETERMINISTIC]);
     let out = temp("none");
     let report = generate_objects(
         "Mojave",
@@ -403,6 +407,7 @@ fn nothing_is_written_when_no_model_can_be_read_and_output_is_deterministic() {
 // source: game-object-shape-offset
 #[test]
 fn the_shape_offset_is_not_scaled_and_node_rotations_are_ignored() {
+    covers(&[ids::objects::blocks::MERGED_PER_BLOCK]);
     let out = temp("offset");
     // the root node turns the model a quarter turn about z, which the game's blocks ignore
     let mut node = av(vec![]);
@@ -444,6 +449,7 @@ fn the_shape_offset_is_not_scaled_and_node_rotations_are_ignored() {
 // source: game-object-block-cell
 #[test]
 fn a_temporary_reference_goes_to_the_block_of_its_cell() {
+    covers(&[ids::objects::selection::TEMPORARY_REFERENCES]);
     let out = temp("cell");
     let mut held = instance("a\\Wall.nif", 100.0, -0.0001, 0.0, 1, false);
     held.cell = Some((0, 0));
@@ -492,6 +498,7 @@ fn with_surfaces(
 
 #[test]
 fn faces_wholly_under_the_ground_are_dropped_and_faces_above_or_crossing_it_are_kept() {
+    covers(&[ids::objects::blocks::FACES_UNDER_GROUND_AND_WATER_DROPPED]);
     // a flat triangle at height 10, one at height 10 turned upright (it reaches 200 units up), one at height 90
     let mut upright = instance("a\\Wall.nif", 300.0, 100.0, 0.0, 2, false);
     upright.placement.rot = [-std::f32::consts::FRAC_PI_2, 0.0, 0.0];
@@ -527,6 +534,7 @@ fn faces_wholly_under_the_ground_are_dropped_and_faces_above_or_crossing_it_are_
 
 #[test]
 fn faces_under_water_are_dropped_only_in_cells_that_have_water() {
+    covers(&[ids::objects::blocks::FACES_UNDER_GROUND_AND_WATER_DROPPED]);
     // the same low triangle in a cell with water at 50 and in a cell without water
     let list = vec![
         instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false),
@@ -551,6 +559,7 @@ fn faces_under_water_are_dropped_only_in_cells_that_have_water() {
 
 #[test]
 fn a_model_with_every_face_dropped_writes_no_block_and_counts_its_faces() {
+    covers(&[ids::objects::blocks::FACES_UNDER_GROUND_AND_WATER_DROPPED]);
     let list = vec![instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)];
     let ground = |_: f32, _: f32| Some(1000.0);
     let (report, vertices) = with_surfaces(
@@ -568,6 +577,7 @@ fn a_model_with_every_face_dropped_writes_no_block_and_counts_its_faces() {
 
 #[test]
 fn object_blocks_start_at_the_grid_anchor() {
+    covers(&[ids::objects::blocks::BLOCK_GRID_AND_PATHS]);
     // an anchor of (-6, -5): the cell (0, 0) lies in the block that starts at (-2, -1)
     let list = vec![instance("a\\Wall.nif", 100.0, 100.0, 0.0, 1, false)];
     let out = std::env::temp_dir().join(format!("lodwright-anchor-{}", std::process::id()));
@@ -609,6 +619,7 @@ fn walk(dir: &std::path::Path) -> Vec<String> {
 
 #[test]
 fn a_uv_outside_the_texture_is_held_at_its_edge_not_wrapped_to_the_far_edge() {
+    covers(&[ids::objects::blocks::UVS_HELD_AT_THE_EDGE]);
     // a vertex a hair outside the texture (-0.02, 1.02) must not jump to the other side of the tile, and a texture
     // meant to repeat (2.5, -3.0) is held at the edge, as the game's own blocks do
     let out = temp("uvclamp");
@@ -646,6 +657,7 @@ fn a_uv_outside_the_texture_is_held_at_its_edge_not_wrapped_to_the_far_edge() {
 
 #[test]
 fn a_model_that_is_missing_or_unreadable_is_named_in_a_warning() {
+    covers(&[ids::objects::blocks::OBJECT_WARNINGS]);
     let out = temp("warn-missing");
     let report = generate_objects(
         "Mojave",
@@ -695,6 +707,7 @@ fn uncompressed_texture(size: u32, shade: u8) -> Vec<u8> {
 
 #[test]
 fn an_uncompressed_32_bit_texture_is_used_not_replaced_by_a_flat_colour() {
+    covers(&[ids::objects::blocks::TEXTURE_FORMATS]);
     let out = temp("uncompressed");
     let mut m = HashMap::new();
     m.insert(
@@ -730,6 +743,7 @@ fn an_uncompressed_32_bit_texture_is_used_not_replaced_by_a_flat_colour() {
 
 #[test]
 fn a_texture_that_is_absent_and_one_that_cannot_be_decoded_get_different_warnings() {
+    covers(&[ids::objects::blocks::OBJECT_WARNINGS]);
     let out = temp("texture-faults");
     let mut m = HashMap::new();
     m.insert(
@@ -771,6 +785,7 @@ fn a_texture_that_is_absent_and_one_that_cannot_be_decoded_get_different_warning
 
 #[test]
 fn a_block_over_the_16_bit_vertex_limit_is_written_as_several_shapes_and_nothing_is_left_out() {
+    covers(&[ids::objects::blocks::BLOCKS_OVER_THE_16_BIT_LIMITS]);
     // 25000 objects of three vertices each: 75000 vertices in one block
     let out = temp("many-shapes");
     let list: Vec<Instance> = (0..25_000_u32)
@@ -816,6 +831,7 @@ fn a_block_over_the_16_bit_vertex_limit_is_written_as_several_shapes_and_nothing
 
 #[test]
 fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_its_vertices_fit() {
+    covers(&[ids::objects::blocks::BLOCKS_OVER_THE_16_BIT_LIMITS]);
     // 40 objects of three vertices and 3000 triangles each: 120 vertices, 120000 triangles in one block
     let out = temp("many-triangles");
     let mut m = HashMap::new();
@@ -867,6 +883,7 @@ fn a_block_over_the_16_bit_triangle_limit_is_written_as_several_shapes_though_it
 
 #[test]
 fn a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its_texture_set() {
+    covers(&[ids::objects::blocks::BLOCKS_OVER_THE_16_BIT_LIMITS]);
     // 40 objects of 3000 triangles: two shapes. Twenty stand in cell 0 of the block and twenty in the next cell east,
     // so the triangles of the shapes together fill segment 0 and segment 4 and no other
     let out = temp("shapes-segments");
@@ -927,6 +944,7 @@ fn a_block_written_as_several_shapes_holds_every_object_with_its_segment_and_its
 
 #[test]
 fn textures_that_do_not_fit_one_atlas_keep_their_size_on_a_second_atlas_with_its_own_shape() {
+    covers(&[ids::objects::blocks::ATLAS_PAGES]);
     // with atlases of at most 2048 by 2048, four textures of 1024 by 1024 fill the first; the fifth goes on a second
     let out = temp("atlas-pages");
     let mut m = HashMap::new();

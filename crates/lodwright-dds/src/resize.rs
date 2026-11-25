@@ -228,6 +228,7 @@ pub fn mip_chain_with_threads(image: &Image, filter: Filter, threads: usize) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lodwright_testkit::{covers, ids};
 
     fn flat(w: u32, h: u32, v: u8) -> Image {
         Image::new(w, h, vec![v; w as usize * h as usize * 4]).unwrap()
@@ -235,6 +236,7 @@ mod tests {
 
     #[test]
     fn mip_sizes_halve_rounding_down_with_a_floor_of_one() {
+        covers(&[ids::formats::meshes_and_images::MIP_CHAINS_AND_RESIZE]);
         let sizes: Vec<_> = (0..mip_count(37, 19))
             .map(|l| mip_size(37, 19, l))
             .collect();
@@ -249,6 +251,7 @@ mod tests {
 
     #[test]
     fn a_flat_image_stays_flat_under_both_filters_at_any_ratio() {
+        covers(&[ids::formats::meshes_and_images::MIP_CHAINS_AND_RESIZE]);
         for filter in [Filter::Box, Filter::Lanczos3] {
             for (w, h) in [(1, 1), (3, 5), (7, 2), (20, 20)] {
                 let out = resize(&flat(13, 9, 77), w, h, filter).unwrap();
@@ -259,6 +262,7 @@ mod tests {
 
     #[test]
     fn the_box_filter_averages_a_two_by_two_block() {
+        covers(&[ids::formats::meshes_and_images::MIP_CHAINS_AND_RESIZE]);
         let img = Image::new(
             2,
             2,
@@ -304,6 +308,7 @@ mod tests {
 
     #[test]
     fn the_chain_has_the_expected_sizes_for_a_non_power_of_two_image() {
+        covers(&[ids::formats::meshes_and_images::MIP_CHAINS_AND_RESIZE]);
         let chain = mip_chain(&flat(37, 19, 9), Filter::Box).unwrap();
         let sizes: Vec<_> = chain.iter().map(|i| (i.width(), i.height())).collect();
         assert_eq!(sizes, [(37, 19), (18, 9), (9, 4), (4, 2), (2, 1), (1, 1)]);
@@ -316,6 +321,7 @@ mod tests {
 
     #[test]
     fn resizing_and_mip_chains_give_the_same_bytes_at_any_thread_count() {
+        covers(&[ids::formats::meshes_and_images::MIP_CHAINS_AND_RESIZE]);
         // 300 by 200 has enough rows to be cut into several bands, and a pattern that every filter tap sees
         let pixels: Vec<u8> = (0..300 * 200 * 4)
             .map(|i: u32| u8::try_from((i.wrapping_mul(2_654_435_761) >> 13) & 0xFF).unwrap())

@@ -165,6 +165,7 @@ mod tests {
     use crate::plugin::{Plugin, read};
     use lodwright_testkit::plugin::PluginBuilder;
     use lodwright_testkit::world::{ltex_record, record_group, txst_record};
+    use lodwright_testkit::{covers, ids};
 
     fn load(items: &[(&str, Vec<u8>)]) -> Vec<(String, Plugin)> {
         items
@@ -201,6 +202,7 @@ mod tests {
 
     #[test]
     fn a_texture_resolves_through_its_texture_set() {
+        covers(&[ids::terrain::textures::TEXTURE_RESOLUTION]);
         let resolver =
             TextureResolver::from_load_order(&load(&[("Base.esm", base_plugin())])).unwrap();
         assert_eq!(resolver.diffuse_path(0x0B00), Some("landscape\\dirt.dds"));
@@ -217,6 +219,7 @@ mod tests {
 
     #[test]
     fn the_specular_exponent_is_read_and_the_range_spans_the_load_order() {
+        covers(&[ids::terrain::textures::SPECULAR_ALPHA]);
         let bytes = PluginBuilder::new()
             .group(record_group(
                 *b"LTEX",
@@ -238,6 +241,7 @@ mod tests {
 
     #[test]
     fn a_texture_without_a_set_falls_back_to_its_icon() {
+        covers(&[ids::terrain::textures::TEXTURE_RESOLUTION]);
         let resolver =
             TextureResolver::from_load_order(&load(&[("Base.esm", base_plugin())])).unwrap();
         assert_eq!(resolver.diffuse_path(0x0B01), Some("old\\rock.dds"));
@@ -255,6 +259,7 @@ mod tests {
 
     #[test]
     fn a_later_plugin_overriding_a_texture_changes_the_resolved_path() {
+        covers(&[ids::terrain::textures::TEXTURE_RESOLUTION]);
         let patch = PluginBuilder::new()
             .master("Base.esm")
             .group(record_group(
@@ -279,6 +284,7 @@ mod tests {
 
     #[test]
     fn a_later_ltex_pointing_at_another_set_changes_the_resolved_path() {
+        covers(&[ids::terrain::textures::TEXTURE_RESOLUTION]);
         let patch = PluginBuilder::new()
             .master("Base.esm")
             .group(record_group(

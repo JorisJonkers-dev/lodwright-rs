@@ -478,6 +478,7 @@ mod tests {
     };
     use crate::plugin::{ReadOptions, read_with};
     use lodwright_testkit::plugin::{Group, PluginBuilder, Record};
+    use lodwright_testkit::{covers, ids};
 
     fn stat(id: u32, model: &str, flags: u32) -> Record {
         let mut r =
@@ -524,6 +525,7 @@ mod tests {
 
     #[test]
     fn high_priority_on_a_static_base_counts_as_on_the_reference() {
+        covers(&[ids::objects::selection::HIGH_PRIORITY]);
         let p = plugin(
             &[],
             vec![
@@ -586,6 +588,7 @@ mod tests {
 
     #[test]
     fn bit_16_on_an_activator_is_not_high_priority() {
+        covers(&[ids::objects::selection::HIGH_PRIORITY]);
         let mut acti = Record::new(*b"ACTI", 0x100).with_subrecord(*b"MODL", b"a.nif\0".to_vec());
         acti.flags = VISIBLE_WHEN_DISTANT | HIGH_PRIORITY_LOD;
         let mut world = Group::new(1, 0x0000_0A00_u32.to_le_bytes());
@@ -609,6 +612,7 @@ mod tests {
 
     #[test]
     fn only_flagged_statics_are_instances_and_a_later_plugin_overrides_a_reference() {
+        covers(&[ids::objects::selection::FLAGGED_STATICS]);
         let base = plugin(
             &[],
             vec![
@@ -634,6 +638,7 @@ mod tests {
 
     #[test]
     fn a_disabled_reference_is_left_out_and_a_flagged_reference_counts_for_an_unflagged_base() {
+        covers(&[ids::objects::selection::DISABLED_REFERENCES]);
         let p = plugin(
             &[],
             vec![stat(0x100, "a.nif", 0)],
@@ -649,6 +654,7 @@ mod tests {
 
     #[test]
     fn a_persistent_disabled_reference_still_counts_as_in_the_games_own_blocks() {
+        covers(&[ids::objects::selection::DISABLED_REFERENCES]);
         let p = plugin(
             &[],
             vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
@@ -667,6 +673,7 @@ mod tests {
 
     #[test]
     fn a_later_plugin_that_enables_a_disabled_reference_brings_it_back() {
+        covers(&[ids::objects::selection::DISABLED_REFERENCES]);
         let base = plugin(
             &[],
             vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
@@ -744,6 +751,7 @@ mod tests {
 
     #[test]
     fn a_reference_follows_the_start_state_of_its_enable_parent_chain() {
+        covers(&[ids::objects::selection::ENABLE_PARENTS]);
         let marker = stat(0x101, "marker.nif", 0);
         let p = plugin(
             &[],
@@ -770,6 +778,7 @@ mod tests {
 
     #[test]
     fn a_long_enable_parent_chain_is_followed_to_its_end_and_a_loop_counts_as_enabled() {
+        covers(&[ids::objects::selection::ENABLE_PARENTS]);
         let marker = stat(0x101, "marker.nif", 0);
         // 0x200 hangs from a chain of 40 links whose last reference is disabled at the start
         let mut refs = vec![refr(0x340, 0x101, INITIALLY_DISABLED | PERSISTENT, 0.0)];
@@ -799,6 +808,7 @@ mod tests {
 
     #[test]
     fn a_later_plugin_that_disables_an_enable_parent_takes_its_children_out() {
+        covers(&[ids::objects::selection::ENABLE_PARENTS]);
         let base = plugin(
             &[],
             vec![
@@ -951,6 +961,7 @@ mod tests {
 
     #[test]
     fn an_enable_parent_in_another_world_decides_the_start_state() {
+        covers(&[ids::objects::selection::ENABLE_PARENTS]);
         // lights seen from far whose enable parent is a disabled marker in another world (the Strip's lights): the
         // child is disabled at the start, its opposite twin stands
         let p = plugin_two_worlds(
@@ -1071,6 +1082,7 @@ mod tests {
 
     #[test]
     fn a_reference_deleted_by_a_later_plugin_drops_out_and_a_third_plugin_can_place_it_again() {
+        covers(&[ids::objects::selection::DELETED_REFERENCES]);
         let base = plugin(
             &[],
             vec![stat(0x100, "a.nif", VISIBLE_WHEN_DISTANT)],
@@ -1109,6 +1121,7 @@ mod tests {
 
     #[test]
     fn the_plugin_that_marks_an_object_visible_from_far_is_the_one_whose_flag_counts() {
+        covers(&[ids::objects::selection::FLAGGED_STATICS]);
         // the base is flagged in Base.esm; Patch.esp flags a reference to an unflagged base of its own
         let base = plugin(
             &[],

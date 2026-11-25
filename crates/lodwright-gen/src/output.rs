@@ -160,6 +160,7 @@ fn write_output_with(
 mod tests {
     use super::{is_plain_relative, linked_folder, write_output_file, write_output_stream};
     use crate::GenError;
+    use lodwright_testkit::{covers, ids};
 
     fn temp(name: &str) -> std::path::PathBuf {
         let dir =
@@ -171,6 +172,7 @@ mod tests {
 
     #[test]
     fn a_write_whose_rename_fails_leaves_no_temporary_file() {
+        covers(&[ids::generate::output_safety::FILES_APPEAR_ATOMICALLY]);
         let out = temp("rename-fails");
         // a folder that holds a file stands where the output should go, so the rename is refused
         std::fs::create_dir_all(out.join("a.bin")).unwrap();
@@ -196,6 +198,7 @@ mod tests {
 
     #[test]
     fn a_file_is_written_with_its_folders_and_its_record() {
+        covers(&[ids::generate::output_safety::FILES_APPEAR_ATOMICALLY]);
         let out = temp("plain");
         let record = write_output_file(&out, "a/b/c.txt", b"abc").unwrap();
         assert_eq!(std::fs::read(out.join("a/b/c.txt")).unwrap(), b"abc");
@@ -220,6 +223,7 @@ mod tests {
 
     #[test]
     fn a_failed_stream_leaves_the_previous_file_and_no_temp_file() {
+        covers(&[ids::generate::output_safety::FILES_APPEAR_ATOMICALLY]);
         let out = temp("stream-fail");
         write_output_file(&out, "a.bsa", b"previous").unwrap();
         let err = write_output_stream(&out, "a.bsa", |f| {
@@ -234,6 +238,7 @@ mod tests {
 
     #[test]
     fn a_path_that_climbs_out_is_refused_and_nothing_is_written() {
+        covers(&[ids::generate::output_safety::PLAIN_RELATIVE_PATHS_ONLY]);
         let out = temp("climb");
         let err = write_output_file(&out.join("inner"), "../x.txt", b"x").unwrap_err();
         assert!(matches!(err, GenError::LinkInOutput { .. }), "{err}");
@@ -243,6 +248,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_linked_folder_on_the_path_is_refused_and_found() {
+        covers(&[ids::generate::output_safety::LINKS_NEVER_FOLLOWED]);
         let root = temp("linked");
         let (out, outside) = (root.join("out"), root.join("outside"));
         std::fs::create_dir_all(&out).unwrap();
@@ -257,6 +263,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_link_at_the_temporary_path_is_removed_not_followed() {
+        covers(&[ids::generate::output_safety::LINKS_NEVER_FOLLOWED]);
         let root = temp("tmp-link");
         let (out, victim) = (root.join("out"), root.join("victim.txt"));
         std::fs::create_dir_all(&out).unwrap();

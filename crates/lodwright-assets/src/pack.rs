@@ -569,6 +569,7 @@ where
 mod tests {
     use super::{PackEntry, PackError, check_limits, name_hash, write};
     use crate::Archive;
+    use lodwright_testkit::{covers, ids};
     use std::io::Cursor;
 
     fn entry(path: &str, data: &[u8], compress: bool) -> PackEntry {
@@ -611,6 +612,7 @@ mod tests {
 
     #[test]
     fn name_hashes_match_the_numbers_measured_on_game_archives() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
         for (name, is_file, expected) in VECTORS {
             assert_eq!(
                 name_hash(name, *is_file),
@@ -638,6 +640,7 @@ mod tests {
 
     #[test]
     fn round_trip_gives_the_same_names_and_bytes_stored_and_compressed() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
         let a = vec![7_u8; 3000];
         let b = b"terrain".to_vec();
         let c = (0..=255_u8).cycle().take(5000).collect::<Vec<_>>();
@@ -687,6 +690,7 @@ mod tests {
 
     #[test]
     fn records_hold_the_hashes_of_the_names_in_ascending_order() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
         let entries: Vec<PackEntry> = (0..40)
             .map(|i| {
                 entry(
@@ -716,6 +720,7 @@ mod tests {
 
     #[test]
     fn output_does_not_depend_on_the_order_of_the_input() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
         let entries: Vec<PackEntry> = (0..30)
             .map(|i| {
                 entry(
@@ -736,6 +741,7 @@ mod tests {
 
     #[test]
     fn output_is_identical_when_written_from_many_threads() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER]);
         let entries: Vec<PackEntry> = (0..20)
             .map(|i| {
                 entry(
@@ -794,6 +800,7 @@ mod tests {
 
     #[test]
     fn two_paths_that_differ_only_in_case_are_refused() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER_LIMITS]);
         let err = write(&[
             entry("Meshes/A.nif", b"1", false),
             entry("meshes\\a.NIF", b"2", false),
@@ -810,6 +817,7 @@ mod tests {
 
     #[test]
     fn two_different_names_with_one_hash_are_refused() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER_LIMITS]);
         let names = colliding_names(true, ".txt");
         let err = write(&[
             entry(&format!("f\\{}", names.0), b"1", false),
@@ -848,6 +856,7 @@ mod tests {
 
     #[test]
     fn paths_the_format_cannot_hold_are_refused() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER_LIMITS]);
         let long = "a".repeat(255);
         for (path, reason) in [
             ("file.nif", "the path has no folder part"),
@@ -883,6 +892,7 @@ mod tests {
 
     #[test]
     fn a_file_over_one_gibibyte_is_refused_with_its_path() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER_LIMITS]);
         let err = check_limits(
             1,
             1,
@@ -912,6 +922,7 @@ mod tests {
 
     #[test]
     fn an_archive_over_four_gibibytes_is_refused_and_says_to_split() {
+        covers(&[ids::formats::plugins::ARCHIVE_WRITER_LIMITS]);
         let sizes = (0..5).map(|i| (i, 0x3FFF_0000_u64));
         let paths = ["a"; 5];
         let err = check_limits(5, 1, 100, sizes, &paths).unwrap_err();

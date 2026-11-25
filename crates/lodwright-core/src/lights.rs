@@ -307,6 +307,10 @@ fn unlit_lamps(
         let Some(&(spot, k)) = spots.get(&base) else {
             continue;
         };
+        // a copy with a light of its own beside it keeps that light, even where it stands off the usual spot
+        if !near(placement.pos).is_empty() {
+            continue;
+        }
         let at = to_world(&placement, spot);
         let (cx, cy) = cell_of(at);
         let taken_by_given = (-1..=1).any(|dx| {
@@ -589,6 +593,21 @@ mod tests {
         }
         let p = plugin(&[], vec![light(0x100, 300, [9, 9, 9], 0)], refs);
         assert_eq!(points(p).len(), 20);
+    }
+
+    #[test]
+    fn a_lit_copy_whose_light_stands_off_the_usual_spot_gets_no_second_point() {
+        // three posts lit at the head, a fourth lit 100 units higher: the fourth keeps its own light only
+        let mut refs = Vec::new();
+        for n in 0..4_u32 {
+            #[allow(clippy::cast_precision_loss)]
+            let x = n as f32 * 1000.0;
+            let z = if n == 3 { 400.0 } else { 300.0 };
+            refs.push(refr_at(0x400 + n, POST, 0, [x, 0.0, 0.0], 0.0));
+            refs.push(refr_at(0x500 + n, 0x100, 0, [x, 0.0, z], 0.0));
+        }
+        let p = plugin(&[], vec![light(0x100, 300, [9, 9, 9], 0)], refs);
+        assert_eq!(points(p).len(), 4);
     }
 
     #[test]

@@ -687,6 +687,7 @@ mod tests {
 mod shapes_tests {
     use super::{ObjectBlock, SEGMENTS, object_block_shapes};
     use crate::{Body, NifFile};
+    use lodwright_testkit::{covers, ids};
 
     #[test]
     fn a_block_of_two_shapes_links_each_shape_to_its_own_blocks_and_reads_back() {

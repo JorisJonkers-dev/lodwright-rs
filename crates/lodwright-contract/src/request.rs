@@ -184,6 +184,11 @@ pub struct ObjectsRequest {
     /// game's own LOD is the standard; written only when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shapes_from_full_models: Option<FullModelShapes>,
+    /// Draw the steady lights that stand beside far objects as small unlit light points, one marked shape per object
+    /// block that the engine shows only at night. Off by default, because an engine without that night switch shows
+    /// them by day too; written only when on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far_lights: bool,
     /// Also take references that nothing marks visible from far when their model has a far model
     /// (`<model>_lod.nif`) and their base is not drawn as a tree billboard; only references that stand when the game
     /// starts are taken. Off by default; written only when on.
@@ -225,6 +230,7 @@ impl Default for ObjectsRequest {
             drop_under_water: false,
             shapes_from_shipped_blocks: Vec::new(),
             shapes_from_full_models: None,
+            far_lights: false,
             far_model_without_flag: false,
         }
     }

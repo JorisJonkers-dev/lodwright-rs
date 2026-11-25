@@ -164,9 +164,18 @@ impl Ctx {
         // shape of `game-lod-water-placeholder`
         // an object block is the root, four blocks per shape, the multibound and its box (`game-lod-object-block-nif`;
         // the game's own blocks have one to four shapes)
+        // and five more for a far lights shape (`objects.far_lights`: the shape, its two properties, data and marker)
         let expected: &[usize] = &[8, 10, 12];
+        let lights = nif
+            .blocks
+            .iter()
+            .filter(|b| matches!(&b.body, Body::TriShapeData(d) if is_far_lights_data(nif, d)))
+            .count();
         let ok = if object {
-            nif.blocks.len() >= 7 && (nif.blocks.len() - 3).is_multiple_of(4)
+            nif.blocks
+                .len()
+                .checked_sub(5 * lights)
+                .is_some_and(|n| n >= 7 && (n - 3).is_multiple_of(4))
         } else {
             expected.contains(&nif.blocks.len())
         };
@@ -177,7 +186,7 @@ impl Ctx {
                     "{} blocks, expected {}",
                     nif.blocks.len(),
                     if object {
-                        "3 plus 4 per shape"
+                        "3 plus 4 per shape, plus 5 for a far lights shape"
                     } else {
                         "8, 10 or 12"
                     }
@@ -199,7 +208,7 @@ impl Ctx {
             self.err(path, "no triangle data block");
         }
         for data in datas {
-            self.check_data(path, data, size, object);
+            self.check_data(path, data, size, object, is_far_lights_data(nif, data));
         }
     }
 
@@ -209,6 +218,7 @@ impl Ctx {
         data: &lodwright_nif::NiTriShapeData,
         size: Option<f32>,
         object: bool,
+        lights: bool,
     ) {
         let g = &data.geometry;
         let verts = g.vertices.as_deref().unwrap_or(&[]);
@@ -250,7 +260,8 @@ impl Ctx {
                 self.err(path, "a UV lies outside 0..1");
             }
         }
-        if object {
+        // the far light points are unlit: no normals or tangents
+        if object && !lights {
             let bad = g
                 .normals
                 .iter()
@@ -1213,11 +1224,26 @@ fn atlas_use(
         .collect()
 }
 
+/// Whether `data` is the data of a far lights shape (`objects.far_lights`): the file carries the marker name and the
+/// data has vertex colours and no normals, which no object shape has.
+fn is_far_lights_data(nif: &NifFile, data: &lodwright_nif::NiTriShapeData) -> bool {
+    data.geometry.normals.is_none()
+        && data.geometry.vertex_colors.is_some()
+        && nif
+            .header
+            .strings
+            .iter()
+            .any(|s| s.as_slice() == lodwright_nif::FAR_LIGHTS_MARKER.as_bytes())
+}
+
+/// The vertices and triangle count of a block's object shapes (a far lights shape is not counted).
 fn all_vertices_and_triangles(nif: &NifFile) -> (Vec<[f32; 3]>, usize) {
     let mut vertices = Vec::new();
     let mut triangles = 0;
     for b in &nif.blocks {
-        if let Body::TriShapeData(d) = &b.body {
+        if let Body::TriShapeData(d) = &b.body
+            && !is_far_lights_data(nif, d)
+        {
             vertices.extend_from_slice(d.geometry.vertices.as_deref().unwrap_or(&[]));
             triangles += d.triangles.as_deref().map_or(0, <[_]>::len);
         }

@@ -11,10 +11,11 @@ use std::path::Path;
 use crate::par::par_map;
 use lodwright_contract::WarningRecord;
 use lodwright_core::layout;
+use lodwright_core::lights::FarLightSource;
 use lodwright_core::objects::Instance;
 use lodwright_core::plugin::Placement;
 use lodwright_dds::{EncodeOptions, Filter, Format, Image, Quality, encode_with_threads, resize};
-use lodwright_nif::{ObjectBlock, SEGMENTS, object_block_shapes};
+use lodwright_nif::{FarLightsShape, ObjectBlock, SEGMENTS, object_block_with_lights};
 
 use crate::assets::{Assets, read_texture, texture_warning};
 use crate::atlas::{Atlas, LARGEST_ATLAS, Rect, pack_pages};
@@ -45,6 +46,8 @@ pub struct ObjectReport {
     pub records: Vec<WarningRecord>,
     /// Instances placed into blocks.
     pub instances: usize,
+    /// Far light points written (`objects.far_lights`), one per light, in the normal files.
+    pub far_lights: usize,
     /// Instances left out because their model has no LOD model or it could not be read.
     pub skipped: usize,
     /// Faces left out because they lie wholly under the ground ([`Surfaces::ground`]).
@@ -86,6 +89,116 @@ pub struct Surfaces<'a> {
     /// rule), whatever `full_models` says; `None` for an object no such rule names. Only the objects it answers for
     /// get such a shape: another object with the same model and no LOD model stays out unless `full_models` is set.
     pub rule_shapes: Option<RuleShapes<'a>>,
+    /// The steady lights of the world (`objects.far_lights`): each one within [`FAR_LIGHT_REACH`] of an object of its
+    /// block is drawn as a small light point in the block's normal file; empty draws none.
+    pub far_lights: &'a [FarLightSource],
+}
+
+/// How near (world units, on the ground plane) a light must stand to an object of its block to get a far light point:
+/// a lamp beside a drawn post or building, not a light alone in the open. Own design.
+pub const FAR_LIGHT_REACH: f32 = 300.0;
+/// Half the size of a far light point (world units): three crossed squares 192 units wide. Own design: tried in the
+/// engine at 2560x1440, 48-unit squares were a few dim pixels from 10,000 units and read as nothing; 192 units give a
+/// small soft spot at the lamp head.
+const FAR_LIGHT_HALF: f32 = 96.0;
+/// A far light point's colour is this share of its light's colour. Own design: at a half share the points were too
+/// dim to see; the soft round texture already keeps a row of lamps from adding up to a white bar.
+const FAR_LIGHT_DIM: f32 = 1.0;
+/// Light points per block at most: each takes 12 vertices of the shape's 65535 and 12 of its 65535 triangles.
+const FAR_LIGHTS_PER_BLOCK: usize = 5000;
+// every vertex index of a block's light points fits the shape's 16-bit indices
+const _: () = assert!(FAR_LIGHTS_PER_BLOCK * 12 <= u16::MAX as usize);
+
+/// The geometry of a block's far light points.
+#[derive(Default)]
+struct LightPoints {
+    vertices: Vec<[f32; 3]>,
+    colors: Vec<[f32; 4]>,
+    uv: Vec<[f32; 2]>,
+    indices: Vec<u16>,
+}
+
+/// The light points of the lights of `lights` that stand within [`FAR_LIGHT_REACH`] of one of `members`, relative to
+/// `origin`: three crossed squares per light (one flat, two upright), in the lights' given order. Each square is written
+/// with both windings, so it shows from either side: the engine culls back faces, and a one-sided square seen from
+/// behind leaves only its edge.
+fn light_points(
+    lights: &[&FarLightSource],
+    members: &[&Instance],
+    origin: (f32, f32),
+) -> LightPoints {
+    let reach = FAR_LIGHT_REACH * FAR_LIGHT_REACH;
+    let mut out = LightPoints::default();
+    let h = FAR_LIGHT_HALF;
+    let corners: [[[f32; 3]; 4]; 3] = [
+        [[-h, -h, 0.0], [h, -h, 0.0], [h, h, 0.0], [-h, h, 0.0]],
+        [[-h, 0.0, -h], [h, 0.0, -h], [h, 0.0, h], [-h, 0.0, h]],
+        [[0.0, -h, -h], [0.0, h, -h], [0.0, h, h], [0.0, -h, h]],
+    ];
+    let uv = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
+    for l in lights
+        .iter()
+        .filter(|l| {
+            members.iter().any(|i| {
+                let (dx, dy) = (i.placement.pos[0] - l.pos[0], i.placement.pos[1] - l.pos[1]);
+                dx * dx + dy * dy <= reach
+            })
+        })
+        .take(FAR_LIGHTS_PER_BLOCK)
+    {
+        let c = l.color.map(|v| f32::from(v) / 255.0 * FAR_LIGHT_DIM);
+        let colour = [c[0], c[1], c[2], 1.0];
+        let at = [l.pos[0] - origin.0, l.pos[1] - origin.1, l.pos[2]];
+        for quad in &corners {
+            // cannot fail: at most FAR_LIGHTS_PER_BLOCK lights of 12 vertices each (checked above, at compile time)
+            let Ok(first) = u16::try_from(out.vertices.len()) else {
+                return out;
+            };
+            for (k, corner) in quad.iter().enumerate() {
+                out.vertices
+                    .push([at[0] + corner[0], at[1] + corner[1], at[2] + corner[2]]);
+                out.colors.push(colour);
+                out.uv.push(uv[k]);
+            }
+            // front, then the same two triangles turned round for the back
+            out.indices.extend_from_slice(&[
+                first,
+                first + 1,
+                first + 2,
+                first,
+                first + 2,
+                first + 3,
+                first,
+                first + 2,
+                first + 1,
+                first,
+                first + 3,
+                first + 2,
+            ]);
+        }
+    }
+    out
+}
+
+/// The light point texture: a soft round spot, white, its alpha and colour falling to 0 at the rim. Own design.
+fn light_point_texture(threads: usize) -> Result<Vec<u8>, GenError> {
+    const SIZE: u32 = 32;
+    let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
+    let half = SIZE as f32 / 2.0;
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let (dx, dy) = (
+                (x as f32 + 0.5 - half) / half,
+                (y as f32 + 0.5 - half) / half,
+            );
+            let r = (dx * dx + dy * dy).sqrt();
+            let v = (1.0 - r).clamp(0.0, 1.0).powi(2);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0 to 255
+            let b = (v * 255.0).round() as u8;
+            rgba.extend_from_slice(&[b, b, b, b]);
+        }
+    }
+    encode_bc3(&Image::new(SIZE, SIZE, rgba)?, threads)
 }
 
 pub(crate) type Mat = [[f32; 3]; 3];
@@ -989,6 +1102,26 @@ pub fn generate_objects_with_atlas_limit(
             key_of: &key_of,
         })
         .collect();
+    // the far lights of each block, by the block their position falls in
+    let mut lights_of: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
+    for l in surfaces.far_lights {
+        // source: cell-size-units
+        #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+        let (cx, cy) = (
+            (l.pos[0] / CELL_UNITS).floor() as i32,
+            (l.pos[1] / CELL_UNITS).floor() as i32,
+        );
+        let (ax, ay) = surfaces.grid_anchor;
+        lights_of
+            .entry((
+                ax + (cx - ax).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+                ay + (cy - ay).div_euclid(BLOCK_CELLS) * BLOCK_CELLS,
+            ))
+            .or_default()
+            .push(l);
+    }
+    let [light_texture_path, light_texture_ref] = layout::far_lights_texture_paths(world)?;
+    let mut lights_written = false;
     let total = groups.len() as u64;
     for (done, ((bx, by, high), mut members)) in (1_u64..).zip(groups) {
         members.sort_by_key(|i| (segment_of(i, (bx, by)), i.reference, i.base));
@@ -998,6 +1131,7 @@ pub fn generate_objects_with_atlas_limit(
         let mut chunks: Vec<Vec<Merged>> =
             (0..pages.len()).map(|_| vec![Merged::default()]).collect();
         let mut dropped = 0;
+        let members_of_block = members.clone();
         for i in members {
             let segment = segment_of(i, (bx, by));
             let Some(model) = models
@@ -1084,7 +1218,24 @@ pub fn generate_objects_with_atlas_limit(
                 textures: [diffuse_ref, normal_ref],
             })
             .collect();
-        let file = object_block_shapes(&shapes)?.write()?;
+        // light points go in the normal file only: the high file is drawn much farther, where they would be noise
+        let points = (!high)
+            .then(|| lights_of.get(&(bx, by)))
+            .flatten()
+            .map(|lights| light_points(lights, &members_of_block, origin))
+            .filter(|p| !p.indices.is_empty());
+        let lights = points.as_ref().map(|p| FarLightsShape {
+            vertices: &p.vertices,
+            colors: &p.colors,
+            uv: &p.uv,
+            indices: &p.indices,
+            texture: &light_texture_ref,
+        });
+        if let Some(p) = &points {
+            report.far_lights += p.vertices.len() / 12;
+            lights_written = true;
+        }
+        let file = object_block_with_lights(&shapes, lights.as_ref())?.write()?;
         report.files.push(write_file(
             out,
             &layout::object_mesh_path(world, bx, by, high)?,
@@ -1092,6 +1243,87 @@ pub fn generate_objects_with_atlas_limit(
         )?);
         block_done(done, total);
     }
+    if lights_written {
+        report.files.push(write_file(
+            out,
+            &light_texture_path,
+            &light_point_texture(surfaces.threads)?,
+        )?);
+    }
     report.files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FAR_LIGHT_HALF, light_points};
+    use lodwright_core::lights::FarLightSource;
+    use lodwright_core::objects::Instance;
+    use lodwright_core::plugin::Placement;
+
+    fn member(pos: [f32; 3]) -> Instance {
+        Instance {
+            base: 1,
+            signature: *b"STAT",
+            model: "a.nif".to_owned(),
+            placement: Placement {
+                pos,
+                rot: [0.0; 3],
+                scale: 1.0,
+            },
+            high_priority: false,
+            has_tree_lod: false,
+            reference: 2,
+            reference_plugin: 0,
+            base_plugin: 0,
+            flagged_by: 0,
+            part: false,
+            cell: None,
+        }
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // the corners are exact sums of whole numbers, the colour the same division
+    fn a_light_point_is_three_two_sided_squares_192_units_wide_in_the_light_s_full_colour() {
+        let light = FarLightSource {
+            reference: 3,
+            pos: [1100.0, 2200.0, 300.0],
+            radius: 512,
+            color: [255, 128, 0],
+        };
+        let near = member([1000.0, 2200.0, 0.0]);
+        let p = light_points(&[&light], &[&near], (1000.0, 2000.0));
+        assert_eq!(p.vertices.len(), 12);
+        // the flat square spans 192 units around the light, relative to the block origin
+        let xs: Vec<f32> = p.vertices[..4].iter().map(|v| v[0]).collect();
+        assert_eq!(xs, vec![4.0, 196.0, 196.0, 4.0]);
+        assert_eq!(FAR_LIGHT_HALF * 2.0, 192.0);
+        assert!(p.vertices[..4].iter().all(|v| v[2] == 300.0));
+        assert!(
+            p.colors
+                .iter()
+                .all(|c| *c == [1.0, 128.0 / 255.0, 0.0, 1.0])
+        );
+        // every triangle comes twice, once turned round, so the square shows from both sides
+        assert_eq!(p.indices.len(), 3 * 12);
+        let tris: Vec<[u16; 3]> = p.indices.chunks(3).map(|t| [t[0], t[1], t[2]]).collect();
+        for quad in tris.chunks(4) {
+            let (front, back) = quad.split_at(2);
+            for (f, b) in front.iter().zip(back) {
+                assert_eq!(*b, [f[0], f[2], f[1]]);
+            }
+        }
+    }
+
+    #[test]
+    fn a_light_far_from_every_object_of_the_block_gets_no_point() {
+        let light = FarLightSource {
+            reference: 3,
+            pos: [5000.0, 0.0, 0.0],
+            radius: 512,
+            color: [255, 255, 255],
+        };
+        let p = light_points(&[&light], &[&member([0.0; 3])], (0.0, 0.0));
+        assert!(p.vertices.is_empty() && p.indices.is_empty());
+    }
 }

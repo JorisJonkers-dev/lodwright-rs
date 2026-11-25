@@ -1,0 +1,10 @@
+[[source]]
+id = "fnv-light-data"
+fact = "A light base object (LIGH) holds its light in the DATA subrecord: time (signed 32-bit), radius in game units (unsigned 32-bit), colour as four bytes red, green, blue, unused, flags (unsigned 32-bit: 0x1 dynamic, 0x2 can be carried, 0x4 negative, 0x8 flicker, 0x10 unused, 0x20 off by default, 0x40 flicker slow, 0x80 pulse, 0x100 pulse slow, 0x200 spot light, 0x400 spot shadow), then falloff exponent and field of view (32-bit floats), value (unsigned 32-bit) and weight (32-bit float). A placed light is an ordinary reference (REFR) whose NAME is the light base."
+url = "https://github.com/TES5Edit/TES5Edit/blob/3ccc9e7d733becfcc97940cf0c877fa3d6213c5b/Core/wbDefinitionsFNV.pas"
+licence = "MPL-2.0 (xEdit, TES5Edit/TES5Edit at revision 3ccc9e7d733becfcc97940cf0c877fa3d6213c5b)"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read RegisterRecordDef(LIGH, 'Light', ...) in wbDefinitionsFNV.pas: the DATA struct (Time itS32, Radius itU32, wbByteColors Color, Flags itU32 with the flag names above, Falloff Exponent and FOV floats, Value itU32, Weight float) and FNAM Fade value. Only the radius, colour and flags are used (far light points, issue 339). Field names and order only; no code was taken. Not second-read."

@@ -15,6 +15,7 @@ pub mod error;
 pub mod land;
 pub mod layers;
 pub mod layout;
+pub mod lights;
 pub mod lod;
 pub mod objects;
 pub mod plugin;

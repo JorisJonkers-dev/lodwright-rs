@@ -1,0 +1,10 @@
+[[source]]
+id = "nif-alpha-flags"
+fact = "The NiAlphaProperty flags (u16): bit 0 alpha blend on, bits 1 to 4 source blend mode, bits 5 to 8 destination blend mode, bit 9 alpha test on, bits 10 to 12 test function, bit 13 no sorter. Blend mode 0 is ONE, 1 ZERO, 6 SRC_ALPHA, 7 INV_SRC_ALPHA. Flags 0x0001 is blending with source ONE and destination ONE (additive) and no alpha test; flags 0x000D is blending with source SRC_ALPHA and destination ONE (additive, scaled by alpha) and no alpha test."
+url = "https://github.com/niftools/nifxml/blob/292bb9403cbf4052c58d66e80906b6bde1700779/nif.xml"
+licence = "GPL-3.0 (niftools/nifxml at revision 292bb9403cbf4052c58d66e80906b6bde1700779, LICENSE file)"
+date = 2026-11-24
+recorded_by = "J.W. Jonkers"
+role = "specifier"
+verified = false
+note = "Read the AlphaFlags bitfield and the AlphaFunction enum of nif.xml. Bit positions and enum values only; no text or code was taken. Used for the far light points (issue 339). Not second-read."

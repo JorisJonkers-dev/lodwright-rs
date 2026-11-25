@@ -32,6 +32,8 @@ const SHIPPED_SINCE: &str = "0.16.0";
 const LAND_LIGHT_SINCE: &str = "0.17.0";
 /// The release that adds `output.pack`.
 const PACK_SINCE: &str = "0.15.0";
+/// The release that adds `objects.far_lights`.
+const FAR_LIGHTS_SINCE: &str = "0.18.0";
 /// The release that adds `objects.far_model_without_flag`.
 const FAR_MODEL_SINCE: &str = "0.18.0";
 
@@ -147,6 +149,12 @@ pub fn request_defaults() -> Defaults {
             ..option(&doc, key, OptionKind::Switch)
         });
     }
+    options.push(OptionInfo {
+        default: Value::Bool(objects.far_lights),
+        tier: 3,
+        since: FAR_LIGHTS_SINCE.to_owned(),
+        ..option(&doc, "objects.far_lights", OptionKind::Switch)
+    });
     options.push(OptionInfo {
         default: Value::Bool(objects.far_model_without_flag),
         tier: 3,
@@ -356,6 +364,11 @@ mod tests {
                     || o.since == "0.16.0"
                     || o.since == "0.17.0"
                     || o.since == "0.18.0"))));
+        let lights = d.option("objects.far_lights").unwrap();
+        assert_eq!(
+            (lights.tier, lights.kind, &lights.default),
+            (3, OptionKind::Switch, &Value::Bool(false))
+        );
         let far_model = d.option("objects.far_model_without_flag").unwrap();
         assert_eq!(
             (far_model.tier, far_model.kind, &far_model.default),

@@ -176,7 +176,7 @@ fn no_lighting_property(texture: &str) -> Vec<u8> {
 
 /// Build the NIF of one object block as [`object_block_shapes`], with the block's far light points as one more
 /// shape when `lights` is given: a plain `NiTriShape` with vertex colours, an unlit property, an additive alpha
-/// property (source SRC_ALPHA, destination ONE, no alpha test) and a `NiStringExtraData` named [`FAR_LIGHTS_MARKER`].
+/// property (source `SRC_ALPHA`, destination `ONE`, no alpha test) and a `NiStringExtraData` named [`FAR_LIGHTS_MARKER`].
 ///
 /// # Errors
 /// As [`object_block_shapes`]; and [`NifError::Inconsistent`] when the light arrays disagree or hold no triangles.

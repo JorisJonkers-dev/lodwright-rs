@@ -1278,6 +1278,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)] // the corners are exact sums of whole numbers, the colour the same division
     fn a_light_point_is_three_two_sided_squares_192_units_wide_in_the_light_s_full_colour() {
         let light = FarLightSource {
             reference: 3,

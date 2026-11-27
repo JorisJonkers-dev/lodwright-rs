@@ -33,6 +33,9 @@ const MAX_VERTICES: usize = 65_535;
 const MAX_TRIANGLES: usize = 65_535;
 /// Key of the flat texture used by shapes without one.
 const NONE: &str = "<none>";
+/// Key prefix of a glow card's texture (far glow on): black, the size of the card's glow texture, which follows the
+/// prefix.
+const CARD: &str = "<glow card>";
 
 /// What object generation produced.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -92,6 +95,10 @@ pub struct Surfaces<'a> {
     /// The steady lights of the world (`objects.far_lights`): each one within [`FAR_LIGHT_REACH`] of an object of its
     /// block is drawn as a small light point in the block's normal file; empty draws none.
     pub far_lights: &'a [FarLightSource],
+    /// Write a glow atlas beside each atlas page whose textures have glow maps (black where a texture has none), name
+    /// it in the glow slot of that page's shapes and give them an emissive material, so lit windows and signs glow
+    /// from far at night. Off by default: the blocks and atlases are then the same bytes as without it.
+    pub glow: bool,
 }
 
 /// How near (world units, on the ground plane) a light must stand to an object of its block to get a far light point:
@@ -116,6 +123,25 @@ struct LightPoints {
     colors: Vec<[f32; 4]>,
     uv: Vec<[f32; 2]>,
     indices: Vec<u16>,
+}
+
+/// The cell a point of the ground plane stands in.
+fn light_cell(pos: [f32; 3]) -> (i32, i32) {
+    // source: cell-size-units
+    #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+    (
+        (pos[0] / CELL_UNITS).floor() as i32,
+        (pos[1] / CELL_UNITS).floor() as i32,
+    )
+}
+
+/// The centre of cell (`cx`, `cy`) on the ground plane.
+fn cell_centre(cx: i32, cy: i32) -> (f32, f32) {
+    #[allow(clippy::cast_precision_loss)] // a cell number is small
+    (
+        (cx as f32 + 0.5) * CELL_UNITS,
+        (cy as f32 + 0.5) * CELL_UNITS,
+    )
 }
 
 /// The light points of the lights of `lights` that stand within [`FAR_LIGHT_REACH`] of one of `members`, relative to
@@ -681,19 +707,19 @@ fn shapes_from_full_models(
         }
     }
     let wanted: Vec<(String, FarLimits)> = wanted.into_iter().collect();
+    let glow = surfaces.glow;
     let made = par_map(&wanted, surfaces.threads, |(lod, limits)| {
         let bytes = assets.read(full_of.get(lod)?)?;
         let parts = parse_lod_model(&bytes).ok()?;
-        // the shapes drawn without lighting are effects and are left out; what is left must have a solid shape
-        if parts
-            .iter()
-            .filter(|part| !part.triangles.is_empty() && !part.unlit)
-            .all(|part| part.alpha)
-        {
+        // the shapes drawn without lighting are effects and are left out (with far glow they are glow cards); what
+        // is left must have a solid shape or be glow cards alone
+        let shapes = || parts.iter().filter(|p| !p.triangles.is_empty());
+        let cards = shapes().any(|p| glow && p.unlit && p.glow_map.is_some());
+        if !cards && shapes().filter(|p| !p.unlit).all(|p| p.alpha) {
             return Some(None);
         }
         // a model that cannot be simplified stays an ordinary model without a LOD model
-        far_parts_from_full_model(parts, *limits).map(Some)
+        far_parts_from_full_model(parts, *limits, glow).map(Some)
     });
     let (mut simplified, mut no_solid_shape) = (BTreeSet::new(), BTreeSet::new());
     for ((lod, _), result) in wanted.into_iter().zip(made) {
@@ -772,6 +798,63 @@ pub fn generate_objects_with_progress(
         LARGEST_ATLAS,
         block_done,
     )
+}
+
+/// `image` with each colour weighted by its alpha and the alpha full: the light a texture blended by its alpha gives
+/// off.
+fn weighted_by_alpha(image: &Image) -> Image {
+    let mut px = image.rgba().to_vec();
+    for p in px.as_chunks_mut::<4>().0 {
+        let a = u16::from(p[3]);
+        for c in &mut p[..3] {
+            *c = u8::try_from((u16::from(*c) * a + 127) / 255).unwrap_or(u8::MAX);
+        }
+        p[3] = 255;
+    }
+    Image::new(image.width(), image.height(), px).unwrap_or_else(|_| image.clone())
+}
+
+/// The glow atlas of one atlas page at half its size, as the normal atlas is: each texture's glow map in the texture's
+/// rectangle, black where a texture has none or its glow map cannot be read. `None` when no texture on the page has a
+/// glow map that can be read, so such a page gets no glow atlas.
+fn glow_atlas(
+    rects: &[(&String, &Rect)],
+    glow_of: &HashMap<String, (String, bool)>,
+    assets: &dyn Assets,
+    atlas: &Atlas,
+    threads: usize,
+) -> Option<Image> {
+    if !rects.iter().any(|(k, _)| glow_of.contains_key(*k)) {
+        return None;
+    }
+    let (gw, gh) = ((atlas.width / 2).max(4), (atlas.height / 2).max(4));
+    let halves = par_map(rects, threads, |(k, r)| {
+        let half = Rect {
+            x: r.x / 2,
+            y: r.y / 2,
+            w: (r.w / 2).max(1),
+            h: (r.h / 2).max(1),
+        };
+        let (path, by_alpha) = glow_of.get(*k)?;
+        let mut img = load_texture(assets, path)?;
+        if *by_alpha {
+            img = weighted_by_alpha(&img);
+        }
+        resize(&img, half.w, half.h, Filter::Box)
+            .ok()
+            .map(|small| (half, small))
+    });
+    if halves.iter().all(Option::is_none) {
+        return None;
+    }
+    let mut glow = vec![0_u8; (gw * gh * 4) as usize];
+    for px in glow.as_chunks_mut::<4>().0 {
+        px[3] = 255;
+    }
+    for (half, small) in halves.iter().flatten() {
+        blit(&mut glow, gw, small, half);
+    }
+    Image::new(gw, gh, glow).ok()
 }
 
 /// [`generate_objects_with_progress`] with atlases no larger than `largest` (width, height): the textures that do not
@@ -952,18 +1035,29 @@ pub fn generate_objects_with_atlas_limit(
     }
     // textures: key by the diffuse path of each shape
     phase("textures");
-    let key_of = |p: &Part| {
-        p.diffuse
+    let key_of = |p: &Part| match (&p.glow_map, p.unlit && surfaces.glow) {
+        (Some(g), true) => format!("{CARD}{}", norm_key(g)),
+        _ => p
+            .diffuse
             .as_deref()
-            .map_or_else(|| NONE.to_owned(), norm_key)
+            .map_or_else(|| NONE.to_owned(), norm_key),
     };
     let mut diffuse_keys: BTreeSet<String> = BTreeSet::new();
     let mut normal_of: HashMap<String, String> = HashMap::new();
+    // a glow map and whether its colour is weighted by its alpha (a glow card's texture is blended by its alpha)
+    let mut glow_of: HashMap<String, (String, bool)> = HashMap::new();
     for model in models.values().flatten() {
         for p in &model.parts {
             let k = key_of(p);
             if let Some(n) = &p.normal_map {
                 normal_of.entry(k.clone()).or_insert_with(|| norm_key(n));
+            }
+            if surfaces.glow
+                && let Some(g) = &p.glow_map
+            {
+                glow_of
+                    .entry(k.clone())
+                    .or_insert_with(|| (norm_key(g), p.unlit));
             }
             diffuse_keys.insert(k);
         }
@@ -979,7 +1073,13 @@ pub fn generate_objects_with_atlas_limit(
             images.insert(k.clone(), image.clone());
         }
     }
-    let decoded = par_map(&keys, surfaces.threads, |k| read_texture(assets, k));
+    let decoded = par_map(&keys, surfaces.threads, |k| match k.strip_prefix(CARD) {
+        // a glow card is black by day: only its glow shows
+        Some(glow) => {
+            read_texture(assets, glow).map(|g| flat(g.width(), g.height(), [0, 0, 0, 255]))
+        }
+        None => read_texture(assets, k),
+    });
     for (k, read) in keys.into_iter().zip(decoded) {
         match read {
             Ok(img) => {
@@ -1014,6 +1114,8 @@ pub fn generate_objects_with_atlas_limit(
     // (halving every texture to fit one atlas blurred every far object of a large load order)
     phase("atlas");
     let atlases = pack_pages(&sizes, largest);
+    // the pages that got a glow atlas
+    let mut glowing = vec![false; atlases.len()];
     for (page, atlas) in atlases.iter().enumerate() {
         let rects: Vec<(&String, &Rect)> = atlas.rects.iter().collect();
         // the textures that need resizing, and the normal maps, are made on the worker threads; the pages are
@@ -1068,6 +1170,14 @@ pub fn generate_objects_with_atlas_limit(
             &normal_path,
             &encode_bc3(&normal_image, surfaces.threads)?,
         )?);
+        if let Some(glow) = glow_atlas(&rects, &glow_of, assets, atlas, surfaces.threads) {
+            report.files.push(write_file(
+                out,
+                &layout::atlas_page_glow_path(world, page)?,
+                &encode_bc3(&glow, surfaces.threads)?,
+            )?);
+            glowing[page] = true;
+        }
     }
     // blocks
     phase("blocks");
@@ -1095,6 +1205,14 @@ pub fn generate_objects_with_atlas_limit(
     let refs: Vec<[String; 2]> = (0..atlases.len())
         .map(|page| layout::nif_atlas_page_paths(world, page))
         .collect::<Result<_, _>>()?;
+    let glow_refs: Vec<Option<String>> = glowing
+        .iter()
+        .enumerate()
+        .map(|(page, on)| {
+            on.then(|| layout::nif_atlas_page_glow_path(world, page))
+                .transpose()
+        })
+        .collect::<Result<_, _>>()?;
     let pages: Vec<Page> = atlases
         .iter()
         .map(|atlas| Page {
@@ -1105,12 +1223,7 @@ pub fn generate_objects_with_atlas_limit(
     // the far lights of each block, by the block their position falls in
     let mut lights_of: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
     for l in surfaces.far_lights {
-        // source: cell-size-units
-        #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
-        let (cx, cy) = (
-            (l.pos[0] / CELL_UNITS).floor() as i32,
-            (l.pos[1] / CELL_UNITS).floor() as i32,
-        );
+        let (cx, cy) = light_cell(l.pos);
         let (ax, ay) = surfaces.grid_anchor;
         lights_of
             .entry((
@@ -1204,9 +1317,9 @@ pub fn generate_objects_with_atlas_limit(
         }
         let shapes: Vec<ObjectBlock> = chunks
             .iter()
-            .zip(&refs)
+            .zip(refs.iter().zip(&glow_refs))
             .flat_map(|(c, r)| c.iter().map(move |m| (m, r)))
-            .map(|(m, [diffuse_ref, normal_ref])| ObjectBlock {
+            .map(|(m, ([diffuse_ref, normal_ref], glow_ref))| ObjectBlock {
                 origin,
                 vertices: &m.vertices,
                 normals: &m.normals,
@@ -1216,26 +1329,42 @@ pub fn generate_objects_with_atlas_limit(
                 indices: &m.indices,
                 segment_triangles: m.segment_triangles,
                 textures: [diffuse_ref, normal_ref],
+                glow: glow_ref.as_deref(),
             })
             .collect();
-        // light points go in the normal file only: the high file is drawn much farther, where they would be noise
-        let points = (!high)
-            .then(|| lights_of.get(&(bx, by)))
-            .flatten()
-            .map(|lights| light_points(lights, &members_of_block, origin))
-            .filter(|p| !p.indices.is_empty());
-        let lights = points.as_ref().map(|p| FarLightsShape {
-            vertices: &p.vertices,
-            colors: &p.colors,
-            uv: &p.uv,
-            indices: &p.indices,
-            texture: &light_texture_ref,
-        });
-        if let Some(p) = &points {
+        // light points go in the normal file only: the high file is drawn much farther, where they would be noise.
+        // One shape per cell, placed at the cell's centre: an engine leaves out the shapes of the cells it draws in
+        // full, so the lamps of loaded cells are not drawn twice.
+        let mut per_cell: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
+        if !high {
+            for l in lights_of.get(&(bx, by)).into_iter().flatten() {
+                per_cell.entry(light_cell(l.pos)).or_default().push(l);
+            }
+        }
+        let points: Vec<((f32, f32), LightPoints)> = per_cell
+            .iter()
+            .map(|(&(cx, cy), lights)| {
+                let centre = cell_centre(cx, cy);
+                (centre, light_points(lights, &members_of_block, centre))
+            })
+            .filter(|(_, p)| !p.indices.is_empty())
+            .collect();
+        let lights: Vec<FarLightsShape<'_>> = points
+            .iter()
+            .map(|(origin, p)| FarLightsShape {
+                origin: *origin,
+                vertices: &p.vertices,
+                colors: &p.colors,
+                uv: &p.uv,
+                indices: &p.indices,
+                texture: &light_texture_ref,
+            })
+            .collect();
+        for (_, p) in &points {
             report.far_lights += p.vertices.len() / 12;
             lights_written = true;
         }
-        let file = object_block_with_lights(&shapes, lights.as_ref())?.write()?;
+        let file = object_block_with_lights(&shapes, &lights)?.write()?;
         report.files.push(write_file(
             out,
             &layout::object_mesh_path(world, bx, by, high)?,

@@ -10,7 +10,7 @@
     reason = "one builder for one fixed file layout"
 )]
 
-use crate::block::{Body, GeometryData, NiTriShapeData};
+use crate::block::{Body, GeometryData, NiMaterialProperty, NiTriShapeData, ObjectNet};
 use crate::error::{NifError, Result};
 use crate::file::{Block, NifFile};
 use crate::terrain::{
@@ -29,6 +29,41 @@ const TYPES: [&[u8]; 7] = [
     b"BSMultiBound",
     b"BSMultiBoundAABB",
 ];
+
+/// The block type a block with far glow adds after the others: one material that every glowing shape names.
+const MATERIAL_TYPE: &[u8] = b"NiMaterialProperty";
+
+/// The material of a block with far glow. The engine scales a shape's glow map by its material's emissive colour, and a
+/// shape without a material draws no glow (measured in the engine: a glow map in slot 2 alone changes nothing, with
+/// this material it glows); where the glow atlas is black nothing is added.
+fn glow_material() -> NiMaterialProperty {
+    NiMaterialProperty {
+        net: ObjectNet {
+            name: -1,
+            extra_data: Vec::new(),
+            controller: -1,
+        },
+        ambient: [1.0; 3],
+        diffuse: [1.0; 3],
+        specular: [0.0; 3],
+        emissive: [1.0; 3],
+        glossiness: 10.0,
+        alpha: 1.0,
+        emissive_mult: 1.0,
+    }
+}
+
+/// A texture set with the atlas, the normal atlas and the glow atlas in slots 0 to 2 and the other three slots empty.
+fn glow_texture_set(paths: [&str; 2], glow: &str) -> Vec<u8> {
+    let mut b = Vec::new();
+    put_u32(&mut b, 6);
+    for p in [paths[0], paths[1], glow] {
+        put_u32(&mut b, u32::try_from(p.len()).unwrap_or(u32::MAX));
+        b.extend_from_slice(p.as_bytes());
+    }
+    b.extend_from_slice(&[0; 12]);
+    b
+}
 
 // source: game-lod-object-block-nif
 /// The lighting property after its empty name, extra data and controller. Differs from the terrain block's in the
@@ -65,15 +100,24 @@ pub struct ObjectBlock<'a> {
     pub segment_triangles: [u32; SEGMENTS],
     /// The atlas and its normal atlas paths as written in the texture set.
     pub textures: [&'a str; 2],
+    /// The glow atlas path for the texture set's glow slot. `None` writes the block as before: no glow map and no
+    /// material. With a glow atlas the shape also names the block's one glow material.
+    pub glow: Option<&'a str>,
 }
 
-fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS], first: i32) -> Result<Vec<u8>> {
+fn shape_bytes(
+    origin: (f32, f32),
+    segments: [u32; SEGMENTS],
+    first: i32,
+    material: Option<i32>,
+) -> Result<Vec<u8>> {
     // source: game-lod-object-block-nif
-    let mut b =
-        Body::TriShape(tri_shape_for_object(origin, first)).write(crate::block::Profile {
+    let mut b = Body::TriShape(tri_shape_for_object(origin, first, material)).write(
+        crate::block::Profile {
             user_version: 11,
             user_version2: 34,
-        })?;
+        },
+    )?;
     // the game's table ends with the last segment that holds a triangle
     let count = segments
         .iter()
@@ -93,11 +137,15 @@ fn shape_bytes(origin: (f32, f32), segments: [u32; SEGMENTS], first: i32) -> Res
 
 /// The game's object block carries the block's origin on the shape; its root node has no translation (measured on
 /// the game's blocks: the engine draws a block only when the translation is where the game puts it).
-fn tri_shape_for_object(origin: (f32, f32), first: i32) -> crate::block::NiTriShape {
+fn tri_shape_for_object(
+    origin: (f32, f32),
+    first: i32,
+    material: Option<i32>,
+) -> crate::block::NiTriShape {
     let mut s = tri_shape();
     s.av.translation = [origin.0, origin.1, 0.0];
     // the shape sits at block `first`; its lighting property follows it and its data is the third block after it
-    s.av.properties = vec![first + 1];
+    s.av.properties = std::iter::once(first + 1).chain(material).collect();
     s.data = first + 3;
     s
 }
@@ -118,18 +166,21 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
 /// # Errors
 /// [`NifError::Inconsistent`] as [`object_block`] for any shape, or when `shapes` is empty or the origins differ.
 pub fn object_block_shapes(shapes: &[ObjectBlock<'_>]) -> Result<NifFile> {
-    object_block_with_lights(shapes, None)
+    object_block_with_lights(shapes, &[])
 }
 
 /// The marker name of the far lights shape: a `NiStringExtraData` of this name on the shape tells the engine to
 /// draw it only at night. One general name that any tool may write.
 pub const FAR_LIGHTS_MARKER: &str = "FarLights";
 
-/// The small unlit, additive light points of one object block (`objects.far_lights`), drawn as one plain shape
-/// beside the block's object shapes.
+/// The small unlit, additive light points of one cell of an object block (`objects.far_lights`), drawn as one plain
+/// shape beside the block's object shapes. A block carries one such shape per cell that has lights, each placed at its
+/// cell's centre, so an engine can leave out the shapes of the cells it draws in full.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FarLightsShape<'a> {
-    /// Positions relative to the block's origin.
+    /// The shape's own position (x and y in world units): the centre of its cell.
+    pub origin: (f32, f32),
+    /// Positions relative to [`FarLightsShape::origin`].
     pub vertices: &'a [[f32; 3]],
     /// Colours, red, green, blue and alpha from 0 to 1, one per vertex.
     pub colors: &'a [[f32; 4]],
@@ -182,7 +233,7 @@ fn no_lighting_property(texture: &str) -> Vec<u8> {
 /// As [`object_block_shapes`]; and [`NifError::Inconsistent`] when the light arrays disagree or hold no triangles.
 pub fn object_block_with_lights(
     shapes: &[ObjectBlock<'_>],
-    lights: Option<&FarLightsShape<'_>>,
+    lights: &[FarLightsShape<'_>],
 ) -> Result<NifFile> {
     let Some(first) = shapes.first() else {
         return Err(NifError::Inconsistent("a block needs a shape"));
@@ -197,8 +248,15 @@ pub fn object_block_with_lights(
     let (mut low, mut high) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
     let mut bodies = vec![Body::Opaque(Vec::new())];
     let mut children = Vec::new();
+    // with far glow, one material after the multibound and its box, named by every shape that has a glow atlas
+    let glow = shapes.iter().any(|s| s.glow.is_some());
+    let material = glow.then(|| i32::try_from(1 + 4 * shapes.len() + 2).unwrap_or(-1));
     for (k, block) in shapes.iter().enumerate() {
-        let (shape_bodies, lo, hi) = shape_blocks(block, i32::try_from(1 + 4 * k).unwrap_or(1))?;
+        let (shape_bodies, lo, hi) = shape_blocks(
+            block,
+            i32::try_from(1 + 4 * k).unwrap_or(1),
+            material.filter(|_| block.glow.is_some()),
+        )?;
         for c in 0..3 {
             low[c] = low[c].min(lo[c]);
             high[c] = high[c].max(hi[c]);
@@ -227,11 +285,19 @@ pub fn object_block_with_lights(
     let _ = ROOT_FLAGS;
     bodies.push(Body::Opaque((multibound + 1).to_le_bytes().to_vec()));
     bodies.push(Body::Opaque(aabb));
-    // type indices: root 0, then per shape 1 to 4 (shape, lighting, texture set, data), then multibound and box
-    let n = bodies.len();
+    let mut types = TYPES.to_vec();
+    if glow {
+        bodies.push(Body::MaterialProperty(glow_material()));
+        types.push(MATERIAL_TYPE);
+    }
+    // type indices: root 0, then per shape 1 to 4 (shape, lighting, texture set, data), then multibound and box, then
+    // the glow material when there is one
+    let n = bodies.len() - usize::from(glow);
     let type_of = |i: usize| -> u16 {
         if i == 0 {
             0
+        } else if i == n {
+            7
         } else if i == n - 2 {
             5
         } else if i == n - 1 {
@@ -248,22 +314,24 @@ pub fn object_block_with_lights(
             body,
         })
         .collect();
-    let mut header = file_header(&TYPES);
-    if let Some(lights) = lights {
-        let at =
-            i32::try_from(blocks.len()).map_err(|_| NifError::Inconsistent("too many blocks"))?;
-        children.push(at.cast_unsigned());
-        blocks[0].body = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
-        let types = u16::try_from(TYPES.len()).unwrap_or(0);
-        for (body, type_index) in light_blocks(lights, first.origin, at)?.into_iter().zip([
-            types,
-            types + 1,
-            types + 2,
-            4,
-            types + 3,
-        ]) {
-            blocks.push(Block { type_index, body });
+    let mut header = file_header(&types);
+    if !lights.is_empty() {
+        let first_light_type = u16::try_from(types.len()).unwrap_or(0);
+        for shape in lights {
+            let at = i32::try_from(blocks.len())
+                .map_err(|_| NifError::Inconsistent("too many blocks"))?;
+            children.push(at.cast_unsigned());
+            for (body, type_index) in light_blocks(shape, shape.origin, at)?.into_iter().zip([
+                first_light_type,
+                first_light_type + 1,
+                first_light_type + 2,
+                4,
+                first_light_type + 3,
+            ]) {
+                blocks.push(Block { type_index, body });
+            }
         }
+        blocks[0].body = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
         header
             .block_types
             .extend(LIGHT_TYPES.iter().map(|t| t.to_vec()));
@@ -369,7 +437,11 @@ fn light_blocks(lights: &FarLightsShape<'_>, origin: (f32, f32), at: i32) -> Res
 }
 
 /// The four blocks of one shape and the corners of its vertices' box.
-fn shape_blocks(block: &ObjectBlock<'_>, first: i32) -> Result<(Vec<Body>, [f32; 3], [f32; 3])> {
+fn shape_blocks(
+    block: &ObjectBlock<'_>,
+    first: i32,
+    material: Option<i32>,
+) -> Result<(Vec<Body>, [f32; 3], [f32; 3])> {
     let n = block.vertices.len();
     if n == 0
         || n > usize::from(u16::MAX)
@@ -455,9 +527,17 @@ fn shape_blocks(block: &ObjectBlock<'_>, first: i32) -> Result<(Vec<Body>, [f32;
     lighting[TEXTURE_SET_REF..TEXTURE_SET_REF + 4].copy_from_slice(&(first + 2).to_le_bytes());
     Ok((
         vec![
-            Body::Opaque(shape_bytes(block.origin, block.segment_triangles, first)?),
+            Body::Opaque(shape_bytes(
+                block.origin,
+                block.segment_triangles,
+                first,
+                material,
+            )?),
             Body::Opaque(lighting),
-            Body::Opaque(texture_set(block.textures)),
+            Body::Opaque(match block.glow {
+                Some(glow) => glow_texture_set(block.textures, glow),
+                None => texture_set(block.textures),
+            }),
             Body::TriShapeData(data),
         ],
         low,
@@ -475,6 +555,11 @@ pub struct ObjectShape {
     pub texture: String,
     /// The normal texture path of the shape's texture set.
     pub normal_texture: String,
+    /// The glow texture path of the shape's texture set (slot 2); empty when it has none.
+    pub glow_texture: String,
+    /// Whether the shape names a material with an emissive colour that is not black, which the engine needs to draw
+    /// the glow map.
+    pub emissive: bool,
     /// Vertex positions relative to the origin.
     pub vertices: Vec<[f32; 3]>,
     /// The UVs of the first set, one per vertex; empty when the shape has none.
@@ -531,8 +616,20 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
         };
         // name, extra data list, controller, flags (u32), translation, rotation, scale, then the property list
         let props = 4 + 4 + 4 + 4 + 12 + 36 + 4;
+        let properties = block_ref(shape_bytes, props).ok_or(BAD)?;
+        if !(1..=2).contains(&properties) {
+            return Err(BAD);
+        }
         let lighting = block_ref(shape_bytes, props + 4).ok_or(BAD)?;
-        let data = block_ref(shape_bytes, props + 12).ok_or(BAD)?;
+        // after the properties: the collision object, then the data
+        let data = block_ref(shape_bytes, props + 4 + 4 * properties + 4).ok_or(BAD)?;
+        let emissive = (1..properties).any(|p| {
+            block_ref(shape_bytes, props + 4 + 4 * p)
+                .and_then(|m| file.blocks.get(m))
+                .is_some_and(|m| {
+                    matches!(&m.body, Body::MaterialProperty(m) if m.emissive.iter().any(|c| *c > 0.0))
+                })
+        });
         let Some(Body::Opaque(lighting_bytes)) = file.blocks.get(lighting).map(|b| &b.body) else {
             return Err(BAD);
         };
@@ -544,8 +641,8 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
             return Err(BAD);
         };
         let mut at = 4;
-        let mut paths = Vec::with_capacity(2);
-        for _ in 0..2 {
+        let mut paths = Vec::with_capacity(3);
+        for _ in 0..3 {
             let len = block_ref(set_bytes, at).ok_or(BAD)?;
             let text = set_bytes.get(at + 4..at + 4 + len).ok_or(BAD)?;
             paths.push(String::from_utf8_lossy(text).into_owned());
@@ -561,12 +658,16 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
         // shape before it has a fixed length, which tells the count (a word that merely equals a smaller count
         // somewhere in the table must not be taken for it)
         let segments = {
-            let body = Body::TriShape(tri_shape_for_object((0.0, 0.0), 0))
-                .write(crate::block::Profile {
-                    user_version: 11,
-                    user_version2: 34,
-                })?
-                .len();
+            let body = Body::TriShape(tri_shape_for_object(
+                (0.0, 0.0),
+                0,
+                (properties > 1).then_some(0),
+            ))
+            .write(crate::block::Profile {
+                user_version: 11,
+                user_version2: 34,
+            })?
+            .len();
             let table = shape_bytes.len().checked_sub(body + 4).ok_or(BAD)?;
             if table % 9 != 0 || block_ref(shape_bytes, body) != Some(table / 9) {
                 return Err(BAD);
@@ -581,6 +682,8 @@ pub fn read_object_shapes(file: &NifFile) -> Result<Vec<ObjectShape>> {
             origin,
             texture: paths.next().unwrap_or_default(),
             normal_texture: paths.next().unwrap_or_default(),
+            glow_texture: paths.next().unwrap_or_default(),
+            emissive,
             vertices: d.geometry.vertices.clone().ok_or(BAD)?,
             uv: d.geometry.uv_sets.first().cloned().unwrap_or_default(),
             triangles: d.triangles.clone().ok_or(BAD)?,
@@ -612,6 +715,77 @@ mod tests {
     }
 
     #[test]
+    fn a_block_with_a_glow_atlas_names_it_in_slot_two_and_one_emissive_material_and_reads_back() {
+        let (v, uv, i) = tri();
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let shape = |glow| ObjectBlock {
+            origin: (4096.0, 0.0),
+            vertices: &v,
+            normals: &n,
+            tangents: &n,
+            bitangents: &n,
+            uv: &uv,
+            indices: &i,
+            segment_triangles: one_segment(0),
+            textures: ["Data\\a.dds", "Data\\a_n.dds"],
+            glow,
+        };
+        let file =
+            super::object_block_shapes(&[shape(Some("Data\\a_g.dds")), shape(None)]).unwrap();
+        // root, two shapes of four blocks, multibound, box, material
+        assert_eq!(file.blocks.len(), 12);
+        assert_eq!(
+            file.header.block_types.last().map(Vec::as_slice),
+            Some(&b"NiMaterialProperty"[..])
+        );
+        let Body::MaterialProperty(m) = &file.blocks[11].body else {
+            panic!("the last block is the material");
+        };
+        assert_eq!(m.emissive, [1.0; 3]);
+        let bytes = file.write().unwrap();
+        let back = NifFile::read(&bytes).unwrap();
+        assert_eq!(back.write().unwrap(), bytes);
+        let shapes = super::read_object_shapes(&back).unwrap();
+        assert_eq!(shapes.len(), 2);
+        assert_eq!(
+            (shapes[0].glow_texture.as_str(), shapes[0].emissive),
+            ("Data\\a_g.dds", true)
+        );
+        assert_eq!(
+            (shapes[1].glow_texture.as_str(), shapes[1].emissive),
+            ("", false)
+        );
+        assert_eq!(shapes[0].triangles, shapes[1].triangles);
+        assert_eq!(shapes[0].segment_triangles, vec![1]);
+    }
+
+    #[test]
+    fn a_block_without_a_glow_atlas_has_no_material_and_its_seven_block_types() {
+        let (v, uv, i) = tri();
+        let n = vec![[0.0, 0.0, 1.0]; 3];
+        let file = object_block(&ObjectBlock {
+            origin: (0.0, 0.0),
+            vertices: &v,
+            normals: &n,
+            tangents: &n,
+            bitangents: &n,
+            uv: &uv,
+            indices: &i,
+            segment_triangles: one_segment(0),
+            textures: ["a", "b"],
+            glow: None,
+        })
+        .unwrap();
+        assert_eq!(file.header.block_types.len(), 7);
+        assert!(
+            !file
+                .blocks
+                .iter()
+                .any(|b| matches!(b.body, Body::MaterialProperty(_)))
+        );
+    }
+
+    #[test]
     fn an_object_block_has_seven_blocks_a_segment_table_and_reads_back() {
         covers(&[ids::formats::meshes_and_images::NIF_OBJECT_BLOCKS]);
         let (v, uv, i) = tri();
@@ -628,6 +802,7 @@ mod tests {
             indices: &i,
             segment_triangles: one_segment(5),
             textures: ["Data\\a.dds", "Data\\b.dds"],
+            glow: None,
         })
         .unwrap();
         let bytes = file.write().unwrap();
@@ -676,6 +851,7 @@ mod tests {
             indices: &i,
             segment_triangles: [0; SEGMENTS],
             textures: ["a", "b"],
+            glow: None,
         });
         assert!(bad.is_err());
     }
@@ -709,6 +885,7 @@ mod shapes_tests {
             indices: &i,
             segment_triangles: seg,
             textures: ["Data\\a.dds", "Data\\b.dds"],
+            glow: None,
         };
         let file = object_block_shapes(&[one.clone(), one]).unwrap();
         let bytes = file.write().unwrap();
@@ -751,6 +928,7 @@ mod shapes_tests {
             indices: &i,
             segment_triangles: seg,
             textures,
+            glow: None,
         };
         let file = object_block_shapes(&[
             page(["Data\\a.dds", "Data\\a_n.dds"]),
@@ -802,6 +980,7 @@ mod shapes_tests {
                 indices: &i,
                 segment_triangles: seg,
                 textures,
+                glow: None,
             }
         };
         let file = object_block_shapes(&[
@@ -843,6 +1022,7 @@ mod shapes_tests {
             indices: &indices,
             segment_triangles: seg,
             textures: ["Data\\a.dds", "Data\\a_n.dds"],
+            glow: None,
         }])
         .unwrap();
         let back = NifFile::read(&file.write().unwrap()).unwrap();
@@ -882,6 +1062,7 @@ mod lights_tests {
             indices: i,
             segment_triangles: segments,
             textures: ["a.dds", "a_n.dds"],
+            glow: None,
         }
     }
 
@@ -900,13 +1081,16 @@ mod lights_tests {
         ];
         let colors = [[0.5, 0.5, 0.25, 1.0]; 3];
         let lights = FarLightsShape {
+            origin: (4096.0, 8192.0),
             vertices: &lv,
             colors: &colors,
             uv: &uv,
             indices: &i,
             texture: "textures\\landscape\\lod\\farlight.dds",
         };
-        let file = object_block_with_lights(std::slice::from_ref(&block), Some(&lights)).unwrap();
+        let file =
+            object_block_with_lights(std::slice::from_ref(&block), std::slice::from_ref(&lights))
+                .unwrap();
         let bytes = file.write().unwrap();
         let back = NifFile::read(&bytes).unwrap();
         assert_eq!(back.write().unwrap(), bytes);
@@ -955,13 +1139,56 @@ mod lights_tests {
     }
 
     #[test]
+    fn a_block_with_light_points_of_two_cells_has_one_marked_shape_at_each_cells_centre() {
+        let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let n = [[0.0, 0.0, 1.0]; 3];
+        let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let i = [0, 1, 2];
+        let block = object(&v, &n, &uv, &i);
+        let lv = [
+            [10.0, 10.0, 500.0],
+            [30.0, 10.0, 500.0],
+            [10.0, 30.0, 500.0],
+        ];
+        let colors = [[0.5, 0.5, 0.25, 1.0]; 3];
+        let at = |origin| FarLightsShape {
+            origin,
+            vertices: &lv,
+            colors: &colors,
+            uv: &uv,
+            indices: &i,
+            texture: "t.dds",
+        };
+        let lights = [at((2048.0, 2048.0)), at((6144.0, 2048.0))];
+        let file = object_block_with_lights(std::slice::from_ref(&block), &lights).unwrap();
+        let bytes = file.write().unwrap();
+        let back = NifFile::read(&bytes).unwrap();
+        assert_eq!(back.write().unwrap(), bytes);
+        assert_eq!(back.blocks.len(), 7 + 5 + 5);
+        // the string table holds the marker once, and both marker blocks name it
+        assert_eq!(back.header.strings.len(), 1);
+        let translations: Vec<[f32; 3]> = [7, 12]
+            .iter()
+            .map(|k| match &back.blocks[*k].body {
+                Body::TriShape(s) => s.av.translation,
+                _ => panic!("a light shape at block {k}"),
+            })
+            .collect();
+        assert_eq!(
+            translations,
+            vec![[2048.0, 2048.0, 0.0], [6144.0, 2048.0, 0.0]]
+        );
+        assert_eq!(read_object_shapes(&back).unwrap().len(), 1);
+    }
+
+    #[test]
     fn without_light_points_the_block_has_no_marker_and_no_light_blocks() {
         let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
         let n = [[0.0, 0.0, 1.0]; 3];
         let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
         let i = [0, 1, 2];
         let block = object(&v, &n, &uv, &i);
-        let nif = object_block_with_lights(std::slice::from_ref(&block), None).unwrap();
+        let nif = object_block_with_lights(std::slice::from_ref(&block), &[]).unwrap();
         assert_eq!(nif.header.strings, Vec::<Vec<u8>>::new());
         assert_eq!(nif.header.block_types.len(), TYPES.len());
         assert!(

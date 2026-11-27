@@ -25,6 +25,10 @@ pub struct Part {
     pub diffuse: Option<String>,
     /// Normal map path from the shape's texture set.
     pub normal_map: Option<String>,
+    /// Glow map path from the shape's texture set (slot 2), as lit windows and signs have. For a shape drawn
+    /// without lighting, the texture its `BSShaderNoLightingProperty` names: what such a shape shows is light it
+    /// gives off.
+    pub glow_map: Option<String>,
     /// The shape has an alpha property.
     pub alpha: bool,
     /// The shape is drawn without lighting (`BSShaderNoLightingProperty`), as light beams, glows and other effects
@@ -101,8 +105,8 @@ fn shape_xf(shape: &NiTriShape) -> Xf {
     }
 }
 
-/// The texture paths of a `BSShaderTextureSet` block: the diffuse and the normal slot.
-pub(crate) fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
+/// The texture paths of a `BSShaderTextureSet` block: the diffuse, the normal and the glow slot.
+pub(crate) fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>, Option<String>) {
     let mut at = 4;
     let count = bytes
         .get(..4)
@@ -121,7 +125,11 @@ pub(crate) fn texture_set(bytes: &[u8]) -> (Option<String>, Option<String>) {
         paths.push(Some(String::from_utf8_lossy(text).into_owned()).filter(|s| !s.is_empty()));
     }
     let mut it = paths.into_iter();
-    (it.next().flatten(), it.next().flatten())
+    (
+        it.next().flatten(),
+        it.next().flatten(),
+        it.next().flatten(),
+    )
 }
 
 /// Where a `BSLightingShaderProperty` of a Skyrim-stream model (user version 12, stream 83: the shader's type, the
@@ -142,11 +150,32 @@ fn skyrim_lighting_texture_set(bytes: &[u8]) -> Option<usize> {
     usize::try_from(word(at)?).ok()
 }
 
+/// The texture a `BSShaderNoLightingProperty` names: after the object name, its extra data links and controller, the
+/// property flags, the shader type, both shader flag words, the environment map scale and the clamp mode.
+pub(crate) fn no_lighting_texture(bytes: &[u8]) -> Option<String> {
+    let word = |at: usize| -> Option<usize> {
+        bytes
+            .get(at..at + 4)
+            .and_then(|b| usize::try_from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])).ok())
+    };
+    let extra = word(4)?;
+    if extra > 64 {
+        return None;
+    }
+    let at = 8 + 4 * extra + 4 + 2 + 4 + 4 + 4 + 4 + 4;
+    let len = word(at)?;
+    let text = bytes.get(at + 4..at + 4 + len)?;
+    Some(String::from_utf8_lossy(text).into_owned()).filter(|s| !s.is_empty())
+}
+
 /// Where a `BSShaderPPLightingProperty` links its texture set (see `game-lod-terrain-block-nif`).
 pub(crate) fn lighting_texture_set(bytes: &[u8]) -> Option<usize> {
     let b = bytes.get(34..38)?;
     usize::try_from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])).ok()
 }
+
+/// The diffuse, normal and glow paths of a shape.
+type Textures = (Option<String>, Option<String>, Option<String>);
 
 struct Ctx<'a> {
     file: &'a NifFile,
@@ -175,8 +204,9 @@ impl Ctx<'_> {
         }
     }
 
-    fn textures(&self, shape: &NiTriShape) -> (Option<String>, Option<String>, bool, bool) {
-        let (mut diffuse, mut normal, mut alpha) = (None, None, shape.alpha_property >= 0);
+    fn textures(&self, shape: &NiTriShape) -> (Textures, bool, bool) {
+        let mut alpha = shape.alpha_property >= 0;
+        let (mut diffuse, mut normal, mut glow) = (None, None, None);
         let unlit = shape
             .av
             .properties
@@ -194,7 +224,7 @@ impl Ctx<'_> {
                 && let Some(set) = lighting_texture_set(bytes)
                 && let Some(Body::Opaque(set_bytes)) = self.file.blocks.get(set).map(|b| &b.body)
             {
-                (diffuse, normal) = texture_set(set_bytes);
+                (diffuse, normal, glow) = texture_set(set_bytes);
             }
         }
         if diffuse.is_none()
@@ -205,9 +235,23 @@ impl Ctx<'_> {
             && self.name(set) == b"BSShaderTextureSet"
             && let Some(Body::Opaque(set_bytes)) = self.file.blocks.get(set).map(|b| &b.body)
         {
-            (diffuse, normal) = texture_set(set_bytes);
+            (diffuse, normal, glow) = texture_set(set_bytes);
         }
-        (diffuse, normal, alpha, unlit)
+        // a shape drawn without lighting shows the light it gives off: its texture is its glow
+        if unlit && glow.is_none() {
+            glow = shape
+                .av
+                .properties
+                .iter()
+                .chain(std::iter::once(&shape.shader_property))
+                .filter_map(|p| usize::try_from(*p).ok())
+                .filter(|p| self.name(*p) == b"BSShaderNoLightingProperty")
+                .find_map(|p| match self.file.blocks.get(p).map(|b| &b.body) {
+                    Some(Body::Opaque(bytes)) => no_lighting_texture(bytes),
+                    _ => None,
+                });
+        }
+        ((diffuse, normal, glow), alpha, unlit)
     }
 
     fn shape(&mut self, shape: &NiTriShape, xf: &Xf) {
@@ -226,7 +270,7 @@ impl Ctx<'_> {
         };
         let n = vertices.len();
         let turn = |v: &[f32; 3]| apply(&xf.rot, *v);
-        let (diffuse, normal_map, alpha, unlit) = self.textures(shape);
+        let ((diffuse, normal_map, glow_map), alpha, unlit) = self.textures(shape);
         self.parts.push(Part {
             // source: game-object-shape-offset
             vertices: vertices
@@ -246,6 +290,7 @@ impl Ctx<'_> {
             triangles,
             diffuse,
             normal_map,
+            glow_map,
             alpha,
             unlit,
         });
@@ -317,6 +362,50 @@ mod tests {
         }
         b.extend_from_slice(&set.to_le_bytes());
         b
+    }
+
+    #[test]
+    fn a_texture_set_gives_its_diffuse_normal_and_glow_slots() {
+        let mut set = 6_u32.to_le_bytes().to_vec();
+        for p in ["a.dds", "", "a_g.dds", "h.dds", "", ""] {
+            set.extend_from_slice(&u32::try_from(p.len()).unwrap().to_le_bytes());
+            set.extend_from_slice(p.as_bytes());
+        }
+        assert_eq!(
+            super::texture_set(&set),
+            (Some("a.dds".to_owned()), None, Some("a_g.dds".to_owned()))
+        );
+    }
+
+    /// A `BSShaderNoLightingProperty` body with `extra` extra data links and the texture `file`.
+    fn no_lighting(extra: u32, file: &str) -> Vec<u8> {
+        let mut b = vec![0_u8; 4];
+        b.extend_from_slice(&extra.to_le_bytes());
+        b.extend(std::iter::repeat_n(
+            0_u8,
+            4 * extra as usize + 4 + 2 + 4 * 5,
+        ));
+        b.extend_from_slice(&u32::try_from(file.len()).unwrap().to_le_bytes());
+        b.extend_from_slice(file.as_bytes());
+        b.extend_from_slice(&[0_u8; 16]);
+        b
+    }
+
+    #[test]
+    fn a_no_lighting_property_names_its_texture() {
+        assert_eq!(
+            super::no_lighting_texture(&no_lighting(0, "fx\\strip.dds")),
+            Some("fx\\strip.dds".to_owned())
+        );
+        assert_eq!(
+            super::no_lighting_texture(&no_lighting(2, "fx\\b.dds")),
+            Some("fx\\b.dds".to_owned())
+        );
+        assert_eq!(super::no_lighting_texture(&no_lighting(0, "")), None);
+        assert_eq!(
+            super::no_lighting_texture(&no_lighting(0, "x.dds")[..20]),
+            None
+        );
     }
 
     #[test]

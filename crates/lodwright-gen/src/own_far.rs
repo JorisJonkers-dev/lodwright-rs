@@ -528,6 +528,7 @@ fn cut(
         triangles,
         diffuse: Some(key.clone()),
         normal_map: None,
+        glow_map: None,
         alpha: false,
         unlit: false,
     };

@@ -1221,6 +1221,26 @@ fn far_lights_write_one_marked_light_shape_per_block_and_the_light_texture_only_
         })
         .collect::<Vec<_>>();
     assert_eq!(light_data, vec![12]);
+    // the light shape sits at the centre of the cell its light stands in, so an engine can leave it out where the
+    // cell is drawn in full
+    let marked = nif
+        .blocks
+        .iter()
+        .filter_map(|b| match &b.body {
+            lodwright_nif::Body::TriShape(t) if !t.av.net.extra_data.is_empty() => {
+                Some(t.av.translation)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(marked.len(), 1);
+    assert_eq!(
+        (
+            marked[0][0].rem_euclid(4096.0),
+            marked[0][1].rem_euclid(4096.0)
+        ),
+        (2048.0, 2048.0)
+    );
     // a block with its light shape is a well-formed object block to the verifier
     let verification = lodwright_gen::verify_folder(&on_out);
     assert!(verification.object_blocks > 0);

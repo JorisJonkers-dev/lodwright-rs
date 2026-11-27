@@ -20,7 +20,7 @@ gets a point at that spot, with the radius and colour of a lit copy's light, unl
 already stands within 64 units of it. A model that stands beside lights only now and then, or with its lights at
 changing spots, teaches nothing.
 
-What is written: in the normal file of each object block that has such lights, one more shape beside the object shapes:
+What is written: in the normal file of each object block that has such lights, one more shape per cell that has lights, beside the object shapes (each placed at the centre of its cell, with its points relative to that, so an engine can leave out the shapes of the cells it draws in full and a lamp that is really loaded is not drawn twice):
 a plain `NiTriShape` with three crossed squares 192 units wide per light (one flat, two upright, each written with both
 windings so it shows from either side), vertex colours at the light's full colour, a `BSShaderNoLightingProperty`
 (shader type 33, z test on, z write off, vertex colours on, falloff unset) naming the world's light point texture

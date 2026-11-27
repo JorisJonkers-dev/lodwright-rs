@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.20.0...v0.21.0) (2026-11-27)
+
+
+### Features
+
+* **objects:** far light points for flickering and pulsing lights ([#441](https://github.com/JorisJonkers-dev/lodwright-rs/issues/441)) ([9c52d67](https://github.com/JorisJonkers-dev/lodwright-rs/commit/9c52d67bc1fc634c91d3368b698a7ea8c32498e8))
+
 ## [0.20.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.19.0...v0.20.0) (2026-11-27)
 
 

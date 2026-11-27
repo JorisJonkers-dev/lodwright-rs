@@ -1,18 +1,19 @@
-# One pipeline ending in "Pipeline Complete", the only required check (estate convention). Every check is its own job
-# and they run in parallel, so one failure does not hide the others and a rerun repeats only what failed; each job
-# calls the same `task` target that `task check` runs locally. "Pipeline Complete" only aggregates their results.
+# One pipeline ending in "Pipeline Complete", the only required check (estate convention). The long checks (tests,
+# Windows, macOS) are their own jobs; the small ones are steps of the one "Checks" job, because GitHub bills every job
+# rounded up to a minute. Every check calls the same `task` target that `task check` runs locally. "Pipeline
+# Complete" only aggregates the results.
 name: Pipeline
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
+    types: [opened, edited, reopened, synchronize, labeled]
   push:
     branches: [main]
   workflow_dispatch:
 
 # A new commit on a branch cancels the run still going for the older one: runners are limited and the older
 # result is of no use. Not cancelled: a title edit (its own group, so it neither cancels nor is cancelled by a
-# push; no label events trigger this workflow, so a bot labelling a new pull request starts nothing) and main
+# push) and main
 # (every commit there runs to the end, so it always has a finished run and its caches are saved).
 concurrency:
   group: pipeline-${{ github.ref == 'refs/heads/main' && github.sha || format('{0}-{1}', github.event.pull_request.number || github.ref, github.event.action == 'edited' && github.run_id || 'commits') }}
@@ -55,9 +56,13 @@ jobs:
 
   # lodwright is linked into the Toolbox's raul on Linux, Windows and macOS (Toolbox ADR-0006), so it is built and
   # tested natively on Windows and macOS too (Apple silicon). The Linux checks are the jobs below; this job lints
-  # and tests on both, and Pipeline Complete gates on it.
+  # and tests on both, and Pipeline Complete gates on it. Windows and macOS minutes cost 2x and 10x Linux minutes, so
+  # a pull request runs this job only when Changed files finds platform-specific changes or the label `ci:all-os`;
+  # a push to main always runs it. A skipped job is accepted by Pipeline Complete.
   platforms:
     name: Build and test (${{ matrix.os }})
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +115,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       code: ${{ steps.changes.outputs.code }}
+      platforms: ${{ steps.changes.outputs.platforms }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -120,55 +126,24 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.sha }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
-          # A push to main always builds, so its feature-catalogue reports carry the test results of all three platforms.
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
-            echo "code=true" >>"$GITHUB_OUTPUT"; echo "a push to main: building"; exit 0
-          fi
+          out() { echo "code=$1" >>"$GITHUB_OUTPUT"; echo "platforms=$2" >>"$GITHUB_OUTPUT"; echo "Rust jobs: $1, Windows and macOS: $2 ($3)"; exit 0; }
+          # A push to main always builds on all three platforms, so its feature-catalogue reports carry all their results.
+          [ "$GITHUB_EVENT_NAME" = push ] && out true true "a push to main"
           if [ -z "${BASE:-}" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ] || ! git cat-file -e "$BASE" 2>/dev/null; then
-            echo "code=true" >>"$GITHUB_OUTPUT"; echo "no base to compare with: building"; exit 0
+            out true true "no base to compare with"
           fi
-          if git diff --name-only "$BASE...$HEAD" | grep -qvE '^(docs/|LICENSE$|.*\.md$)'; then
-            echo "code=true" >>"$GITHUB_OUTPUT"
-          else
-            echo "code=false" >>"$GITHUB_OUTPUT"; echo "only documentation changed: the Rust jobs are skipped"
-          fi
-
-  fmt:
-    name: Format
-    needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task fmt
-
-  clippy:
-    name: Clippy
-    needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: ". -> target"
-          shared-key: clippy
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: mise exec -- task clippy
+          files="$(git diff --name-only "$BASE...$HEAD")"
+          grep -qvE '^(docs/|LICENSE$|.*\.md$)' <<<"$files" || out false false "only documentation changed"
+          jq -e 'index("ci:all-os")' <<<"$LABELS" >/dev/null && out true true "label ci:all-os"
+          grep -qE '^(Cargo\.(toml|lock)|rust-toolchain\.toml|mise\.toml|Taskfile\.yml|deny\.toml|clippy\.toml|\.config/.*|\.github/workflows/pipeline\.yml|crates/[^/]+/Cargo\.toml)$' <<<"$files" && out true true "build setup changed"
+          # Rust files that contain platform conditions, as they are after the change.
+          while read -r f; do
+            case "$f" in *.rs) [ -f "$f" ] && grep -qE 'cfg(_attr)?!?\(.*(windows|unix|target_os|target_family)' "$f" && out true true "platform code in $f";; esac
+          done <<<"$files"
+          out true false "nothing platform-specific changed"
 
   test:
     name: Tests and coverage gate
@@ -204,94 +179,56 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  fuzz:
-    name: Fuzz harnesses compile
+  # The small checks as steps of one job: GitHub bills each job rounded up to a minute and starts it on a fresh
+  # runner, so eleven jobs of 5-30 seconds cost more than one of three minutes. Each step runs whatever the others
+  # did (`!cancelled()`), so one failure does not hide the rest. The Rust steps are skipped on documentation-only
+  # changes; the rest always run.
+  checks:
+    name: Checks
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           cache: true
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: ${{ needs.changes.outputs.code == 'true' }}
         with:
-          workspaces: "fuzz -> target"
-          shared-key: fuzz
+          workspaces: |
+            . -> target
+            fuzz -> target
+          shared-key: checks
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: mise exec -- task fuzz:check
-
-  deny:
-    name: Dependencies
-    needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task deny
-
-  secrets:
-    name: Secrets
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task secrets
-
-  workflows:
-    name: Workflows
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task lint:actions
-
-  guards:
-    name: Clean-room guards
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task guards
-
-  scripts:
-    name: Guard self-tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
-        with:
-          cache: true
-      - run: mise exec -- task scripts
+      - name: Format
+        if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
+        run: mise exec -- task fmt
+      - name: Clippy
+        if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
+        run: mise exec -- task clippy
+      - name: Fuzz harnesses compile
+        if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
+        run: mise exec -- task fuzz:check
+      - name: Dependencies
+        if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
+        run: mise exec -- task deny
+      - name: Secrets
+        if: ${{ !cancelled() }}
+        run: mise exec -- task secrets
+      - name: Workflows
+        if: ${{ !cancelled() }}
+        run: mise exec -- task lint:actions
+      - name: Clean-room guards
+        if: ${{ !cancelled() }}
+        run: mise exec -- task guards
+      - name: Guard self-tests
+        if: ${{ !cancelled() }}
+        run: mise exec -- task scripts
 
   # The feature catalogue (catalogue/, docs/TESTING.md "Feature catalogue"): ids, the generator copy and the test tags
   # hold, and no id disappears without `retired` or an alias. With the JUnit results of all three platforms, an item is
@@ -325,6 +262,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           JUNIT: ${{ runner.temp }}/junit
           CODE: ${{ needs.changes.outputs.code }}
+          PLATFORMS: ${{ needs.changes.outputs.platforms }}
         run: |
           set -euo pipefail
           # The files the `reports` job commits on main must not be ignored, or its `git add` fails there.
@@ -340,6 +278,10 @@ jobs:
           if [ -f "$JUNIT/junit-linux.xml" ] && [ -f "$JUNIT/junit-windows.xml" ] && [ -f "$JUNIT/junit-macos.xml" ]; then
             "$tally" ingest --junit "$JUNIT/junit-linux.xml" --junit "$JUNIT/junit-windows.xml" --junit "$JUNIT/junit-macos.xml" --out "$RUNNER_TEMP/results.json"
             args=(--results "$RUNNER_TEMP/results.json")
+          elif [ "$CODE" = true ] && [ "$PLATFORMS" = false ]; then
+            # Windows and macOS did not run on this pull request (label `ci:all-os` runs them): the structure checks
+            # still run, the covered count and the ratchet are left to the push to main, which runs all three.
+            echo "::notice title=Feature catalogue::Windows and macOS skipped: no covered count and no ratchet on this pull request"
           elif [ "$GITHUB_EVENT_NAME" = push ] || [ "$CODE" = true ]; then
             # The test jobs ran, so their results must be here: a lost upload must not switch the ratchet off.
             echo "::error title=Feature catalogue::the JUnit results of Linux, Windows and macOS are needed when the tests run"; exit 1
@@ -479,7 +421,7 @@ jobs:
   # two reusable workflows run on pull requests only.
   pipeline-complete:
     name: Pipeline Complete
-    needs: [hygiene, pr-title, quarantine, platforms, changes, fmt, clippy, test, catalogue, fuzz, deny, secrets, workflows, guards, scripts]
+    needs: [hygiene, pr-title, quarantine, platforms, changes, checks, test, catalogue]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -13,10 +13,9 @@ use crate::plugin::{LightBase, Placement, Plugin};
 use crate::worldspace::{absolute, master_table};
 
 // source: fnv-light-data
-/// Light flags of a light that is not steady or does not give light: negative, flicker, off by default, flicker
-/// slow, pulse and pulse slow.
-pub const UNSTEADY_OR_DARK: u32 =
-    0x0000_0004 | 0x0000_0008 | 0x0000_0020 | 0x0000_0040 | 0x0000_0080 | 0x0000_0100;
+/// Light flags of a light that does not give light: negative and off by default. Flickering and pulsing lights (fires,
+/// torches, neon) do give light and get a far point like a steady one (issue 1040 of nv-rs).
+pub const DARK: u32 = 0x0000_0004 | 0x0000_0020;
 
 /// A winning reference as the selection needs it: base, flags, placement and enable parent (absolute `FormID`,
 /// opposite).
@@ -127,7 +126,7 @@ pub fn far_light_sources(
             continue;
         };
         // source: fnv-light-data
-        if light.flags & UNSTEADY_OR_DARK != 0 || light.radius < min_radius {
+        if light.flags & DARK != 0 || light.radius < min_radius {
             continue;
         }
         if flags & INITIALLY_DISABLED != 0 || disabled_at_start(&state, id) {
@@ -451,14 +450,29 @@ mod tests {
     }
 
     #[test]
-    fn flickering_pulsing_negative_and_off_by_default_lights_are_left_out() {
-        let flags = [0x4, 0x8, 0x20, 0x40, 0x80, 0x100];
+    fn flickering_and_pulsing_lights_give_a_point_like_steady_ones() {
+        let flags = [0x8, 0x40, 0x80, 0x100];
         let lights = flags
             .iter()
             .zip(0x100_u32..)
             .map(|(&f, id)| light(id, 512, [9, 9, 9], f))
             .collect();
-        let refs = (0..6_u32)
+        let refs = (0..4_u32)
+            .map(|n| refr(0x200 + n, 0x100 + n, 0, 1.0))
+            .collect();
+        let p = plugin(&[], lights, refs);
+        assert_eq!(sources(&[("A.esm".to_owned(), p)]).len(), 4);
+    }
+
+    #[test]
+    fn negative_and_off_by_default_lights_are_left_out() {
+        let flags = [0x4, 0x20];
+        let lights = flags
+            .iter()
+            .zip(0x100_u32..)
+            .map(|(&f, id)| light(id, 512, [9, 9, 9], f))
+            .collect();
+        let refs = (0..2_u32)
             .map(|n| refr(0x200 + n, 0x100 + n, 0, 1.0))
             .collect();
         let p = plugin(&[], lights, refs);
@@ -496,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn a_later_plugin_that_makes_a_light_flicker_takes_it_out() {
+    fn a_later_plugin_that_makes_a_light_negative_takes_it_out() {
         let game = plugin(
             &[],
             vec![light(0x100, 512, [9, 9, 9], 0)],
@@ -504,7 +518,7 @@ mod tests {
         );
         let patch = plugin(
             &["A.esm"],
-            vec![light(0x100, 512, [9, 9, 9], 0x8)],
+            vec![light(0x100, 512, [9, 9, 9], 0x4)],
             Vec::new(),
         );
         assert_eq!(

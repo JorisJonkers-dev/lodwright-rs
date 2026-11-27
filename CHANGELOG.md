@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.19.0...v0.20.0) (2026-11-27)
+
+
+### Features
+
+* **objects:** far blocks glow at night (objects.far_glow) ([#439](https://github.com/JorisJonkers-dev/lodwright-rs/issues/439)) ([a73ddca](https://github.com/JorisJonkers-dev/lodwright-rs/commit/a73ddcafff48d666eed731b26023d143fae6a7d9))
+
 ## [0.19.0](https://github.com/JorisJonkers-dev/lodwright-rs/compare/v0.18.0...v0.19.0) (2026-11-25)
 
 

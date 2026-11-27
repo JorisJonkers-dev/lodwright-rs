@@ -6,9 +6,12 @@
 small light points in the far view, so street lamps and lit buildings show from a distance at night.
 
 Which lights: exterior light references (`LIGH`) that stand when the game starts (not initially disabled, not kept
-disabled by their enable parent chain), whose light reaches at least 256 game units and is not negative, flickering,
-pulsing or off by default (`fnv-light-data`), and that stand within 300 units (on the ground plane) of an object drawn in
-the same object block. A light alone in the open gets no point.
+disabled by their enable parent chain), whose light reaches at least 256 game units and is not negative or off by default
+(`fnv-light-data`). Flickering and pulsing lights count like steady ones (since 0.21.0): campfires, burning barrels, torches,
+lanterns, neon and casino signs and lit windows get a point as street lamps do (the engine fades the point's alpha;
+the point itself does not flicker). Muzzle flashes, spell and effect lights and lights carried by moving actors are not
+placed lights and get no point; the engine's light reach applies to them. A light also needs to stand within 300 units (on the ground plane) of an object drawn in
+the same object block; a light alone in the open gets no point.
 
 Lamps lit only on some posts: a load order often places a light on only some copies of one lamp model (a row of posts
 where every second one carries a light, to keep the number of lights low), while every lamp head is drawn lit near by.

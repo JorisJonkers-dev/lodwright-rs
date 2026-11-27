@@ -124,6 +124,13 @@
       "tier": 3
     },
     {
+      "default": false,
+      "key": "objects.far_glow",
+      "kind": "switch",
+      "since": "0.20.0",
+      "tier": 3
+    },
+    {
       "default": true,
       "key": "trees.enabled",
       "kind": "switch",

@@ -136,6 +136,10 @@ impl Ctx {
             self.err(path, "no node or shape");
             return;
         }
+        let has_far_lights = nif
+            .blocks
+            .iter()
+            .any(|b| matches!(&b.body, Body::TriShapeData(d) if is_far_lights_data(nif, d)));
         for (i, (name, t)) in nodes.iter().enumerate() {
             let carrier = if object {
                 name.ends_with("TriShape")
@@ -147,7 +151,19 @@ impl Ctx {
                 continue;
             }
             let want = if carrier { origin } else { [0.0; 3] };
-            if t.iter().zip(want).any(|(a, b)| (a - b).abs() > 0.001) {
+            // the far lights shapes of an object block sit at the centre of their cell, inside the block
+            let at_a_cell_centre_of_the_block = object
+                && has_far_lights
+                && carrier
+                && (0..2).all(|k| {
+                    let local = t[k] - origin[k];
+                    (0.0..crate::objects::BLOCK_CELLS as f32 * 4096.0).contains(&local)
+                        && (local % 4096.0 - 2048.0).abs() < 0.001
+                })
+                && t[2] == 0.0;
+            if !at_a_cell_centre_of_the_block
+                && t.iter().zip(want).any(|(a, b)| (a - b).abs() > 0.001)
+            {
                 self.err(
                     path,
                     format!(

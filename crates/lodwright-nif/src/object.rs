@@ -166,18 +166,21 @@ pub fn object_block(block: &ObjectBlock<'_>) -> Result<NifFile> {
 /// # Errors
 /// [`NifError::Inconsistent`] as [`object_block`] for any shape, or when `shapes` is empty or the origins differ.
 pub fn object_block_shapes(shapes: &[ObjectBlock<'_>]) -> Result<NifFile> {
-    object_block_with_lights(shapes, None)
+    object_block_with_lights(shapes, &[])
 }
 
 /// The marker name of the far lights shape: a `NiStringExtraData` of this name on the shape tells the engine to
 /// draw it only at night. One general name that any tool may write.
 pub const FAR_LIGHTS_MARKER: &str = "FarLights";
 
-/// The small unlit, additive light points of one object block (`objects.far_lights`), drawn as one plain shape
-/// beside the block's object shapes.
+/// The small unlit, additive light points of one cell of an object block (`objects.far_lights`), drawn as one plain
+/// shape beside the block's object shapes. A block carries one such shape per cell that has lights, each placed at its
+/// cell's centre, so an engine can leave out the shapes of the cells it draws in full.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FarLightsShape<'a> {
-    /// Positions relative to the block's origin.
+    /// The shape's own position (x and y in world units): the centre of its cell.
+    pub origin: (f32, f32),
+    /// Positions relative to [`FarLightsShape::origin`].
     pub vertices: &'a [[f32; 3]],
     /// Colours, red, green, blue and alpha from 0 to 1, one per vertex.
     pub colors: &'a [[f32; 4]],
@@ -230,7 +233,7 @@ fn no_lighting_property(texture: &str) -> Vec<u8> {
 /// As [`object_block_shapes`]; and [`NifError::Inconsistent`] when the light arrays disagree or hold no triangles.
 pub fn object_block_with_lights(
     shapes: &[ObjectBlock<'_>],
-    lights: Option<&FarLightsShape<'_>>,
+    lights: &[FarLightsShape<'_>],
 ) -> Result<NifFile> {
     let Some(first) = shapes.first() else {
         return Err(NifError::Inconsistent("a block needs a shape"));
@@ -312,21 +315,23 @@ pub fn object_block_with_lights(
         })
         .collect();
     let mut header = file_header(&types);
-    if let Some(lights) = lights {
-        let at =
-            i32::try_from(blocks.len()).map_err(|_| NifError::Inconsistent("too many blocks"))?;
-        children.push(at.cast_unsigned());
-        blocks[0].body = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
+    if !lights.is_empty() {
         let first_light_type = u16::try_from(types.len()).unwrap_or(0);
-        for (body, type_index) in light_blocks(lights, first.origin, at)?.into_iter().zip([
-            first_light_type,
-            first_light_type + 1,
-            first_light_type + 2,
-            4,
-            first_light_type + 3,
-        ]) {
-            blocks.push(Block { type_index, body });
+        for shape in lights {
+            let at = i32::try_from(blocks.len())
+                .map_err(|_| NifError::Inconsistent("too many blocks"))?;
+            children.push(at.cast_unsigned());
+            for (body, type_index) in light_blocks(shape, shape.origin, at)?.into_iter().zip([
+                first_light_type,
+                first_light_type + 1,
+                first_light_type + 2,
+                4,
+                first_light_type + 3,
+            ]) {
+                blocks.push(Block { type_index, body });
+            }
         }
+        blocks[0].body = Body::Opaque(root_node((0.0, 0.0), &children, multibound));
         header
             .block_types
             .extend(LIGHT_TYPES.iter().map(|t| t.to_vec()));
@@ -1076,13 +1081,16 @@ mod lights_tests {
         ];
         let colors = [[0.5, 0.5, 0.25, 1.0]; 3];
         let lights = FarLightsShape {
+            origin: (4096.0, 8192.0),
             vertices: &lv,
             colors: &colors,
             uv: &uv,
             indices: &i,
             texture: "textures\\landscape\\lod\\farlight.dds",
         };
-        let file = object_block_with_lights(std::slice::from_ref(&block), Some(&lights)).unwrap();
+        let file =
+            object_block_with_lights(std::slice::from_ref(&block), std::slice::from_ref(&lights))
+                .unwrap();
         let bytes = file.write().unwrap();
         let back = NifFile::read(&bytes).unwrap();
         assert_eq!(back.write().unwrap(), bytes);
@@ -1131,13 +1139,56 @@ mod lights_tests {
     }
 
     #[test]
+    fn a_block_with_light_points_of_two_cells_has_one_marked_shape_at_each_cells_centre() {
+        let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
+        let n = [[0.0, 0.0, 1.0]; 3];
+        let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let i = [0, 1, 2];
+        let block = object(&v, &n, &uv, &i);
+        let lv = [
+            [10.0, 10.0, 500.0],
+            [30.0, 10.0, 500.0],
+            [10.0, 30.0, 500.0],
+        ];
+        let colors = [[0.5, 0.5, 0.25, 1.0]; 3];
+        let at = |origin| FarLightsShape {
+            origin,
+            vertices: &lv,
+            colors: &colors,
+            uv: &uv,
+            indices: &i,
+            texture: "t.dds",
+        };
+        let lights = [at((2048.0, 2048.0)), at((6144.0, 2048.0))];
+        let file = object_block_with_lights(std::slice::from_ref(&block), &lights).unwrap();
+        let bytes = file.write().unwrap();
+        let back = NifFile::read(&bytes).unwrap();
+        assert_eq!(back.write().unwrap(), bytes);
+        assert_eq!(back.blocks.len(), 7 + 5 + 5);
+        // the string table holds the marker once, and both marker blocks name it
+        assert_eq!(back.header.strings.len(), 1);
+        let translations: Vec<[f32; 3]> = [7, 12]
+            .iter()
+            .map(|k| match &back.blocks[*k].body {
+                Body::TriShape(s) => s.av.translation,
+                _ => panic!("a light shape at block {k}"),
+            })
+            .collect();
+        assert_eq!(
+            translations,
+            vec![[2048.0, 2048.0, 0.0], [6144.0, 2048.0, 0.0]]
+        );
+        assert_eq!(read_object_shapes(&back).unwrap().len(), 1);
+    }
+
+    #[test]
     fn without_light_points_the_block_has_no_marker_and_no_light_blocks() {
         let v = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 50.0]];
         let n = [[0.0, 0.0, 1.0]; 3];
         let uv = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
         let i = [0, 1, 2];
         let block = object(&v, &n, &uv, &i);
-        let nif = object_block_with_lights(std::slice::from_ref(&block), None).unwrap();
+        let nif = object_block_with_lights(std::slice::from_ref(&block), &[]).unwrap();
         assert_eq!(nif.header.strings, Vec::<Vec<u8>>::new());
         assert_eq!(nif.header.block_types.len(), TYPES.len());
         assert!(

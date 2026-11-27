@@ -125,6 +125,25 @@ struct LightPoints {
     indices: Vec<u16>,
 }
 
+/// The cell a point of the ground plane stands in.
+fn light_cell(pos: [f32; 3]) -> (i32, i32) {
+    // source: cell-size-units
+    #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
+    (
+        (pos[0] / CELL_UNITS).floor() as i32,
+        (pos[1] / CELL_UNITS).floor() as i32,
+    )
+}
+
+/// The centre of cell (`cx`, `cy`) on the ground plane.
+fn cell_centre(cx: i32, cy: i32) -> (f32, f32) {
+    #[allow(clippy::cast_precision_loss)] // a cell number is small
+    (
+        (cx as f32 + 0.5) * CELL_UNITS,
+        (cy as f32 + 0.5) * CELL_UNITS,
+    )
+}
+
 /// The light points of the lights of `lights` that stand within [`FAR_LIGHT_REACH`] of one of `members`, relative to
 /// `origin`: three crossed squares per light (one flat, two upright), in the lights' given order. Each square is written
 /// with both windings, so it shows from either side: the engine culls back faces, and a one-sided square seen from
@@ -1204,12 +1223,7 @@ pub fn generate_objects_with_atlas_limit(
     // the far lights of each block, by the block their position falls in
     let mut lights_of: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
     for l in surfaces.far_lights {
-        // source: cell-size-units
-        #[allow(clippy::cast_possible_truncation)] // a cell number of a world fits an i32
-        let (cx, cy) = (
-            (l.pos[0] / CELL_UNITS).floor() as i32,
-            (l.pos[1] / CELL_UNITS).floor() as i32,
-        );
+        let (cx, cy) = light_cell(l.pos);
         let (ax, ay) = surfaces.grid_anchor;
         lights_of
             .entry((
@@ -1318,24 +1332,39 @@ pub fn generate_objects_with_atlas_limit(
                 glow: glow_ref.as_deref(),
             })
             .collect();
-        // light points go in the normal file only: the high file is drawn much farther, where they would be noise
-        let points = (!high)
-            .then(|| lights_of.get(&(bx, by)))
-            .flatten()
-            .map(|lights| light_points(lights, &members_of_block, origin))
-            .filter(|p| !p.indices.is_empty());
-        let lights = points.as_ref().map(|p| FarLightsShape {
-            vertices: &p.vertices,
-            colors: &p.colors,
-            uv: &p.uv,
-            indices: &p.indices,
-            texture: &light_texture_ref,
-        });
-        if let Some(p) = &points {
+        // light points go in the normal file only: the high file is drawn much farther, where they would be noise.
+        // One shape per cell, placed at the cell's centre: an engine leaves out the shapes of the cells it draws in
+        // full, so the lamps of loaded cells are not drawn twice.
+        let mut per_cell: BTreeMap<(i32, i32), Vec<&FarLightSource>> = BTreeMap::new();
+        if !high {
+            for l in lights_of.get(&(bx, by)).into_iter().flatten() {
+                per_cell.entry(light_cell(l.pos)).or_default().push(l);
+            }
+        }
+        let points: Vec<((f32, f32), LightPoints)> = per_cell
+            .iter()
+            .map(|(&(cx, cy), lights)| {
+                let centre = cell_centre(cx, cy);
+                (centre, light_points(lights, &members_of_block, centre))
+            })
+            .filter(|(_, p)| !p.indices.is_empty())
+            .collect();
+        let lights: Vec<FarLightsShape<'_>> = points
+            .iter()
+            .map(|(origin, p)| FarLightsShape {
+                origin: *origin,
+                vertices: &p.vertices,
+                colors: &p.colors,
+                uv: &p.uv,
+                indices: &p.indices,
+                texture: &light_texture_ref,
+            })
+            .collect();
+        for (_, p) in &points {
             report.far_lights += p.vertices.len() / 12;
             lights_written = true;
         }
-        let file = object_block_with_lights(&shapes, lights.as_ref())?.write()?;
+        let file = object_block_with_lights(&shapes, &lights)?.write()?;
         report.files.push(write_file(
             out,
             &layout::object_mesh_path(world, bx, by, high)?,
